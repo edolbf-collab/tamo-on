@@ -5,6 +5,6 @@
     "database":  140,
     "edge":  110,
     "mandatory":  false,
-    "notes":  "Correção dos 20 escudos de grupos, restaurados a partir dos arquivos originais da Build 139, sem alterações no banco ou nas Edge Functions.",
+    "notes":  "Correção dos 20 escudos dos grupos e sincronização das versões internas do aplicativo, HTML e Service Worker para encerrar o ciclo de atualização.",
     "label":  "Tâmo On Beta 1.0 Build 141"
 }
