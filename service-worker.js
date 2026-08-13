@@ -1,40 +1,41 @@
-const SW_BUILD = 139;
-const CACHE = "tamo-on-beta-1.0-build-139-r1";
+const SW_BUILD = 140;
+const CACHE = "tamo-on-beta-1.0-build-140-r1";
 const ASSETS = [
   "/",
   "/index.html",
-  "/styles.css?v=beta139r1",
-  "/app.js?v=beta139r1",
-  "/pwa-bootstrap.js?v=beta139r1",
+  "/styles.css?v=beta140r1",
+  "/app.js?v=beta140r1",
+  "/pwa-bootstrap.js?v=beta140r1",
   "/supabase-config.js?v=0.3.3",
-  "/group-avatars-data.js?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-01.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-02.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-03.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-04.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-05.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-06.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-07.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-08.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-09.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-10.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-11.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-12.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-13.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-14.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-15.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-16.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-17.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-18.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-19.png?v=beta139r1",
-  "/assets/group-avatars-build-127/badge-20.png?v=beta139r1",
+  "/group-avatars-data.js?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-01.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-02.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-03.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-04.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-05.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-06.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-07.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-08.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-09.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-10.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-11.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-12.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-13.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-14.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-15.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-16.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-17.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-18.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-19.png?v=beta140r1",
+  "/assets/group-avatars-build-140/badge-20.png?v=beta140r1",
   "/manifest.json",
   "/offline.html",
   "/version.json",
-  "/resenhafc-icon-192.png",
-  "/resenhafc-icon-512.png",
-  "/resenhafc-maskable-192.png",
-  "/resenhafc-maskable-512.png",
+  "/brand/tamo-on-logo-horizontal-negative.svg",
+  "/tamo-on-icon-192.png",
+  "/tamo-on-icon-512.png",
+  "/tamo-on-maskable-192.png",
+  "/tamo-on-maskable-512.png",
   "/apple-touch-icon.png",
 ];
 
@@ -86,8 +87,8 @@ self.addEventListener("push", event => {
   const title = payload.title || "Tâmo On";
   const options = {
     body: payload.body || "Novo aviso do grupo.",
-    icon: payload.icon || "./icons/icon-192-v023.png",
-    badge: payload.badge || "./icons/icon-96.png",
+    icon: payload.icon || "/tamo-on-icon-192.png",
+    badge: payload.badge || "/icons/icon-64.png",
     tag: payload.tag || "tamo-on-aviso",
     renotify: true,
     data: payload.data || { url: payload.url || "./?page=home" },
@@ -117,6 +118,6 @@ self.addEventListener("notificationclick", event => {
 self.addEventListener("message", event => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
   if (event.data?.type === "GET_VERSION") {
-    event.source?.postMessage?.({ type: "RESENHA_SW_VERSION", build: SW_BUILD, cache: CACHE });
+    event.source?.postMessage?.({ type: "TAMOON_SW_VERSION", build: SW_BUILD, cache: CACHE });
   }
 });

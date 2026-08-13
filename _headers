@@ -7,55 +7,31 @@
 
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate
-
 /manifest.json
   Cache-Control: no-cache, max-age=0, must-revalidate
-
 /manifest.webmanifest
   Cache-Control: no-cache, max-age=0, must-revalidate
-
-/apple-touch-icon.png
-  Cache-Control: no-cache, max-age=0, must-revalidate
-
-/apple-touch-icon-precomposed.png
-  Cache-Control: no-cache, max-age=0, must-revalidate
-
-
-/login-logo-transparent-v0311.png
-  Cache-Control: public, max-age=31536000, immutable
-
-/assets/group-avatars/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/group-avatars-data.js
-  Cache-Control: no-cache, max-age=0, must-revalidate
-
-/brand/brand-mark-transparent-v0311.png
-  Cache-Control: public, max-age=31536000, immutable
-
 /service-worker.js
   Cache-Control: no-cache, no-store, must-revalidate
-
 /pwa-bootstrap.js
   Cache-Control: no-cache, max-age=0, must-revalidate
-
-/resenhafc-icon-192.png
-  Cache-Control: public, max-age=31536000, immutable
-
-/resenhafc-icon-512.png
-  Cache-Control: public, max-age=31536000, immutable
-
-/resenhafc-maskable-192.png
-  Cache-Control: public, max-age=31536000, immutable
-
-/resenhafc-maskable-512.png
-  Cache-Control: public, max-age=31536000, immutable
-
 /app.js
   Cache-Control: no-cache, no-store, must-revalidate
-
 /styles.css
   Cache-Control: no-cache, max-age=0, must-revalidate
-
 /version.json
   Cache-Control: no-cache, no-store, must-revalidate
+/group-avatars-data.js
+  Cache-Control: no-cache, max-age=0, must-revalidate
+/brand/*
+  Cache-Control: public, max-age=31536000, immutable
+/assets/group-avatars-build-140/*
+  Cache-Control: public, max-age=31536000, immutable
+/tamo-on-icon-192.png
+  Cache-Control: public, max-age=31536000, immutable
+/tamo-on-icon-512.png
+  Cache-Control: public, max-age=31536000, immutable
+/tamo-on-maskable-192.png
+  Cache-Control: public, max-age=31536000, immutable
+/tamo-on-maskable-512.png
+  Cache-Control: public, max-age=31536000, immutable

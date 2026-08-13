@@ -1,0 +1,4 @@
+[functions.publish-announcement]
+verify_jwt = false
+[functions.delete-beta-user]
+verify_jwt = false

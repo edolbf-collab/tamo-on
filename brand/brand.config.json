@@ -1,0 +1,17 @@
+{
+  "brandName": "Tâmo On",
+  "technicalSlug": "tamoon",
+  "tagline": "Chamou. Confirmou. Jogou.",
+  "description": "Plataforma para organizar grupos, confirmar presenças e viver o esporte em comunidade.",
+  "colors": {
+    "emerald": "#1ED17A",
+    "emerald600": "#0FA463",
+    "action": "#007A46",
+    "dark": "#09251F",
+    "ink": "#06110E",
+    "mint": "#A8F0C6",
+    "surface": "#F5F9F7",
+    "white": "#FFFFFF",
+    "gray": "#42534C"
+  }
+}

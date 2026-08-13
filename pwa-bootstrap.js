@@ -1,4 +1,4 @@
-/* Tâmo On Build 139 — registro PWA antecipado, atualização coerente e diagnóstico do service worker. */
+/* Tâmo On Build 140 — registro PWA antecipado, atualização coerente e diagnóstico do service worker. */
 (() => {
   "use strict";
 
@@ -23,7 +23,7 @@
   }
 
   navigator.serviceWorker?.addEventListener("message", event => {
-    if (event.data?.type !== "RESENHA_SW_VERSION") return;
+    if (event.data?.type !== "TAMOON_SW_VERSION") return;
     state.swBuild = Number(event.data.build || 0) || null;
     state.swCache = String(event.data.cache || "") || null;
   });
@@ -62,7 +62,7 @@
     requestWorkerVersion();
   });
 
-  window.resenhaPwa = {
+  window.tamoonPwa = {
     register,
     getRegistration: register,
     getState: () => ({ ...state })

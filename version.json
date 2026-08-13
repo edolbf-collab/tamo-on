@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 139,
-  "database": 139,
-  "edge": 109,
+  "build": 140,
+  "database": 140,
+  "edge": 110,
   "mandatory": false,
-  "notes": "Telemetria de push por tentativa técnica, identificação de recuperações após reenvio, estados Instável/Atenção/Reativação recomendada e sanitização de endpoints e endereços técnicos no painel e nos backups.",
-  "label": "Tâmo On Beta 1.0 Build 139"
+  "notes": "Identidade Tâmo On consolidada em interface, PWA, assets oficiais, configuração, notificações, telemetria e código operacional.",
+  "label": "Tâmo On Beta 1.0 Build 140"
 }

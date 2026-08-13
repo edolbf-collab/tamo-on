@@ -1,8 +1,0 @@
-RESENHA FC — BETA 1.0 BUILD 137
-
-Não há alteração de banco de dados.
-Banco permanece na Build 136 r1.
-
-Não há alteração de Edge Functions.
-publish-announcement permanece na Build 108.
-delete-beta-user permanece na Build 105.

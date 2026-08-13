@@ -1,6 +1,0 @@
-Resenha FC — Beta 1.0 Build 134
-
-Não há alteração nas Edge Functions.
-Mantenha publicadas:
-- publish-announcement — Build 106
-- delete-beta-user — Build 105

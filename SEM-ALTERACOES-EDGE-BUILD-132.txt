@@ -1,9 +1,0 @@
-Resenha FC — Beta 1.0 Build 132
-
-Não há alteração nas Edge Functions.
-
-Manter:
-- publish-announcement: Build 106
-- delete-beta-user: Build 105
-
-Não republicar nenhuma função nesta atualização.

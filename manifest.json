@@ -1,16 +1,16 @@
 {
   "id": "/",
-  "name": "Tâmo On Beta",
+  "name": "Tâmo On",
   "short_name": "Tâmo On",
-  "description": "Organize grupos esportivos, eventos, presença, times, caixa, churrasco, avisos e notificações.",
+  "description": "Organize grupos, confirme presenças e viva o esporte em comunidade.",
   "lang": "pt-BR",
   "dir": "ltr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#04101a",
-  "theme_color": "#041521",
+  "background_color": "#09251F",
+  "theme_color": "#09251F",
   "prefer_related_applications": false,
   "categories": [
     "sports",
@@ -19,25 +19,25 @@
   ],
   "icons": [
     {
-      "src": "/resenhafc-icon-192.png",
+      "src": "/tamo-on-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/resenhafc-maskable-192.png",
+      "src": "/tamo-on-maskable-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/resenhafc-icon-512.png",
+      "src": "/tamo-on-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/resenhafc-maskable-512.png",
+      "src": "/tamo-on-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

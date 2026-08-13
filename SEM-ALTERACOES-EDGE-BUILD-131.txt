@@ -1,9 +1,0 @@
-Resenha FC — Beta 1.0 Build 131
-
-Não há alteração de Edge Function nesta build.
-
-Manter publicadas, sem modificação:
-- publish-announcement — Build 106
-- delete-beta-user — Build 105
-
-Versão geral esperada das Edge Functions no aplicativo: Build 106.
