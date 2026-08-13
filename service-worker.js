@@ -32,11 +32,11 @@ const ASSETS = [
   "/offline.html",
   "/version.json",
   "/brand/tamo-on-logo-horizontal-negative.svg",
-  "/tamo-on-icon-192.png",
-  "/tamo-on-icon-512.png",
-  "/tamo-on-maskable-192.png",
-  "/tamo-on-maskable-512.png",
-  "/apple-touch-icon.png",
+  "/tamo-on-icon-192.png?v=icon3dr1",
+  "/tamo-on-icon-512.png?v=icon3dr1",
+  "/tamo-on-maskable-192.png?v=icon3dr1",
+  "/tamo-on-maskable-512.png?v=icon3dr1",
+  "/apple-touch-icon.png?v=icon3dr1",
 ];
 
 self.addEventListener("install", event => event.waitUntil((async () => {
@@ -87,7 +87,7 @@ self.addEventListener("push", event => {
   const title = payload.title || "Tâmo On";
   const options = {
     body: payload.body || "Novo aviso do grupo.",
-    icon: payload.icon || "/tamo-on-icon-192.png",
+    icon: payload.icon || "/tamo-on-icon-192.png?v=icon3dr1",
     badge: payload.badge || "/icons/icon-64.png",
     tag: payload.tag || "tamo-on-aviso",
     renotify: true,
