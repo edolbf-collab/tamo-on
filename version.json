@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 142,
+  "build": 143,
   "database": 140,
-  "edge": 110,
+  "edge": 111,
   "mandatory": false,
-  "notes": "Restauração dos 20 escudos clássicos dos grupos, reenquadrados em PNG transparente 512 × 512, sem alteração de arte, banco ou Edge Functions.",
-  "label": "Tâmo On Beta 1.0 Build 142"
+  "notes": "Alerta ao grupo quando um membro confirmado muda para Não vou e identificação do membro vinculada ao valor das entradas financeiras.",
+  "label": "Tâmo On Beta 1.0 Build 143"
 }

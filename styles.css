@@ -225,6 +225,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .row-delete-button{width:31px;height:31px;flex:0 0 31px;border-radius:10px;border:1px solid rgba(255,93,103,.3);background:rgba(255,93,103,.08);color:#ff9da4;font-size:19px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0}
 .row-delete-button:active{transform:scale(.96);background:rgba(255,93,103,.16)}
 .finance-row .money{white-space:nowrap;font-size:12px}
+.finance-value-bubble{flex:0 0 auto;display:grid;justify-items:end;gap:3px;max-width:150px;padding:7px 9px;border:1px solid var(--line);border-radius:11px;background:rgba(255,255,255,.035)}
+.finance-value-bubble.is-income{border-color:rgba(30,209,122,.22);background:rgba(30,209,122,.07)}
+.finance-value-bubble.is-expense{border-color:rgba(255,93,103,.2);background:rgba(255,93,103,.055)}
+.finance-value-bubble small{max-width:140px;color:#b7cbc3;font-size:8.5px;font-weight:750;line-height:1.2;text-align:right;overflow-wrap:anywhere}
 .finance-charge-row .status-pill{white-space:nowrap}
 
 @media(max-width:390px){
@@ -234,6 +238,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .finance-row{gap:7px}
   .finance-row .finance-icon{width:32px;height:32px}
   .finance-row .money{font-size:10.5px}
+  .finance-value-bubble{max-width:112px;padding:6px 7px}
+  .finance-value-bubble small{max-width:104px;font-size:7.8px}
   .row-delete-button{width:29px;height:29px;flex-basis:29px}
 }
 

@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 142, database: 140, edge: 110 });
-  const APP_ASSET_TOKEN = "beta142r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 143, database: 140, edge: 111 });
+  const APP_ASSET_TOKEN = "beta143r1";
   const createEmptyState = () => ({
     profile: null,
     groups: [],
@@ -90,7 +90,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta142r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta143r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -697,6 +697,16 @@
       });
     }
 
+    async notifyAttendanceDeclined(groupId, matchId, playerId) {
+      return this.invokeNotification({
+        action: "attendance-declined",
+        groupId,
+        matchId,
+        playerId,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo"
+      });
+    }
+
     async notifyAttendanceReminder(groupId, matchId, playerId) {
       return this.invokeNotification({
         action: "attendance-reminder",
@@ -1147,7 +1157,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta142r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta143r1");
       }, true);
     },
 
@@ -1487,7 +1497,18 @@
       const pct = totalCharged ? Math.min(100, Math.round(totalApplied / totalCharged * 100)) : 0;
       const canDelete = this.canManageFinance();
       const movements = [
-        ...payments.map(item => ({ ...item, entryType: "payment", type: "income", description: item.description || `Pagamento · ${this.player(item.player_id)?.nickname || "Jogador"}`, date: item.paid_at })),
+        ...payments.map(item => {
+          const linkedCharge = this.state.charges.find(charge => charge.id === item.charge_id);
+          const linkedPlayer = this.player(item.player_id || linkedCharge?.player_id);
+          return {
+            ...item,
+            entryType: "payment",
+            type: "income",
+            description: item.description || `Pagamento · ${linkedPlayer?.nickname || linkedPlayer?.name || "Jogador"}`,
+            linkedMemberName: linkedPlayer?.name || linkedPlayer?.nickname || "",
+            date: item.paid_at
+          };
+        }),
         ...expenses.map(item => ({ ...item, entryType: "expense", type: "expense", date: item.occurred_at }))
       ].sort((a, b) => new Date(b.date) - new Date(a.date));
       const statusPresentation = status => ({
@@ -1505,7 +1526,7 @@
           : "";
         return `<div class="card list-row finance-charge-row">${this.personAvatar(player)}<div class="list-main"><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(charge.description)} · Total: ${money(charge.amount)}</small>${paymentDetails}</div><span class="status-pill ${statusClass}">${statusLabel}</span>${canDelete ? `<button class="row-delete-button" data-action="delete-finance" data-type="charge" data-id="${charge.id}" aria-label="Excluir cobrança">×</button>` : ""}</div>`;
       }).join("");
-      return `<div class="page-head"><div><span class="page-kicker">FINANCEIRO</span><h1>Caixa</h1><p>Mensalidades, quadra, materiais e churrasco.</p></div>${canDelete ? '<div class="page-head-actions"><button class="btn btn-secondary btn-small" data-action="batch-charge">Cobrança em lote</button><button class="btn btn-primary btn-small" data-action="new-finance">+ Lançar</button></div>' : ""}</div><div class="content-stack">${!canDelete ? '<div class="notice"><strong>Acesso de consulta</strong><br>Somente administrador e tesoureiro podem alterar lançamentos.</div>' : '<div class="notice notice-success"><strong>Acesso autorizado</strong><br>Você pode registrar e excluir cobranças, pagamentos e despesas.</div>'}<section class="card balance-card"><small>Saldo atual</small><h2>${money(income - out)}</h2><div class="balance-grid"><div><small>Entradas</small><strong>${money(income)}</strong></div><div><small>Saídas</small><strong>${money(out)}</strong></div></div><div class="balance-track"><span style="width:${pct}%"></span></div><p>${paid} paga(s) · ${partial} parcial(is) · ${pct}% do valor cobrado recebido</p></section></div><div class="section-title"><h2>Movimentações</h2></div><div class="list">${movements.map(item => `<div class="card finance-row"><div class="finance-icon ${item.type === "income" ? "finance-income" : "finance-expense"}">${item.type === "income" ? "+" : "−"}</div><div class="list-main"><strong>${escapeHtml(item.description)}</strong><small>${escapeHtml(shortDate(item.date))}</small></div><strong class="money ${item.type === "income" ? "positive" : "negative"}">${item.type === "income" ? "+" : "−"}${money(item.amount)}</strong>${canDelete ? `<button class="row-delete-button" data-action="delete-finance" data-type="${item.entryType}" data-id="${item.id}" aria-label="Excluir lançamento">×</button>` : ""}</div>`).join("") || '<div class="card empty">Sem movimentações.</div>'}</div><div class="section-title"><h2>Cobranças</h2></div><div class="list">${chargeRows || '<div class="card empty">Nenhuma cobrança.</div>'}</div>`;
+      return `<div class="page-head"><div><span class="page-kicker">FINANCEIRO</span><h1>Caixa</h1><p>Mensalidades, quadra, materiais e churrasco.</p></div>${canDelete ? '<div class="page-head-actions"><button class="btn btn-secondary btn-small" data-action="batch-charge">Cobrança em lote</button><button class="btn btn-primary btn-small" data-action="new-finance">+ Lançar</button></div>' : ""}</div><div class="content-stack">${!canDelete ? '<div class="notice"><strong>Acesso de consulta</strong><br>Somente administrador e tesoureiro podem alterar lançamentos.</div>' : '<div class="notice notice-success"><strong>Acesso autorizado</strong><br>Você pode registrar e excluir cobranças, pagamentos e despesas.</div>'}<section class="card balance-card"><small>Saldo atual</small><h2>${money(income - out)}</h2><div class="balance-grid"><div><small>Entradas</small><strong>${money(income)}</strong></div><div><small>Saídas</small><strong>${money(out)}</strong></div></div><div class="balance-track"><span style="width:${pct}%"></span></div><p>${paid} paga(s) · ${partial} parcial(is) · ${pct}% do valor cobrado recebido</p></section></div><div class="section-title"><h2>Movimentações</h2></div><div class="list">${movements.map(item => `<div class="card finance-row"><div class="finance-icon ${item.type === "income" ? "finance-income" : "finance-expense"}">${item.type === "income" ? "+" : "−"}</div><div class="list-main"><strong>${escapeHtml(item.description)}</strong><small>${escapeHtml(shortDate(item.date))}</small></div><div class="finance-value-bubble ${item.type === "income" ? "is-income" : "is-expense"}"><strong class="money ${item.type === "income" ? "positive" : "negative"}">${item.type === "income" ? "+" : "−"}${money(item.amount)}</strong>${item.type === "income" && item.linkedMemberName ? `<small>Membro: ${escapeHtml(item.linkedMemberName)}</small>` : ""}</div>${canDelete ? `<button class="row-delete-button" data-action="delete-finance" data-type="${item.entryType}" data-id="${item.id}" aria-label="Excluir lançamento">×</button>` : ""}</div>`).join("") || '<div class="card empty">Sem movimentações.</div>'}</div><div class="section-title"><h2>Cobranças</h2></div><div class="list">${chargeRows || '<div class="card empty">Nenhuma cobrança.</div>'}</div>`;
     },
 
     morePage() {
@@ -2334,6 +2355,13 @@
           console.warn("Presença confirmada, mas a notificação falhou:", error);
         }
       }
+      if (effectiveStatus === "out" && current?.status === "confirmed") {
+        try {
+          await this.repo.notifyAttendanceDeclined(this.state.currentGroupId, matchId, player.id);
+        } catch (error) {
+          console.warn("Ausência registrada, mas a notificação de alteração falhou:", error);
+        }
+      }
       if (effectiveStatus === "waitlist") this.toast("Resposta registrada. Sua situação seguirá a regra de espera definida para o evento.");
       else this.toast(requestedStatus === "confirmed" ? "Presença confirmada." : "Ausência confirmada.");
     },
@@ -2386,6 +2414,13 @@
               await this.repo.notifyAttendanceConfirmed(this.state.currentGroupId, matchId, player.id);
             } catch (error) {
               console.warn("Presença confirmada, mas a notificação falhou:", error);
+            }
+          }
+          if (effectiveStatus === "out" && current.status === "confirmed") {
+            try {
+              await this.repo.notifyAttendanceDeclined(this.state.currentGroupId, matchId, player.id);
+            } catch (error) {
+              console.warn("Ausência registrada, mas a notificação de alteração falhou:", error);
             }
           }
           this.toast(effectiveStatus === "waitlist" ? "Respostas atualizadas. Sua situação seguirá a regra de espera do evento." : "Respostas atualizadas.");
