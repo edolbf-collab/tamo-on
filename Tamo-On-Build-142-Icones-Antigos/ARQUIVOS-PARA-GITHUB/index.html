@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#09251F">
+  <meta name="app-build" content="142">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Tâmo On">
+  <meta name="description" content="Tâmo On organiza grupos esportivos, eventos, presença, times, caixa, churrasco e notificações.">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preload" as="image" href="/brand/tamo-on-logo-horizontal-negative.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=beta142r1">
+  <script src="/pwa-bootstrap.js?v=beta142r1"></script>
+  
+  
+  
+  
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/tamo-on-icon-192.png">
+    <link rel="stylesheet" href="styles.css?v=beta142r1">
+  <title>Tâmo On</title>
+</head>
+<body>
+  <div id="bootLoader" class="boot-loader" role="status" aria-live="polite" aria-label="Carregando o aplicativo" hidden>
+    <div class="boot-loader-card">
+      <img src="/brand/tamo-on-logo-horizontal-negative.svg" class="boot-loader-logo" alt="Tâmo On">
+      <span class="boot-loader-spinner" aria-hidden="true"></span>
+      <strong>Ficando ON…</strong>
+      <small data-boot-message>Carregando os dados essenciais…</small>
+    </div>
+  </div>
+
+  <div id="app" class="app-shell" aria-live="polite">
+    <header class="topbar">
+      <div class="group-switcher">
+        <button id="groupAvatarButton" class="group-emblem-button" type="button" aria-label="Personalizar grupo">
+          <img id="groupAvatar" class="top-group-avatar" alt="" width="46" height="46" data-group-avatar hidden>
+        </button>
+        <button id="groupButton" class="group-button" type="button" aria-label="Selecionar grupo">
+          <span class="group-copy"><strong id="groupName">Tâmo On</strong><small id="syncLabel">Conectando à nuvem</small></span>
+          <span class="chevron" aria-hidden="true">⌄</span>
+        </button>
+      </div>
+      <div class="top-actions">
+        <button id="notificationButton" class="notification-button" type="button" aria-label="Abrir avisos do grupo" hidden><span aria-hidden="true">🔔</span></button>
+        <button id="profileButton" class="avatar-button" type="button" aria-label="Abrir perfil">?</button>
+      </div>
+    </header>
+
+    <main id="mainContent" class="main-content"></main>
+
+    <nav class="bottom-nav" aria-label="Navegação principal">
+      <button data-route="home" class="nav-item active"><span>⌂</span><small>Início</small></button>
+      <button data-route="matches" class="nav-item"><span>▣</span><small>Jogos</small></button>
+      <button data-route="teams" class="nav-item"><span>⇄</span><small>Times</small></button>
+      <button data-route="members" class="nav-item"><span>♟</span><small>Membros</small></button>
+      <button data-route="finance" class="nav-item"><span>R$</span><small>Caixa</small></button>
+      <button data-route="more" class="nav-item"><span>•••</span><small>Mais</small></button>
+    </nav>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toastRoot" class="toast-root" aria-live="assertive"></div>
+
+  <script src="group-avatars-data.js?v=beta142r1"></script>
+  <script src="supabase-config.js?v=0.3.3"></script>
+  <script src="app.js?v=beta142r1"></script>
+  <!-- Cloudflare Web Analytics — instalação manual -->
+  <script
+    type="module"
+    src="https://static.cloudflareinsights.com/beacon.min.js"
+    data-cf-beacon='{"token":"5af5f626d10e4df1866bae8757dc335d"}'
+  ></script>
+
+</body>
+</html>
