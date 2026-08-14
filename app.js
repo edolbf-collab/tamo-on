@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 143, database: 140, edge: 111 });
-  const APP_ASSET_TOKEN = "beta143r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 144, database: 141, edge: 111 });
+  const APP_ASSET_TOKEN = "beta144r1";
   const createEmptyState = () => ({
     profile: null,
     groups: [],
@@ -90,7 +90,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta143r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta144r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -591,6 +591,19 @@
       });
       if (error) throw error;
       return this.loadGroup(this.state.currentGroupId, { subscribe: false });
+    }
+
+    async recordBatchPayments(groupId, chargeIds, description, method, paidAt) {
+      const { data, error } = await this.client.rpc("record_batch_payments", {
+        p_group_id: groupId,
+        p_charge_ids: chargeIds,
+        p_description: description,
+        p_method: method || "manual",
+        p_paid_at: paidAt || new Date().toISOString()
+      });
+      if (error) throw error;
+      await this.loadGroup(groupId, { subscribe: false });
+      return data || {};
     }
 
     async savePushSubscription(subscription) {
@@ -1157,7 +1170,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta143r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta144r1");
       }, true);
     },
 
@@ -1526,7 +1539,7 @@
           : "";
         return `<div class="card list-row finance-charge-row">${this.personAvatar(player)}<div class="list-main"><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(charge.description)} · Total: ${money(charge.amount)}</small>${paymentDetails}</div><span class="status-pill ${statusClass}">${statusLabel}</span>${canDelete ? `<button class="row-delete-button" data-action="delete-finance" data-type="charge" data-id="${charge.id}" aria-label="Excluir cobrança">×</button>` : ""}</div>`;
       }).join("");
-      return `<div class="page-head"><div><span class="page-kicker">FINANCEIRO</span><h1>Caixa</h1><p>Mensalidades, quadra, materiais e churrasco.</p></div>${canDelete ? '<div class="page-head-actions"><button class="btn btn-secondary btn-small" data-action="batch-charge">Cobrança em lote</button><button class="btn btn-primary btn-small" data-action="new-finance">+ Lançar</button></div>' : ""}</div><div class="content-stack">${!canDelete ? '<div class="notice"><strong>Acesso de consulta</strong><br>Somente administrador e tesoureiro podem alterar lançamentos.</div>' : '<div class="notice notice-success"><strong>Acesso autorizado</strong><br>Você pode registrar e excluir cobranças, pagamentos e despesas.</div>'}<section class="card balance-card"><small>Saldo atual</small><h2>${money(income - out)}</h2><div class="balance-grid"><div><small>Entradas</small><strong>${money(income)}</strong></div><div><small>Saídas</small><strong>${money(out)}</strong></div></div><div class="balance-track"><span style="width:${pct}%"></span></div><p>${paid} paga(s) · ${partial} parcial(is) · ${pct}% do valor cobrado recebido</p></section></div><div class="section-title"><h2>Movimentações</h2></div><div class="list">${movements.map(item => `<div class="card finance-row"><div class="finance-icon ${item.type === "income" ? "finance-income" : "finance-expense"}">${item.type === "income" ? "+" : "−"}</div><div class="list-main"><strong>${escapeHtml(item.description)}</strong><small>${escapeHtml(shortDate(item.date))}</small></div><div class="finance-value-bubble ${item.type === "income" ? "is-income" : "is-expense"}"><strong class="money ${item.type === "income" ? "positive" : "negative"}">${item.type === "income" ? "+" : "−"}${money(item.amount)}</strong>${item.type === "income" && item.linkedMemberName ? `<small>Membro: ${escapeHtml(item.linkedMemberName)}</small>` : ""}</div>${canDelete ? `<button class="row-delete-button" data-action="delete-finance" data-type="${item.entryType}" data-id="${item.id}" aria-label="Excluir lançamento">×</button>` : ""}</div>`).join("") || '<div class="card empty">Sem movimentações.</div>'}</div><div class="section-title"><h2>Cobranças</h2></div><div class="list">${chargeRows || '<div class="card empty">Nenhuma cobrança.</div>'}</div>`;
+      return `<div class="page-head"><div><span class="page-kicker">FINANCEIRO</span><h1>Caixa</h1><p>Mensalidades, quadra, materiais e churrasco.</p></div>${canDelete ? '<div class="page-head-actions"><button class="btn btn-secondary btn-small" data-action="batch-charge">Cobrança em lote</button><button class="btn btn-secondary btn-small" data-action="batch-payment">Baixar em lote</button><button class="btn btn-primary btn-small" data-action="new-finance">+ Lançar</button></div>' : ""}</div><div class="content-stack">${!canDelete ? '<div class="notice"><strong>Acesso de consulta</strong><br>Somente administrador e tesoureiro podem alterar lançamentos.</div>' : '<div class="notice notice-success"><strong>Acesso autorizado</strong><br>Você pode registrar e excluir cobranças, pagamentos e despesas.</div>'}<section class="card balance-card"><small>Saldo atual</small><h2>${money(income - out)}</h2><div class="balance-grid"><div><small>Entradas</small><strong>${money(income)}</strong></div><div><small>Saídas</small><strong>${money(out)}</strong></div></div><div class="balance-track"><span style="width:${pct}%"></span></div><p>${paid} paga(s) · ${partial} parcial(is) · ${pct}% do valor cobrado recebido</p></section></div><div class="section-title"><h2>Movimentações</h2></div><div class="list">${movements.map(item => `<div class="card finance-row"><div class="finance-icon ${item.type === "income" ? "finance-income" : "finance-expense"}">${item.type === "income" ? "+" : "−"}</div><div class="list-main"><strong>${escapeHtml(item.description)}</strong><small>${escapeHtml(shortDate(item.date))}</small></div><div class="finance-value-bubble ${item.type === "income" ? "is-income" : "is-expense"}"><strong class="money ${item.type === "income" ? "positive" : "negative"}">${item.type === "income" ? "+" : "−"}${money(item.amount)}</strong>${item.type === "income" && item.linkedMemberName ? `<small>Membro: ${escapeHtml(item.linkedMemberName)}</small>` : ""}</div>${canDelete ? `<button class="row-delete-button" data-action="delete-finance" data-type="${item.entryType}" data-id="${item.id}" aria-label="Excluir lançamento">×</button>` : ""}</div>`).join("") || '<div class="card empty">Sem movimentações.</div>'}</div><div class="section-title"><h2>Cobranças</h2></div><div class="list">${chargeRows || '<div class="card empty">Nenhuma cobrança.</div>'}</div>`;
     },
 
     morePage() {
@@ -1550,6 +1563,7 @@
           "clear-teams": () => this.undoTeamSeparation(data.id),
           "new-finance": () => this.openFinanceForm(),
           "batch-charge": () => this.openBatchChargeForm(),
+          "batch-payment": () => this.openBatchPaymentForm(),
           "delete-finance": () => this.deleteFinanceEntry(data.type, data.id),
           "rate-members": () => this.openMemberRatings(),
           players: () => this.openPlayers(),
@@ -1573,7 +1587,7 @@
           "sign-out": () => this.logout(),
           reload: () => location.reload()
         };
-        if (["new-match", "rsvp", "new-finance", "batch-charge", "create-group", "join-group", "announcement", "report-problem"].includes(action)) this.repo?.logEvent("ui_action", { action });
+        if (["new-match", "rsvp", "new-finance", "batch-charge", "batch-payment", "create-group", "join-group", "announcement", "report-problem"].includes(action)) this.repo?.logEvent("ui_action", { action });
         if (actions[action]) await actions[action]();
       } catch (error) {
         console.error(error);
@@ -2638,6 +2652,98 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
             submit.disabled = false;
             submit.textContent = "Criar cobranças";
             this.toast(error.message || "Não foi possível criar as cobranças em lote.", true);
+          }
+        });
+      });
+    },
+
+    openBatchPaymentForm() {
+      if (!this.canManageFinance()) return this.toast("Somente administrador e tesoureiro podem baixar pagamentos em lote.", true);
+
+      const paymentTotals = this.state.payments.reduce((totals, payment) => {
+        if (!payment.charge_id) return totals;
+        totals[payment.charge_id] = (totals[payment.charge_id] || 0) + Number(payment.amount || 0);
+        return totals;
+      }, {});
+      const pendingCharges = this.state.charges
+        .filter(charge => !["paid", "cancelled"].includes(charge.status) && charge.player_id)
+        .map(charge => {
+          const player = this.player(charge.player_id);
+          const amount = Number(charge.amount || 0);
+          const paidAmount = Number(paymentTotals[charge.id] || 0);
+          return { ...charge, player, amount, paidAmount, remaining: Math.max(0, amount - paidAmount) };
+        })
+        .filter(charge => charge.player && charge.remaining > 0)
+        .sort((a, b) => String(a.player.name || "").localeCompare(String(b.player.name || ""), "pt-BR") || String(a.due_date || "").localeCompare(String(b.due_date || "")));
+
+      if (!pendingCharges.length) return this.toast("Não há pendências vinculadas a membros para baixar.");
+
+      const today = new Date().toISOString().slice(0, 10);
+      const chargeRows = pendingCharges.map(charge => {
+        const dueDate = charge.due_date
+          ? new Intl.DateTimeFormat("pt-BR").format(new Date(`${charge.due_date}T12:00:00`))
+          : "sem vencimento";
+        const partialLabel = charge.paidAmount > 0 ? `Parcial: ${money(charge.paidAmount)} · ` : "";
+        return `<label class="batch-member-row batch-payment-row"><input class="batch-payment-checkbox" type="checkbox" name="charge_ids" value="${charge.id}" data-amount="${charge.remaining}"><span class="batch-member-avatar">${this.personAvatar(charge.player)}</span><span><strong>${escapeHtml(charge.player.name)}</strong><small>${escapeHtml(charge.description)} · vence ${escapeHtml(dueDate)}</small><b class="batch-payment-balance">${partialLabel}Baixar ${money(charge.remaining)}</b></span></label>`;
+      }).join("");
+
+      this.modal("Pagamentos em lote", `<form id="batchPaymentForm" class="batch-charge-layout"><div class="batch-charge-top"><button type="button" class="batch-info-button" id="batchPaymentInfo" aria-label="Informações sobre pagamentos em lote">!</button><div class="field"><label>Identificação dos lançamentos</label><input name="description" required minlength="2" maxlength="200" value="Pagamento em lote"></div><div class="form-grid two-columns"><div class="field"><label>Forma de pagamento</label><select name="method"><option value="manual">Manual</option><option value="pix">Pix</option><option value="cash">Dinheiro</option><option value="transfer">Transferência</option><option value="card">Cartão</option></select></div><div class="field"><label>Data do pagamento</label><input name="paid_date" type="date" value="${today}" required></div></div><div class="batch-selection-head"><div><strong>Selecionar pendências</strong><small id="batchPaymentSelectedCount">0 selecionada(s)</small></div><div><button type="button" class="text-action" id="batchPaymentSelectAll">Selecionar todas</button><button type="button" class="text-action" id="batchPaymentClearAll">Limpar</button></div></div></div><div class="batch-member-list">${chargeRows}</div><div class="batch-charge-footer"><strong id="batchPaymentFooter">Nenhuma pendência selecionada</strong><button id="batchPaymentSubmit" class="btn btn-primary btn-block" type="submit" disabled>Baixar pagamentos</button></div></form>`, (root, close) => {
+        const form = $("#batchPaymentForm", root);
+        const checkboxes = $$(".batch-payment-checkbox", root);
+        const counter = $("#batchPaymentSelectedCount", root);
+        const footer = $("#batchPaymentFooter", root);
+        const submit = $("#batchPaymentSubmit", root);
+
+        $("#batchPaymentInfo", root)?.addEventListener("click", () => alert("Cada item representa uma pendência já criada. Ao confirmar, o aplicativo lançará o saldo restante como pagamento, vinculará a entrada à pendência e marcará todas as selecionadas como pagas. Se um item falhar, nenhuma baixa do lote será aplicada."));
+
+        const updateSelection = () => {
+          const selected = checkboxes.filter(item => item.checked);
+          const total = selected.reduce((sum, item) => sum + Number(item.dataset.amount || 0), 0);
+          const count = selected.length;
+          counter.textContent = `${count} selecionada(s)`;
+          footer.textContent = count ? `${count} pendência${count === 1 ? "" : "s"} · Total ${money(total)}` : "Nenhuma pendência selecionada";
+          submit.textContent = count ? `Baixar ${count} pagamento${count === 1 ? "" : "s"}` : "Baixar pagamentos";
+          submit.disabled = count === 0;
+        };
+
+        checkboxes.forEach(item => item.addEventListener("change", updateSelection));
+        $("#batchPaymentSelectAll", root)?.addEventListener("click", () => { checkboxes.forEach(item => { item.checked = true; }); updateSelection(); });
+        $("#batchPaymentClearAll", root)?.addEventListener("click", () => { checkboxes.forEach(item => { item.checked = false; }); updateSelection(); });
+
+        form.addEventListener("submit", async event => {
+          event.preventDefault();
+          const data = new FormData(form);
+          const chargeIds = data.getAll("charge_ids").map(String).filter(Boolean);
+          const description = String(data.get("description") || "").trim();
+          const method = String(data.get("method") || "manual");
+          const paidDate = String(data.get("paid_date") || today);
+          const selected = checkboxes.filter(item => item.checked);
+          const selectedTotal = selected.reduce((sum, item) => sum + Number(item.dataset.amount || 0), 0);
+
+          if (!chargeIds.length) return this.toast("Selecione ao menos uma pendência.", true);
+          if (description.length < 2) return this.toast("Informe uma identificação válida.", true);
+          if (!paidDate) return this.toast("Informe a data dos pagamentos.", true);
+          if (!confirm(`Baixar ${chargeIds.length} pendência(s), totalizando ${money(selectedTotal)}?\n\nOs pagamentos serão vinculados e as pendências selecionadas serão marcadas como pagas.`)) return;
+
+          const [year, month, day] = paidDate.split("-").map(Number);
+          const paidAt = new Date();
+          paidAt.setFullYear(year, month - 1, day);
+          if (paidDate !== today) paidAt.setHours(12, 0, 0, 0);
+
+          submit.disabled = true;
+          submit.textContent = "Processando baixas…";
+          try {
+            const result = await this.repo.recordBatchPayments(this.state.currentGroupId, chargeIds, description, method, paidAt.toISOString());
+            this.state = this.repo.state;
+            close();
+            this.render();
+            const created = Number(result.created_count || chargeIds.length);
+            const total = Number(result.total_amount || selectedTotal);
+            this.toast(`${created} pagamento(s) lançado(s) · ${money(total)} baixado(s) com sucesso.`);
+          } catch (error) {
+            submit.disabled = false;
+            updateSelection();
+            this.toast(error.message || "Não foi possível baixar os pagamentos em lote.", true);
           }
         });
       });

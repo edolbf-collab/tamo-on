@@ -696,3 +696,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* Build 140 — identidade oficial Tâmo On */
 .welcome-mark{width:min(300px,76vw)!important;height:auto!important;max-height:110px;object-fit:contain!important}.auth-brand-logo{position:relative;z-index:2;width:min(310px,78%);height:auto;max-height:105px;object-fit:contain;margin:0 auto 14px;filter:drop-shadow(0 12px 18px rgba(0,0,0,.38))}.auth-stadium .auth-brand-logo{width:min(330px,80%);margin:0 0 10px}.boot-loader-logo{width:min(210px,72vw);height:auto;max-height:64px;object-fit:contain;margin-bottom:4px}.boot-loader-card{border-color:rgba(30,209,122,.24)}
+
+/* Build 144 — baixa transacional de pagamentos em lote. */
+.batch-payment-row{align-items:center}
+.batch-payment-row>span:last-child{gap:4px}
+.batch-payment-balance{display:block;width:max-content;max-width:100%;padding:4px 7px;border-radius:8px;background:rgba(30,209,122,.09);color:#a9f6c9;font-size:.68rem;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.batch-payment-row:has(input:checked) .batch-payment-balance{background:rgba(30,209,122,.17);color:#d4ffe5}

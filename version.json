@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 143,
-  "database": 140,
+  "build": 144,
+  "database": 141,
   "edge": 111,
   "mandatory": false,
-  "notes": "Alerta ao grupo quando um membro confirmado muda para Não vou e identificação do membro vinculada ao valor das entradas financeiras.",
-  "label": "Tâmo On Beta 1.0 Build 143"
+  "notes": "Pagamentos em lote vinculados às pendências selecionadas, com quitação integral dos saldos restantes e baixa transacional em uma única operação.",
+  "label": "Tâmo On Beta 1.0 Build 144"
 }
