@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 144,
-  "database": 141,
+  "build": 145,
+  "database": 142,
   "edge": 111,
   "mandatory": false,
-  "notes": "Pagamentos em lote vinculados às pendências selecionadas, com quitação integral dos saldos restantes e baixa transacional em uma única operação.",
-  "label": "Tâmo On Beta 1.0 Build 144"
+  "notes": "Duração dos eventos, separação dos times disponível até 50% do tempo e pagamentos em lote com descrição opcional e formas simplificadas.",
+  "label": "Tâmo On Beta 1.0 Build 145"
 }

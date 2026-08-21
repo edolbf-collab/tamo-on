@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 144, database: 141, edge: 111 });
-  const APP_ASSET_TOKEN = "beta144r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 145, database: 142, edge: 111 });
+  const APP_ASSET_TOKEN = "beta145r1";
   const createEmptyState = () => ({
     profile: null,
     groups: [],
@@ -31,6 +31,11 @@
   const nowIso = () => new Date().toISOString();
   const money = value => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
   const shortDate = iso => new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  const shortTime = iso => new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  const matchDuration = match => Math.max(15, Number(match?.duration_minutes || 60));
+  const matchEndAt = match => new Date(new Date(match?.starts_at).getTime() + matchDuration(match) * 60000);
+  const matchHistoryAt = match => new Date(new Date(match?.starts_at).getTime() + matchDuration(match) * 30000);
+  const matchSchedule = match => `${shortDate(match?.starts_at)} às ${shortTime(matchEndAt(match))}`;
   const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
   const initials = (name = "") => name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase() || "?";
   const safeImageUrl = (value = "") => {
@@ -90,7 +95,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta144r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta145r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -394,6 +399,7 @@
         p_group_id: payload.groupId,
         p_title: payload.title,
         p_starts_at: payload.startsAt,
+        p_duration_minutes: payload.durationMinutes,
         p_location: payload.location,
         p_max_players: payload.maxPlayers,
         p_players_per_team: payload.playersPerTeam,
@@ -504,6 +510,7 @@
         p_match_id: matchId,
         p_max_players: Number(payload.maxPlayers),
         p_players_per_team: payload.playersPerTeam == null ? null : Number(payload.playersPerTeam),
+        p_duration_minutes: Number(payload.durationMinutes),
         p_notes: payload.notes || ""
       });
       if (error) throw error;
@@ -598,7 +605,7 @@
         p_group_id: groupId,
         p_charge_ids: chargeIds,
         p_description: description,
-        p_method: method || "manual",
+        p_method: method || "pix",
         p_paid_at: paidAt || new Date().toISOString()
       });
       if (error) throw error;
@@ -939,6 +946,8 @@
     updateAvailable: null,
     lastSyncAt: null,
     accessCheckTimer: null,
+    matchTimelineTimer: null,
+    lastMatchTimelineSignature: "",
 
     htmlBuild() {
       return Number(document.querySelector('meta[name="app-build"]')?.content || 0);
@@ -1066,6 +1075,21 @@
     startAccessMonitor() {
       clearInterval(this.accessCheckTimer);
       this.accessCheckTimer = setInterval(() => this.verifyBetaAccess(), 120000);
+      clearInterval(this.matchTimelineTimer);
+      this.lastMatchTimelineSignature = this.matchTimelineSignature();
+      this.matchTimelineTimer = setInterval(() => {
+        const signature = this.matchTimelineSignature();
+        if (signature === this.lastMatchTimelineSignature) return;
+        this.lastMatchTimelineSignature = signature;
+        this.render();
+      }, 30000);
+    },
+
+    matchTimelineSignature() {
+      return (this.state?.matches || [])
+        .map(match => `${match.id}:${this.isHistoricalMatch(match) ? "history" : this.isMatchStarted(match) ? "started" : "scheduled"}`)
+        .sort()
+        .join("|");
     },
 
     async verifyBetaAccess() {
@@ -1170,7 +1194,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta144r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta145r1");
       }, true);
     },
 
@@ -1271,8 +1295,11 @@
         .filter(item => item.status === "waitlist")
         .sort((a, b) => Number(a.waitlist_position || 9999) - Number(b.waitlist_position || 9999) || new Date(a.responded_at) - new Date(b.responded_at));
     },
+    isMatchStarted(match) {
+      return Boolean(match && new Date(match.starts_at) <= new Date());
+    },
     isHistoricalMatch(match) {
-      return Boolean(match && (new Date(match.starts_at) <= new Date() || match.status === "finished"));
+      return Boolean(match && (matchHistoryAt(match) <= new Date() || match.status === "finished"));
     },
     upcomingMatches() {
       return (this.state?.matches || []).filter(match => !this.isHistoricalMatch(match) && !["cancelled", "finished"].includes(match.status)).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
@@ -1359,6 +1386,7 @@
       const confirmed = attendance.filter(item => item.status === "confirmed");
       const waitlist = attendance.filter(item => item.status === "waitlist");
       const overflow = Math.max(0, confirmed.length - Number(match?.max_players || 0));
+      const matchStarted = this.isMatchStarted(match);
       const notice = [...(this.state?.announcements || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
       const administrator = this.memberPlayer(this.adminMember());
       const player = this.myPlayer();
@@ -1370,7 +1398,7 @@
         : myAttendance?.status === "out" ? "out" : "";
       const bbqAnswered = Boolean(myAttendance?.bbq_responded);
       const responseButton = (scope, value, label, selected, icon) => `<button type="button" class="home-response-button ${selected ? "is-selected" : ""} ${value === "out" || value === "no" ? "is-negative" : "is-positive"}" data-action="home-${scope}-response" data-id="${match?.id || ""}" data-value="${value}" aria-pressed="${selected ? "true" : "false"}"><span aria-hidden="true">${icon}</span>${label}</button>`;
-      const responsePanel = match ? `<div class="home-response-stack" aria-label="Respostas do evento"><div class="home-response-row"><span class="home-response-label">Jogo</span><div class="home-response-actions">${responseButton("game", "confirmed", "Vou", gameAnswer === "confirmed", "✓")}${responseButton("game", "out", "Não vou", gameAnswer === "out", "×")}</div></div>${match.bbq_enabled ? `<div class="home-response-row"><span class="home-response-label">Churrasco</span><div class="home-response-actions">${responseButton("bbq", "yes", "Vou", bbqAnswered && myAttendance?.bbq === true, "✓")}${responseButton("bbq", "no", "Não vou", bbqAnswered && myAttendance?.bbq === false, "×")}</div></div>` : ""}</div>` : "";
+      const responsePanel = match && !matchStarted ? `<div class="home-response-stack" aria-label="Respostas do evento"><div class="home-response-row"><span class="home-response-label">Jogo</span><div class="home-response-actions">${responseButton("game", "confirmed", "Vou", gameAnswer === "confirmed", "✓")}${responseButton("game", "out", "Não vou", gameAnswer === "out", "×")}</div></div>${match.bbq_enabled ? `<div class="home-response-row"><span class="home-response-label">Churrasco</span><div class="home-response-actions">${responseButton("bbq", "yes", "Vou", bbqAnswered && myAttendance?.bbq === true, "✓")}${responseButton("bbq", "no", "Não vou", bbqAnswered && myAttendance?.bbq === false, "×")}</div></div>` : ""}</div>` : "";
       const emblem = this.canManageGroup()
         ? `<button class="hero-avatar-button" data-action="group-settings" aria-label="Personalizar grupo">${this.groupAvatar(group, "hero-group-avatar")}</button>`
         : this.groupAvatar(group, "hero-group-avatar");
@@ -1378,7 +1406,7 @@
         <section class="stadium-hero home-hero">
           <div class="stadium-lights"></div>
           <div class="group-identity">${emblem}<div><span class="eyebrow">${escapeHtml(roleLabels[this.currentRole()])}</span><h1>${escapeHtml(group.name)}</h1><p>Administrador: ${escapeHtml(administrator?.name || "Não identificado")}</p></div></div>
-          ${match ? `<div class="next-match-panel"><div class="next-match-heading"><div><span class="match-kicker">PRÓXIMA PELADA</span><h2>${escapeHtml(match.title)}</h2></div><button class="match-detail-link" data-action="open-match" data-id="${match.id}">Detalhes</button></div><p>${escapeHtml(shortDate(match.starts_at))} · ${escapeHtml(match.location)}</p><div class="hero-numbers"><div><strong>${confirmed.length}</strong><small>confirmados</small></div><div><strong>${match.max_players}</strong><small>começam</small></div><div><strong>${overflow || waitlist.length || Math.max(0, Number(match.max_players) - confirmed.length)}</strong><small>${overflow ? "excedentes" : waitlist.length ? "em espera" : "restantes"}</small></div></div>${responsePanel}</div>` : `<div class="next-match-panel empty-match-panel"><span class="match-kicker">AGENDA LIVRE</span><h2>Nenhuma pelada marcada</h2><p>Organizadores podem criar o próximo jogo.</p>${this.canManageMatches() ? '<button class="btn btn-primary btn-small" data-action="new-match">Agendar pelada</button>' : ""}</div>`}
+          ${match ? `<div class="next-match-panel"><div class="next-match-heading"><div><span class="match-kicker">${matchStarted ? "PELADA EM ANDAMENTO" : "PRÓXIMA PELADA"}</span><h2>${escapeHtml(match.title)}</h2></div><button class="match-detail-link" data-action="open-match" data-id="${match.id}">Detalhes</button></div><p>${escapeHtml(matchSchedule(match))} · ${escapeHtml(match.location)}</p><div class="hero-numbers"><div><strong>${confirmed.length}</strong><small>confirmados</small></div><div><strong>${match.max_players}</strong><small>começam</small></div><div><strong>${overflow || waitlist.length || Math.max(0, Number(match.max_players) - confirmed.length)}</strong><small>${overflow ? "excedentes" : waitlist.length ? "em espera" : "restantes"}</small></div></div>${responsePanel}</div>` : `<div class="next-match-panel empty-match-panel"><span class="match-kicker">AGENDA LIVRE</span><h2>Nenhuma pelada marcada</h2><p>Organizadores podem criar o próximo jogo.</p>${this.canManageMatches() ? '<button class="btn btn-primary btn-small" data-action="new-match">Agendar pelada</button>' : ""}</div>`}
         </section>
         ${notice ? `<button class="home-notice" data-action="announcement-center" data-id="${notice.id}"><span>📣</span><div><strong>${escapeHtml(notice.title)}</strong><small>${escapeHtml(notice.body)}</small></div><b>›</b></button>` : ""}
         <div class="home-quick-grid">
@@ -1402,8 +1430,10 @@
       const confirmed = this.confirmedFor(match.id);
       const waitlist = this.waitlistFor(match.id);
       const future = !this.isHistoricalMatch(match);
+      const started = this.isMatchStarted(match);
       const recurring = Number(match.recurrence_total || 1) > 1;
-      return `<article class="card match-card" data-action="open-match" data-id="${match.id}" role="button" tabindex="0" aria-label="Abrir detalhes de ${escapeHtml(match.title)}"><div class="match-top"><div class="match-date"><small>${date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").toUpperCase()}</small><strong>${String(date.getDate()).padStart(2, "0")}</strong></div><div class="match-info"><h3>${escapeHtml(match.title)}</h3><p>${escapeHtml(shortDate(match.starts_at))}<br>${escapeHtml(match.location)}</p>${recurring ? '<span class="recurrence-chip">↻ Semanal</span>' : ""}${match.bbq_enabled ? '<span class="bbq-chip">Churrasco</span>' : ""}</div><span class="status-pill ${future ? "status-maybe" : "status-confirmed"}">${future ? "Agendado" : "Histórico"}</span></div><div class="match-footer"><div class="avatar-stack">${confirmed.slice(0, 5).map(item => `<span>${initials(this.player(item.player_id)?.name)}</span>`).join("")}${confirmed.length > 5 ? `<span>+${confirmed.length - 5}</span>` : ""}</div><span class="match-open-label">${confirmed.length}/${match.max_players} começam${waitlist.length ? ` · ${waitlist.length} espera` : ""} <b>›</b></span></div></article>`;
+      const statusLabel = future ? (started ? "Em andamento" : "Agendado") : "Histórico";
+      return `<article class="card match-card" data-action="open-match" data-id="${match.id}" role="button" tabindex="0" aria-label="Abrir detalhes de ${escapeHtml(match.title)}"><div class="match-top"><div class="match-date"><small>${date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").toUpperCase()}</small><strong>${String(date.getDate()).padStart(2, "0")}</strong></div><div class="match-info"><h3>${escapeHtml(match.title)}</h3><p>${escapeHtml(matchSchedule(match))}<br>${escapeHtml(match.location)}</p>${recurring ? '<span class="recurrence-chip">↻ Semanal</span>' : ""}${match.bbq_enabled ? '<span class="bbq-chip">Churrasco</span>' : ""}</div><span class="status-pill ${future ? "status-maybe" : "status-confirmed"}">${statusLabel}</span></div><div class="match-footer"><div class="avatar-stack">${confirmed.slice(0, 5).map(item => `<span>${initials(this.player(item.player_id)?.name)}</span>`).join("")}${confirmed.length > 5 ? `<span>+${confirmed.length - 5}</span>` : ""}</div><span class="match-open-label">${confirmed.length}/${match.max_players} começam${waitlist.length ? ` · ${waitlist.length} espera` : ""} <b>›</b></span></div></article>`;
     },
 
     teamsPage() {
@@ -1430,7 +1460,7 @@
       const teams = [...new Set(assignments.map(item => item.team_name))];
 
       if (historical) {
-        return `<div class="page-head"><div><span class="page-kicker">HISTÓRICO DA PARTIDA</span><h1>Times</h1><p>${escapeHtml(match.title)} · ${escapeHtml(shortDate(match.starts_at))}</p></div><button type="button" class="btn btn-secondary btn-small" data-route="matches">Voltar aos jogos</button></div><div class="content-stack"><div class="notice notice-history"><strong>Registro somente para consulta</strong><br>A partida já foi finalizada. A divisão permanece preservada no histórico e não pode mais ser rebalanceada ou desfeita.</div>${teams.length ? `<div class="team-grid">${teams.map(name => this.teamCard(name, assignments)).join("")}</div>` : `<div class="card empty"><strong>Nenhuma separação registrada</strong><span>Este evento foi finalizado sem uma divisão de times salva.</span></div>`}</div>`;
+        return `<div class="page-head"><div><span class="page-kicker">HISTÓRICO DA PARTIDA</span><h1>Times</h1><p>${escapeHtml(match.title)} · ${escapeHtml(matchSchedule(match))}</p></div><button type="button" class="btn btn-secondary btn-small" data-route="matches">Voltar aos jogos</button></div><div class="content-stack"><div class="notice notice-history"><strong>Registro somente para consulta</strong><br>A partida já foi finalizada. A divisão permanece preservada no histórico e não pode mais ser rebalanceada ou desfeita.</div>${teams.length ? `<div class="team-grid">${teams.map(name => this.teamCard(name, assignments)).join("")}</div>` : `<div class="card empty"><strong>Nenhuma separação registrada</strong><span>Este evento foi finalizado sem uma divisão de times salva.</span></div>`}</div>`;
       }
 
       const maximumTeams = Math.min(12, Math.max(2, confirmed.length));
@@ -1443,7 +1473,10 @@
       const configPanel = this.canManageMatches()
         ? `<section class="card team-config-card"><div class="team-config-copy"><strong>Quantidade de times</strong><small>Defina quantas equipes serão formadas nesta partida. A escolha fica salva para novos rebalanceamentos.</small></div><div class="team-config-controls"><select id="teamCountSelect" aria-label="Quantidade de times" ${confirmed.length < 2 ? "disabled" : ""}>${teamOptions}</select><div class="team-config-actions"><button type="button" class="btn btn-primary" data-action="configure-teams" data-id="${match.id}" ${confirmed.length < 2 ? "disabled" : ""}>${assignments.length ? "Rebalancear" : "Separar"}</button>${assignments.length ? `<button type="button" class="btn btn-secondary team-clear-button" data-action="clear-teams" data-id="${match.id}">Desfazer separação</button>` : ""}</div></div>${assignments.length ? '<small class="team-config-reference">Desfazer remove somente os times formados. Confirmações, sorteio da espera e quantidade configurada de times são preservados.</small>' : match.players_per_team ? `<small class="team-config-reference">Referência informada no evento: ${Number(match.players_per_team)} jogadores por time.</small>` : '<small class="team-config-reference">O evento não possui quantidade fixa de jogadores por time.</small>'}</section>`
         : "";
-      return `<div class="page-head"><div><span class="page-kicker">ESCALAÇÃO</span><h1>Times</h1><p>${escapeHtml(match.title)} · ${confirmed.length} confirmados</p></div></div>${configPanel}<div class="content-stack"><div class="notice"><strong>Equilíbrio confidencial</strong><br>O servidor prioriza goleiros principais e, quando necessário, completa a posição com quem marcou “Também posso jogar no gol”. Sem opções suficientes, a separação continua normalmente. As avaliações permanecem confidenciais.</div>${teams.length ? `<div class="team-grid">${teams.map(name => this.teamCard(name, assignments)).join("")}</div>` : `<div class="card empty"><strong>Times ainda não formados</strong><span>${confirmed.length < 2 ? "Aguarde mais confirmações." : "Escolha a quantidade de times e use o botão Separar."}</span></div>`}</div><div class="section-title"><h2>Confirmados</h2></div><div class="list">${confirmed.map(player => this.playerRow(player, { showRating: this.canSeeRatings() })).join("") || '<div class="card empty">Nenhum confirmado.</div>'}</div>`;
+      const activeWindowNotice = this.isMatchStarted(match)
+        ? `<div class="notice notice-success"><strong>Evento em andamento</strong><br>A separação dos times permanece disponível até ${escapeHtml(shortTime(matchHistoryAt(match)))}. Depois desse horário, o evento será transferido ao histórico.</div>`
+        : "";
+      return `<div class="page-head"><div><span class="page-kicker">${this.isMatchStarted(match) ? "EVENTO EM ANDAMENTO" : "ESCALAÇÃO"}</span><h1>Times</h1><p>${escapeHtml(match.title)} · ${confirmed.length} confirmados</p></div></div>${activeWindowNotice}${configPanel}<div class="content-stack"><div class="notice"><strong>Equilíbrio confidencial</strong><br>O servidor prioriza goleiros principais e, quando necessário, completa a posição com quem marcou “Também posso jogar no gol”. Sem opções suficientes, a separação continua normalmente. As avaliações permanecem confidenciais.</div>${teams.length ? `<div class="team-grid">${teams.map(name => this.teamCard(name, assignments)).join("")}</div>` : `<div class="card empty"><strong>Times ainda não formados</strong><span>${confirmed.length < 2 ? "Aguarde mais confirmações." : "Escolha a quantidade de times e use o botão Separar."}</span></div>`}</div><div class="section-title"><h2>Confirmados</h2></div><div class="list">${confirmed.map(player => this.playerRow(player, { showRating: this.canSeeRatings() })).join("") || '<div class="card empty">Nenhum confirmado.</div>'}</div>`;
     },
 
     teamCard(name, assignments) {
@@ -1597,6 +1630,7 @@
 
     renderBetaAccessDenied(error) {
       clearInterval(this.accessCheckTimer);
+      clearInterval(this.matchTimelineTimer);
       const email = this.repo?.state?.profile?.email || "E-mail não identificado";
       const hasIdentifiedEmail = email !== "E-mail não identificado";
       document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel simple-auth access-denied-panel"><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><span class="access-denied-icon">!</span><h1>Aguardando liberação</h1><p>O Tâmo On está em beta fechado. Antes de continuar, a administração precisa autorizar a conta Google usada no login.</p><div class="denied-account-card"><small>CONTA UTILIZADA</small><div><strong id="deniedAccountEmail">${escapeHtml(email)}</strong>${hasIdentifiedEmail ? '<button id="copyDeniedEmail" class="copy-email-button" type="button" aria-label="Copiar e-mail">Copiar</button>' : ''}</div></div><div class="notice auth-error"><strong>Situação do acesso</strong><br><span id="deniedAccessMessage">${escapeHtml(error?.message || "Este e-mail ainda não está autorizado.")}</span></div><div class="access-denied-instructions"><strong>Como liberar</strong><ol><li>Envie o e-mail acima para a administração do beta.</li><li>Aguarde a confirmação de que o acesso foi autorizado.</li><li>Volte a esta tela e toque em <b>Verificar liberação</b>.</li></ol></div><div id="deniedCheckStatus" class="denied-check-status" role="status" aria-live="polite"></div><button id="deniedCheckAccess" class="btn btn-primary btn-block">Verificar liberação</button><button id="deniedSignOut" class="btn btn-secondary btn-block">Sair e usar outra conta</button></section></main><div id="toastRoot" class="toast-root"></div>`;
@@ -1951,11 +1985,25 @@
       const date = new Date(Date.now() + 7 * 86400000);
       date.setHours(20, 0, 0, 0);
       const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-      this.modal("Agendar pelada", `<form id="matchForm" class="form-grid"><div class="field"><label>Título</label><input name="title" required value="Pelada semanal"></div><div class="field"><label>Data e hora da primeira pelada</label><input name="starts_at" type="datetime-local" min="${new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}" required value="${local}"></div><div class="field"><label>Local</label><input name="location" required placeholder="Arena e número da quadra"></div><div class="field-row"><div class="field"><label>Máximo de jogadores</label><input name="max_players" type="number" min="4" max="60" value="12" required></div><div class="field"><label>Jogadores por time <span class="optional-label">opcional</span></label><input name="players_per_team" type="number" min="2" max="11" placeholder="Definir depois"></div></div><div class="field-help">A quantidade de times será escolhida na aba Times. O número por time serve apenas como referência do evento.</div><label class="check-row recurrence-toggle"><input name="repeat_weekly" type="checkbox"> Repetir esta pelada toda semana</label><div class="recurrence-panel" id="recurrencePanel" hidden><div class="field"><label>Quantidade total de peladas</label><input name="occurrences" type="number" min="2" max="52" value="8" inputmode="numeric"><small>Será criada uma ocorrência a cada 7 dias, sempre no mesmo horário.</small></div><div class="recurrence-preview" id="recurrencePreview">8 peladas semanais serão agendadas.</div></div><div class="field"><label>Observações</label><textarea name="notes" placeholder="Uniforme, prazo, regras..."></textarea></div><button class="btn btn-primary btn-block">Criar programação</button></form>`, (root, close) => {
+      this.modal("Agendar pelada", `<form id="matchForm" class="form-grid"><div class="field"><label>Título</label><input name="title" required value="Pelada semanal"></div><div class="field"><label>Data e hora da primeira pelada</label><input name="starts_at" type="datetime-local" min="${new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}" required value="${local}"></div><div class="field"><label>Duração do evento</label><input name="duration_minutes" type="number" min="15" max="480" step="15" value="60" required inputmode="numeric"><small>Informe a duração total em minutos.</small></div><div class="notice match-duration-preview" id="matchDurationPreview"></div><div class="field"><label>Local</label><input name="location" required placeholder="Arena e número da quadra"></div><div class="field-row"><div class="field"><label>Máximo de jogadores</label><input name="max_players" type="number" min="4" max="60" value="12" required></div><div class="field"><label>Jogadores por time <span class="optional-label">opcional</span></label><input name="players_per_team" type="number" min="2" max="11" placeholder="Definir depois"></div></div><div class="field-help">A quantidade de times será escolhida na aba Times. O número por time serve apenas como referência do evento.</div><label class="check-row recurrence-toggle"><input name="repeat_weekly" type="checkbox"> Repetir esta pelada toda semana</label><div class="recurrence-panel" id="recurrencePanel" hidden><div class="field"><label>Quantidade total de peladas</label><input name="occurrences" type="number" min="2" max="52" value="8" inputmode="numeric"><small>Será criada uma ocorrência a cada 7 dias, sempre no mesmo horário e com a mesma duração.</small></div><div class="recurrence-preview" id="recurrencePreview">8 peladas semanais serão agendadas.</div></div><div class="field"><label>Observações</label><textarea name="notes" placeholder="Uniforme, prazo, regras..."></textarea></div><button class="btn btn-primary btn-block">Criar programação</button></form>`, (root, close) => {
         const repeat = $('[name="repeat_weekly"]', root);
         const panel = $("#recurrencePanel", root);
         const occurrencesInput = $('[name="occurrences"]', root);
         const preview = $("#recurrencePreview", root);
+        const startsInput = $('[name="starts_at"]', root);
+        const durationInput = $('[name="duration_minutes"]', root);
+        const durationPreview = $("#matchDurationPreview", root);
+        const refreshDuration = () => {
+          const startsAt = new Date(startsInput.value);
+          const durationMinutes = Number(durationInput.value || 0);
+          if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(durationMinutes) || durationMinutes < 15) {
+            durationPreview.innerHTML = "<strong>Horário do evento</strong><br>Informe início e duração válidos.";
+            return;
+          }
+          const endsAt = new Date(startsAt.getTime() + durationMinutes * 60000);
+          const historyAt = new Date(startsAt.getTime() + durationMinutes * 30000);
+          durationPreview.innerHTML = `<strong>${shortTime(startsAt)} às ${shortTime(endsAt)}</strong><br>O evento permanecerá aberto para separar os times até ${shortTime(historyAt)}.`;
+        };
         const refreshRecurrence = () => {
           panel.hidden = !repeat.checked;
           const count = Math.max(2, Math.min(52, Number(occurrencesInput.value || 8)));
@@ -1963,12 +2011,17 @@
         };
         repeat.addEventListener("change", refreshRecurrence);
         occurrencesInput.addEventListener("input", refreshRecurrence);
+        startsInput.addEventListener("input", refreshDuration);
+        durationInput.addEventListener("input", refreshDuration);
         refreshRecurrence();
+        refreshDuration();
         $("#matchForm", root).addEventListener("submit", async event => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
           const startsAt = new Date(form.get("starts_at"));
           if (startsAt <= new Date()) return this.toast("Escolha uma data futura.", true);
+          const durationMinutes = Number(form.get("duration_minutes"));
+          if (!Number.isInteger(durationMinutes) || durationMinutes < 15 || durationMinutes > 480) return this.toast("Informe uma duração entre 15 e 480 minutos.", true);
           const rawPlayersPerTeam = String(form.get("players_per_team") || "").trim();
           const playersPerTeam = rawPlayersPerTeam ? Number(rawPlayersPerTeam) : null;
           const occurrences = repeat.checked ? Math.max(2, Math.min(52, Number(form.get("occurrences") || 8))) : 1;
@@ -1979,6 +2032,7 @@
             groupId: this.state.currentGroupId,
             title: form.get("title"),
             startsAt: startsAt.toISOString(),
+            durationMinutes,
             location: form.get("location"),
             maxPlayers: Number(form.get("max_players")),
             playersPerTeam,
@@ -2007,13 +2061,15 @@
       const match = this.state.matches.find(item => item.id === id);
       if (!match) return;
       const future = !this.isHistoricalMatch(match);
+      const started = this.isMatchStarted(match);
+      const responsesOpen = future && !started;
       const recurring = Number(match.recurrence_total || 1) > 1;
       const matchAttendance = this.attendanceFor(id);
       const grouped = { confirmed: [], waitlist: [], out: [] };
       matchAttendance.forEach(item => grouped[item.status]?.push(item));
       grouped.waitlist.sort((a, b) => Number(a.waitlist_position || 9999) - Number(b.waitlist_position || 9999));
       const attendanceByPlayer = new Map(matchAttendance.map(item => [item.player_id, item]));
-      const pendingMembers = future
+      const pendingMembers = responsesOpen
         ? this.state.members
             .map(member => ({ member, player: this.memberPlayer(member) }))
             .filter(item => item.player && item.player.active !== false && !this.isGuest(item.player))
@@ -2049,10 +2105,10 @@
       };
       const groupHtml = (title, key) => `<div class="section-title"><h2>${title} (${grouped[key].length})</h2></div><div class="list">${grouped[key].map(item => attendanceRow(item, key)).join("") || '<div class="card empty">Nenhum.</div>'}</div>`;
       const pendingRow = ({ member, player }) => {
-        const canSendReminder = future && this.canManageMatches() && Boolean(member?.user_id || player?.user_id);
+        const canSendReminder = responsesOpen && this.canManageMatches() && Boolean(member?.user_id || player?.user_id);
         return `<div class="card list-row attendance-list-row pending-confirmation-row">${this.personAvatar(player)}<div class="list-main"><strong>${escapeHtml(player.name)}</strong><small>${playerPositionHtml(player)} · ainda não respondeu</small></div>${canSendReminder ? `<button type="button" class="attendance-reminder-button" data-remind-attendance="${match.id}" data-player-id="${player.id}" data-player-name="${escapeHtml(player.name)}" aria-label="Enviar lembrete de confirmação para ${escapeHtml(player.name)}"><span aria-hidden="true">🔔</span><b>Lembrar</b></button>` : '<span class="status-pill status-maybe">Pendente</span>'}</div>`;
       };
-      const pendingHtml = future
+      const pendingHtml = responsesOpen
         ? `<div class="section-title pending-confirmation-title"><h2>Pendente de confirmação (${pendingMembers.length})</h2><small>Sem resposta de presença ou ausência.</small></div><div class="list pending-confirmation-list">${pendingMembers.map(pendingRow).join("") || '<div class="card empty">Todos os membros já responderam.</div>'}</div>`
         : "";
       const recurringInfo = recurring ? `<div class="recurrence-detail"><span>↻</span><div><strong>Pelada semanal recorrente</strong><small>Esta data pertence a uma série criada automaticamente.</small></div></div>` : "";
@@ -2065,19 +2121,20 @@
         : grouped.waitlist.length ? `<section class="match-draw-section"><div class="section-title"><h2>Resultado da espera</h2></div>${drawStatus}</section>` : "";
 
       const bbqExpanded = match.bbq_enabled
-        ? `<section class="match-bbq-section is-enabled"><div class="section-title"><h2>Confraternização</h2><small>Configuração exclusiva desta pelada.</small></div>${barbecueParticipantsPanel}${future && this.canManageGroup() ? `<form id="matchBbqForm" class="match-bbq-form"><label class="check-row"><input name="bbq_enabled" type="checkbox" checked> Haverá churrasco nesta pelada</label><div class="bbq-expanded-options"><div class="field" id="matchBbqPriceField"><label>Valor por pessoa</label><input name="bbq_price" type="number" min="0" step="0.01" value="${Number(match.bbq_price || 0)}" inputmode="decimal"></div><button class="btn btn-secondary btn-block">Salvar churrasco</button></div></form>` : ""}</section>`
-        : future && this.canManageGroup()
+        ? `<section class="match-bbq-section is-enabled"><div class="section-title"><h2>Confraternização</h2><small>Configuração exclusiva desta pelada.</small></div>${barbecueParticipantsPanel}${responsesOpen && this.canManageGroup() ? `<form id="matchBbqForm" class="match-bbq-form"><label class="check-row"><input name="bbq_enabled" type="checkbox" checked> Haverá churrasco nesta pelada</label><div class="bbq-expanded-options"><div class="field" id="matchBbqPriceField"><label>Valor por pessoa</label><input name="bbq_price" type="number" min="0" step="0.01" value="${Number(match.bbq_price || 0)}" inputmode="decimal"></div><button class="btn btn-secondary btn-block">Salvar churrasco</button></div></form>` : ""}</section>`
+        : responsesOpen && this.canManageGroup()
           ? `<section class="match-bbq-compact"><form id="matchBbqForm" class="match-bbq-form compact"><label class="check-row bbq-toggle-row"><input name="bbq_enabled" type="checkbox"> Haverá churrasco nesta pelada</label><div class="bbq-expanded-options" hidden><div class="bbq-status enabled"><span>♨</span><div><strong>Configurar churrasco</strong><small>Informe o valor e salve para abrir as opções aos participantes.</small></div></div><div class="field" id="matchBbqPriceField"><label>Valor por pessoa</label><input name="bbq_price" type="number" min="0" step="0.01" value="0" inputmode="decimal"></div><button class="btn btn-secondary btn-block">Salvar churrasco</button></div></form></section>`
           : "";
 
-      const managerControls = future && this.canManageMatches()
+      const managerControls = responsesOpen && this.canManageMatches()
         ? `<section class="attendance-manager-section"><div class="section-title"><h2>Gestão da escala</h2><small>${pendingMembers.length} sem resposta.</small></div><div class="attendance-manager-actions"><button class="btn btn-secondary" data-manage-attendance="${match.id}">Gerenciar presenças</button><button class="btn btn-secondary" data-edit-match="${match.id}">Editar evento</button></div></section>`
         : "";
-      const deleteControls = future && this.canManageMatches() ? `<div class="delete-match-actions"><button class="btn btn-danger btn-block delete-match-button" data-delete-match="${match.id}">${recurring ? "Excluir somente esta data" : "Excluir jogo agendado"}</button>${recurring ? `<button class="btn btn-danger-outline btn-block" data-delete-series="${match.id}">Excluir esta e as próximas</button>` : ""}<p class="danger-help">A exclusão só é permitida antes do horário. Peladas realizadas permanecem no histórico.</p></div>` : "";
-      const eventCapacity = `<div class="match-detail-capacity"><span>Máximo: <strong>${Number(match.max_players)}</strong></span><span>Por time: <strong>${match.players_per_team ? Number(match.players_per_team) : "não definido"}</strong></span>${match.team_count ? `<span>Times: <strong>${Number(match.team_count)}</strong></span>` : ""}</div>`;
+      const deleteControls = responsesOpen && this.canManageMatches() ? `<div class="delete-match-actions"><button class="btn btn-danger btn-block delete-match-button" data-delete-match="${match.id}">${recurring ? "Excluir somente esta data" : "Excluir jogo agendado"}</button>${recurring ? `<button class="btn btn-danger-outline btn-block" data-delete-series="${match.id}">Excluir esta e as próximas</button>` : ""}<p class="danger-help">A exclusão só é permitida antes do horário. Peladas realizadas permanecem no histórico.</p></div>` : "";
+      const eventCapacity = `<div class="match-detail-capacity"><span>Duração: <strong>${matchDuration(match)} min</strong></span><span>Máximo: <strong>${Number(match.max_players)}</strong></span><span>Por time: <strong>${match.players_per_team ? Number(match.players_per_team) : "não definido"}</strong></span>${match.team_count ? `<span>Times: <strong>${Number(match.team_count)}</strong></span>` : ""}</div>`;
       const hasSavedTeams = this.state.assignments.some(item => item.match_id === match.id);
       const canOpenTeams = future ? (this.canManageMatches() || hasSavedTeams) : hasSavedTeams;
-      this.modal(match.title, `<div class="match-detail-banner"><span class="status-pill ${future ? "status-maybe" : "status-confirmed"}">${future ? "Agendado" : "Histórico"}</span><strong>${escapeHtml(shortDate(match.starts_at))}</strong><p>${escapeHtml(match.location)}</p>${eventCapacity}${match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}</div>${recurringInfo}${managerControls}${drawSection}${bbqExpanded}<div class="actions">${future ? `<button class="btn btn-primary" data-modal-rsvp="${match.id}">Minha presença</button>` : ""}${canOpenTeams ? `<button class="btn btn-secondary" data-modal-teams="${match.id}">Abrir Times</button>` : ""}</div>${deleteControls}${groupHtml("Começam jogando", "confirmed")}${groupHtml("Não vão", "out")}${groupHtml("Espera inicial", "waitlist")}${pendingHtml}`, (root, close) => {
+      const statusLabel = future ? (started ? "Em andamento" : "Agendado") : "Histórico";
+      this.modal(match.title, `<div class="match-detail-banner"><span class="status-pill ${future ? "status-maybe" : "status-confirmed"}">${statusLabel}</span><strong>${escapeHtml(matchSchedule(match))}</strong><p>${escapeHtml(match.location)}</p>${eventCapacity}${started && future ? `<small>Separação dos times disponível até ${escapeHtml(shortTime(matchHistoryAt(match)))}.</small>` : match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}${started && future && match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}</div>${recurringInfo}${managerControls}${drawSection}${bbqExpanded}<div class="actions">${responsesOpen ? `<button class="btn btn-primary" data-modal-rsvp="${match.id}">Minha presença</button>` : ""}${canOpenTeams ? `<button class="btn btn-secondary" data-modal-teams="${match.id}">Abrir Times</button>` : ""}</div>${deleteControls}${groupHtml("Começam jogando", "confirmed")}${groupHtml("Não vão", "out")}${groupHtml("Espera inicial", "waitlist")}${pendingHtml}`, (root, close) => {
         $("[data-modal-rsvp]", root)?.addEventListener("click", () => {
           close();
           this.openRsvp(match.id);
@@ -2192,9 +2249,9 @@
       if (!this.canManageMatches()) return this.toast("Somente administrador e organizador podem editar eventos.", true);
       const match = this.state.matches.find(item => item.id === matchId);
       if (!match) return this.toast("Evento não encontrado.", true);
-      if (new Date(match.starts_at) <= new Date()) return this.toast("Eventos já iniciados permanecem no histórico e não podem ser editados.", true);
+      if (this.isMatchStarted(match)) return this.toast("Eventos já iniciados não podem ser editados.", true);
       const recurring = Number(match.recurrence_total || 1) > 1;
-      this.modal("Editar evento", `<form id="matchEditForm" class="form-grid"><div class="notice"><strong>${escapeHtml(match.title)}</strong><br>${recurring ? "As alterações serão aplicadas somente a esta ocorrência da série." : "Altere os dados operacionais deste evento."}</div><div class="field-row"><div class="field"><label>Máximo de jogadores</label><input name="max_players" type="number" min="4" max="60" value="${Number(match.max_players)}" required></div><div class="field"><label>Jogadores por time <span class="optional-label">opcional</span></label><input name="players_per_team" type="number" min="2" max="11" value="${match.players_per_team == null ? "" : Number(match.players_per_team)}" placeholder="Não definido"></div></div><div class="field-help">A quantidade de times é definida separadamente na aba Times.</div><div class="field"><label>Observações</label><textarea name="notes" placeholder="Uniforme, prazo, regras...">${escapeHtml(match.notes || "")}</textarea></div><button class="btn btn-primary btn-block">Salvar alterações</button></form>`, (root, close) => {
+      this.modal("Editar evento", `<form id="matchEditForm" class="form-grid"><div class="notice"><strong>${escapeHtml(match.title)}</strong><br>${recurring ? "As alterações serão aplicadas somente a esta ocorrência da série." : "Altere os dados operacionais deste evento."}</div><div class="field"><label>Duração do evento</label><input name="duration_minutes" type="number" min="15" max="480" step="15" value="${matchDuration(match)}" required inputmode="numeric"><small>Horário atual: ${escapeHtml(matchSchedule(match))}</small></div><div class="field-row"><div class="field"><label>Máximo de jogadores</label><input name="max_players" type="number" min="4" max="60" value="${Number(match.max_players)}" required></div><div class="field"><label>Jogadores por time <span class="optional-label">opcional</span></label><input name="players_per_team" type="number" min="2" max="11" value="${match.players_per_team == null ? "" : Number(match.players_per_team)}" placeholder="Não definido"></div></div><div class="field-help">A quantidade de times é definida separadamente na aba Times.</div><div class="field"><label>Observações</label><textarea name="notes" placeholder="Uniforme, prazo, regras...">${escapeHtml(match.notes || "")}</textarea></div><button class="btn btn-primary btn-block">Salvar alterações</button></form>`, (root, close) => {
         $("#matchEditForm", root).addEventListener("submit", async event => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
@@ -2205,6 +2262,7 @@
           await this.repo.updateMatchSettings(matchId, {
             maxPlayers: Number(form.get("max_players")),
             playersPerTeam: rawPlayersPerTeam ? Number(rawPlayersPerTeam) : null,
+            durationMinutes: Number(form.get("duration_minutes")),
             notes: form.get("notes") || ""
           });
           this.state = this.repo.state;
@@ -2228,7 +2286,7 @@
     openWaitlistDraw(matchId) {
       if (!this.canManageMatches()) return this.toast("Somente administrador e organizador podem realizar o sorteio.", true);
       const match = this.state.matches.find(item => item.id === matchId);
-      if (!match || new Date(match.starts_at) <= new Date()) return this.toast("O sorteio está disponível apenas em eventos futuros.", true);
+      if (!match || this.isHistoricalMatch(match)) return this.toast("O sorteio foi encerrado com a transferência do evento para o histórico.", true);
       const eligibleAttendance = this.attendanceFor(matchId).filter(item => ["confirmed", "waitlist"].includes(item.status));
       const eligiblePlayers = eligibleAttendance.map(item => this.player(item.player_id)).filter(Boolean).sort((a, b) => String(a.name).localeCompare(String(b.name), "pt-BR"));
       if (eligiblePlayers.length < 2) return this.toast("São necessárias ao menos duas presenças confirmadas para realizar o sorteio.", true);
@@ -2317,7 +2375,7 @@
     openAttendanceManager(matchId) {
       if (!this.canManageMatches()) return this.toast("Somente administrador e organizador podem gerenciar presenças.", true);
       const match = this.state.matches.find(item => item.id === matchId);
-      if (!match || new Date(match.starts_at) <= new Date()) return this.toast("As presenças de jogos do histórico não podem ser alteradas.", true);
+      if (!match || this.isMatchStarted(match)) return this.toast("As presenças não podem ser alteradas após o início do evento.", true);
       const attendance = new Map(this.attendanceFor(matchId).map(item => [item.player_id, item]));
       const players = this.matchPlayers(matchId).sort((a, b) => String(a.name).localeCompare(String(b.name), "pt-BR"));
       const rows = players.map(player => {
@@ -2351,7 +2409,7 @@
     async setHomeGameResponse(matchId, value) {
       const match = this.state.matches.find(item => item.id === matchId);
       if (!match) return this.toast("Evento não encontrado.", true);
-      if (new Date(match.starts_at) <= new Date()) return this.toast("A confirmação está encerrada para jogos do histórico.", true);
+      if (this.isMatchStarted(match)) return this.toast("A confirmação foi encerrada com o início do evento.", true);
       const player = this.myPlayer();
       if (!player) return this.toast("Seu perfil de jogador não foi encontrado.", true);
       const requestedStatus = value === "out" ? "out" : "confirmed";
@@ -2384,7 +2442,7 @@
       const match = this.state.matches.find(item => item.id === matchId);
       if (!match) return this.toast("Evento não encontrado.", true);
       if (!match.bbq_enabled) return this.toast("Este evento não possui churrasco configurado.", true);
-      if (new Date(match.starts_at) <= new Date()) return this.toast("A confirmação do churrasco está encerrada.", true);
+      if (this.isMatchStarted(match)) return this.toast("A confirmação do churrasco foi encerrada com o início do evento.", true);
       const player = this.myPlayer();
       if (!player) return this.toast("Seu perfil de jogador não foi encontrado.", true);
       const attending = value === "yes";
@@ -2399,7 +2457,7 @@
     openRsvp(matchId) {
       const match = this.state.matches.find(item => item.id === matchId);
       if (!match) return this.toast("Crie um jogo primeiro.", true);
-      if (new Date(match.starts_at) <= new Date()) return this.toast("A confirmação está encerrada para jogos do histórico.", true);
+      if (this.isMatchStarted(match)) return this.toast("A confirmação foi encerrada com o início do evento.", true);
       const player = this.myPlayer();
       if (!player) return this.toast("Seu perfil de jogador não foi encontrado.", true);
       const current = this.attendanceFor(matchId).find(item => item.player_id === player.id) || {};
@@ -2407,7 +2465,7 @@
       const waitlistNotice = current.status === "waitlist" ? `<div class="notice attendance-waitlist-notice"><strong>Você está na espera inicial</strong><br>Ao manter “Vou”, sua intenção de participar permanece registrada conforme a regra do evento.</div>` : "";
       const gameOptions = [["confirmed", "Vou"], ["out", "Não vou"]].map(([value, label]) => `<label class="radio-card response-radio-card"><input type="radio" name="status" value="${value}" required ${selectedStatus === value ? "checked" : ""}><span>${label}</span></label>`).join("");
       const bbqOptions = match.bbq_enabled ? `<div class="response-modal-section"><strong>Churrasco</strong><small>Esta resposta é independente da presença no jogo.</small><div class="radio-grid">${[["yes", "Vou"], ["no", "Não vou"]].map(([value, label]) => `<label class="radio-card response-radio-card"><input type="radio" name="bbq_status" value="${value}" ${current.bbq_responded && ((value === "yes") === Boolean(current.bbq)) ? "checked" : ""}><span>${label}</span></label>`).join("")}</div></div>` : "";
-      this.modal("Minhas respostas", `<form id="rsvpForm" class="form-grid"><div class="notice"><strong>${escapeHtml(match.title)}</strong><br>${escapeHtml(shortDate(match.starts_at))} · ${escapeHtml(match.location)}</div>${waitlistNotice}<div class="response-modal-section"><strong>Jogo</strong><small>Informe se participará desta partida.</small><div class="radio-grid">${gameOptions}</div></div>${bbqOptions}<button class="btn btn-primary btn-block">Salvar respostas</button></form>`, (root, close) => {
+      this.modal("Minhas respostas", `<form id="rsvpForm" class="form-grid"><div class="notice"><strong>${escapeHtml(match.title)}</strong><br>${escapeHtml(matchSchedule(match))} · ${escapeHtml(match.location)}</div>${waitlistNotice}<div class="response-modal-section"><strong>Jogo</strong><small>Informe se participará desta partida.</small><div class="radio-grid">${gameOptions}</div></div>${bbqOptions}<button class="btn btn-primary btn-block">Salvar respostas</button></form>`, (root, close) => {
         $("#rsvpForm", root).addEventListener("submit", async event => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
@@ -2687,14 +2745,14 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         return `<label class="batch-member-row batch-payment-row"><input class="batch-payment-checkbox" type="checkbox" name="charge_ids" value="${charge.id}" data-amount="${charge.remaining}"><span class="batch-member-avatar">${this.personAvatar(charge.player)}</span><span><strong>${escapeHtml(charge.player.name)}</strong><small>${escapeHtml(charge.description)} · vence ${escapeHtml(dueDate)}</small><b class="batch-payment-balance">${partialLabel}Baixar ${money(charge.remaining)}</b></span></label>`;
       }).join("");
 
-      this.modal("Pagamentos em lote", `<form id="batchPaymentForm" class="batch-charge-layout"><div class="batch-charge-top"><button type="button" class="batch-info-button" id="batchPaymentInfo" aria-label="Informações sobre pagamentos em lote">!</button><div class="field"><label>Identificação dos lançamentos</label><input name="description" required minlength="2" maxlength="200" value="Pagamento em lote"></div><div class="form-grid two-columns"><div class="field"><label>Forma de pagamento</label><select name="method"><option value="manual">Manual</option><option value="pix">Pix</option><option value="cash">Dinheiro</option><option value="transfer">Transferência</option><option value="card">Cartão</option></select></div><div class="field"><label>Data do pagamento</label><input name="paid_date" type="date" value="${today}" required></div></div><div class="batch-selection-head"><div><strong>Selecionar pendências</strong><small id="batchPaymentSelectedCount">0 selecionada(s)</small></div><div><button type="button" class="text-action" id="batchPaymentSelectAll">Selecionar todas</button><button type="button" class="text-action" id="batchPaymentClearAll">Limpar</button></div></div></div><div class="batch-member-list">${chargeRows}</div><div class="batch-charge-footer"><strong id="batchPaymentFooter">Nenhuma pendência selecionada</strong><button id="batchPaymentSubmit" class="btn btn-primary btn-block" type="submit" disabled>Baixar pagamentos</button></div></form>`, (root, close) => {
+      this.modal("Pagamentos em lote", `<form id="batchPaymentForm" class="batch-charge-layout"><div class="batch-charge-top"><button type="button" class="batch-info-button" id="batchPaymentInfo" aria-label="Informações sobre pagamentos em lote">!</button><div class="field"><label>Identificação dos pagamentos <span class="optional-label">opcional</span></label><input name="description" maxlength="200" placeholder="Em branco, utiliza a descrição de cada cobrança"></div><div class="form-grid two-columns"><div class="field"><label>Forma de pagamento</label><select name="method"><option value="pix">Pix</option><option value="cash">Dinheiro</option><option value="card">Cartão</option></select></div><div class="field"><label>Data do pagamento</label><input name="paid_date" type="date" value="${today}" required></div></div><div class="batch-selection-head"><div><strong>Selecionar pendências</strong><small id="batchPaymentSelectedCount">0 selecionada(s)</small></div><div><button type="button" class="text-action" id="batchPaymentSelectAll">Selecionar todas</button><button type="button" class="text-action" id="batchPaymentClearAll">Limpar</button></div></div></div><div class="batch-member-list">${chargeRows}</div><div class="batch-charge-footer"><strong id="batchPaymentFooter">Nenhuma pendência selecionada</strong><button id="batchPaymentSubmit" class="btn btn-primary btn-block" type="submit" disabled>Baixar pagamentos</button></div></form>`, (root, close) => {
         const form = $("#batchPaymentForm", root);
         const checkboxes = $$(".batch-payment-checkbox", root);
         const counter = $("#batchPaymentSelectedCount", root);
         const footer = $("#batchPaymentFooter", root);
         const submit = $("#batchPaymentSubmit", root);
 
-        $("#batchPaymentInfo", root)?.addEventListener("click", () => alert("Cada item representa uma pendência já criada. Ao confirmar, o aplicativo lançará o saldo restante como pagamento, vinculará a entrada à pendência e marcará todas as selecionadas como pagas. Se um item falhar, nenhuma baixa do lote será aplicada."));
+        $("#batchPaymentInfo", root)?.addEventListener("click", () => alert("Cada item representa uma pendência já criada. Se a identificação ficar em branco, o pagamento utilizará a descrição da própria cobrança. Ao confirmar, o aplicativo lançará o saldo restante, vinculará a entrada e marcará todas as selecionadas como pagas. Se um item falhar, nenhuma baixa do lote será aplicada."));
 
         const updateSelection = () => {
           const selected = checkboxes.filter(item => item.checked);
@@ -2715,13 +2773,12 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
           const data = new FormData(form);
           const chargeIds = data.getAll("charge_ids").map(String).filter(Boolean);
           const description = String(data.get("description") || "").trim();
-          const method = String(data.get("method") || "manual");
+          const method = String(data.get("method") || "pix");
           const paidDate = String(data.get("paid_date") || today);
           const selected = checkboxes.filter(item => item.checked);
           const selectedTotal = selected.reduce((sum, item) => sum + Number(item.dataset.amount || 0), 0);
 
           if (!chargeIds.length) return this.toast("Selecione ao menos uma pendência.", true);
-          if (description.length < 2) return this.toast("Informe uma identificação válida.", true);
           if (!paidDate) return this.toast("Informe a data dos pagamentos.", true);
           if (!confirm(`Baixar ${chargeIds.length} pendência(s), totalizando ${money(selectedTotal)}?\n\nOs pagamentos serão vinculados e as pendências selecionadas serão marcadas como pagas.`)) return;
 
@@ -2770,7 +2827,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       });
       const rows = guests.map(player => {
         const match = this.state.matches.find(item => item.id === player.guest_match_id);
-        const eventLabel = match ? `${match.title} · ${shortDate(match.starts_at)}` : "Evento indisponível";
+        const eventLabel = match ? `${match.title} · ${matchSchedule(match)}` : "Evento indisponível";
         return `<button type="button" class="card list-row guest-manage-row" data-edit-guest="${player.id}">${this.personAvatar(player)}<div class="list-main"><strong>${escapeHtml(player.name)}</strong><small>${playerPositionHtml(player)} · ${escapeHtml(eventLabel)}</small></div><span class="guest-badge">Convidado</span><strong>›</strong></button>`;
       }).join("");
       this.modal("Convidados por evento", `<button class="btn btn-primary btn-block" id="addPlayer">+ Incluir convidado</button><div class="section-title"><h2>Convidados cadastrados</h2><small>Visíveis somente no evento escolhido.</small></div><div class="list">${rows || '<div class="card empty">Nenhum convidado cadastrado.</div>'}</div>`, root => {
@@ -2791,7 +2848,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         .filter(match => new Date(match.starts_at) > new Date() && !["cancelled", "finished"].includes(match.status))
         .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
       if (!player && !futureMatches.length) return this.toast("Crie um evento futuro antes de incluir convidados.", true);
-      const eventOptions = futureMatches.map(match => `<option value="${match.id}" ${player?.guest_match_id === match.id ? "selected" : ""}>${escapeHtml(match.title)} · ${escapeHtml(shortDate(match.starts_at))}</option>`).join("");
+      const eventOptions = futureMatches.map(match => `<option value="${match.id}" ${player?.guest_match_id === match.id ? "selected" : ""}>${escapeHtml(match.title)} · ${escapeHtml(matchSchedule(match))}</option>`).join("");
       const positionItems = positionOptions.map(position => `<option value="${position}" ${player?.primary_position === position ? "selected" : ""}>${position}</option>`).join("");
       const title = player ? "Editar convidado" : "Incluir convidado";
       this.modal(title, `<form id="playerForm" class="form-grid" novalidate><div class="field"><label>Evento</label><select name="match_id" required ${player ? "disabled" : ""}><option value="">Selecione o evento</option>${eventOptions}</select>${player ? `<input type="hidden" name="match_id" value="${player.guest_match_id}">` : ""}</div><div class="field"><label>Nome</label><input name="name" required minlength="2" maxlength="80" autocomplete="off" value="${escapeHtml(player?.name || "")}" placeholder="Ex.: João da Silva"><small>Letras, espaços, ponto, apóstrofo e hífen.</small></div><div class="field"><label>Apelido <span class="optional-label">opcional</span></label><input name="nickname" maxlength="40" autocomplete="off" value="${escapeHtml(player?.nickname || "")}" placeholder="Ex.: João"></div><div class="field"><label>Posição</label><select name="position" required><option value="">Selecione a posição</option>${positionItems}</select></div><label class="check-row"><input name="goalkeeper" type="checkbox" ${player?.goalkeeper ? "checked" : ""}> Também joga no gol</label><button class="btn btn-primary btn-block" type="submit">${player ? "Salvar alterações" : "Incluir convidado"}</button>${player ? '<button class="btn btn-danger-outline btn-block" type="button" id="deleteGuest">Excluir convidado</button>' : ""}</form>`, (root, close) => {
@@ -3475,6 +3532,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     async logout() {
       if (!confirm("Deseja sair da sua conta neste aparelho?")) return;
       clearInterval(this.accessCheckTimer);
+      clearInterval(this.matchTimelineTimer);
       await this.disablePushNotifications(true);
       await this.repo.signOut();
       localStorage.removeItem("tamoon-current-group");
