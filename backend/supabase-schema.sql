@@ -70,6 +70,7 @@ create table if not exists public.matches (
   group_id uuid not null references public.groups(id) on delete cascade,
   title text not null default 'Pelada semanal',
   starts_at timestamptz not null,
+  duration_minutes integer not null default 60 check (duration_minutes between 15 and 480),
   location text not null,
   max_players integer not null default 12 check (max_players between 4 and 60),
   players_per_team integer not null default 6 check (players_per_team between 2 and 11),
@@ -742,6 +743,147 @@ begin
 end;
 $$;
 
+create or replace function public.record_batch_payments(
+  p_group_id uuid,
+  p_charge_ids uuid[],
+  p_description text default null,
+  p_method text default 'pix',
+  p_paid_at timestamptz default now()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_charge_ids uuid[];
+  v_charge_id uuid;
+  v_player_id uuid;
+  v_charge_description text;
+  v_charge_amount numeric(12,2);
+  v_charge_status text;
+  v_paid_before numeric(12,2);
+  v_remaining numeric(12,2);
+  v_payment_id uuid;
+  v_description text;
+  v_method text;
+  v_paid_at timestamptz;
+  v_created_count integer := 0;
+  v_total_amount numeric(12,2) := 0;
+  v_payments jsonb := '[]'::jsonb;
+begin
+  if not public.can_manage_finance(p_group_id) then
+    raise exception 'Sem permissão para registrar pagamentos em lote';
+  end if;
+
+  select array_agg(item.charge_id order by item.charge_id)
+    into v_charge_ids
+  from (
+    select distinct charge_id
+    from unnest(coalesce(p_charge_ids, array[]::uuid[])) as selected(charge_id)
+    where charge_id is not null
+  ) item;
+
+  if coalesce(cardinality(v_charge_ids), 0) = 0 then
+    raise exception 'Selecione ao menos uma pendência';
+  end if;
+
+  v_description := nullif(trim(coalesce(p_description, '')), '');
+  if v_description is not null and char_length(v_description) > 200 then
+    raise exception 'A descrição deve ter no máximo 200 caracteres';
+  end if;
+
+  v_method := lower(trim(coalesce(p_method, 'pix')));
+  if v_method not in ('pix', 'cash', 'card') then
+    raise exception 'Forma de pagamento inválida. Use Pix, Dinheiro ou Cartão';
+  end if;
+  v_paid_at := coalesce(p_paid_at, now());
+
+  foreach v_charge_id in array v_charge_ids loop
+    select
+      c.player_id,
+      c.description,
+      c.amount,
+      c.status
+    into
+      v_player_id,
+      v_charge_description,
+      v_charge_amount,
+      v_charge_status
+    from public.charges c
+    where c.id = v_charge_id
+      and c.group_id = p_group_id
+    for update;
+
+    if not found then
+      raise exception 'Uma das pendências selecionadas não pertence ao grupo ou não existe';
+    end if;
+
+    if v_player_id is null then
+      raise exception 'A pendência "%" não possui membro vinculado', v_charge_description;
+    end if;
+
+    if v_charge_status in ('paid', 'cancelled') then
+      raise exception 'A pendência "%" já está encerrada', v_charge_description;
+    end if;
+
+    if not exists (
+      select 1
+      from public.players p
+      where p.id = v_player_id
+        and p.group_id = p_group_id
+    ) then
+      raise exception 'O membro vinculado à pendência "%" não é válido', v_charge_description;
+    end if;
+
+    select coalesce(sum(p.amount), 0)
+      into v_paid_before
+    from public.payments p
+    where p.group_id = p_group_id
+      and p.charge_id = v_charge_id;
+
+    v_remaining := greatest(v_charge_amount - v_paid_before, 0);
+
+    if v_remaining <= 0 then
+      raise exception 'A pendência "%" não possui saldo restante', v_charge_description;
+    end if;
+
+    insert into public.payments(
+      group_id, player_id, charge_id, description, amount, method, paid_at, recorded_by
+    ) values (
+      p_group_id,
+      v_player_id,
+      v_charge_id,
+      coalesce(v_description, v_charge_description),
+      v_remaining,
+      v_method,
+      v_paid_at,
+      auth.uid()
+    ) returning id into v_payment_id;
+
+    update public.charges
+       set status = 'paid'
+     where id = v_charge_id
+       and group_id = p_group_id;
+
+    v_created_count := v_created_count + 1;
+    v_total_amount := v_total_amount + v_remaining;
+    v_payments := v_payments || jsonb_build_array(jsonb_build_object(
+      'id', v_payment_id,
+      'charge_id', v_charge_id,
+      'player_id', v_player_id,
+      'amount', v_remaining
+    ));
+  end loop;
+
+  return jsonb_build_object(
+    'created_count', v_created_count,
+    'total_amount', v_total_amount,
+    'payments', v_payments
+  );
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- RLS
 -- ---------------------------------------------------------------------------
@@ -1055,6 +1197,7 @@ revoke all on function public.join_group_by_code(text) from public;
 revoke all on function public.update_my_profile(text) from public;
 revoke all on function public.replace_match_assignments(uuid, jsonb) from public;
 revoke all on function public.record_payment(uuid, uuid, uuid, text, numeric, text, timestamptz) from public;
+revoke all on function public.record_batch_payments(uuid, uuid[], text, text, timestamptz) from public;
 
 grant execute on function public.has_group_role(uuid, text[]) to authenticated;
 grant execute on function public.is_group_member(uuid) to authenticated;
@@ -1068,6 +1211,7 @@ grant execute on function public.join_group_by_code(text) to authenticated;
 grant execute on function public.update_my_profile(text) to authenticated;
 grant execute on function public.replace_match_assignments(uuid, jsonb) to authenticated;
 grant execute on function public.record_payment(uuid, uuid, uuid, text, numeric, text, timestamptz) to authenticated;
+grant execute on function public.record_batch_payments(uuid, uuid[], text, text, timestamptz) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Realtime
@@ -2573,11 +2717,24 @@ alter table public.matches
   add constraint matches_team_count_check
   check (team_count is null or team_count between 2 and 12);
 
+alter table public.matches
+  add column if not exists duration_minutes integer not null default 60;
+
+alter table public.matches
+  drop constraint if exists matches_duration_minutes_check;
+
+alter table public.matches
+  add constraint matches_duration_minutes_check
+  check (duration_minutes between 15 and 480);
+
 -- Criação de uma pelada ou série semanal com jogadores por time opcional.
+drop function if exists public.create_match_schedule(uuid,text,timestamptz,text,integer,integer,boolean,numeric,text,integer);
+
 create or replace function public.create_match_schedule(
   p_group_id uuid,
   p_title text,
   p_starts_at timestamptz,
+  p_duration_minutes integer,
   p_location text,
   p_max_players integer default 12,
   p_players_per_team integer default null,
@@ -2614,6 +2771,10 @@ begin
     raise exception 'A primeira pelada deve ter data futura';
   end if;
 
+  if p_duration_minutes not between 15 and 480 then
+    raise exception 'A duração do evento deve ficar entre 15 e 480 minutos';
+  end if;
+
   if char_length(trim(coalesce(p_location, ''))) < 2 then
     raise exception 'Local da pelada inválido';
   end if;
@@ -2643,6 +2804,7 @@ begin
       group_id,
       title,
       starts_at,
+      duration_minutes,
       location,
       max_players,
       players_per_team,
@@ -2658,6 +2820,7 @@ begin
       p_group_id,
       trim(p_title),
       p_starts_at + ((v_index - 1) * interval '7 days'),
+      p_duration_minutes,
       trim(p_location),
       p_max_players,
       p_players_per_team,
@@ -2679,10 +2842,13 @@ end;
 $$;
 
 -- Edição limitada aos dados operacionais solicitados para uma ocorrência futura.
+drop function if exists public.update_match_settings(uuid,integer,integer,text);
+
 create or replace function public.update_match_settings(
   p_match_id uuid,
   p_max_players integer,
   p_players_per_team integer default null,
+  p_duration_minutes integer default 60,
   p_notes text default ''
 )
 returns jsonb
@@ -2727,9 +2893,14 @@ begin
     raise exception 'Quantidade de jogadores por time inválida';
   end if;
 
+  if p_duration_minutes not between 15 and 480 then
+    raise exception 'A duração do evento deve ficar entre 15 e 480 minutos';
+  end if;
+
   update public.matches
   set max_players = p_max_players,
       players_per_team = p_players_per_team,
+      duration_minutes = p_duration_minutes,
       notes = left(coalesce(p_notes, ''), 2000),
       updated_at = now()
   where id = p_match_id;
@@ -2748,6 +2919,7 @@ begin
       'match_id', p_match_id,
       'max_players', p_max_players,
       'players_per_team', p_players_per_team,
+      'duration_minutes', p_duration_minutes,
       'assignments_cleared', v_assignments_cleared
     )
   );
@@ -2756,6 +2928,7 @@ begin
     'match_id', p_match_id,
     'max_players', p_max_players,
     'players_per_team', p_players_per_team,
+    'duration_minutes', p_duration_minutes,
     'assignments_cleared', v_assignments_cleared
   );
 end;
@@ -3088,13 +3261,16 @@ as $$
 declare
   v_group_id uuid;
   v_player_count integer;
+  v_starts_at timestamptz;
+  v_duration_minutes integer;
+  v_status text;
 begin
   if auth.uid() is null then
     raise exception 'Usuário não autenticado';
   end if;
 
-  select m.group_id
-  into v_group_id
+  select m.group_id, m.starts_at, m.duration_minutes, m.status
+  into v_group_id, v_starts_at, v_duration_minutes, v_status
   from public.matches m
   where m.id = p_match_id
   for update;
@@ -3105,6 +3281,14 @@ begin
 
   if not public.can_manage_matches(v_group_id) then
     raise exception 'Sem permissão para formar os times';
+  end if;
+
+  if v_status in ('cancelled', 'finished') then
+    raise exception 'O evento não está disponível para separar times';
+  end if;
+
+  if now() >= v_starts_at + (v_duration_minutes * interval '1 minute' / 2) then
+    raise exception 'O prazo para separar os times foi encerrado';
   end if;
 
   select count(*)::integer
@@ -3142,17 +3326,17 @@ begin
 end;
 $$;
 
-revoke all on function public.create_match_schedule(uuid,text,timestamptz,text,integer,integer,boolean,numeric,text,integer) from public;
-grant execute on function public.create_match_schedule(uuid,text,timestamptz,text,integer,integer,boolean,numeric,text,integer) to authenticated;
+revoke all on function public.create_match_schedule(uuid,text,timestamptz,integer,text,integer,integer,boolean,numeric,text,integer) from public;
+grant execute on function public.create_match_schedule(uuid,text,timestamptz,integer,text,integer,integer,boolean,numeric,text,integer) to authenticated;
 
-revoke all on function public.update_match_settings(uuid,integer,integer,text) from public;
-grant execute on function public.update_match_settings(uuid,integer,integer,text) to authenticated;
+revoke all on function public.update_match_settings(uuid,integer,integer,integer,text) from public;
+grant execute on function public.update_match_settings(uuid,integer,integer,integer,text) to authenticated;
 
 revoke all on function public.clear_match_waitlist_draw(uuid) from public;
 grant execute on function public.clear_match_waitlist_draw(uuid) to authenticated;
 
 revoke all on function public.balance_match_teams(uuid) from public;
-grant execute on function public.balance_match_teams(uuid) to authenticated;
+revoke execute on function public.balance_match_teams(uuid) from authenticated;
 
 revoke all on function public.balance_match_teams_with_count(uuid,integer) from public;
 grant execute on function public.balance_match_teams_with_count(uuid,integer) to authenticated;
