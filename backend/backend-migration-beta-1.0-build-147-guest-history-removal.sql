@@ -1,90 +1,17 @@
--- Tâmo On — Beta 1.0 Build 146 / Database Build 143
--- Atalhos práticos da Comunidade, histórico imutável de convidados
--- e reutilização segura do último cadastro em um novo evento.
+-- Tâmo On — Beta 1.0 Build 147 / Database Build 144
+-- Remoção segura de convidados da lista histórica, bloqueio durante toda a
+-- duração do evento e preservação dos registros reais da partida.
 
 begin;
 
--- Cada convidado passa a ter uma identidade estável entre participações.
--- A participação continua sendo um registro separado por evento.
 alter table public.players
-  add column if not exists guest_profile_id uuid;
+  add column if not exists guest_history_archived_at timestamptz;
 
-with normalized_guests as (
-  select
-    p.group_id,
-    lower(regexp_replace(trim(p.name), '[[:space:]]+', ' ', 'g')) as normalized_name,
-    lower(regexp_replace(trim(coalesce(p.nickname, '')), '[[:space:]]+', ' ', 'g')) as normalized_nickname
-  from public.players p
-  where p.guest_match_id is not null
-    and p.guest_profile_id is null
-  group by
-    p.group_id,
-    lower(regexp_replace(trim(p.name), '[[:space:]]+', ' ', 'g')),
-    lower(regexp_replace(trim(coalesce(p.nickname, '')), '[[:space:]]+', ' ', 'g'))
-), guest_identities as (
-  select
-    n.group_id,
-    n.normalized_name,
-    n.normalized_nickname,
-    gen_random_uuid() as guest_profile_id
-  from normalized_guests n
-)
-update public.players p
-set guest_profile_id = i.guest_profile_id
-from guest_identities i
-where p.guest_match_id is not null
-  and p.guest_profile_id is null
-  and p.group_id = i.group_id
-  and lower(regexp_replace(trim(p.name), '[[:space:]]+', ' ', 'g')) = i.normalized_name
-  and lower(regexp_replace(trim(coalesce(p.nickname, '')), '[[:space:]]+', ' ', 'g')) = i.normalized_nickname;
+create index if not exists players_guest_history_active_idx
+  on public.players(group_id, guest_match_id)
+  where guest_match_id is not null
+    and guest_history_archived_at is null;
 
-create index if not exists players_guest_profile_idx
-  on public.players(group_id, guest_profile_id)
-  where guest_profile_id is not null;
-
--- Novos cadastros manuais reutilizam a identidade conhecida quando nome e
--- apelido coincidem; caso contrário, recebem uma nova identidade.
-create or replace function public.assign_match_guest_profile_id()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_existing_profile_id uuid;
-begin
-  if new.guest_match_id is null or new.guest_profile_id is not null then
-    return new;
-  end if;
-
-  select p.guest_profile_id
-  into v_existing_profile_id
-  from public.players p
-  where p.group_id = new.group_id
-    and p.guest_match_id is not null
-    and p.guest_profile_id is not null
-    and lower(regexp_replace(trim(p.name), '[[:space:]]+', ' ', 'g'))
-      = lower(regexp_replace(trim(new.name), '[[:space:]]+', ' ', 'g'))
-    and lower(regexp_replace(trim(coalesce(p.nickname, '')), '[[:space:]]+', ' ', 'g'))
-      = lower(regexp_replace(trim(coalesce(new.nickname, '')), '[[:space:]]+', ' ', 'g'))
-  order by p.created_at desc
-  limit 1;
-
-  new.guest_profile_id := coalesce(v_existing_profile_id, gen_random_uuid());
-  return new;
-end;
-$$;
-
-drop trigger if exists players_assign_match_guest_profile_id
-  on public.players;
-
-create trigger players_assign_match_guest_profile_id
-before insert on public.players
-for each row
-execute function public.assign_match_guest_profile_id();
-
--- Proteção central: depois do marco que transfere o evento ao histórico
--- (início + 50% da duração), nenhum dado da participação pode ser alterado.
 create or replace function public.protect_match_guest_history()
 returns trigger
 language plpgsql
@@ -97,7 +24,10 @@ declare
   v_match_group_id uuid;
   v_starts_at timestamptz;
   v_duration_minutes integer;
+  v_ends_at timestamptz;
+  v_history_at timestamptz;
   v_status text;
+  v_event_in_progress boolean;
 begin
   if tg_op = 'INSERT' then
     v_match_id := new.guest_match_id;
@@ -138,8 +68,6 @@ begin
   where m.id = v_match_id;
 
   if not found then
-    -- Permite somente a limpeza automática provocada pela exclusão do
-    -- evento ou do grupo pai. Inserções e alterações exigem evento válido.
     if tg_op = 'DELETE' then
       return old;
     end if;
@@ -150,29 +78,143 @@ begin
     raise exception 'O convidado e o evento devem pertencer ao mesmo grupo';
   end if;
 
-  if v_status = 'finished'
-     or now() >= v_starts_at
-       + (v_duration_minutes * interval '1 minute' / 2) then
-    raise exception 'O histórico do convidado está encerrado e não pode ser alterado ou excluído';
-  end if;
+  v_ends_at := v_starts_at
+    + (v_duration_minutes * interval '1 minute');
+  v_history_at := v_starts_at
+    + (v_duration_minutes * interval '1 minute' / 2);
+  v_event_in_progress := v_status <> 'cancelled'
+    and now() >= v_starts_at
+    and now() < v_ends_at;
 
   if tg_op = 'DELETE' then
+    -- Exclusões em cascata continuam permitidas quando o grupo pai já está
+    -- sendo removido ou quando o evento pai já deixou de existir.
+    if not exists (
+      select 1
+      from public.groups g
+      where g.id = v_player_group_id
+    ) then
+      return old;
+    end if;
+
+    if v_event_in_progress then
+      raise exception 'O convidado não pode ser excluído enquanto o evento está acontecendo';
+    end if;
+
+    if v_status = 'finished' or now() >= v_ends_at then
+      raise exception 'Registros de partidas realizadas devem ser removidos pela função de arquivamento';
+    end if;
+
     return old;
   end if;
+
+  if tg_op = 'UPDATE'
+     and old.guest_history_archived_at
+       is distinct from new.guest_history_archived_at then
+    if to_jsonb(old) - 'guest_history_archived_at'
+       is distinct from to_jsonb(new) - 'guest_history_archived_at' then
+      raise exception 'O arquivamento não pode alterar os dados históricos do convidado';
+    end if;
+
+    if v_event_in_progress then
+      raise exception 'O convidado não pode ser excluído enquanto o evento está acontecendo';
+    end if;
+
+    if now() < v_ends_at then
+      raise exception 'O convidado só pode ser removido do histórico após o término do evento';
+    end if;
+
+    return new;
+  end if;
+
+  if v_status = 'finished' or now() >= v_history_at then
+    raise exception 'O histórico do convidado está encerrado e não pode ser editado';
+  end if;
+
   return new;
 end;
 $$;
 
-drop trigger if exists players_protect_match_guest_history
-  on public.players;
+create or replace function public.remove_match_guest_record(
+  p_player_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_guest public.players%rowtype;
+  v_match public.matches%rowtype;
+  v_ends_at timestamptz;
+  v_event_in_progress boolean;
+begin
+  if auth.uid() is null then
+    raise exception 'Usuário não autenticado';
+  end if;
 
-create trigger players_protect_match_guest_history
-before insert or update or delete on public.players
-for each row
-execute function public.protect_match_guest_history();
+  select p.*
+  into v_guest
+  from public.players p
+  where p.id = p_player_id
+    and p.guest_match_id is not null
+    and p.guest_history_archived_at is null
+  for update;
 
--- Cria uma nova participação confirmada copiando os dados da participação
--- histórica mais recente daquele convidado no grupo.
+  if not found then
+    raise exception 'Convidado não encontrado ou já removido do histórico';
+  end if;
+
+  if not public.can_manage_matches(v_guest.group_id) then
+    raise exception 'Sem permissão para excluir este convidado';
+  end if;
+
+  select m.*
+  into v_match
+  from public.matches m
+  where m.id = v_guest.guest_match_id
+  for update;
+
+  if not found then
+    raise exception 'Evento do convidado não encontrado';
+  end if;
+
+  v_ends_at := v_match.starts_at
+    + (coalesce(v_match.duration_minutes, 60) * interval '1 minute');
+  v_event_in_progress := v_match.status <> 'cancelled'
+    and now() >= v_match.starts_at
+    and now() < v_ends_at;
+
+  if v_event_in_progress then
+    raise exception 'O convidado não pode ser excluído enquanto o evento está acontecendo';
+  end if;
+
+  if v_match.status = 'cancelled' or now() < v_match.starts_at then
+    delete from public.players
+    where id = p_player_id;
+
+    return jsonb_build_object(
+      'player_id', p_player_id,
+      'match_id', v_guest.guest_match_id,
+      'action', 'deleted'
+    );
+  end if;
+
+  update public.players
+  set guest_history_archived_at = now()
+  where id = p_player_id;
+
+  return jsonb_build_object(
+    'player_id', p_player_id,
+    'match_id', v_guest.guest_match_id,
+    'action', 'archived'
+  );
+end;
+$$;
+
+-- Um registro removido da lista de gerenciamento não pode ser usado como
+-- fonte de um novo convite. Os demais registros históricos do mesmo perfil
+-- continuam disponíveis normalmente.
 create or replace function public.reinvite_match_guest(
   p_source_player_id uuid,
   p_match_id uuid
@@ -199,6 +241,7 @@ begin
   join public.matches m on m.id = p.guest_match_id
   where p.id = p_source_player_id
     and p.guest_match_id is not null
+    and p.guest_history_archived_at is null
     and (
       m.status = 'finished'
       or now() >= m.starts_at
@@ -206,7 +249,7 @@ begin
     );
 
   if not found or v_source_profile_id is null then
-    raise exception 'Selecione um convidado de um evento já encerrado';
+    raise exception 'Selecione um convidado disponível no histórico';
   end if;
 
   if not public.can_manage_matches(v_group_id) then
@@ -234,6 +277,7 @@ begin
   join public.matches m on m.id = p.guest_match_id
   where p.group_id = v_group_id
     and p.guest_profile_id = v_source_profile_id
+    and p.guest_history_archived_at is null
     and (
       m.status = 'finished'
       or now() >= m.starts_at
@@ -246,6 +290,7 @@ begin
     select 1
     from public.players p
     where p.guest_match_id = p_match_id
+      and p.guest_history_archived_at is null
       and (
         p.guest_profile_id = v_source_profile_id
         or (
@@ -310,29 +355,19 @@ begin
 end;
 $$;
 
-revoke all on function public.assign_match_guest_profile_id()
-from public;
+revoke all on function public.protect_match_guest_history() from public;
+revoke all on function public.protect_match_guest_history() from anon;
+revoke all on function public.protect_match_guest_history() from authenticated;
 
-revoke all on function public.assign_match_guest_profile_id()
-from anon;
+revoke all on function public.remove_match_guest_record(uuid) from public;
+revoke all on function public.remove_match_guest_record(uuid) from anon;
+revoke all on function public.remove_match_guest_record(uuid) from authenticated;
+grant execute on function public.remove_match_guest_record(uuid) to authenticated;
 
-revoke all on function public.assign_match_guest_profile_id()
-from authenticated;
-
-revoke all on function public.protect_match_guest_history()
-from public;
-
-revoke all on function public.protect_match_guest_history()
-from anon;
-
-revoke all on function public.protect_match_guest_history()
-from authenticated;
-
-revoke all on function public.reinvite_match_guest(uuid, uuid)
-from public;
-
-grant execute on function public.reinvite_match_guest(uuid, uuid)
-to authenticated;
+revoke all on function public.reinvite_match_guest(uuid, uuid) from public;
+revoke all on function public.reinvite_match_guest(uuid, uuid) from anon;
+revoke all on function public.reinvite_match_guest(uuid, uuid) from authenticated;
+grant execute on function public.reinvite_match_guest(uuid, uuid) to authenticated;
 
 insert into public.app_releases(
   channel,
@@ -347,12 +382,12 @@ insert into public.app_releases(
 values (
   'beta',
   'Beta 1.0',
-  146,
-  143,
+  147,
+  144,
   111,
   true,
   false,
-  'Atalhos Onde jogar e Convidados, histórico imutável e reutilização do último cadastro do convidado.'
+  'Exclusão de convidados antes e depois do evento, bloqueio durante a partida e retorno à tela de Convidados.'
 )
 on conflict (channel, build) do update
 set version = excluded.version,
@@ -366,6 +401,6 @@ set version = excluded.version,
 update public.app_releases
 set active = false
 where channel = 'beta'
-  and build < 146;
+  and build < 147;
 
 commit;

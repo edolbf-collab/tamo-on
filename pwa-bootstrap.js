@@ -1,4 +1,4 @@
-/* Tâmo On Build 146 — registro PWA antecipado, atualização coerente e diagnóstico do service worker. */
+/* Tâmo On Build 147 — registro PWA antecipado, atualização coerente e diagnóstico do service worker. */
 (() => {
   "use strict";
 

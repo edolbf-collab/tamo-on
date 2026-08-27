@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 146,
-  "database": 143,
+  "build": 147,
+  "database": 144,
   "edge": 111,
   "mandatory": false,
-  "notes": "Atalhos Onde jogar e Convidados, histórico imutável e reutilização do último cadastro do convidado.",
-  "label": "Tâmo On Beta 1.0 Build 146"
+  "notes": "Exclusão de convidados antes e depois do evento, bloqueio durante a partida e retorno à tela de Convidados.",
+  "label": "Tâmo On Beta 1.0 Build 147"
 }

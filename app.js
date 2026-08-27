@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 146, database: 143, edge: 111 });
-  const APP_ASSET_TOKEN = "beta146r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 147, database: 144, edge: 111 });
+  const APP_ASSET_TOKEN = "beta147r1";
   const createEmptyState = () => ({
     profile: null,
     groups: [],
@@ -95,7 +95,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta146r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta147r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -545,10 +545,10 @@
     }
 
     async deleteMatchGuest(playerId) {
-      const { data, error } = await this.client.rpc("delete_match_guest", { p_player_id: playerId });
+      const { data, error } = await this.client.rpc("remove_match_guest_record", { p_player_id: playerId });
       if (error) throw error;
       await this.loadGroup(this.state.currentGroupId, { subscribe: false });
-      return data;
+      return data || {};
     }
 
     async reinviteMatchGuest(sourcePlayerId, matchId) {
@@ -1204,7 +1204,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta146r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta147r1");
       }, true);
     },
 
@@ -1288,7 +1288,7 @@
     canManageFinance() { return ["admin", "treasurer"].includes(this.currentRole()); },
     canSeeRatings() { return this.currentRole() === "admin"; },
     activePlayers() { return (this.state?.players || []).filter(player => player.active !== false && !player.guest_match_id); },
-    guestPlayers() { return (this.state?.players || []).filter(player => Boolean(player.guest_match_id)); },
+    guestPlayers() { return (this.state?.players || []).filter(player => Boolean(player.guest_match_id) && !player.guest_history_archived_at); },
     matchPlayers(matchId) { return (this.state?.players || []).filter(player => player.active !== false && (!player.guest_match_id || player.guest_match_id === matchId)); },
     isGuest(player) { return Boolean(player?.guest_match_id); },
     guestProfileKey(player) {
@@ -1303,6 +1303,19 @@
     isGuestHistoryLocked(player) {
       const match = this.guestMatch(player);
       return !match || this.isHistoricalMatch(match);
+    },
+    isGuestDeletionBlocked(player) {
+      const match = this.guestMatch(player);
+      if (!match || match.status === "cancelled") return false;
+      const now = new Date();
+      return new Date(match.starts_at) <= now && now < matchEndAt(match);
+    },
+    keepGuestsListOnModalClose(root) {
+      const returnToGuests = () => setTimeout(() => this.openPlayers(), 0);
+      $(".modal-close", root)?.addEventListener("click", returnToGuests, { once: true });
+      $(".modal-backdrop", root)?.addEventListener("click", event => {
+        if (event.target.classList.contains("modal-backdrop")) returnToGuests();
+      });
     },
     reusableGuestProfiles() {
       const latestByProfile = new Map();
@@ -2882,7 +2895,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       };
       const openRows = openGuests.map(recordRow).join("");
       const historyRows = historyGuests.map(recordRow).join("");
-      this.modal("Convidados", `<button class="btn btn-primary btn-block" id="addPlayer">+ Incluir novo convidado</button>${reusableRows ? `<div class="section-title"><h2>Convidar novamente</h2><small>Reutiliza os dados da participação mais recente.</small></div><div class="list guest-reuse-list">${reusableRows}</div>` : ""}<div class="section-title"><h2>Eventos em aberto</h2><small>Os dados podem ser corrigidos até o evento ser encerrado.</small></div><div class="list">${openRows || '<div class="card empty">Nenhum convidado em evento aberto.</div>'}</div><div class="section-title"><h2>Histórico de participações</h2><small>Registros encerrados são permanentes e somente para consulta.</small></div><div class="list">${historyRows || '<div class="card empty">Nenhuma participação encerrada.</div>'}</div>`, root => {
+      this.modal("Convidados", `<button class="btn btn-primary btn-block" id="addPlayer">+ Incluir novo convidado</button>${reusableRows ? `<div class="section-title"><h2>Convidar novamente</h2><small>Reutiliza os dados da participação mais recente.</small></div><div class="list guest-reuse-list">${reusableRows}</div>` : ""}<div class="section-title"><h2>Eventos em aberto</h2><small>Os dados podem ser corrigidos até o evento ser encerrado.</small></div><div class="list">${openRows || '<div class="card empty">Nenhum convidado em evento aberto.</div>'}</div><div class="section-title"><h2>Histórico de participações</h2><small>Sem edição; pode ser removido da lista após o término do evento.</small></div><div class="list">${historyRows || '<div class="card empty">Nenhuma participação encerrada.</div>'}</div>`, root => {
         $("#addPlayer", root)?.addEventListener("click", event => {
           if (event.currentTarget.disabled) return;
           event.currentTarget.disabled = true;
@@ -2902,11 +2915,34 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       const match = this.guestMatch(player);
       const eventLabel = match ? `${match.title} · ${matchSchedule(match)} · ${match.location}` : "Evento indisponível";
       const canReinvite = this.state.matches.some(item => new Date(item.starts_at) > new Date() && !["cancelled", "finished"].includes(item.status) && !this.guestAlreadyScheduled(player, item.id));
-      this.modal("Registro do convidado", `<div class="notice notice-history"><strong>Histórico preservado</strong><br>Este evento já foi encerrado. Nome, apelido, posição, condição de goleiro e participação não podem mais ser alterados ou excluídos.</div><div class="card guest-history-summary">${this.personAvatar(player)}<div><strong>${escapeHtml(player.name)}</strong><small>${player.nickname ? `Apelido: ${escapeHtml(player.nickname)}<br>` : ""}${playerPositionHtml(player)}<br>${escapeHtml(eventLabel)}</small></div></div>${canReinvite ? '<button type="button" class="btn btn-primary btn-block" id="reinviteHistoricalGuest">Convidar novamente</button>' : '<div class="notice"><strong>Nenhum evento disponível</strong><br>Agende uma nova pelada para convidar este jogador novamente.</div>'}`, (root, close) => {
+      const deletionBlocked = this.isGuestDeletionBlocked(player);
+      const deletionHelp = deletionBlocked && match
+        ? `<div class="notice"><strong>Evento em andamento</strong><br>A exclusão ficará disponível após ${escapeHtml(shortTime(matchEndAt(match)))}.</div>`
+        : "";
+      const deleteButton = `<button type="button" class="btn btn-danger-outline btn-block" id="deleteHistoricalGuest" ${deletionBlocked ? "disabled" : ""}>${deletionBlocked ? "Exclusão disponível após o evento" : "Excluir convidado do histórico"}</button>`;
+      this.modal("Registro do convidado", `<div class="notice notice-history"><strong>Histórico sem edição</strong><br>Nome, apelido, posição e condição de goleiro permanecem preservados. Após o término do evento, este registro pode ser removido da lista de convidados sem alterar os participantes e times da partida.</div><div class="card guest-history-summary">${this.personAvatar(player)}<div><strong>${escapeHtml(player.name)}</strong><small>${player.nickname ? `Apelido: ${escapeHtml(player.nickname)}<br>` : ""}${playerPositionHtml(player)}<br>${escapeHtml(eventLabel)}</small></div></div>${canReinvite ? '<button type="button" class="btn btn-primary btn-block" id="reinviteHistoricalGuest">Convidar novamente</button>' : '<div class="notice"><strong>Nenhum evento disponível</strong><br>Agende uma nova pelada para convidar este jogador novamente.</div>'}${deletionHelp}${deleteButton}`, (root, close) => {
         $("#reinviteHistoricalGuest", root)?.addEventListener("click", () => {
           close();
           setTimeout(() => this.openGuestReinviteForm(player.id), 0);
         }, { once: true });
+        $("#deleteHistoricalGuest", root)?.addEventListener("click", async event => {
+          if (event.currentTarget.disabled || !confirm(`Excluir ${player.name} da lista de convidados?\n\nA participação continuará preservada dentro do histórico da partida.`)) return;
+          event.currentTarget.disabled = true;
+          event.currentTarget.textContent = "Excluindo…";
+          try {
+            await this.repo.deleteMatchGuest(player.id);
+            this.state = this.repo.state;
+            close();
+            this.render();
+            setTimeout(() => this.openPlayers(), 0);
+            this.toast("Convidado removido do histórico de gerenciamento. A partida foi preservada.");
+          } catch (error) {
+            event.currentTarget.disabled = false;
+            event.currentTarget.textContent = "Excluir convidado do histórico";
+            this.toast(error.message || "Não foi possível excluir o convidado do histórico.", true);
+          }
+        }, { once: true });
+        this.keepGuestsListOnModalClose(root);
       });
     },
 
@@ -2937,6 +2973,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
             this.state = this.repo.state;
             close();
             this.render();
+            setTimeout(() => this.openPlayers(), 0);
             this.toast(`${source.name} foi convidado novamente com os dados da última participação.`);
           } catch (error) {
             button.disabled = false;
@@ -2944,6 +2981,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
             this.toast(error.message || "Não foi possível convidar novamente.", true);
           }
         });
+        this.keepGuestsListOnModalClose(root);
       });
     },
 
@@ -2961,7 +2999,11 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       const eventOptions = availableMatches.map(match => `<option value="${match.id}" ${player?.guest_match_id === match.id ? "selected" : ""}>${escapeHtml(match.title)} · ${escapeHtml(matchSchedule(match))}</option>`).join("");
       const positionItems = positionOptions.map(position => `<option value="${position}" ${player?.primary_position === position ? "selected" : ""}>${position}</option>`).join("");
       const title = player ? "Editar convidado" : "Incluir convidado";
-      this.modal(title, `<form id="playerForm" class="form-grid" novalidate><div class="field"><label>Evento</label><select name="match_id" required ${player ? "disabled" : ""}><option value="">Selecione o evento</option>${eventOptions}</select>${player ? `<input type="hidden" name="match_id" value="${player.guest_match_id}">` : ""}</div><div class="field"><label>Nome</label><input name="name" required minlength="2" maxlength="80" autocomplete="off" value="${escapeHtml(player?.name || "")}" placeholder="Ex.: João da Silva"><small>Letras, espaços, ponto, apóstrofo e hífen.</small></div><div class="field"><label>Apelido <span class="optional-label">opcional</span></label><input name="nickname" maxlength="40" autocomplete="off" value="${escapeHtml(player?.nickname || "")}" placeholder="Ex.: João"></div><div class="field"><label>Posição</label><select name="position" required><option value="">Selecione a posição</option>${positionItems}</select></div><label class="check-row"><input name="goalkeeper" type="checkbox" ${player?.goalkeeper ? "checked" : ""}> Também joga no gol</label><button class="btn btn-primary btn-block" type="submit">${player ? "Salvar alterações" : "Incluir convidado"}</button>${player ? '<button class="btn btn-danger-outline btn-block" type="button" id="deleteGuest">Excluir convidado</button>' : ""}</form>`, (root, close) => {
+      const deletionBlocked = player ? this.isGuestDeletionBlocked(player) : false;
+      const deleteControl = player
+        ? `<button class="btn btn-danger-outline btn-block" type="button" id="deleteGuest" ${deletionBlocked ? "disabled" : ""}>${deletionBlocked ? "Não é possível excluir durante o evento" : "Excluir convidado"}</button>`
+        : "";
+      this.modal(title, `<form id="playerForm" class="form-grid" novalidate><div class="field"><label>Evento</label><select name="match_id" required ${player ? "disabled" : ""}><option value="">Selecione o evento</option>${eventOptions}</select>${player ? `<input type="hidden" name="match_id" value="${player.guest_match_id}">` : ""}</div><div class="field"><label>Nome</label><input name="name" required minlength="2" maxlength="80" autocomplete="off" value="${escapeHtml(player?.name || "")}" placeholder="Ex.: João da Silva"><small>Letras, espaços, ponto, apóstrofo e hífen.</small></div><div class="field"><label>Apelido <span class="optional-label">opcional</span></label><input name="nickname" maxlength="40" autocomplete="off" value="${escapeHtml(player?.nickname || "")}" placeholder="Ex.: João"></div><div class="field"><label>Posição</label><select name="position" required><option value="">Selecione a posição</option>${positionItems}</select></div><label class="check-row"><input name="goalkeeper" type="checkbox" ${player?.goalkeeper ? "checked" : ""}> Também joga no gol</label><button class="btn btn-primary btn-block" type="submit">${player ? "Salvar alterações" : "Incluir convidado"}</button>${deleteControl}</form>`, (root, close) => {
         const formEl = $("#playerForm", root);
         let submitting = false;
         formEl.addEventListener("submit", async event => {
@@ -2988,6 +3030,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
             this.state = this.repo.state;
             close();
             this.render();
+            setTimeout(() => this.openPlayers(), 0);
             this.toast(player ? "Dados do convidado atualizados." : "Convidado incluído no evento.");
           } catch (error) {
             submitting = false;
@@ -3003,11 +3046,12 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
           event.currentTarget.disabled = true;
           event.currentTarget.textContent = "Excluindo...";
           try {
-            await this.repo.deleteMatchGuest(player.id);
+            const result = await this.repo.deleteMatchGuest(player.id);
             this.state = this.repo.state;
             close();
             this.render();
-            this.toast("Convidado excluído do evento.");
+            setTimeout(() => this.openPlayers(), 0);
+            this.toast(result.action === "archived" ? "Convidado removido do histórico de gerenciamento." : "Convidado excluído do evento.");
           } catch (error) {
             submitting = false;
             event.currentTarget.disabled = false;
@@ -3015,6 +3059,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
             this.toast(error.message || "Não foi possível excluir o convidado.", true);
           }
         }, { once: true });
+        this.keepGuestsListOnModalClose(root);
       });
     },
 
