@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 145, database: 142, edge: 111 });
-  const APP_ASSET_TOKEN = "beta145r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 146, database: 143, edge: 111 });
+  const APP_ASSET_TOKEN = "beta146r1";
   const createEmptyState = () => ({
     profile: null,
     groups: [],
@@ -95,7 +95,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta145r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta146r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -549,6 +549,16 @@
       if (error) throw error;
       await this.loadGroup(this.state.currentGroupId, { subscribe: false });
       return data;
+    }
+
+    async reinviteMatchGuest(sourcePlayerId, matchId) {
+      const { data, error } = await this.client.rpc("reinvite_match_guest", {
+        p_source_player_id: sourcePlayerId,
+        p_match_id: matchId
+      });
+      if (error) throw error;
+      await this.loadGroup(this.state.currentGroupId, { subscribe: false });
+      return data || {};
     }
 
     async rateMember(groupId, playerId, score) {
@@ -1194,7 +1204,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta145r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta146r1");
       }, true);
     },
 
@@ -1278,9 +1288,37 @@
     canManageFinance() { return ["admin", "treasurer"].includes(this.currentRole()); },
     canSeeRatings() { return this.currentRole() === "admin"; },
     activePlayers() { return (this.state?.players || []).filter(player => player.active !== false && !player.guest_match_id); },
-    guestPlayers() { return (this.state?.players || []).filter(player => player.active !== false && Boolean(player.guest_match_id)); },
+    guestPlayers() { return (this.state?.players || []).filter(player => Boolean(player.guest_match_id)); },
     matchPlayers(matchId) { return (this.state?.players || []).filter(player => player.active !== false && (!player.guest_match_id || player.guest_match_id === matchId)); },
     isGuest(player) { return Boolean(player?.guest_match_id); },
+    guestProfileKey(player) {
+      const profileId = String(player?.guest_profile_id || "").trim();
+      if (profileId) return profileId;
+      const normalize = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
+      return `${normalize(player?.name)}|${normalize(player?.nickname)}`;
+    },
+    guestMatch(player) {
+      return (this.state?.matches || []).find(match => match.id === player?.guest_match_id) || null;
+    },
+    isGuestHistoryLocked(player) {
+      const match = this.guestMatch(player);
+      return !match || this.isHistoricalMatch(match);
+    },
+    reusableGuestProfiles() {
+      const latestByProfile = new Map();
+      this.guestPlayers()
+        .filter(player => this.isGuestHistoryLocked(player))
+        .sort((a, b) => new Date(this.guestMatch(b)?.starts_at || b.created_at || 0) - new Date(this.guestMatch(a)?.starts_at || a.created_at || 0))
+        .forEach(player => {
+          const key = this.guestProfileKey(player);
+          if (key && !latestByProfile.has(key)) latestByProfile.set(key, player);
+        });
+      return [...latestByProfile.values()];
+    },
+    guestAlreadyScheduled(source, matchId) {
+      const sourceKey = this.guestProfileKey(source);
+      return this.guestPlayers().some(player => player.guest_match_id === matchId && this.guestProfileKey(player) === sourceKey);
+    },
     player(id) { return (this.state?.players || []).find(player => player.id === id); },
     memberPlayer(member) { return this.player(member?.player_id) || (this.state?.players || []).find(player => player.user_id === member?.user_id); },
     myPlayer() {
@@ -1410,9 +1448,9 @@
         </section>
         ${notice ? `<button class="home-notice" data-action="announcement-center" data-id="${notice.id}"><span>📣</span><div><strong>${escapeHtml(notice.title)}</strong><small>${escapeHtml(notice.body)}</small></div><b>›</b></button>` : ""}
         <div class="home-quick-grid">
-          <button class="quick-card" data-action="rsvp" data-id="${match?.id || ""}"><span class="quick-icon">✓</span><span><strong>Respostas</strong><small>Revise jogo e churrasco</small></span></button>
+          <button class="quick-card quick-card-coming-soon" data-action="playing-spaces"><span class="quick-icon">⌖</span><span><strong>Onde jogar</strong><small>Em construção</small></span></button>
           <button class="quick-card" data-route="teams"><span class="quick-icon">⇄</span><span><strong>Times</strong><small>Equilíbrio do elenco</small></span></button>
-          <button class="quick-card" data-route="members"><span class="quick-icon">★</span><span><strong>Membros</strong><small>Posições e notas</small></span></button>
+          <button class="quick-card" data-action="players"><span class="quick-icon">＋</span><span><strong>Convidados</strong><small>Incluir no evento</small></span></button>
           <button class="quick-card" data-action="invite"><span class="quick-icon">↗</span><span><strong>Convidar</strong><small>WhatsApp e código</small></span></button>
         </div>
       </section>`;
@@ -1580,7 +1618,7 @@
       const pushConfigured = Boolean(String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim());
       const pushText = !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
       const adminTools = this.state.is_platform_admin ? '<div class="section-title"><h2>Operação do beta</h2><small>Acesso exclusivo da plataforma.</small></div><button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel Beta</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button><button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : "";
-      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Jogadores sem acesso</strong><small>Cadastrar convidado eventual.</small></div><strong>›</strong></button>' : ""}<div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar e escolher outra conta Google.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta fechado</div>`;
+      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>' : ""}<div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar e escolher outra conta Google.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta fechado</div>`;
     },
 
     async handleAction(action, data) {
@@ -1591,6 +1629,7 @@
           rsvp: () => this.openRsvp(data.id || this.nextMatch()?.id),
           "home-game-response": () => this.setHomeGameResponse(data.id, data.value),
           "home-bbq-response": () => this.setHomeBbqResponse(data.id, data.value),
+          "playing-spaces": () => this.toast("Onde jogar está em construção. O acesso será liberado quando a Comunidade for conectada aos espaços parceiros."),
           "draw-teams": () => this.openTeamsForMatch(data.id),
           "configure-teams": () => this.drawTeams(data.id, Number($("#teamCountSelect")?.value || 2)),
           "clear-teams": () => this.undoTeamSeparation(data.id),
@@ -1620,7 +1659,7 @@
           "sign-out": () => this.logout(),
           reload: () => location.reload()
         };
-        if (["new-match", "rsvp", "new-finance", "batch-charge", "batch-payment", "create-group", "join-group", "announcement", "report-problem"].includes(action)) this.repo?.logEvent("ui_action", { action });
+        if (["new-match", "rsvp", "playing-spaces", "players", "new-finance", "batch-charge", "batch-payment", "create-group", "join-group", "announcement", "report-problem"].includes(action)) this.repo?.logEvent("ui_action", { action });
         if (actions[action]) await actions[action]();
       } catch (error) {
         console.error(error);
@@ -2821,22 +2860,90 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     openPlayers() {
       if (!this.canManageMatches()) return this.toast("Somente administrador e organizador podem gerenciar convidados.", true);
       const guests = this.guestPlayers().sort((a, b) => {
-        const matchA = this.state.matches.find(item => item.id === a.guest_match_id);
-        const matchB = this.state.matches.find(item => item.id === b.guest_match_id);
-        return new Date(matchA?.starts_at || 0) - new Date(matchB?.starts_at || 0) || String(a.name).localeCompare(String(b.name), "pt-BR");
+        const matchA = this.guestMatch(a);
+        const matchB = this.guestMatch(b);
+        return new Date(matchB?.starts_at || b.created_at || 0) - new Date(matchA?.starts_at || a.created_at || 0) || String(a.name).localeCompare(String(b.name), "pt-BR");
       });
-      const rows = guests.map(player => {
-        const match = this.state.matches.find(item => item.id === player.guest_match_id);
-        const eventLabel = match ? `${match.title} · ${matchSchedule(match)}` : "Evento indisponível";
-        return `<button type="button" class="card list-row guest-manage-row" data-edit-guest="${player.id}">${this.personAvatar(player)}<div class="list-main"><strong>${escapeHtml(player.name)}</strong><small>${playerPositionHtml(player)} · ${escapeHtml(eventLabel)}</small></div><span class="guest-badge">Convidado</span><strong>›</strong></button>`;
+      const reusable = this.reusableGuestProfiles();
+      const openGuests = guests.filter(player => !this.isGuestHistoryLocked(player));
+      const historyGuests = guests.filter(player => this.isGuestHistoryLocked(player));
+      const reusableRows = reusable.map(player => {
+        const match = this.guestMatch(player);
+        const lastEvent = match ? `${match.title} · ${matchSchedule(match)}` : "Última participação indisponível";
+        return `<button type="button" class="card list-row guest-manage-row guest-reuse-row" data-reinvite-guest="${player.id}">${this.personAvatar(player)}<div class="list-main"><strong>${escapeHtml(player.name)}</strong><small>${playerPositionHtml(player)} · Último evento: ${escapeHtml(lastEvent)}</small></div><span class="guest-reuse-action">Convidar novamente</span><strong>›</strong></button>`;
       }).join("");
-      this.modal("Convidados por evento", `<button class="btn btn-primary btn-block" id="addPlayer">+ Incluir convidado</button><div class="section-title"><h2>Convidados cadastrados</h2><small>Visíveis somente no evento escolhido.</small></div><div class="list">${rows || '<div class="card empty">Nenhum convidado cadastrado.</div>'}</div>`, root => {
+      const recordRow = player => {
+        const match = this.guestMatch(player);
+        const historical = this.isGuestHistoryLocked(player);
+        const eventLabel = match ? `${match.title} · ${matchSchedule(match)}` : "Evento indisponível";
+        const stateLabel = historical ? "Histórico" : this.isMatchStarted(match) ? "Em andamento" : match?.status === "cancelled" ? "Cancelado" : "Em aberto";
+        const action = historical ? "data-view-guest" : "data-edit-guest";
+        return `<button type="button" class="card list-row guest-manage-row ${historical ? "is-history" : ""}" ${action}="${player.id}">${this.personAvatar(player)}<div class="list-main"><strong>${escapeHtml(player.name)}</strong><small>${playerPositionHtml(player)} · ${escapeHtml(eventLabel)}</small></div><span class="guest-record-state ${historical ? "is-locked" : ""}">${historical ? "🔒 " : ""}${stateLabel}</span><strong>›</strong></button>`;
+      };
+      const openRows = openGuests.map(recordRow).join("");
+      const historyRows = historyGuests.map(recordRow).join("");
+      this.modal("Convidados", `<button class="btn btn-primary btn-block" id="addPlayer">+ Incluir novo convidado</button>${reusableRows ? `<div class="section-title"><h2>Convidar novamente</h2><small>Reutiliza os dados da participação mais recente.</small></div><div class="list guest-reuse-list">${reusableRows}</div>` : ""}<div class="section-title"><h2>Eventos em aberto</h2><small>Os dados podem ser corrigidos até o evento ser encerrado.</small></div><div class="list">${openRows || '<div class="card empty">Nenhum convidado em evento aberto.</div>'}</div><div class="section-title"><h2>Histórico de participações</h2><small>Registros encerrados são permanentes e somente para consulta.</small></div><div class="list">${historyRows || '<div class="card empty">Nenhuma participação encerrada.</div>'}</div>`, root => {
         $("#addPlayer", root)?.addEventListener("click", event => {
           if (event.currentTarget.disabled) return;
           event.currentTarget.disabled = true;
           this.openPlayerForm();
         }, { once: true });
         $$('[data-edit-guest]', root).forEach(button => button.addEventListener("click", () => this.openPlayerForm(button.dataset.editGuest), { once: true }));
+        $$('[data-view-guest]', root).forEach(button => button.addEventListener("click", () => this.openGuestHistory(button.dataset.viewGuest), { once: true }));
+        $$('[data-reinvite-guest]', root).forEach(button => button.addEventListener("click", () => this.openGuestReinviteForm(button.dataset.reinviteGuest), { once: true }));
+      });
+    },
+
+    openGuestHistory(playerId) {
+      if (!this.canManageMatches()) return this.toast("Sem permissão para consultar convidados.", true);
+      const player = this.guestPlayers().find(item => item.id === playerId);
+      if (!player) return this.toast("Registro do convidado não encontrado.", true);
+      if (!this.isGuestHistoryLocked(player)) return this.openPlayerForm(playerId);
+      const match = this.guestMatch(player);
+      const eventLabel = match ? `${match.title} · ${matchSchedule(match)} · ${match.location}` : "Evento indisponível";
+      const canReinvite = this.state.matches.some(item => new Date(item.starts_at) > new Date() && !["cancelled", "finished"].includes(item.status) && !this.guestAlreadyScheduled(player, item.id));
+      this.modal("Registro do convidado", `<div class="notice notice-history"><strong>Histórico preservado</strong><br>Este evento já foi encerrado. Nome, apelido, posição, condição de goleiro e participação não podem mais ser alterados ou excluídos.</div><div class="card guest-history-summary">${this.personAvatar(player)}<div><strong>${escapeHtml(player.name)}</strong><small>${player.nickname ? `Apelido: ${escapeHtml(player.nickname)}<br>` : ""}${playerPositionHtml(player)}<br>${escapeHtml(eventLabel)}</small></div></div>${canReinvite ? '<button type="button" class="btn btn-primary btn-block" id="reinviteHistoricalGuest">Convidar novamente</button>' : '<div class="notice"><strong>Nenhum evento disponível</strong><br>Agende uma nova pelada para convidar este jogador novamente.</div>'}`, (root, close) => {
+        $("#reinviteHistoricalGuest", root)?.addEventListener("click", () => {
+          close();
+          setTimeout(() => this.openGuestReinviteForm(player.id), 0);
+        }, { once: true });
+      });
+    },
+
+    openGuestReinviteForm(sourcePlayerId) {
+      if (!this.canManageMatches()) return this.toast("Sem permissão para incluir convidados.", true);
+      const selectedSource = this.guestPlayers().find(item => item.id === sourcePlayerId);
+      if (!selectedSource) return this.toast("Convidado não encontrado.", true);
+      const profileKey = this.guestProfileKey(selectedSource);
+      const source = this.reusableGuestProfiles().find(item => this.guestProfileKey(item) === profileKey) || selectedSource;
+      const sourceMatch = this.guestMatch(source);
+      const eligibleMatches = this.state.matches
+        .filter(match => new Date(match.starts_at) > new Date() && !["cancelled", "finished"].includes(match.status) && !this.guestAlreadyScheduled(source, match.id))
+        .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+      if (!eligibleMatches.length) return this.toast("Este convidado já está incluído nos próximos eventos disponíveis, ou ainda não há uma nova pelada agendada.", true);
+      const eventOptions = eligibleMatches.map(match => `<option value="${match.id}">${escapeHtml(match.title)} · ${escapeHtml(matchSchedule(match))}</option>`).join("");
+      const lastEvent = sourceMatch ? `${sourceMatch.title} · ${matchSchedule(sourceMatch)}` : "Evento anterior indisponível";
+      this.modal("Convidar novamente", `<form id="guestReinviteForm" class="form-grid"><div class="notice notice-success"><strong>${escapeHtml(source.name)}</strong><br>Serão reutilizados os dados da participação mais recente: ${playerPositionHtml(source)}${source.nickname ? ` · ${escapeHtml(source.nickname)}` : ""}.<br><small>Último evento: ${escapeHtml(lastEvent)}</small></div><div class="field"><label>Novo evento</label><select name="match_id" required>${eventOptions}</select></div><div class="guest-reinvite-confirm"><span>✓</span><p>O convidado será incluído como confirmado. O registro anterior permanecerá intacto no histórico.</p></div><button type="submit" class="btn btn-primary btn-block">Confirmar novo convite</button></form>`, (root, close) => {
+        const formEl = $("#guestReinviteForm", root);
+        formEl.addEventListener("submit", async event => {
+          event.preventDefault();
+          const button = event.submitter;
+          const matchId = String(new FormData(formEl).get("match_id") || "");
+          if (!matchId) return this.toast("Selecione o evento.", true);
+          button.disabled = true;
+          button.textContent = "Incluindo…";
+          try {
+            await this.repo.reinviteMatchGuest(source.id, matchId);
+            this.state = this.repo.state;
+            close();
+            this.render();
+            this.toast(`${source.name} foi convidado novamente com os dados da última participação.`);
+          } catch (error) {
+            button.disabled = false;
+            button.textContent = "Confirmar novo convite";
+            this.toast(error.message || "Não foi possível convidar novamente.", true);
+          }
+        });
       });
     },
 
@@ -2844,11 +2951,14 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       if (!this.canManageMatches()) return this.toast("Sem permissão para gerenciar convidados.", true);
       const player = playerId ? this.state.players.find(item => item.id === playerId && item.guest_match_id) : null;
       if (playerId && !player) return this.toast("Convidado não encontrado.", true);
+      if (player && this.isGuestHistoryLocked(player)) return this.openGuestHistory(player.id);
+      const playerMatch = player ? this.guestMatch(player) : null;
       const futureMatches = this.state.matches
         .filter(match => new Date(match.starts_at) > new Date() && !["cancelled", "finished"].includes(match.status))
         .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
       if (!player && !futureMatches.length) return this.toast("Crie um evento futuro antes de incluir convidados.", true);
-      const eventOptions = futureMatches.map(match => `<option value="${match.id}" ${player?.guest_match_id === match.id ? "selected" : ""}>${escapeHtml(match.title)} · ${escapeHtml(matchSchedule(match))}</option>`).join("");
+      const availableMatches = playerMatch && !futureMatches.some(match => match.id === playerMatch.id) ? [playerMatch, ...futureMatches] : futureMatches;
+      const eventOptions = availableMatches.map(match => `<option value="${match.id}" ${player?.guest_match_id === match.id ? "selected" : ""}>${escapeHtml(match.title)} · ${escapeHtml(matchSchedule(match))}</option>`).join("");
       const positionItems = positionOptions.map(position => `<option value="${position}" ${player?.primary_position === position ? "selected" : ""}>${position}</option>`).join("");
       const title = player ? "Editar convidado" : "Incluir convidado";
       this.modal(title, `<form id="playerForm" class="form-grid" novalidate><div class="field"><label>Evento</label><select name="match_id" required ${player ? "disabled" : ""}><option value="">Selecione o evento</option>${eventOptions}</select>${player ? `<input type="hidden" name="match_id" value="${player.guest_match_id}">` : ""}</div><div class="field"><label>Nome</label><input name="name" required minlength="2" maxlength="80" autocomplete="off" value="${escapeHtml(player?.name || "")}" placeholder="Ex.: João da Silva"><small>Letras, espaços, ponto, apóstrofo e hífen.</small></div><div class="field"><label>Apelido <span class="optional-label">opcional</span></label><input name="nickname" maxlength="40" autocomplete="off" value="${escapeHtml(player?.nickname || "")}" placeholder="Ex.: João"></div><div class="field"><label>Posição</label><select name="position" required><option value="">Selecione a posição</option>${positionItems}</select></div><label class="check-row"><input name="goalkeeper" type="checkbox" ${player?.goalkeeper ? "checked" : ""}> Também joga no gol</label><button class="btn btn-primary btn-block" type="submit">${player ? "Salvar alterações" : "Incluir convidado"}</button>${player ? '<button class="btn btn-danger-outline btn-block" type="button" id="deleteGuest">Excluir convidado</button>' : ""}</form>`, (root, close) => {

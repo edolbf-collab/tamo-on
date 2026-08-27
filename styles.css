@@ -327,6 +327,86 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   color: inherit;
   cursor: pointer;
 }
+.guest-manage-row.is-history {
+  border: 1px solid rgba(255, 255, 255, .055);
+  opacity: .92;
+}
+.guest-record-state,
+.guest-reuse-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.guest-record-state {
+  color: #8cec71;
+  background: rgba(30, 209, 122, .11);
+}
+.guest-record-state.is-locked {
+  color: #aebdc3;
+  background: rgba(255, 255, 255, .065);
+}
+.guest-reuse-action {
+  color: var(--lime);
+  background: rgba(30, 209, 122, .09);
+  border: 1px solid rgba(30, 209, 122, .18);
+}
+.guest-reuse-row {
+  border: 1px solid rgba(30, 209, 122, .15);
+  background: linear-gradient(135deg, rgba(30, 209, 122, .065), rgba(255, 255, 255, .025));
+}
+.guest-history-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+.guest-history-summary > div:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+.guest-history-summary small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+.guest-reinvite-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(30, 209, 122, .065);
+  border: 1px solid rgba(30, 209, 122, .15);
+}
+.guest-reinvite-confirm span {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #041207;
+  background: var(--primary);
+  font-weight: 900;
+}
+.guest-reinvite-confirm p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.home-quick-grid .quick-card-coming-soon small {
+  color: #f2c873;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .35px;
+}
 .optional-label {
   font-size: 11px;
   font-weight: 600;

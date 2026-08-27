@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 145,
-  "database": 142,
+  "build": 146,
+  "database": 143,
   "edge": 111,
   "mandatory": false,
-  "notes": "Duração dos eventos, separação dos times disponível até 50% do tempo e pagamentos em lote com descrição opcional e formas simplificadas.",
-  "label": "Tâmo On Beta 1.0 Build 145"
+  "notes": "Atalhos Onde jogar e Convidados, histórico imutável e reutilização do último cadastro do convidado.",
+  "label": "Tâmo On Beta 1.0 Build 146"
 }
