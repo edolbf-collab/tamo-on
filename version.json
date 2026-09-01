@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 147,
-  "database": 144,
+  "build": 148,
+  "database": 145,
   "edge": 111,
   "mandatory": false,
-  "notes": "Exclusão de convidados antes e depois do evento, bloqueio durante a partida e retorno à tela de Convidados.",
-  "label": "Tâmo On Beta 1.0 Build 147"
+  "notes": "Contador de novos avisos no sino e gestão de presença alinhada a Vou e Não vou.",
+  "label": "Tâmo On Beta 1.0 Build 148"
 }

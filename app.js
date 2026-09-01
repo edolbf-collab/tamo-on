@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 147, database: 144, edge: 111 });
-  const APP_ASSET_TOKEN = "beta147r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 148, database: 145, edge: 111 });
+  const APP_ASSET_TOKEN = "beta148r1";
   const createEmptyState = () => ({
     profile: null,
     groups: [],
@@ -18,6 +18,7 @@
     member_ratings: [],
     match_events: [],
     announcements: [],
+    notification_receipts: [],
     push_subscriptions: [],
     is_platform_admin: false,
     beta_access: null
@@ -95,7 +96,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta147r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta148r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -250,7 +251,7 @@
       if (this.state.currentGroupId) {
         await this.loadGroup(this.state.currentGroupId);
       } else {
-        ["members", "players", "matches", "attendance", "assignments", "charges", "payments", "expenses", "member_ratings", "match_events", "announcements", "push_subscriptions"].forEach(key => { this.state[key] = []; });
+        ["members", "players", "matches", "attendance", "assignments", "charges", "payments", "expenses", "member_ratings", "match_events", "announcements", "notification_receipts", "push_subscriptions"].forEach(key => { this.state[key] = []; });
       }
       try {
         const { data } = await this.client.rpc("is_platform_admin");
@@ -265,12 +266,21 @@
       const { subscribe = true } = options;
       this.state.currentGroupId = groupId;
       const tableNames = ["players", "matches", "charges", "payments", "expenses", "announcements", "group_members", "member_ratings"];
-      const results = await Promise.all(tableNames.map(table => this.client.from(table).select("*").eq("group_id", groupId)));
+      const [results, receipts] = await Promise.all([
+        Promise.all(tableNames.map(table => this.client.from(table).select("*").eq("group_id", groupId))),
+        this.client
+          .from("notification_receipts")
+          .select("*")
+          .eq("group_id", groupId)
+          .eq("user_id", this.state.profile.id)
+      ]);
       results.forEach((result, index) => {
         if (result.error) throw result.error;
         const stateKey = tableNames[index] === "group_members" ? "members" : tableNames[index];
         this.state[stateKey] = result.data || [];
       });
+      if (receipts.error) throw receipts.error;
+      this.state.notification_receipts = receipts.data || [];
 
       const subscriptions = await this.client.from("push_subscriptions").select("id,endpoint,device_label,enabled,created_at,updated_at,last_attempt_at,last_success_at,last_failure_at,last_failure_status,last_failure_reason,consecutive_failures,invalidated_at,last_test_at,last_recovered_at,last_delivery_attempts,last_error_category,last_provider").eq("user_id", this.state.profile.id);
       if (subscriptions.error) throw subscriptions.error;
@@ -317,7 +327,7 @@
       const onChange = () => this.queueReload(groupId);
       let channel = this.client.channel(`group-${groupId}`);
       channel = channel.on("postgres_changes", { event: "*", schema: "public", table: "groups", filter: `id=eq.${groupId}` }, onChange);
-      ["group_members", "players", "matches", "match_attendance", "team_assignments", "member_ratings", "match_events", "charges", "payments", "expenses", "announcements"].forEach(table => {
+      ["group_members", "players", "matches", "match_attendance", "team_assignments", "member_ratings", "match_events", "charges", "payments", "expenses", "announcements", "notification_receipts"].forEach(table => {
         channel = channel.on("postgres_changes", { event: "*", schema: "public", table, filter: `group_id=eq.${groupId}` }, onChange);
       });
       this.channel = channel.subscribe();
@@ -706,6 +716,24 @@
       const { error } = await this.client.rpc("delete_announcement", { p_announcement_id: announcementId });
       if (error) throw error;
       return this.loadGroup(this.state.currentGroupId, { subscribe: false });
+    }
+
+    async markAnnouncementsRead(groupId, announcementIds) {
+      const ids = [...new Set((announcementIds || []).map(String).filter(Boolean))];
+      if (!ids.length) return { marked_count: 0 };
+      const { data, error } = await this.client.rpc("mark_group_announcements_read", {
+        p_group_id: groupId,
+        p_announcement_ids: ids
+      });
+      if (error) throw error;
+      const receipts = await this.client
+        .from("notification_receipts")
+        .select("*")
+        .eq("group_id", groupId)
+        .eq("user_id", this.state.profile.id);
+      if (receipts.error) throw receipts.error;
+      this.state.notification_receipts = receipts.data || [];
+      return data || { marked_count: ids.length };
     }
 
     async notifyMatchCreated(groupId, matchId) {
@@ -1204,7 +1232,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta147r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta148r1");
       }, true);
     },
 
@@ -1332,6 +1360,37 @@
       const sourceKey = this.guestProfileKey(source);
       return this.guestPlayers().some(player => player.guest_match_id === matchId && this.guestProfileKey(player) === sourceKey);
     },
+    unreadAnnouncements() {
+      const receiptIds = new Set((this.state?.notification_receipts || [])
+        .filter(item => item.source_type === "announcement")
+        .map(item => String(item.source_id)));
+      const ownUserId = String(this.state?.profile?.id || "");
+      return (this.state?.announcements || []).filter(item =>
+        String(item.created_by || "") !== ownUserId
+        && !receiptIds.has(String(item.id))
+      );
+    },
+    unreadNotificationCount() {
+      // Outras fontes, como mensagens do Marketplace, poderão ser somadas
+      // aqui usando a mesma tabela genérica de comprovantes de leitura.
+      return this.unreadAnnouncements().length;
+    },
+    updateNotificationBadge() {
+      const button = $("#notificationButton");
+      const badge = $("#notificationBadge");
+      const group = this.currentGroup();
+      if (!button || !badge) return;
+      const count = group ? this.unreadNotificationCount() : 0;
+      const label = count > 9 ? "9+" : String(count);
+      badge.textContent = label;
+      badge.hidden = count === 0;
+      button.classList.toggle("has-unread", count > 0);
+      button.setAttribute("aria-label", !group
+        ? "Avisos"
+        : count > 0
+          ? `Abrir avisos do grupo · ${count > 9 ? "mais de 9" : count} novo${count === 1 ? "" : "s"}`
+          : "Abrir avisos do grupo");
+    },
     player(id) { return (this.state?.players || []).find(player => player.id === id); },
     memberPlayer(member) { return this.player(member?.player_id) || (this.state?.players || []).find(player => player.user_id === member?.user_id); },
     myPlayer() {
@@ -1404,8 +1463,8 @@
       const notificationButton = $("#notificationButton");
       if (notificationButton) {
         notificationButton.hidden = !group;
-        notificationButton.setAttribute("aria-label", group ? "Abrir avisos do grupo" : "Avisos");
       }
+      this.updateNotificationBadge();
       $$(".nav-item").forEach(button => button.classList.toggle("active", button.dataset.route === this.route));
       const compactHome = Boolean(group && this.route === "home");
       $("#mainContent")?.classList.toggle("home-compact", compactHome);
@@ -2433,8 +2492,9 @@
       const rows = players.map(player => {
         const current = attendance.get(player.id);
         const status = current?.status || "pending";
+        const managerStatus = status === "maybe" ? "pending" : status;
         const waitLabel = `Espera${current?.waitlist_position ? ` #${current.waitlist_position}` : ""}`;
-        return `<label class="attendance-manager-row">${this.personAvatar(player, "attendance-manager-avatar")}<span><strong>${escapeHtml(player.name)}</strong><small>${playerPositionHtml(player)}</small></span><select name="attendance_${player.id}" data-player-id="${player.id}" data-original-status="${status}" aria-label="Presença de ${escapeHtml(player.name)}"><option value="pending" ${status === "pending" ? "selected" : ""}>Sem resposta</option><option value="confirmed" ${status === "confirmed" ? "selected" : ""}>Confirmado</option><option value="maybe" ${status === "maybe" ? "selected" : ""}>Talvez</option><option value="out" ${status === "out" ? "selected" : ""}>Ausente</option>${status === "waitlist" ? `<option value="waitlist" selected disabled>${waitLabel}</option>` : ""}</select></label>`;
+        return `<label class="attendance-manager-row">${this.personAvatar(player, "attendance-manager-avatar")}<span><strong>${escapeHtml(player.name)}</strong><small>${playerPositionHtml(player)}</small></span><select name="attendance_${player.id}" data-player-id="${player.id}" data-original-status="${managerStatus}" aria-label="Presença de ${escapeHtml(player.name)}"><option value="pending" ${managerStatus === "pending" ? "selected" : ""}>Sem resposta</option><option value="confirmed" ${managerStatus === "confirmed" ? "selected" : ""}>Vou</option><option value="out" ${managerStatus === "out" ? "selected" : ""}>Não vou</option>${managerStatus === "waitlist" ? `<option value="waitlist" selected disabled>${waitLabel}</option>` : ""}</select></label>`;
       }).join("");
       this.modal("Gerenciar presenças", `<form id="attendanceManagerForm" class="form-grid"><div class="notice"><strong>${escapeHtml(match.title)}</strong><br>Administrador e organizador podem registrar respostas recebidas fora do aplicativo. A espera inicial continua sendo definida pelo sorteio.</div><div class="attendance-manager-list">${rows}</div><button class="btn btn-primary btn-block">Salvar alterações</button></form>`, (root, close) => {
         $("#attendanceManagerForm", root).addEventListener("submit", async event => {
@@ -2443,7 +2503,7 @@
             playerId: select.dataset.playerId,
             status: select.value,
             originalStatus: select.dataset.originalStatus
-          })).filter(item => item.status !== item.originalStatus && item.status !== "waitlist");
+          })).filter(item => ["pending", "confirmed", "out"].includes(item.status) && item.status !== item.originalStatus);
           if (!changes.length) return this.toast("Nenhuma presença foi alterada.");
           const submit = event.submitter;
           submit.disabled = true;
@@ -3385,8 +3445,12 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
     openAnnouncementCenter(selectedId = "") {
       const announcements = [...(this.state.announcements || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const unreadIds = new Set(this.unreadAnnouncements().map(item => String(item.id)));
       const canManage = this.canManageMatches();
-      const list = announcements.length ? announcements.map(item => `<article class="announcement-card ${item.id === selectedId ? "is-selected" : ""}"><div class="announcement-icon">📣</div><div class="announcement-content"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(shortDate(item.created_at))}${item.push_sent_count || item.push_failed_count ? ` · ${Number(item.push_sent_count || 0)} enviado(s)` : ""}</small><p>${escapeHtml(item.body)}</p>${canManage ? `<div class="announcement-actions"><button class="announcement-action resend" data-resend-announcement="${item.id}">↻ Reenviar</button><button class="announcement-action delete" data-delete-announcement="${item.id}">Excluir</button></div>` : ""}</div></article>`).join("") : '<div class="card empty"><strong>Nenhum aviso publicado</strong><span>Os comunicados do grupo aparecerão aqui.</span></div>';
+      const list = announcements.length ? announcements.map(item => {
+        const unread = unreadIds.has(String(item.id));
+        return `<article class="announcement-card ${item.id === selectedId ? "is-selected" : ""} ${unread ? "is-unread" : ""}"><div class="announcement-icon">📣</div><div class="announcement-content"><div class="announcement-title-row"><strong>${escapeHtml(item.title)}</strong>${unread ? '<span class="announcement-new-label">Novo</span>' : ""}</div><small>${escapeHtml(shortDate(item.created_at))}${item.push_sent_count || item.push_failed_count ? ` · ${Number(item.push_sent_count || 0)} enviado(s)` : ""}</small><p>${escapeHtml(item.body)}</p>${canManage ? `<div class="announcement-actions"><button class="announcement-action resend" data-resend-announcement="${item.id}">↻ Reenviar</button><button class="announcement-action delete" data-delete-announcement="${item.id}">Excluir</button></div>` : ""}</div></article>`;
+      }).join("") : '<div class="card empty"><strong>Nenhum aviso publicado</strong><span>Os comunicados do grupo aparecerão aqui.</span></div>';
       this.modal("Avisos do grupo", `<div class="announcement-list">${list}</div>`, (root, close) => {
         if (selectedId) root.querySelector(".announcement-card.is-selected")?.scrollIntoView({ block: "center" });
         $$('[data-resend-announcement]', root).forEach(button => button.addEventListener("click", async event => {
@@ -3423,6 +3487,14 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
           }
         }));
       });
+      if (unreadIds.size) {
+        this.repo.markAnnouncementsRead(this.state.currentGroupId, [...unreadIds])
+          .then(() => {
+            this.state = this.repo.state;
+            this.updateNotificationBadge();
+          })
+          .catch(error => console.warn("Não foi possível marcar os avisos como lidos.", error));
+      }
       navigator.clearAppBadge?.().catch?.(() => {});
       if (this.launchAnnouncementId && history.replaceState) {
         this.launchAnnouncementId = "";
