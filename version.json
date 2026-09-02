@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 150,
-  "database": 147,
+  "build": 151,
+  "database": 148,
   "edge": 112,
   "mandatory": false,
-  "notes": "Leitura coletiva ao abrir o sino e compartilhamento da lista final do evento pelo WhatsApp.",
-  "label": "Tâmo On Beta 1.0 Build 150"
+  "notes": "Leitura híbrida das notificações, método de baixa auditável e retenção automática.",
+  "label": "Tâmo On Beta 1.0 Build 151"
 }

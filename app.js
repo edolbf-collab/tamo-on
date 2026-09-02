@@ -1,8 +1,11 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 150, database: 147, edge: 112 });
-  const APP_ASSET_TOKEN = "beta150r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 151, database: 148, edge: 112 });
+  const APP_ASSET_TOKEN = "beta151r1";
+  const NOTIFICATION_VISIBLE_DAYS = 90;
+  const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
+  const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
   const createEmptyState = () => ({
     profile: null,
     groups: [],
@@ -97,7 +100,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta150r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta151r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -277,12 +280,14 @@
         this.state.user_notifications = [];
         return [];
       }
-      const select = "id,user_id,group_id,notification_type,title,body,target_url,source_id,metadata,read_at,created_at";
+      const select = "id,user_id,group_id,notification_type,title,body,target_url,source_id,metadata,read_at,read_method,created_at";
+      const visibleSince = new Date(Date.now() - NOTIFICATION_VISIBLE_DAYS * 86400000).toISOString();
       const [unread, recent] = await Promise.all([
         this.client
           .from("user_notifications")
           .select(select)
           .eq("user_id", this.state.profile.id)
+          .gte("created_at", visibleSince)
           .is("read_at", null)
           .order("created_at", { ascending: false })
           .limit(200),
@@ -290,6 +295,7 @@
           .from("user_notifications")
           .select(select)
           .eq("user_id", this.state.profile.id)
+          .gte("created_at", visibleSince)
           .not("read_at", "is", null)
           .order("created_at", { ascending: false })
           .limit(30)
@@ -305,8 +311,15 @@
       const { subscribe = true } = options;
       this.state.currentGroupId = groupId;
       const tableNames = ["players", "matches", "charges", "payments", "expenses", "announcements", "group_members", "member_ratings"];
+      const announcementsVisibleSince = new Date();
+      announcementsVisibleSince.setMonth(announcementsVisibleSince.getMonth() - ANNOUNCEMENT_VISIBLE_MONTHS);
       const [results, receipts] = await Promise.all([
-        Promise.all(tableNames.map(table => this.client.from(table).select("*").eq("group_id", groupId))),
+        Promise.all(tableNames.map(table => {
+          const query = this.client.from(table).select("*").eq("group_id", groupId);
+          return table === "announcements"
+            ? query.gte("created_at", announcementsVisibleSince.toISOString())
+            : query;
+        })),
         this.client
           .from("notification_receipts")
           .select("*")
@@ -812,26 +825,35 @@
       const readAt = data?.read_at || nowIso();
       const selected = new Set(ids);
       this.state.user_notifications = (this.state.user_notifications || []).map(item =>
-        selected.has(String(item.id)) ? { ...item, read_at: item.read_at || readAt } : item
+        selected.has(String(item.id))
+          ? { ...item, read_at: item.read_at || readAt, read_method: item.read_method || "clicked" }
+          : item
       );
-      return data || { marked_count: ids.length, read_at: readAt };
+      return data || { marked_count: ids.length, read_at: readAt, read_method: "clicked" };
     }
 
-    async markAllUserNotificationsRead() {
+    async markOpenedUserNotificationsRead() {
       const previous = this.state.user_notifications || [];
       const optimisticReadAt = nowIso();
       this.state.user_notifications = previous.map(item =>
-        item.read_at ? item : { ...item, read_at: optimisticReadAt }
+        item.read_at || !AUTO_READ_NOTIFICATION_TYPES.has(String(item.notification_type || ""))
+          ? item
+          : { ...item, read_at: optimisticReadAt, read_method: "notification_center_opened" }
       );
       try {
         const { data, error } = await this.client.rpc("mark_all_user_notifications_read");
         if (error) throw error;
         const readAt = data?.read_at || optimisticReadAt;
-        this.state.user_notifications = this.state.user_notifications.map(item => ({
-          ...item,
-          read_at: item.read_at || readAt
-        }));
-        return data || { marked_count: previous.filter(item => !item.read_at).length, read_at: readAt };
+        this.state.user_notifications = this.state.user_notifications.map(item =>
+          item.read_at || !AUTO_READ_NOTIFICATION_TYPES.has(String(item.notification_type || ""))
+            ? item
+            : { ...item, read_at: readAt, read_method: "notification_center_opened" }
+        );
+        return data || {
+          marked_count: previous.filter(item => !item.read_at && AUTO_READ_NOTIFICATION_TYPES.has(String(item.notification_type || ""))).length,
+          read_at: readAt,
+          read_method: "notification_center_opened"
+        };
       } catch (error) {
         this.state.user_notifications = previous;
         throw error;
@@ -1333,7 +1355,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta150r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta151r1");
       }, true);
     },
 
@@ -3658,9 +3680,9 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         "match-created": { icon: "⚽", label: "Novo evento" },
         "attendance-confirmed": { icon: "✓", label: "Presença confirmada" },
         "attendance-declined": { icon: "×", label: "Alteração de presença" },
-        "attendance-reminder": { icon: "🔔", label: "Lembrete" },
-        "charge-created": { icon: "R$", label: "Cobrança" },
-        "system-announcement": { icon: "✦", label: "Tâmo On" },
+        "attendance-reminder": { icon: "🔔", label: "Lembrete de confirmação" },
+        "charge-created": { icon: "R$", label: "Nova cobrança" },
+        "system-announcement": { icon: "✦", label: "Mensagem do sistema" },
         marketplace: { icon: "⌖", label: "Onde jogar" }
       };
       return presentations[type] || { icon: "🔔", label: "Notificação" };
@@ -3676,9 +3698,17 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     openNotificationCenter() {
+      const hadAutomaticUnread = (this.state?.user_notifications || []).some(item =>
+        !item.read_at && AUTO_READ_NOTIFICATION_TYPES.has(String(item.notification_type || ""))
+      );
+      const automaticRead = hadAutomaticUnread
+        ? this.repo.markOpenedUserNotificationsRead()
+        : null;
+      this.state = this.repo.state;
+      this.updateNotificationBadge();
+
       const allNotifications = [...(this.state?.user_notifications || [])]
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      const hadUnread = allNotifications.some(item => !item.read_at);
       const notifications = [
         ...allNotifications.filter(item => !item.read_at).slice(0, 30),
         ...allNotifications.filter(item => item.read_at).slice(0, 20)
@@ -3687,15 +3717,37 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       const list = notifications.length ? notifications.map(item => {
         const presentation = this.notificationPresentation(item.notification_type);
         const groupName = item.group_id ? groupsById.get(String(item.group_id))?.name : "";
-        return `<a class="notification-inbox-card" href="${escapeHtml(this.notificationTargetUrl(item))}"><span class="notification-inbox-icon" aria-hidden="true">${escapeHtml(presentation.icon)}</span><span class="notification-inbox-content"><span class="notification-inbox-title"><strong>${escapeHtml(item.title)}</strong></span><small>${escapeHtml(presentation.label)}${groupName ? ` · ${escapeHtml(groupName)}` : ""} · ${escapeHtml(shortDate(item.created_at))}</small><p>${escapeHtml(item.body || "")}</p></span><span class="notification-inbox-arrow" aria-hidden="true">›</span></a>`;
+        const unread = !item.read_at;
+        return `<a class="notification-inbox-card${unread ? " is-unread" : ""}" href="${escapeHtml(this.notificationTargetUrl(item))}" data-notification-id="${escapeHtml(item.id)}"${unread ? ' aria-label="Abrir e marcar notificação como lida"' : ""}><span class="notification-inbox-icon" aria-hidden="true">${escapeHtml(presentation.icon)}</span><span class="notification-inbox-content"><span class="notification-inbox-title"><strong>${escapeHtml(item.title)}</strong>${unread ? "<b>Nova</b>" : ""}</span><small>${escapeHtml(presentation.label)}${groupName ? ` · ${escapeHtml(groupName)}` : ""} · ${escapeHtml(shortDate(item.created_at))}</small><p>${escapeHtml(item.body || "")}</p>${unread ? '<span class="notification-read-hint">Toque para abrir e marcar como lida</span>' : ""}</span><span class="notification-inbox-arrow" aria-hidden="true">›</span></a>`;
       }).join("") : '<div class="card empty"><strong>Nenhuma notificação</strong><span>Lembretes, avisos e atualizações importantes aparecerão aqui.</span></div>';
-      this.modal("Notificações", `<div class="notification-inbox-list">${list}</div>`, () => {});
+      this.modal("Notificações", `<div class="notification-inbox-list">${list}</div>`, root => {
+        $$('[data-notification-id]', root).forEach(link => {
+          link.addEventListener("click", async event => {
+            const notificationId = String(link.dataset.notificationId || "");
+            const notification = (this.state?.user_notifications || []).find(item => String(item.id) === notificationId);
+            if (!notification || notification.read_at) return;
 
-      if (hadUnread) {
-        const readAll = this.repo.markAllUserNotificationsRead();
-        this.state = this.repo.state;
-        this.updateNotificationBadge();
-        readAll
+            event.preventDefault();
+            if (link.dataset.reading === "true") return;
+            link.dataset.reading = "true";
+            link.classList.add("is-reading");
+            const target = link.href;
+            try {
+              await this.repo.markUserNotificationsRead([notificationId]);
+              this.state = this.repo.state;
+              this.updateNotificationBadge();
+            } catch (error) {
+              console.warn("Não foi possível marcar a notificação como lida.", error);
+              this.toast("A notificação foi aberta, mas a leitura não pôde ser registrada.", true);
+            } finally {
+              location.href = target;
+            }
+          });
+        });
+      });
+
+      if (automaticRead) {
+        automaticRead
           .then(() => {
             this.state = this.repo.state;
             this.updateNotificationBadge();
@@ -3703,8 +3755,8 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
           .catch(error => {
             this.state = this.repo.state;
             this.updateNotificationBadge();
-            console.warn("Não foi possível marcar todas as notificações como lidas.", error);
-            this.toast("Não foi possível atualizar a leitura das notificações.", true);
+            console.warn("Não foi possível registrar a abertura das notificações de presença.", error);
+            this.toast("Não foi possível atualizar os avisos de presença.", true);
           });
       }
     },
