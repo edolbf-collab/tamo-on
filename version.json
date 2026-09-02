@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 149,
-  "database": 146,
+  "build": 150,
+  "database": 147,
   "edge": 112,
   "mandatory": false,
-  "notes": "Caixa individual de notificações e contador no sino para todas as mensagens do aplicativo.",
-  "label": "Tâmo On Beta 1.0 Build 149"
+  "notes": "Leitura coletiva ao abrir o sino e compartilhamento da lista final do evento pelo WhatsApp.",
+  "label": "Tâmo On Beta 1.0 Build 150"
 }

@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 149, database: 146, edge: 112 });
-  const APP_ASSET_TOKEN = "beta149r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 150, database: 147, edge: 112 });
+  const APP_ASSET_TOKEN = "beta150r1";
   const createEmptyState = () => ({
     profile: null,
     groups: [],
@@ -97,7 +97,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta149r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta150r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -817,6 +817,27 @@
       return data || { marked_count: ids.length, read_at: readAt };
     }
 
+    async markAllUserNotificationsRead() {
+      const previous = this.state.user_notifications || [];
+      const optimisticReadAt = nowIso();
+      this.state.user_notifications = previous.map(item =>
+        item.read_at ? item : { ...item, read_at: optimisticReadAt }
+      );
+      try {
+        const { data, error } = await this.client.rpc("mark_all_user_notifications_read");
+        if (error) throw error;
+        const readAt = data?.read_at || optimisticReadAt;
+        this.state.user_notifications = this.state.user_notifications.map(item => ({
+          ...item,
+          read_at: item.read_at || readAt
+        }));
+        return data || { marked_count: previous.filter(item => !item.read_at).length, read_at: readAt };
+      } catch (error) {
+        this.state.user_notifications = previous;
+        throw error;
+      }
+    }
+
     async notifyMatchCreated(groupId, matchId) {
       return this.invokeNotification({
         action: "match-created",
@@ -1312,7 +1333,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta149r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta150r1");
       }, true);
     },
 
@@ -1481,6 +1502,111 @@
       return this.attendanceFor(matchId)
         .filter(item => item.status === "waitlist")
         .sort((a, b) => Number(a.waitlist_position || 9999) - Number(b.waitlist_position || 9999) || new Date(a.responded_at) - new Date(b.responded_at));
+    },
+    attendanceShareName(player) {
+      const name = String(player?.nickname || player?.name || "Participante").trim();
+      return this.isGuest(player) ? `${name} (convidado)` : name;
+    },
+    attendanceShareGroups(match) {
+      const attendanceByPlayer = new Map(this.attendanceFor(match.id).map(item => [item.player_id, item]));
+      const matchStartsAt = new Date(match.starts_at).getTime();
+      const currentMemberPlayerIds = new Set((this.state?.members || [])
+        .map(member => this.memberPlayer(member)?.id)
+        .filter(Boolean));
+      const eligiblePlayers = (this.state?.players || []).filter(player => {
+        if (player.guest_match_id) return player.guest_match_id === match.id;
+        if (attendanceByPlayer.has(player.id)) return true;
+        if (!currentMemberPlayerIds.has(player.id)) return false;
+        const createdAt = new Date(player.created_at || 0).getTime();
+        return !Number.isFinite(createdAt) || createdAt <= 0 || createdAt <= matchStartsAt;
+      });
+      const groups = { confirmed: [], waitlist: [], out: [], pending: [] };
+      eligiblePlayers.forEach(player => {
+        const attendance = attendanceByPlayer.get(player.id) || null;
+        const status = attendance?.status;
+        const key = ["confirmed", "waitlist", "out"].includes(status) ? status : "pending";
+        groups[key].push({ player, attendance });
+      });
+      const alphabetic = (a, b) => this.attendanceShareName(a.player).localeCompare(this.attendanceShareName(b.player), "pt-BR");
+      groups.confirmed.sort(alphabetic);
+      groups.out.sort(alphabetic);
+      groups.pending.sort(alphabetic);
+      groups.waitlist.sort((a, b) =>
+        Number(a.attendance?.waitlist_position || 9999) - Number(b.attendance?.waitlist_position || 9999)
+        || alphabetic(a, b)
+      );
+      return groups;
+    },
+    attendanceShareText(match) {
+      const groups = this.attendanceShareGroups(match);
+      const date = new Intl.DateTimeFormat("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      }).format(new Date(match.starts_at));
+      const section = (icon, title, entries) => [
+        `${icon} *${title} — ${entries.length}*`,
+        ...(entries.length
+          ? entries.map((entry, index) => `${index + 1}. ${this.attendanceShareName(entry.player)}`)
+          : ["Nenhum."])
+      ].join("\n");
+      return [
+        `⚽ *${String(match.title || "Evento").trim()}*`,
+        `📅 ${date} — ${shortTime(match.starts_at)} às ${shortTime(matchEndAt(match))}`,
+        `📍 ${String(match.location || "Local não informado").trim()}`,
+        "",
+        section("✅", "VÃO", groups.confirmed),
+        "",
+        section("⏳", "ESPERA", groups.waitlist),
+        "",
+        section("❌", "NÃO VÃO", groups.out),
+        "",
+        section("❔", "SEM RESPOSTA", groups.pending),
+        "",
+        "Lista gerada pelo Tâmo On."
+      ].join("\n");
+    },
+    async copyPlainText(text) {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      const copied = document.execCommand?.("copy");
+      area.remove();
+      if (!copied) throw new Error("Não foi possível copiar a lista.");
+    },
+    openAttendanceShare(matchId) {
+      const match = (this.state?.matches || []).find(item => item.id === matchId);
+      if (!match) return this.toast("Evento não encontrado.", true);
+      if (!this.canManageMatches()) return this.toast("Somente administrador ou organizador pode compartilhar a lista.", true);
+      if (!this.isMatchStarted(match)) return this.toast("A lista será liberada quando o prazo de confirmação terminar.", true);
+      const text = this.attendanceShareText(match);
+      this.modal("Compartilhar lista", `<div class="notice attendance-share-notice"><strong>Lista consolidada</strong><br>As confirmações já foram encerradas. Confira o texto antes de compartilhar.</div><pre class="attendance-share-preview">${escapeHtml(text)}</pre><div class="attendance-share-actions"><button type="button" class="btn btn-whatsapp btn-block" id="shareAttendanceWhatsApp">Enviar pelo WhatsApp</button><button type="button" class="btn btn-secondary btn-block" id="copyAttendanceList">Copiar lista</button></div>`, root => {
+        $("#shareAttendanceWhatsApp", root)?.addEventListener("click", () => {
+          window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+        });
+        $("#copyAttendanceList", root)?.addEventListener("click", async event => {
+          const button = event.currentTarget;
+          const original = button.textContent;
+          button.disabled = true;
+          try {
+            await this.copyPlainText(text);
+            button.textContent = "Lista copiada";
+            this.toast("Lista copiada.");
+          } catch (error) {
+            button.disabled = false;
+            button.textContent = original;
+            this.toast(error?.message || "Não foi possível copiar a lista.", true);
+          }
+        });
+      });
     },
     isMatchStarted(match) {
       return Boolean(match && new Date(match.starts_at) <= new Date());
@@ -2321,13 +2447,18 @@
       const eventCapacity = `<div class="match-detail-capacity"><span>Duração: <strong>${matchDuration(match)} min</strong></span><span>Máximo: <strong>${Number(match.max_players)}</strong></span><span>Por time: <strong>${match.players_per_team ? Number(match.players_per_team) : "não definido"}</strong></span>${match.team_count ? `<span>Times: <strong>${Number(match.team_count)}</strong></span>` : ""}</div>`;
       const hasSavedTeams = this.state.assignments.some(item => item.match_id === match.id);
       const canOpenTeams = future ? (this.canManageMatches() || hasSavedTeams) : hasSavedTeams;
+      const canShareAttendance = started && this.canManageMatches();
       const statusLabel = future ? (started ? "Em andamento" : "Agendado") : "Histórico";
-      this.modal(match.title, `<div class="match-detail-banner"><span class="status-pill ${future ? "status-maybe" : "status-confirmed"}">${statusLabel}</span><strong>${escapeHtml(matchSchedule(match))}</strong><p>${escapeHtml(match.location)}</p>${eventCapacity}${started && future ? `<small>Separação dos times disponível até ${escapeHtml(shortTime(matchHistoryAt(match)))}.</small>` : match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}${started && future && match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}</div>${recurringInfo}${managerControls}${drawSection}${bbqExpanded}<div class="actions">${responsesOpen ? `<button class="btn btn-primary" data-modal-rsvp="${match.id}">Minha presença</button>` : ""}${canOpenTeams ? `<button class="btn btn-secondary" data-modal-teams="${match.id}">Abrir Times</button>` : ""}</div>${deleteControls}${groupHtml("Começam jogando", "confirmed")}${groupHtml("Não vão", "out")}${groupHtml("Espera inicial", "waitlist")}${pendingHtml}`, (root, close) => {
+      this.modal(match.title, `<div class="match-detail-banner"><span class="status-pill ${future ? "status-maybe" : "status-confirmed"}">${statusLabel}</span><strong>${escapeHtml(matchSchedule(match))}</strong><p>${escapeHtml(match.location)}</p>${eventCapacity}${started && future ? `<small>Separação dos times disponível até ${escapeHtml(shortTime(matchHistoryAt(match)))}.</small>` : match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}${started && future && match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}</div>${recurringInfo}${managerControls}${drawSection}${bbqExpanded}<div class="actions">${responsesOpen ? `<button class="btn btn-primary" data-modal-rsvp="${match.id}">Minha presença</button>` : ""}${canOpenTeams ? `<button class="btn btn-secondary" data-modal-teams="${match.id}">Abrir Times</button>` : ""}${canShareAttendance ? `<button class="btn btn-secondary attendance-share-button" data-share-attendance="${match.id}">Compartilhar lista</button>` : ""}</div>${deleteControls}${groupHtml("Começam jogando", "confirmed")}${groupHtml("Não vão", "out")}${groupHtml("Espera inicial", "waitlist")}${pendingHtml}`, (root, close) => {
         $("[data-modal-rsvp]", root)?.addEventListener("click", () => {
           close();
           this.openRsvp(match.id);
         });
         $("[data-modal-teams]", root)?.addEventListener("click", () => { close(); this.openTeamsForMatch(match.id); });
+        $("[data-share-attendance]", root)?.addEventListener("click", () => {
+          close();
+          this.openAttendanceShare(match.id);
+        });
         $("[data-edit-match]", root)?.addEventListener("click", () => { close(); this.openMatchEditForm(match.id); });
         $("[data-manage-attendance]", root)?.addEventListener("click", () => {
           close();
@@ -3547,27 +3678,34 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     openNotificationCenter() {
       const allNotifications = [...(this.state?.user_notifications || [])]
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const hadUnread = allNotifications.some(item => !item.read_at);
       const notifications = [
         ...allNotifications.filter(item => !item.read_at).slice(0, 30),
         ...allNotifications.filter(item => item.read_at).slice(0, 20)
       ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      const unreadIds = notifications.filter(item => !item.read_at).map(item => String(item.id));
       const groupsById = new Map((this.state?.groups || []).map(group => [String(group.id), group]));
       const list = notifications.length ? notifications.map(item => {
         const presentation = this.notificationPresentation(item.notification_type);
         const groupName = item.group_id ? groupsById.get(String(item.group_id))?.name : "";
-        const unread = !item.read_at;
-        return `<a class="notification-inbox-card ${unread ? "is-unread" : ""}" href="${escapeHtml(this.notificationTargetUrl(item))}"><span class="notification-inbox-icon" aria-hidden="true">${escapeHtml(presentation.icon)}</span><span class="notification-inbox-content"><span class="notification-inbox-title"><strong>${escapeHtml(item.title)}</strong>${unread ? '<b>Novo</b>' : ""}</span><small>${escapeHtml(presentation.label)}${groupName ? ` · ${escapeHtml(groupName)}` : ""} · ${escapeHtml(shortDate(item.created_at))}</small><p>${escapeHtml(item.body || "")}</p></span><span class="notification-inbox-arrow" aria-hidden="true">›</span></a>`;
+        return `<a class="notification-inbox-card" href="${escapeHtml(this.notificationTargetUrl(item))}"><span class="notification-inbox-icon" aria-hidden="true">${escapeHtml(presentation.icon)}</span><span class="notification-inbox-content"><span class="notification-inbox-title"><strong>${escapeHtml(item.title)}</strong></span><small>${escapeHtml(presentation.label)}${groupName ? ` · ${escapeHtml(groupName)}` : ""} · ${escapeHtml(shortDate(item.created_at))}</small><p>${escapeHtml(item.body || "")}</p></span><span class="notification-inbox-arrow" aria-hidden="true">›</span></a>`;
       }).join("") : '<div class="card empty"><strong>Nenhuma notificação</strong><span>Lembretes, avisos e atualizações importantes aparecerão aqui.</span></div>';
       this.modal("Notificações", `<div class="notification-inbox-list">${list}</div>`, () => {});
 
-      if (unreadIds.length) {
-        this.repo.markUserNotificationsRead(unreadIds)
+      if (hadUnread) {
+        const readAll = this.repo.markAllUserNotificationsRead();
+        this.state = this.repo.state;
+        this.updateNotificationBadge();
+        readAll
           .then(() => {
             this.state = this.repo.state;
             this.updateNotificationBadge();
           })
-          .catch(error => console.warn("Não foi possível marcar as notificações como lidas.", error));
+          .catch(error => {
+            this.state = this.repo.state;
+            this.updateNotificationBadge();
+            console.warn("Não foi possível marcar todas as notificações como lidas.", error);
+            this.toast("Não foi possível atualizar a leitura das notificações.", true);
+          });
       }
     },
 
