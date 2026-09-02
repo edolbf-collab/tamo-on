@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 148,
-  "database": 145,
-  "edge": 111,
+  "build": 149,
+  "database": 146,
+  "edge": 112,
   "mandatory": false,
-  "notes": "Contador de novos avisos no sino e gestão de presença alinhada a Vou e Não vou.",
-  "label": "Tâmo On Beta 1.0 Build 148"
+  "notes": "Caixa individual de notificações e contador no sino para todas as mensagens do aplicativo.",
+  "label": "Tâmo On Beta 1.0 Build 149"
 }

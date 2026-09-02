@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 148, database: 145, edge: 111 });
-  const APP_ASSET_TOKEN = "beta148r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 149, database: 146, edge: 112 });
+  const APP_ASSET_TOKEN = "beta149r1";
   const createEmptyState = () => ({
     profile: null,
     groups: [],
@@ -19,6 +19,7 @@
     match_events: [],
     announcements: [],
     notification_receipts: [],
+    user_notifications: [],
     push_subscriptions: [],
     is_platform_admin: false,
     beta_access: null
@@ -96,7 +97,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta148r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta149r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -181,8 +182,10 @@
       });
       this.state = createEmptyState();
       this.channel = null;
+      this.notificationChannel = null;
       this.subscribedGroupId = null;
       this.reloadTimer = null;
+      this.notificationReloadTimer = null;
     }
 
     async session() {
@@ -219,10 +222,15 @@
 
     async signOut() {
       clearTimeout(this.reloadTimer);
+      clearTimeout(this.notificationReloadTimer);
       if (this.channel) {
         await this.client.removeChannel(this.channel);
         this.channel = null;
         this.subscribedGroupId = null;
+      }
+      if (this.notificationChannel) {
+        await this.client.removeChannel(this.notificationChannel);
+        this.notificationChannel = null;
       }
       const { error } = await this.client.auth.signOut({ scope: "local" });
       if (error) throw error;
@@ -252,7 +260,9 @@
         await this.loadGroup(this.state.currentGroupId);
       } else {
         ["members", "players", "matches", "attendance", "assignments", "charges", "payments", "expenses", "member_ratings", "match_events", "announcements", "notification_receipts", "push_subscriptions"].forEach(key => { this.state[key] = []; });
+        await this.loadUserNotifications();
       }
+      this.subscribeNotifications();
       try {
         const { data } = await this.client.rpc("is_platform_admin");
         this.state.is_platform_admin = data === true;
@@ -260,6 +270,35 @@
         console.warn("Não foi possível verificar a administração da plataforma.", error);
       }
       return this.state;
+    }
+
+    async loadUserNotifications() {
+      if (!this.state.profile?.id) {
+        this.state.user_notifications = [];
+        return [];
+      }
+      const select = "id,user_id,group_id,notification_type,title,body,target_url,source_id,metadata,read_at,created_at";
+      const [unread, recent] = await Promise.all([
+        this.client
+          .from("user_notifications")
+          .select(select)
+          .eq("user_id", this.state.profile.id)
+          .is("read_at", null)
+          .order("created_at", { ascending: false })
+          .limit(200),
+        this.client
+          .from("user_notifications")
+          .select(select)
+          .eq("user_id", this.state.profile.id)
+          .not("read_at", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(30)
+      ]);
+      if (unread.error) throw unread.error;
+      if (recent.error) throw recent.error;
+      const byId = new Map([...(unread.data || []), ...(recent.data || [])].map(item => [item.id, item]));
+      this.state.user_notifications = [...byId.values()].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      return this.state.user_notifications;
     }
 
     async loadGroup(groupId, options = {}) {
@@ -295,6 +334,8 @@
         if (result.error) throw result.error;
         this.state[key] = result.data || [];
       });
+
+      await this.loadUserNotifications();
 
       const ownAvatar = safeImageUrl(this.state.profile?.avatar_url || "");
       if (ownAvatar) {
@@ -332,6 +373,31 @@
       });
       this.channel = channel.subscribe();
       this.subscribedGroupId = groupId;
+    }
+
+    subscribeNotifications() {
+      if (this.notificationChannel || !this.state.profile?.id) return;
+      const onChange = () => {
+        clearTimeout(this.notificationReloadTimer);
+        this.notificationReloadTimer = setTimeout(async () => {
+          try {
+            await this.loadUserNotifications();
+            App.state = this.state;
+            App.render();
+          } catch (error) {
+            console.error("Falha ao sincronizar as notificações em tempo real.", error);
+          }
+        }, 120);
+      };
+      this.notificationChannel = this.client
+        .channel(`notifications-${this.state.profile.id}`)
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "user_notifications",
+          filter: `user_id=eq.${this.state.profile.id}`
+        }, onChange)
+        .subscribe();
     }
 
     async mutate(collection, record, mode = "upsert") {
@@ -736,6 +802,21 @@
       return data || { marked_count: ids.length };
     }
 
+    async markUserNotificationsRead(notificationIds) {
+      const ids = [...new Set((notificationIds || []).map(String).filter(Boolean))];
+      if (!ids.length) return { marked_count: 0 };
+      const { data, error } = await this.client.rpc("mark_user_notifications_read", {
+        p_notification_ids: ids
+      });
+      if (error) throw error;
+      const readAt = data?.read_at || nowIso();
+      const selected = new Set(ids);
+      this.state.user_notifications = (this.state.user_notifications || []).map(item =>
+        selected.has(String(item.id)) ? { ...item, read_at: item.read_at || readAt } : item
+      );
+      return data || { marked_count: ids.length, read_at: readAt };
+    }
+
     async notifyMatchCreated(groupId, matchId) {
       return this.invokeNotification({
         action: "match-created",
@@ -1094,7 +1175,6 @@
           swBuild: window.tamoonPwa?.getState?.().swBuild || null
         });
         this.checkForUpdates();
-        navigator.clearAppBadge?.().catch?.(() => {});
         if (this.pendingInvite) setTimeout(() => this.openJoinGroupModal(this.pendingInvite), 80);
         else if (this.launchAction === "rsvp") setTimeout(() => this.openRsvp(this.nextMatch()?.id), 80);
         else if (this.launchAnnouncementId) setTimeout(() => this.openAnnouncementCenter(this.launchAnnouncementId), 120);
@@ -1190,7 +1270,7 @@
         if (this.currentGroup() && this.canManageGroup()) this.openGroupSettings();
         else this.openGroupModal();
       });
-      $("#notificationButton")?.addEventListener("click", () => this.openAnnouncementCenter());
+      $("#notificationButton")?.addEventListener("click", () => this.openNotificationCenter());
       $("#profileButton")?.addEventListener("click", () => this.openProfileModal());
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "visible") this.verifyBetaAccess();
@@ -1232,7 +1312,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta148r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta149r1");
       }, true);
     },
 
@@ -1371,25 +1451,22 @@
       );
     },
     unreadNotificationCount() {
-      // Outras fontes, como mensagens do Marketplace, poderão ser somadas
-      // aqui usando a mesma tabela genérica de comprovantes de leitura.
-      return this.unreadAnnouncements().length;
+      return (this.state?.user_notifications || []).filter(item => !item.read_at).length;
     },
     updateNotificationBadge() {
       const button = $("#notificationButton");
       const badge = $("#notificationBadge");
-      const group = this.currentGroup();
       if (!button || !badge) return;
-      const count = group ? this.unreadNotificationCount() : 0;
+      const count = this.unreadNotificationCount();
       const label = count > 9 ? "9+" : String(count);
       badge.textContent = label;
       badge.hidden = count === 0;
       button.classList.toggle("has-unread", count > 0);
-      button.setAttribute("aria-label", !group
-        ? "Avisos"
-        : count > 0
-          ? `Abrir avisos do grupo · ${count > 9 ? "mais de 9" : count} novo${count === 1 ? "" : "s"}`
-          : "Abrir avisos do grupo");
+      button.setAttribute("aria-label", count > 0
+        ? `Abrir notificações · ${count > 9 ? "mais de 9" : count} nova${count === 1 ? "" : "s"}`
+        : "Abrir notificações");
+      if (count > 0) navigator.setAppBadge?.(count).catch?.(() => {});
+      else navigator.clearAppBadge?.().catch?.(() => {});
     },
     player(id) { return (this.state?.players || []).find(player => player.id === id); },
     memberPlayer(member) { return this.player(member?.player_id) || (this.state?.players || []).find(player => player.user_id === member?.user_id); },
@@ -1462,7 +1539,7 @@
       profileButton.innerHTML = profilePhoto ? `<img src="${escapeHtml(profilePhoto)}" alt="Meu perfil" referrerpolicy="no-referrer">` : initials(this.state.profile?.name || "Usuário");
       const notificationButton = $("#notificationButton");
       if (notificationButton) {
-        notificationButton.hidden = !group;
+        notificationButton.hidden = false;
       }
       this.updateNotificationBadge();
       $$(".nav-item").forEach(button => button.classList.toggle("active", button.dataset.route === this.route));
@@ -3443,13 +3520,62 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       }
     },
 
+    notificationPresentation(type = "") {
+      const presentations = {
+        announcement: { icon: "📣", label: "Aviso do grupo" },
+        "announcement-resend": { icon: "📣", label: "Aviso reenviado" },
+        "match-created": { icon: "⚽", label: "Novo evento" },
+        "attendance-confirmed": { icon: "✓", label: "Presença confirmada" },
+        "attendance-declined": { icon: "×", label: "Alteração de presença" },
+        "attendance-reminder": { icon: "🔔", label: "Lembrete" },
+        "charge-created": { icon: "R$", label: "Cobrança" },
+        "system-announcement": { icon: "✦", label: "Tâmo On" },
+        marketplace: { icon: "⌖", label: "Onde jogar" }
+      };
+      return presentations[type] || { icon: "🔔", label: "Notificação" };
+    },
+
+    notificationTargetUrl(item) {
+      try {
+        const url = new URL(String(item?.target_url || appBaseUrl()), document.baseURI);
+        return url.origin === location.origin ? url.href : appBaseUrl();
+      } catch {
+        return appBaseUrl();
+      }
+    },
+
+    openNotificationCenter() {
+      const allNotifications = [...(this.state?.user_notifications || [])]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const notifications = [
+        ...allNotifications.filter(item => !item.read_at).slice(0, 30),
+        ...allNotifications.filter(item => item.read_at).slice(0, 20)
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const unreadIds = notifications.filter(item => !item.read_at).map(item => String(item.id));
+      const groupsById = new Map((this.state?.groups || []).map(group => [String(group.id), group]));
+      const list = notifications.length ? notifications.map(item => {
+        const presentation = this.notificationPresentation(item.notification_type);
+        const groupName = item.group_id ? groupsById.get(String(item.group_id))?.name : "";
+        const unread = !item.read_at;
+        return `<a class="notification-inbox-card ${unread ? "is-unread" : ""}" href="${escapeHtml(this.notificationTargetUrl(item))}"><span class="notification-inbox-icon" aria-hidden="true">${escapeHtml(presentation.icon)}</span><span class="notification-inbox-content"><span class="notification-inbox-title"><strong>${escapeHtml(item.title)}</strong>${unread ? '<b>Novo</b>' : ""}</span><small>${escapeHtml(presentation.label)}${groupName ? ` · ${escapeHtml(groupName)}` : ""} · ${escapeHtml(shortDate(item.created_at))}</small><p>${escapeHtml(item.body || "")}</p></span><span class="notification-inbox-arrow" aria-hidden="true">›</span></a>`;
+      }).join("") : '<div class="card empty"><strong>Nenhuma notificação</strong><span>Lembretes, avisos e atualizações importantes aparecerão aqui.</span></div>';
+      this.modal("Notificações", `<div class="notification-inbox-list">${list}</div>`, () => {});
+
+      if (unreadIds.length) {
+        this.repo.markUserNotificationsRead(unreadIds)
+          .then(() => {
+            this.state = this.repo.state;
+            this.updateNotificationBadge();
+          })
+          .catch(error => console.warn("Não foi possível marcar as notificações como lidas.", error));
+      }
+    },
+
     openAnnouncementCenter(selectedId = "") {
       const announcements = [...(this.state.announcements || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      const unreadIds = new Set(this.unreadAnnouncements().map(item => String(item.id)));
       const canManage = this.canManageMatches();
       const list = announcements.length ? announcements.map(item => {
-        const unread = unreadIds.has(String(item.id));
-        return `<article class="announcement-card ${item.id === selectedId ? "is-selected" : ""} ${unread ? "is-unread" : ""}"><div class="announcement-icon">📣</div><div class="announcement-content"><div class="announcement-title-row"><strong>${escapeHtml(item.title)}</strong>${unread ? '<span class="announcement-new-label">Novo</span>' : ""}</div><small>${escapeHtml(shortDate(item.created_at))}${item.push_sent_count || item.push_failed_count ? ` · ${Number(item.push_sent_count || 0)} enviado(s)` : ""}</small><p>${escapeHtml(item.body)}</p>${canManage ? `<div class="announcement-actions"><button class="announcement-action resend" data-resend-announcement="${item.id}">↻ Reenviar</button><button class="announcement-action delete" data-delete-announcement="${item.id}">Excluir</button></div>` : ""}</div></article>`;
+        return `<article class="announcement-card ${item.id === selectedId ? "is-selected" : ""}"><div class="announcement-icon">📣</div><div class="announcement-content"><div class="announcement-title-row"><strong>${escapeHtml(item.title)}</strong></div><small>${escapeHtml(shortDate(item.created_at))}${item.push_sent_count || item.push_failed_count ? ` · ${Number(item.push_sent_count || 0)} enviado(s)` : ""}</small><p>${escapeHtml(item.body)}</p>${canManage ? `<div class="announcement-actions"><button class="announcement-action resend" data-resend-announcement="${item.id}">↻ Reenviar</button><button class="announcement-action delete" data-delete-announcement="${item.id}">Excluir</button></div>` : ""}</div></article>`;
       }).join("") : '<div class="card empty"><strong>Nenhum aviso publicado</strong><span>Os comunicados do grupo aparecerão aqui.</span></div>';
       this.modal("Avisos do grupo", `<div class="announcement-list">${list}</div>`, (root, close) => {
         if (selectedId) root.querySelector(".announcement-card.is-selected")?.scrollIntoView({ block: "center" });
@@ -3487,15 +3613,6 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
           }
         }));
       });
-      if (unreadIds.size) {
-        this.repo.markAnnouncementsRead(this.state.currentGroupId, [...unreadIds])
-          .then(() => {
-            this.state = this.repo.state;
-            this.updateNotificationBadge();
-          })
-          .catch(error => console.warn("Não foi possível marcar os avisos como lidos.", error));
-      }
-      navigator.clearAppBadge?.().catch?.(() => {});
       if (this.launchAnnouncementId && history.replaceState) {
         this.launchAnnouncementId = "";
         history.replaceState({}, document.title, appBaseUrl());

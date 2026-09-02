@@ -197,6 +197,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .announcement-title-row{display:flex;align-items:center;gap:7px;min-width:0}.announcement-title-row strong{min-width:0}.announcement-new-label{flex:0 0 auto;padding:3px 6px;border-radius:999px;background:#e53f4f;color:#fff;font-size:8px;font-weight:950;line-height:1;text-transform:uppercase;letter-spacing:.3px}
 .announcement-icon{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:rgba(244,189,62,.11);font-size:20px}
 .announcement-card strong,.announcement-card small{display:block}.announcement-card strong{font-size:14px}.announcement-card small{margin-top:3px;color:var(--muted);font-size:9.5px}.announcement-card p{margin:8px 0 0;color:#d4e0e4;font-size:11px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.notification-inbox-list{display:grid;gap:8px}
+.notification-inbox-card{display:grid;grid-template-columns:39px minmax(0,1fr) 14px;align-items:start;gap:10px;padding:12px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,rgba(16,38,51,.95),rgba(8,27,38,.96));color:inherit;text-decoration:none}
+.notification-inbox-card.is-unread{border-color:rgba(229,63,79,.42);background:linear-gradient(145deg,rgba(55,31,42,.96),rgba(8,27,38,.96))}
+.notification-inbox-card:active{transform:scale(.99)}
+.notification-inbox-icon{width:39px;height:39px;border-radius:13px;display:grid;place-items:center;background:rgba(244,189,62,.11);color:var(--gold);font-size:17px;font-weight:900}
+.notification-inbox-content{min-width:0}.notification-inbox-title{display:flex;align-items:center;gap:7px;min-width:0}.notification-inbox-title strong{min-width:0;font-size:13px;line-height:1.3}.notification-inbox-title b{flex:0 0 auto;padding:3px 6px;border-radius:999px;background:#e53f4f;color:#fff;font-size:8px;font-weight:950;line-height:1;text-transform:uppercase;letter-spacing:.3px}
+.notification-inbox-content small{display:block;margin-top:3px;color:var(--muted);font-size:9px;line-height:1.35}.notification-inbox-content p{margin:7px 0 0;color:#d4e0e4;font-size:10.5px;line-height:1.48;white-space:pre-wrap;overflow-wrap:anywhere}
+.notification-inbox-arrow{align-self:center;color:var(--muted);font-size:20px;font-weight:800}
 .notification-status-card{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;padding:15px;border:1px solid rgba(255,255,255,.11);border-radius:18px;background:linear-gradient(145deg,rgba(20,47,61,.9),rgba(7,27,38,.94))}
 .notification-status-card>span{width:44px;height:44px;flex:0 0 auto;border-radius:15px;display:grid;place-items:center;background:rgba(244,189,62,.11);font-size:21px}
 .notification-status-card div{min-width:0}.notification-status-card strong{display:block;font-size:14px}.notification-status-card p{margin:5px 0 0;color:var(--muted);font-size:10.5px;line-height:1.55}

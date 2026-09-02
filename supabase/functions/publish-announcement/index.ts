@@ -57,6 +57,16 @@ type PushResult = {
   failureReason: string;
 };
 
+type InboxOptions = {
+  title: string;
+  body: string;
+  url: string;
+  data: Record<string, unknown>;
+  recordInbox?: boolean;
+  inboxTitle?: string;
+  inboxBody?: string;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido.", code: "METHOD_NOT_ALLOWED" }, 405);
@@ -141,6 +151,41 @@ Deno.serve(async (req) => {
       data.announcementId || data.systemAnnouncementId || data.matchId || data.chargeId || data.playerId || fallback,
       160,
     );
+
+    const storeUserNotifications = async (
+      recipientUserIds: string[],
+      options: InboxOptions,
+      notificationGroupId: string | null,
+    ) => {
+      if (options.recordInbox === false) return;
+      const userIds = [...new Set((recipientUserIds || []).map((id) => cleanText(id, 64)).filter(Boolean))];
+      if (!userIds.length) return;
+
+      const notificationType = cleanText(options.data.eventType || "notification", 80) || "notification";
+      const sourceId = cleanText(
+        options.data.announcementId
+          || options.data.systemAnnouncementId
+          || options.data.matchId
+          || options.data.chargeId
+          || options.data.playerId,
+        64,
+      ) || null;
+      const rows = userIds.map((userId) => ({
+        user_id: userId,
+        group_id: notificationGroupId,
+        notification_type: notificationType,
+        title: cleanText(options.inboxTitle || options.title, 160),
+        body: cleanText(options.inboxBody || options.body, 1000),
+        target_url: cleanText(options.url, 2000),
+        source_id: sourceId,
+        metadata: options.data,
+        created_by: user.id,
+      }));
+
+      stage = "store-user-notifications";
+      const { error } = await adminClient.from("user_notifications").insert(rows);
+      if (error) throw error;
+    };
 
     const providerFromEndpoint = (endpoint: string) => {
       const value = String(endpoint || "").toLowerCase();
@@ -311,6 +356,9 @@ Deno.serve(async (req) => {
       url: string;
       data: Record<string, unknown>;
       excludeUserId?: string;
+      recordInbox?: boolean;
+      inboxTitle?: string;
+      inboxBody?: string;
     }): Promise<PushResult> => {
       stage = "load-recipients";
       const { data: members, error: membersError } = await adminClient.from("group_members").select("user_id").eq("group_id", groupId);
@@ -318,6 +366,7 @@ Deno.serve(async (req) => {
       const userIds = [...new Set((members || []).map((item) => item.user_id).filter(Boolean))]
         .filter((id) => id !== options.excludeUserId);
 
+      let activeUserIds: string[] = [];
       let subscriptions: StoredSubscription[] = [];
       if (userIds.length) {
         const { data: activeRows, error: accessError } = await adminClient
@@ -326,7 +375,7 @@ Deno.serve(async (req) => {
           .eq("status", "active")
           .in("user_id", userIds);
         if (accessError) throw accessError;
-        const activeUserIds = [...new Set((activeRows || []).map((item) => item.user_id).filter(Boolean))];
+        activeUserIds = [...new Set((activeRows || []).map((item) => item.user_id).filter(Boolean))];
         if (activeUserIds.length) {
           const { data, error } = await adminClient.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", activeUserIds).eq("enabled", true);
           if (error) throw error;
@@ -334,14 +383,16 @@ Deno.serve(async (req) => {
         }
       }
 
+      await storeUserNotifications(activeUserIds, options, groupId);
+
       let sent = 0;
       let failed = 0;
       const failures: PushFailure[] = [];
       const notificationPayload = JSON.stringify({
         title: options.title,
         body: options.body.slice(0, 240),
-        icon: appOrigin ? `${appOrigin}/icons/icon-192-v023.png` : "/icons/icon-192-v023.png",
-        badge: appOrigin ? `${appOrigin}/icons/icon-96.png` : "/icons/icon-96.png",
+        icon: appOrigin ? `${appOrigin}/tamo-on-icon-192.png?v=icon3dr1` : "/tamo-on-icon-192.png?v=icon3dr1",
+        badge: appOrigin ? `${appOrigin}/icons/icon-64.png` : "/icons/icon-64.png",
         tag: options.tag,
         timestamp: Date.now(),
         data: { ...options.data, url: options.url },
@@ -392,8 +443,12 @@ Deno.serve(async (req) => {
       url: string;
       data: Record<string, unknown>;
       endpoint?: string;
+      recordInbox?: boolean;
+      inboxTitle?: string;
+      inboxBody?: string;
     }): Promise<PushResult> => {
       const userIds = [...new Set((targetUserIds || []).map((id) => cleanText(id, 64)).filter(Boolean))];
+      let activeUserIds: string[] = [];
       let subscriptions: StoredSubscription[] = [];
       if (userIds.length) {
         stage = "load-direct-recipients";
@@ -403,7 +458,7 @@ Deno.serve(async (req) => {
           .eq("status", "active")
           .in("user_id", userIds);
         if (accessError) throw accessError;
-        const activeUserIds = [...new Set((activeRows || []).map((item) => item.user_id).filter(Boolean))];
+        activeUserIds = [...new Set((activeRows || []).map((item) => item.user_id).filter(Boolean))];
         if (activeUserIds.length) {
           const { data, error } = await adminClient.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", activeUserIds).eq("enabled", true);
           if (error) throw error;
@@ -412,14 +467,16 @@ Deno.serve(async (req) => {
         }
       }
 
+      await storeUserNotifications(activeUserIds, options, groupId || null);
+
       let sent = 0;
       let failed = 0;
       const failures: PushFailure[] = [];
       const notificationPayload = JSON.stringify({
         title: options.title,
         body: options.body.slice(0, 240),
-        icon: appOrigin ? `${appOrigin}/icons/icon-192-v023.png` : "/icons/icon-192-v023.png",
-        badge: appOrigin ? `${appOrigin}/icons/icon-96.png` : "/icons/icon-96.png",
+        icon: appOrigin ? `${appOrigin}/tamo-on-icon-192.png?v=icon3dr1` : "/tamo-on-icon-192.png?v=icon3dr1",
+        badge: appOrigin ? `${appOrigin}/icons/icon-64.png` : "/icons/icon-64.png",
         tag: options.tag,
         timestamp: Date.now(),
         data: { ...options.data, url: options.url },
@@ -469,25 +526,31 @@ Deno.serve(async (req) => {
       tag: string;
       url: string;
       data: Record<string, unknown>;
+      excludeUserId?: string;
+      recordInbox?: boolean;
+      inboxTitle?: string;
+      inboxBody?: string;
     }): Promise<PushResult> => {
       stage = "load-all-recipients";
       const { data: activeRows, error: activeError } = await adminClient.from("beta_access").select("user_id").eq("status", "active").not("user_id", "is", null);
       if (activeError) throw activeError;
-      const activeUserIds = [...new Set((activeRows || []).map((item) => item.user_id).filter(Boolean))];
+      const activeUserIds = [...new Set((activeRows || []).map((item) => item.user_id).filter(Boolean))]
+        .filter((id) => id !== options.excludeUserId);
       let subscriptions: StoredSubscription[] = [];
       if (activeUserIds.length) {
         const { data, error } = await adminClient.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", activeUserIds).eq("enabled", true);
         if (error) throw error;
         subscriptions = (data || []) as StoredSubscription[];
       }
+      await storeUserNotifications(activeUserIds, options, null);
       let sent = 0;
       let failed = 0;
       const failures: PushFailure[] = [];
       const notificationPayload = JSON.stringify({
         title: options.title,
         body: options.body.slice(0, 240),
-        icon: appOrigin ? `${appOrigin}/icons/icon-192-v023.png` : "/icons/icon-192-v023.png",
-        badge: appOrigin ? `${appOrigin}/icons/icon-96.png` : "/icons/icon-96.png",
+        icon: appOrigin ? `${appOrigin}/tamo-on-icon-192.png?v=icon3dr1` : "/tamo-on-icon-192.png?v=icon3dr1",
+        badge: appOrigin ? `${appOrigin}/icons/icon-64.png` : "/icons/icon-64.png",
         tag: options.tag,
         timestamp: Date.now(),
         data: { ...options.data, url: options.url },
@@ -535,6 +598,7 @@ Deno.serve(async (req) => {
         tag: `push-test-${user.id}-${Date.now()}`,
         url: targetUrl,
         endpoint,
+        recordInbox: false,
         data: { groupId, eventType: "push-test", userId: user.id },
       });
       if (!pushResult.subscriptions) return json({ error: "A assinatura deste aparelho não está ativa no banco. Vincule novamente as notificações.", code: "SUBSCRIPTION_NOT_ACTIVE" }, 404);
@@ -561,6 +625,8 @@ Deno.serve(async (req) => {
         body,
         tag: `system-${systemAnnouncement.id}`,
         url: targetUrl,
+        excludeUserId: user.id,
+        inboxTitle: title,
         data: { eventType: "system-announcement", systemAnnouncementId: systemAnnouncement.id },
       });
       await adminClient.from("system_announcements").update({ push_sent_at: new Date().toISOString(), push_sent_count: pushResult.sent, push_failed_count: pushResult.failed }).eq("id", systemAnnouncement.id);
@@ -600,6 +666,9 @@ Deno.serve(async (req) => {
         body: `${announcement.title}: ${announcement.body}`,
         tag: `announcement-${announcement.id}`,
         url: targetUrl,
+        excludeUserId: user.id,
+        inboxTitle: String(announcement.title || "Aviso do grupo"),
+        inboxBody: String(announcement.body || ""),
         data: { groupId, announcementId: announcement.id, eventType: action === "resend" ? "announcement-resend" : "announcement" },
       });
 
@@ -634,6 +703,8 @@ Deno.serve(async (req) => {
         body: message,
         tag: `match-created-${match.id}`,
         url: targetUrl,
+        excludeUserId: user.id,
+        inboxTitle: `Nova pelada: ${match.title}`,
         data: { groupId, matchId: match.id, eventType: "match-created" },
       });
       return json({ match, ...pushResult, action });
@@ -667,7 +738,45 @@ Deno.serve(async (req) => {
         body: `${displayName} confirmou presença na ${match.title} do dia ${when.date}.`,
         tag: `attendance-${match.id}-${player.id}-${Date.now()}`,
         url: targetUrl,
+        inboxTitle: "Presença confirmada",
         data: { groupId, matchId: match.id, playerId: player.id, eventType: "attendance-confirmed" },
+        excludeUserId: user.id,
+      });
+      return json({ attendance, ...pushResult, action });
+    }
+
+    if (action === "attendance-declined") {
+      const matchId = cleanText(payload.matchId, 64);
+      const playerId = cleanText(payload.playerId, 64);
+      if (!matchId || !playerId) return json({ error: "Evento ou membro não informado.", code: "ATTENDANCE_TARGET_REQUIRED" }, 400);
+
+      stage = "load-declined-attendance";
+      const { data: attendance, error: attendanceError } = await adminClient.from("match_attendance")
+        .select("id,status,player_id")
+        .eq("group_id", groupId).eq("match_id", matchId).eq("player_id", playerId).maybeSingle();
+      if (attendanceError) throw attendanceError;
+      if (!attendance || attendance.status !== "out") return json({ error: "A ausência ainda não está registrada.", code: "ATTENDANCE_NOT_DECLINED" }, 409);
+
+      const [{ data: player, error: playerError }, { data: match, error: matchError }] = await Promise.all([
+        adminClient.from("players").select("id,user_id,name,nickname").eq("id", playerId).eq("group_id", groupId).single(),
+        adminClient.from("matches").select("id,group_id,title,starts_at").eq("id", matchId).eq("group_id", groupId).single(),
+      ]);
+      if (playerError) throw playerError;
+      if (matchError) throw matchError;
+      if (player.user_id !== user.id && !canManageMatches) return json({ error: "Você não pode notificar a alteração deste jogador.", code: "FORBIDDEN" }, 403);
+
+      const when = formatDateTime(match.starts_at, cleanText(payload.timeZone, 80));
+      const displayName = cleanText(player.nickname || player.name || "Um jogador", 80);
+      const targetUrl = appOrigin
+        ? `${appOrigin}/?group=${encodeURIComponent(groupId)}&page=matches&match=${encodeURIComponent(match.id)}`
+        : `/?group=${encodeURIComponent(groupId)}&page=matches&match=${encodeURIComponent(match.id)}`;
+      pushResult = await sendGroupPush({
+        title: `${group!.name} · Alteração de presença`,
+        body: `${displayName} alterou a resposta para “Não vou” na ${match.title} do dia ${when.date}.`,
+        tag: `attendance-declined-${match.id}-${player.id}-${Date.now()}`,
+        url: targetUrl,
+        inboxTitle: "Alteração de presença",
+        data: { groupId, matchId: match.id, playerId: player.id, eventType: "attendance-declined" },
         excludeUserId: user.id,
       });
       return json({ attendance, ...pushResult, action });
@@ -725,6 +834,7 @@ Deno.serve(async (req) => {
         body: `${displayName}, confirme se você vai ou não vai participar de ${match.title}, dia ${when.date}, às ${when.time}.`,
         tag: `attendance-reminder-${match.id}-${player.id}-${Date.now()}`,
         url: targetUrl,
+        inboxTitle: "Confirme sua presença",
         data: { groupId, matchId: match.id, playerId: player.id, eventType: "attendance-reminder" },
       });
       return json({ match, player, attendance: attendance || null, ...pushResult, action });
@@ -761,6 +871,7 @@ Deno.serve(async (req) => {
         body: `Foi criada uma cobrança de ${amountLabel} referente a ${description}.${dueText}`,
         tag: `charge-${charge.id}`,
         url: targetUrl,
+        inboxTitle: "Nova cobrança",
         data: { groupId, chargeId: charge.id, playerId: player.id, eventType: "charge-created" },
       });
       return json({ charge, player, ...pushResult, action });
