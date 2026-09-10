@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 151,
+  "build": 152,
   "database": 148,
   "edge": 112,
   "mandatory": false,
-  "notes": "Leitura híbrida das notificações, método de baixa auditável e retenção automática.",
-  "label": "Tâmo On Beta 1.0 Build 151"
+  "notes": "Badge do ícone atualizado imediatamente pelo Service Worker e sincronizado com os avisos pendentes.",
+  "label": "Tâmo On Beta 1.0 Build 152"
 }
