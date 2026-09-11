@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 153, database: 148, edge: 112 });
-  const APP_ASSET_TOKEN = "beta153r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 154, database: 148, edge: 112 });
+  const APP_ASSET_TOKEN = "beta154r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -150,7 +150,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta153r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta154r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -1416,7 +1416,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta153r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta154r1");
       }, true);
     },
 
@@ -2040,8 +2040,23 @@
       const chargeSummaries = this.financeChargeSummaries();
       const monthCharges = chargeSummaries.filter(item => monthKeyFromDate(item.due_date) === month);
       const activeMonthCharges = monthCharges.filter(item => item.effectiveStatus !== "cancelled");
+      const now = Date.now();
+      const consolidatedReceived = payments
+        .filter(item => {
+          const timestamp = new Date(item.paid_at).getTime();
+          return Number.isFinite(timestamp) && timestamp <= now;
+        })
+        .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const consolidatedSpent = expenses
+        .filter(item => {
+          const timestamp = new Date(item.occurred_at).getTime();
+          return Number.isFinite(timestamp) && timestamp <= now;
+        })
+        .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const consolidatedBalance = consolidatedReceived - consolidatedSpent;
       const received = monthPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
       const spent = monthExpenses.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const monthBalance = received - spent;
       const receivable = activeMonthCharges.reduce((sum, item) => sum + item.remaining, 0);
       const totalCharged = activeMonthCharges.reduce((sum, item) => sum + item.amount, 0);
       const totalApplied = activeMonthCharges.reduce((sum, item) => sum + Math.min(item.paidAmount, item.amount), 0);
@@ -2097,7 +2112,7 @@
       const emptyMessage = this.financeView === "movements" ? "Sem movimentações neste período." : "Nenhuma cobrança neste período.";
       const paidCount = monthCharges.filter(item => item.effectiveStatus === "paid").length;
       const partialCount = monthCharges.filter(item => item.effectiveStatus === "partial").length;
-      return `<div class="page-head finance-page-head"><div><span class="page-kicker">FINANCEIRO</span><h1>Caixa</h1><p>Entradas, despesas e cobranças organizadas por mês.</p></div>${canManage ? '<div class="page-head-actions"><button class="btn btn-secondary btn-small" data-action="batch-charge">Cobrança em lote</button><button class="btn btn-secondary btn-small" data-action="batch-payment">Baixar em lote</button><button class="btn btn-primary btn-small" data-action="new-finance">+ Lançar</button></div>' : ""}</div>${!canManage ? '<div class="notice finance-readonly-notice"><strong>Acesso de consulta</strong><br>Somente administrador e tesoureiro podem alterar lançamentos.</div>' : ""}<section class="finance-month-nav" aria-label="Selecionar mês"><button type="button" data-action="finance-month" data-offset="-1" aria-label="Mês anterior" ${month <= range.first ? "disabled" : ""}>‹</button><div><small>PERÍODO</small><strong>${escapeHtml(monthLabel(month))}</strong>${month !== currentMonthKey() ? '<button type="button" data-action="finance-current-month">Voltar ao mês atual</button>' : ""}</div><button type="button" data-action="finance-month" data-offset="1" aria-label="Próximo mês" ${month >= range.last ? "disabled" : ""}>›</button></section><section class="card balance-card finance-month-balance"><small>Saldo do mês</small><h2>${money(received - spent)}</h2><div class="finance-summary-grid"><div class="is-income"><small>Recebido</small><strong>${money(received)}</strong></div><div class="is-receivable"><small>A receber</small><strong>${money(receivable)}</strong></div><div class="is-expense"><small>Despesas</small><strong>${money(spent)}</strong></div></div><div class="balance-track"><span style="width:${collectionPct}%"></span></div><p>${monthCharges.length} cobrança(s) · ${paidCount} paga(s) · ${partialCount} parcial(is) · ${collectionPct}% do valor cobrado recebido</p></section>${previousPendingPanel}<div class="finance-tabs" role="tablist" aria-label="Áreas do caixa"><button type="button" role="tab" aria-selected="${this.financeView === "movements"}" class="${this.financeView === "movements" ? "is-active" : ""}" data-action="finance-view" data-value="movements"><span>Extrato</span><small>Dinheiro que entrou ou saiu</small></button><button type="button" role="tab" aria-selected="${this.financeView === "charges"}" class="${this.financeView === "charges" ? "is-active" : ""}" data-action="finance-view" data-value="charges"><span>Cobranças</span><small>Valores pagos e pendentes</small></button></div><section class="finance-list-toolbar"><label class="finance-search"><span aria-hidden="true">⌕</span><input id="financeSearch" type="search" data-finance-search placeholder="Buscar ${this.financeView === "movements" ? "movimentação" : "membro ou cobrança"}" value="${escapeHtml(this.financeSearch)}" autocomplete="off"></label><div class="finance-filter-strip">${this.financeView === "movements" ? movementFilters : chargeFilters}</div></section><div class="finance-period-list">${activeRows || `<div class="card empty">${emptyMessage}</div>`}<div id="financeSearchEmpty" class="card empty" hidden>Nenhum resultado encontrado para esta busca.</div></div>`;
+      return `<div class="page-head finance-page-head"><div><span class="page-kicker">FINANCEIRO</span><h1>Caixa</h1><p>Entradas, despesas e cobranças organizadas por mês.</p></div>${canManage ? '<div class="page-head-actions"><button class="btn btn-secondary btn-small" data-action="batch-charge">Cobrança em lote</button><button class="btn btn-secondary btn-small" data-action="batch-payment">Baixar em lote</button><button class="btn btn-primary btn-small" data-action="new-finance">+ Lançar</button></div>' : ""}</div>${!canManage ? '<div class="notice finance-readonly-notice"><strong>Acesso de consulta</strong><br>Somente administrador e tesoureiro podem alterar lançamentos.</div>' : ""}<section class="finance-month-nav" aria-label="Selecionar mês"><button type="button" data-action="finance-month" data-offset="-1" aria-label="Mês anterior" ${month <= range.first ? "disabled" : ""}>‹</button><div><small>PERÍODO</small><strong>${escapeHtml(monthLabel(month))}</strong>${month !== currentMonthKey() ? '<button type="button" data-action="finance-current-month">Voltar ao mês atual</button>' : ""}</div><button type="button" data-action="finance-month" data-offset="1" aria-label="Próximo mês" ${month >= range.last ? "disabled" : ""}>›</button></section><section class="card balance-card finance-consolidated-balance"><small>Saldo consolidado</small><h2>${money(consolidatedBalance)}</h2><span class="finance-balance-caption">Pagamentos recebidos menos despesas efetivadas até hoje</span><div class="finance-summary-grid"><div class="is-month-balance"><small>Saldo do mês</small><strong>${money(monthBalance)}</strong></div><div class="is-income"><small>Recebido no mês</small><strong>${money(received)}</strong></div><div class="is-receivable"><small>A receber no mês</small><strong>${money(receivable)}</strong></div><div class="is-expense"><small>Despesas do mês</small><strong>${money(spent)}</strong></div></div><div class="balance-track"><span style="width:${collectionPct}%"></span></div><p>${monthCharges.length} cobrança(s) · ${paidCount} paga(s) · ${partialCount} parcial(is) · ${collectionPct}% do valor cobrado recebido</p></section>${previousPendingPanel}<div class="finance-tabs" role="tablist" aria-label="Áreas do caixa"><button type="button" role="tab" aria-selected="${this.financeView === "movements"}" class="${this.financeView === "movements" ? "is-active" : ""}" data-action="finance-view" data-value="movements"><span>Extrato</span><small>Dinheiro que entrou ou saiu</small></button><button type="button" role="tab" aria-selected="${this.financeView === "charges"}" class="${this.financeView === "charges" ? "is-active" : ""}" data-action="finance-view" data-value="charges"><span>Cobranças</span><small>Valores pagos e pendentes</small></button></div><section class="finance-list-toolbar"><label class="finance-search"><span aria-hidden="true">⌕</span><input id="financeSearch" type="search" data-finance-search placeholder="Buscar ${this.financeView === "movements" ? "movimentação" : "membro ou cobrança"}" value="${escapeHtml(this.financeSearch)}" autocomplete="off"></label><div class="finance-filter-strip">${this.financeView === "movements" ? movementFilters : chargeFilters}</div></section><div class="finance-period-list">${activeRows || `<div class="card empty">${emptyMessage}</div>`}<div id="financeSearchEmpty" class="card empty" hidden>Nenhum resultado encontrado para esta busca.</div></div>`;
     },
 
     morePage() {

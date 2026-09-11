@@ -811,14 +811,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .finance-month-nav small{color:var(--muted);font-size:8px;font-weight:900;letter-spacing:.14em}
 .finance-month-nav strong{font-size:15px}
 .finance-month-nav div>button{border:0;background:transparent;color:var(--primary);font-size:9px;font-weight:850;cursor:pointer;padding:2px 5px}
-.finance-month-balance{margin-bottom:12px}
-.finance-month-balance h2{margin-bottom:13px}
-.finance-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.finance-consolidated-balance{margin-bottom:12px}
+.finance-consolidated-balance h2{margin-bottom:3px}
+.finance-balance-caption{display:block;margin-bottom:13px;color:#b7cbc3;font-size:8.5px;line-height:1.35}
+.finance-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .finance-summary-grid>div{min-width:0;padding:10px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.055)}
 .finance-summary-grid small,.finance-summary-grid strong{display:block}
 .finance-summary-grid small{color:#b7cbc3;font-size:8px}
 .finance-summary-grid strong{margin-top:4px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.finance-summary-grid .is-income strong{color:#98f2be}.finance-summary-grid .is-receivable strong{color:#ffd07d}.finance-summary-grid .is-expense strong{color:#ff9da4}
+.finance-summary-grid .is-month-balance strong{color:#9edfff}.finance-summary-grid .is-income strong{color:#98f2be}.finance-summary-grid .is-receivable strong{color:#ffd07d}.finance-summary-grid .is-expense strong{color:#ff9da4}
 .finance-overdue-panel{margin-bottom:12px;padding:0;border-color:rgba(244,189,62,.3);background:linear-gradient(145deg,rgba(244,189,62,.075),rgba(12,35,34,.92));overflow:hidden}
 .finance-overdue-panel>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;cursor:pointer;list-style:none}
 .finance-overdue-panel>summary::-webkit-details-marker{display:none}
