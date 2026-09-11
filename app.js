@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 154, database: 148, edge: 112 });
-  const APP_ASSET_TOKEN = "beta154r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 155, database: 148, edge: 112 });
+  const APP_ASSET_TOKEN = "beta155r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -150,7 +150,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta154r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta155r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -1369,6 +1369,15 @@
         this.financeSearch = search.value;
         this.applyFinanceSearchFilter();
       });
+      document.addEventListener("submit", event => {
+        const form = event.target.closest("#financeSearchForm");
+        if (!form) return;
+        event.preventDefault();
+        const search = $("#financeSearch", form);
+        this.financeSearch = search?.value || "";
+        this.applyFinanceSearchFilter();
+        search?.blur();
+      });
       $("#groupButton")?.addEventListener("click", () => this.openGroupModal());
       $("#groupAvatarButton")?.addEventListener("click", () => {
         if (this.currentGroup() && this.canManageGroup()) this.openGroupSettings();
@@ -1416,7 +1425,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta154r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta155r1");
       }, true);
     },
 
@@ -2061,9 +2070,13 @@
       const totalCharged = activeMonthCharges.reduce((sum, item) => sum + item.amount, 0);
       const totalApplied = activeMonthCharges.reduce((sum, item) => sum + Math.min(item.paidAmount, item.amount), 0);
       const collectionPct = totalCharged ? Math.min(100, Math.round(totalApplied / totalCharged * 100)) : 0;
+      const chargeStatusRank = { overdue: 0, open: 1, partial: 2, paid: 3, cancelled: 4 };
+      const chargeComparator = (a, b) => (chargeStatusRank[a.effectiveStatus] ?? 9) - (chargeStatusRank[b.effectiveStatus] ?? 9)
+        || String(a.due_date || "").localeCompare(String(b.due_date || ""))
+        || String(this.player(a.player_id)?.name || a.description || "").localeCompare(String(this.player(b.player_id)?.name || b.description || ""), "pt-BR", { sensitivity: "base" });
       const previousPending = chargeSummaries
         .filter(item => monthKeyFromDate(item.due_date) < month && !["paid", "cancelled"].includes(item.effectiveStatus) && item.remaining > 0)
-        .sort((a, b) => String(b.due_date).localeCompare(String(a.due_date)));
+        .sort(chargeComparator);
       const previousPendingTotal = previousPending.reduce((sum, item) => sum + item.remaining, 0);
       const paymentMethod = { pix: "Pix", cash: "Dinheiro", card: "Cartão", transfer: "Transferência", manual: "Manual" };
       const movements = [
@@ -2080,13 +2093,22 @@
             date: item.paid_at
           };
         }),
-        ...monthExpenses.map(item => ({ ...item, entryType: "expense", type: "expense", date: item.occurred_at }))
+        ...monthExpenses.map(item => {
+          const linkedPlayer = this.player(item.player_id);
+          return {
+            ...item,
+            entryType: "expense",
+            type: "expense",
+            linkedMemberName: linkedPlayer?.name || linkedPlayer?.nickname || "",
+            date: item.occurred_at
+          };
+        })
       ].sort((a, b) => new Date(b.date) - new Date(a.date));
       const filteredMovements = movements.filter(item => this.financeMovementFilter === "all" || item.type === this.financeMovementFilter);
       const chargeMatchesFilter = charge => this.financeChargeFilter === "all"
         || (this.financeChargeFilter === "pending" && ["open", "overdue"].includes(charge.effectiveStatus))
         || charge.effectiveStatus === this.financeChargeFilter;
-      const filteredCharges = monthCharges.filter(chargeMatchesFilter).sort((a, b) => String(b.due_date).localeCompare(String(a.due_date)));
+      const filteredCharges = monthCharges.filter(chargeMatchesFilter).sort(chargeComparator);
       const renderGrouped = (items, dateSelector, rowRenderer) => {
         const groups = new Map();
         items.forEach(item => {
@@ -2102,7 +2124,13 @@
         const searchIndex = normalizeSearchText(`${item.description} ${item.linkedMemberName || ""} ${meta}`);
         return `<div class="card finance-row" data-finance-search-row="true" data-search-index="${escapeHtml(searchIndex)}"><div class="finance-icon ${item.type === "income" ? "finance-income" : "finance-expense"}">${item.type === "income" ? "+" : "−"}</div><div class="list-main"><strong>${escapeHtml(item.description)}</strong><small>${escapeHtml(meta)}</small></div><div class="finance-value-bubble ${item.type === "income" ? "is-income" : "is-expense"}"><strong class="money ${item.type === "income" ? "positive" : "negative"}">${item.type === "income" ? "+" : "−"}${money(item.amount)}</strong>${memberLabel}</div>${canManage ? `<button class="row-delete-button" data-action="delete-finance" data-type="${item.entryType}" data-id="${item.id}" aria-label="Excluir lançamento">×</button>` : ""}</div>`;
       });
-      const chargeRows = renderGrouped(filteredCharges, item => item.due_date, item => this.financeChargeRow(item, canManage));
+      const chargeGroupKey = status => ["overdue", "open"].includes(status) ? "pending" : status;
+      const chargeGroupLabels = { pending: "Em aberto e vencidas", partial: "Parciais", paid: "Pagas", cancelled: "Canceladas" };
+      const chargeRows = ["pending", "partial", "paid", "cancelled"].map(group => {
+        const entries = filteredCharges.filter(item => chargeGroupKey(item.effectiveStatus) === group);
+        if (!entries.length) return "";
+        return `<section class="finance-day-group finance-charge-group" data-finance-day-section="true"><div class="finance-day-label">${chargeGroupLabels[group]}</div><div class="list">${entries.map(item => this.financeChargeRow(item, canManage, { showDate: true })).join("")}</div></section>`;
+      }).join("");
       const previousPendingPanel = previousPending.length ? `<details class="card finance-overdue-panel"><summary><span><strong>${previousPending.length} pendência(s) anterior(es)</strong><small>${money(previousPendingTotal)} ainda não recebido(s)</small></span><b>Ver lista</b></summary><div class="list finance-overdue-list">${previousPending.map(item => this.financeChargeRow(item, canManage, { searchable: false, showDate: true })).join("")}</div></details>` : "";
       const movementFilter = (value, label, count) => `<button class="finance-filter-chip ${this.financeMovementFilter === value ? "is-active" : ""}" data-action="finance-filter" data-value="${value}">${label}<span>${count}</span></button>`;
       const chargeFilter = (value, label, count) => `<button class="finance-filter-chip ${this.financeChargeFilter === value ? "is-active" : ""}" data-action="finance-filter" data-value="${value}">${label}<span>${count}</span></button>`;
@@ -2112,7 +2140,7 @@
       const emptyMessage = this.financeView === "movements" ? "Sem movimentações neste período." : "Nenhuma cobrança neste período.";
       const paidCount = monthCharges.filter(item => item.effectiveStatus === "paid").length;
       const partialCount = monthCharges.filter(item => item.effectiveStatus === "partial").length;
-      return `<div class="page-head finance-page-head"><div><span class="page-kicker">FINANCEIRO</span><h1>Caixa</h1><p>Entradas, despesas e cobranças organizadas por mês.</p></div>${canManage ? '<div class="page-head-actions"><button class="btn btn-secondary btn-small" data-action="batch-charge">Cobrança em lote</button><button class="btn btn-secondary btn-small" data-action="batch-payment">Baixar em lote</button><button class="btn btn-primary btn-small" data-action="new-finance">+ Lançar</button></div>' : ""}</div>${!canManage ? '<div class="notice finance-readonly-notice"><strong>Acesso de consulta</strong><br>Somente administrador e tesoureiro podem alterar lançamentos.</div>' : ""}<section class="finance-month-nav" aria-label="Selecionar mês"><button type="button" data-action="finance-month" data-offset="-1" aria-label="Mês anterior" ${month <= range.first ? "disabled" : ""}>‹</button><div><small>PERÍODO</small><strong>${escapeHtml(monthLabel(month))}</strong>${month !== currentMonthKey() ? '<button type="button" data-action="finance-current-month">Voltar ao mês atual</button>' : ""}</div><button type="button" data-action="finance-month" data-offset="1" aria-label="Próximo mês" ${month >= range.last ? "disabled" : ""}>›</button></section><section class="card balance-card finance-consolidated-balance"><small>Saldo consolidado</small><h2>${money(consolidatedBalance)}</h2><span class="finance-balance-caption">Pagamentos recebidos menos despesas efetivadas até hoje</span><div class="finance-summary-grid"><div class="is-month-balance"><small>Saldo do mês</small><strong>${money(monthBalance)}</strong></div><div class="is-income"><small>Recebido no mês</small><strong>${money(received)}</strong></div><div class="is-receivable"><small>A receber no mês</small><strong>${money(receivable)}</strong></div><div class="is-expense"><small>Despesas do mês</small><strong>${money(spent)}</strong></div></div><div class="balance-track"><span style="width:${collectionPct}%"></span></div><p>${monthCharges.length} cobrança(s) · ${paidCount} paga(s) · ${partialCount} parcial(is) · ${collectionPct}% do valor cobrado recebido</p></section>${previousPendingPanel}<div class="finance-tabs" role="tablist" aria-label="Áreas do caixa"><button type="button" role="tab" aria-selected="${this.financeView === "movements"}" class="${this.financeView === "movements" ? "is-active" : ""}" data-action="finance-view" data-value="movements"><span>Extrato</span><small>Dinheiro que entrou ou saiu</small></button><button type="button" role="tab" aria-selected="${this.financeView === "charges"}" class="${this.financeView === "charges" ? "is-active" : ""}" data-action="finance-view" data-value="charges"><span>Cobranças</span><small>Valores pagos e pendentes</small></button></div><section class="finance-list-toolbar"><label class="finance-search"><span aria-hidden="true">⌕</span><input id="financeSearch" type="search" data-finance-search placeholder="Buscar ${this.financeView === "movements" ? "movimentação" : "membro ou cobrança"}" value="${escapeHtml(this.financeSearch)}" autocomplete="off"></label><div class="finance-filter-strip">${this.financeView === "movements" ? movementFilters : chargeFilters}</div></section><div class="finance-period-list">${activeRows || `<div class="card empty">${emptyMessage}</div>`}<div id="financeSearchEmpty" class="card empty" hidden>Nenhum resultado encontrado para esta busca.</div></div>`;
+      return `<div class="page-head finance-page-head"><div><span class="page-kicker">FINANCEIRO</span><h1>Caixa</h1><p>Entradas, despesas e cobranças organizadas por mês.</p></div>${canManage ? '<div class="page-head-actions"><button class="btn btn-secondary btn-small" data-action="batch-charge">Cobrança em lote</button><button class="btn btn-secondary btn-small" data-action="batch-payment">Baixar em lote</button><button class="btn btn-primary btn-small" data-action="new-finance">+ Lançar</button></div>' : ""}</div>${!canManage ? '<div class="notice finance-readonly-notice"><strong>Acesso de consulta</strong><br>Somente administrador e tesoureiro podem alterar lançamentos.</div>' : ""}<section class="finance-month-nav" aria-label="Selecionar mês"><button type="button" data-action="finance-month" data-offset="-1" aria-label="Mês anterior" ${month <= range.first ? "disabled" : ""}>‹</button><div><small>PERÍODO</small><strong>${escapeHtml(monthLabel(month))}</strong>${month !== currentMonthKey() ? '<button type="button" data-action="finance-current-month">Voltar ao mês atual</button>' : ""}</div><button type="button" data-action="finance-month" data-offset="1" aria-label="Próximo mês" ${month >= range.last ? "disabled" : ""}>›</button></section><section class="card balance-card finance-consolidated-balance"><small>Saldo consolidado</small><h2>${money(consolidatedBalance)}</h2><span class="finance-balance-caption">Pagamentos recebidos menos despesas efetivadas até hoje</span><div class="finance-summary-grid"><div class="is-month-balance"><small>Saldo do mês</small><strong>${money(monthBalance)}</strong></div><div class="is-income"><small>Recebido no mês</small><strong>${money(received)}</strong></div><div class="is-receivable"><small>A receber no mês</small><strong>${money(receivable)}</strong></div><div class="is-expense"><small>Despesas do mês</small><strong>${money(spent)}</strong></div></div><div class="balance-track"><span style="width:${collectionPct}%"></span></div><p>${monthCharges.length} cobrança(s) · ${paidCount} paga(s) · ${partialCount} parcial(is) · ${collectionPct}% do valor cobrado recebido</p></section>${previousPendingPanel}<div class="finance-tabs" role="tablist" aria-label="Áreas do caixa"><button type="button" role="tab" aria-selected="${this.financeView === "movements"}" class="${this.financeView === "movements" ? "is-active" : ""}" data-action="finance-view" data-value="movements"><span>Extrato</span><small>Dinheiro que entrou ou saiu</small></button><button type="button" role="tab" aria-selected="${this.financeView === "charges"}" class="${this.financeView === "charges" ? "is-active" : ""}" data-action="finance-view" data-value="charges"><span>Cobranças</span><small>Valores pagos e pendentes</small></button></div><section class="finance-list-toolbar"><form id="financeSearchForm" class="finance-search-row" role="search"><label class="finance-search"><span aria-hidden="true">⌕</span><input id="financeSearch" type="search" data-finance-search placeholder="Buscar ${this.financeView === "movements" ? "movimentação ou membro" : "membro ou cobrança"}" value="${escapeHtml(this.financeSearch)}" autocomplete="off" enterkeyhint="search" aria-label="Pesquisar no caixa"></label><button type="submit" class="finance-search-button">Buscar</button></form><div class="finance-filter-strip">${this.financeView === "movements" ? movementFilters : chargeFilters}</div></section><div class="finance-period-list">${activeRows || `<div class="card empty">${emptyMessage}</div>`}<div id="financeSearchEmpty" class="card empty" hidden>Nenhum resultado encontrado para esta busca.</div></div>`;
     },
 
     morePage() {
@@ -3102,7 +3130,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
     openFinanceForm() {
       if (!this.canManageFinance()) return this.toast("Somente administração e tesouraria podem alterar o caixa.", true);
-      const players = this.activePlayers();
+      const players = [...this.activePlayers()].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt-BR", { sensitivity: "base" }));
       this.modal("Novo lançamento", `<form id="financeForm" class="form-grid"><div class="field"><label>Tipo</label><select name="type"><option value="payment">Pagamento recebido</option><option value="expense">Despesa</option><option value="charge">Nova cobrança</option></select></div><div class="field"><label>Jogador</label><select name="player_id"><option value="">Não se aplica</option>${players.map(player => `<option value="${player.id}">${escapeHtml(player.name)}</option>`).join("")}</select></div><div class="notice finance-payment-link" id="paymentChargeInfo" hidden></div><div class="field"><label>Descrição</label><input name="description" required placeholder="Mensalidade, quadra, bola..."></div><div class="field"><label>Valor</label><input name="amount" type="number" min="0.01" step="0.01" required></div><button class="btn btn-primary btn-block">Salvar lançamento</button></form>`, (root, close) => {
         const formElement = $("#financeForm", root);
         const typeInput = $('[name="type"]', formElement);
