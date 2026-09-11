@@ -800,3 +800,48 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .batch-payment-row>span:last-child{gap:4px}
 .batch-payment-balance{display:block;width:max-content;max-width:100%;padding:4px 7px;border-radius:8px;background:rgba(30,209,122,.09);color:#a9f6c9;font-size:.68rem;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .batch-payment-row:has(input:checked) .batch-payment-balance{background:rgba(30,209,122,.17);color:#d4ffe5}
+
+/* Build 153 — caixa mensal no modelo de extrato bancário. */
+.finance-page-head{margin-bottom:10px}
+.finance-readonly-notice{margin-bottom:10px}
+.finance-month-nav{display:grid;grid-template-columns:46px minmax(0,1fr) 46px;align-items:center;gap:8px;margin-bottom:12px;padding:8px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.03)}
+.finance-month-nav>button{width:42px;height:42px;border:1px solid rgba(30,209,122,.2);border-radius:13px;background:rgba(30,209,122,.07);color:var(--lime);font-size:27px;line-height:1;cursor:pointer}
+.finance-month-nav>button:disabled{opacity:.28;cursor:default}
+.finance-month-nav>div{display:grid;justify-items:center;gap:2px;min-width:0;text-align:center}
+.finance-month-nav small{color:var(--muted);font-size:8px;font-weight:900;letter-spacing:.14em}
+.finance-month-nav strong{font-size:15px}
+.finance-month-nav div>button{border:0;background:transparent;color:var(--primary);font-size:9px;font-weight:850;cursor:pointer;padding:2px 5px}
+.finance-month-balance{margin-bottom:12px}
+.finance-month-balance h2{margin-bottom:13px}
+.finance-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.finance-summary-grid>div{min-width:0;padding:10px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.055)}
+.finance-summary-grid small,.finance-summary-grid strong{display:block}
+.finance-summary-grid small{color:#b7cbc3;font-size:8px}
+.finance-summary-grid strong{margin-top:4px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.finance-summary-grid .is-income strong{color:#98f2be}.finance-summary-grid .is-receivable strong{color:#ffd07d}.finance-summary-grid .is-expense strong{color:#ff9da4}
+.finance-overdue-panel{margin-bottom:12px;padding:0;border-color:rgba(244,189,62,.3);background:linear-gradient(145deg,rgba(244,189,62,.075),rgba(12,35,34,.92));overflow:hidden}
+.finance-overdue-panel>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;cursor:pointer;list-style:none}
+.finance-overdue-panel>summary::-webkit-details-marker{display:none}
+.finance-overdue-panel>summary>span{display:grid;gap:2px;min-width:0}.finance-overdue-panel>summary strong{font-size:12px}.finance-overdue-panel>summary small{color:#dbc590;font-size:9px}
+.finance-overdue-panel>summary>b{color:#ffd07d;font-size:9px;white-space:nowrap}
+.finance-overdue-panel[open]>summary{border-bottom:1px solid rgba(244,189,62,.18)}
+.finance-overdue-list{padding:10px;background:rgba(0,0,0,.08)}
+.finance-overdue-list .finance-charge-row{background:rgba(7,24,34,.7)}
+.finance-entry-meta{color:#dbc590!important}
+.finance-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px;padding:4px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.025)}
+.finance-tabs button{display:grid;gap:2px;min-width:0;min-height:48px;padding:8px 10px;border:1px solid transparent;border-radius:12px;background:transparent;color:var(--muted);text-align:left;cursor:pointer}
+.finance-tabs button span{font-size:12px;font-weight:900}.finance-tabs button small{font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.finance-tabs button.is-active{border-color:rgba(30,209,122,.28);background:rgba(30,209,122,.1);color:var(--text)}
+.finance-tabs button.is-active small{color:#a8c9bc}
+.finance-list-toolbar{display:grid;gap:8px;margin-bottom:12px}
+.finance-search{display:flex;align-items:center;gap:8px;height:42px;padding:0 12px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.035)}
+.finance-search:focus-within{border-color:rgba(30,209,122,.42);box-shadow:0 0 0 2px rgba(30,209,122,.08)}
+.finance-search>span{color:var(--muted);font-size:20px;line-height:1}.finance-search input{width:100%;height:100%;padding:0;border:0;outline:0;background:transparent;color:var(--text);font-size:11px}
+.finance-filter-strip{display:flex;gap:6px;overflow-x:auto;padding:1px 1px 3px;scrollbar-width:none}.finance-filter-strip::-webkit-scrollbar{display:none}
+.finance-filter-chip{display:flex;align-items:center;gap:6px;min-height:32px;padding:6px 9px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.03);color:var(--muted);font-size:9px;font-weight:850;white-space:nowrap;cursor:pointer}
+.finance-filter-chip span{min-width:18px;padding:2px 5px;border-radius:999px;background:rgba(255,255,255,.07);color:inherit;font-size:8px;text-align:center}
+.finance-filter-chip.is-active{border-color:rgba(30,209,122,.34);background:rgba(30,209,122,.1);color:var(--lime)}
+.finance-period-list{display:grid;gap:12px}.finance-day-group{display:grid;gap:6px}.finance-day-label{padding:0 4px;color:var(--muted);font-size:9px;font-weight:850}
+.finance-day-group .list{gap:6px}.finance-day-group .finance-row,.finance-day-group .finance-charge-row{box-shadow:0 5px 16px rgba(0,0,0,.09)}
+@media(max-width:560px){.finance-page-head .page-head-actions{display:grid;grid-template-columns:1fr 1fr}.finance-page-head .page-head-actions .btn:last-child{grid-column:1/-1}.finance-summary-grid{gap:5px}.finance-summary-grid>div{padding:8px 7px}.finance-summary-grid strong{font-size:10px}.finance-tabs button{padding:8px}.finance-tabs button small{font-size:7.5px}}
+@media(max-width:390px){.finance-month-nav{grid-template-columns:42px minmax(0,1fr) 42px}.finance-month-nav>button{width:38px;height:38px}.finance-month-nav strong{font-size:13px}.finance-summary-grid strong{font-size:9px}.finance-overdue-list{padding:7px}.finance-tabs button small{display:none}.finance-tabs button{min-height:40px;text-align:center}}
