@@ -846,6 +846,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .finance-filter-chip span{min-width:18px;padding:2px 5px;border-radius:999px;background:rgba(255,255,255,.07);color:inherit;font-size:8px;text-align:center}
 .finance-filter-chip.is-active{border-color:rgba(30,209,122,.34);background:rgba(30,209,122,.1);color:var(--lime)}
 .finance-period-list{display:grid;gap:12px}.finance-day-group{display:grid;gap:6px}.finance-day-label{padding:0 4px;color:var(--muted);font-size:9px;font-weight:850}
+/* Build 156 — respeitar o filtro mesmo em linhas flex e seções grid. */
+.finance-period-list [hidden]{display:none!important}
 .finance-day-group .list{gap:6px}.finance-day-group .finance-row,.finance-day-group .finance-charge-row{box-shadow:0 5px 16px rgba(0,0,0,.09)}
 .finance-charge-group+.finance-charge-group{margin-top:4px}.finance-charge-group .finance-day-label{color:#c7d8d1;text-transform:uppercase;letter-spacing:.07em}
 @media(max-width:560px){.finance-page-head .page-head-actions{display:grid;grid-template-columns:1fr 1fr}.finance-page-head .page-head-actions .btn:last-child{grid-column:1/-1}.finance-summary-grid{gap:5px}.finance-summary-grid>div{padding:8px 7px}.finance-summary-grid strong{font-size:10px}.finance-tabs button{padding:8px}.finance-tabs button small{font-size:7.5px}}

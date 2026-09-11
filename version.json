@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 155,
+  "build": 156,
   "database": 148,
   "edge": 112,
   "mandatory": false,
-  "notes": "Cobranças ordenadas por situação, jogadores em ordem alfabética e busca nominal do Caixa com botão e sem zoom automático.",
-  "label": "Tâmo On Beta 1.0 Build 155"
+  "notes": "Correção da busca do Caixa: oculta registros sem correspondência e mostra corretamente a ausência de resultados.",
+  "label": "Tâmo On Beta 1.0 Build 156"
 }
