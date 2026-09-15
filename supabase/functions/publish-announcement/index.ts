@@ -1,3 +1,4 @@
+// Tâmo On publish-announcement — Build 113
 import { createClient } from "npm:@supabase/supabase-js@2.110.7";
 import { sendNotification } from "npm:web-push-neo@0.1.2";
 
@@ -114,6 +115,11 @@ Deno.serve(async (req) => {
     if (!betaAccess || betaAccess.status !== "active" || (betaAccess.user_id && betaAccess.user_id !== user.id)) {
       return json({ error: "Acesso ao beta não autorizado ou bloqueado.", code: "BETA_ACCESS_REQUIRED" }, 403);
     }
+
+    stage = "authorize-legal-acceptance";
+    const { data: legalAllowed, error: legalError } = await adminClient.rpc("community_legal_access_for_user", { p_user_id: user.id });
+    if (legalError) throw legalError;
+    if (legalAllowed !== true) return json({ error: "Confirme a maioridade e os documentos vigentes no Tâmo On.", code: "LEGAL_ACCEPTANCE_REQUIRED" }, 403);
 
     stage = "validate-input";
     const payload = await req.json().catch(() => ({})) as Record<string, unknown>;

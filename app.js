@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 156, database: 148, edge: 112 });
-  const APP_ASSET_TOKEN = "beta156r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 157, database: 149, edge: 113 });
+  const APP_ASSET_TOKEN = "beta157r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -150,7 +150,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta156r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta157r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -231,7 +231,15 @@
     constructor(config) {
       this.config = config;
       this.client = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+        global: { fetch: async (...args) => {
+          const response = await fetch(...args);
+          if (response.status === 403) {
+            const body = await response.clone().json().catch(() => null);
+            if (body?.message === "LEGAL_ACCEPTANCE_REQUIRED") window.dispatchEvent(new Event("tamoon-legal-required"));
+          }
+          return response;
+        } }
       });
       this.state = createEmptyState();
       this.channel = null;
@@ -243,6 +251,22 @@
 
     async session() {
       return (await this.client.auth.getSession()).data.session;
+    }
+
+    async checkLegalAccess() {
+      const { data, error } = await this.client.rpc("get_community_legal_access_status");
+      if (error) throw error;
+      if (!data || typeof data.allowed !== "boolean" || typeof data.enabled !== "boolean") throw new Error("Não foi possível verificar o aceite obrigatório.");
+      this.legalStatus = data;
+      if (!data.allowed) {
+        const { data: documents, error: documentsError } = await this.client.rpc("get_community_legal_status");
+        if (documentsError) throw documentsError;
+        const denied = new Error("Confirme sua maioridade e os documentos do Tâmo On.");
+        denied.legalAcceptanceRequired = true;
+        denied.legalStatus = documents;
+        throw denied;
+      }
+      return data;
     }
 
     async claimBetaAccess() {
@@ -299,6 +323,7 @@
       const avatarUrl = extractUserAvatar(user);
       this.state.profile = { id: user.id, email, name, avatar_url: avatarUrl };
       await this.claimBetaAccess();
+      await this.checkLegalAccess();
 
       const { data: memberships, error } = await this.client
         .from("group_members")
@@ -1281,10 +1306,31 @@
       } catch (error) {
         this.cancelBootFeedback();
         console.error(error);
+        if (error?.legalAcceptanceRequired) return this.showLegalGate(error.legalStatus);
+        if (error?.message === "LEGAL_ACCEPTANCE_REQUIRED") return this.refreshLegalGate();
         if (error?.betaAccessDenied || /beta fechado|acesso ao beta|não está autorizado|acesso.*bloqueado/i.test(error?.message || "")) {
           return this.renderBetaAccessDenied(error);
         }
         this.renderBackendError(error);
+      }
+    },
+
+    emptyLegalState(profile) { return { ...createEmptyState(), profile }; },
+
+    async showLegalGate(status) {
+      if (this.legalGateVisible) return;
+      this.legalGateVisible = true;
+      this.ready = false;
+      if (!window.TamoonLegal) return this.renderBackendError(new Error("Atualize o aplicativo para acessar os documentos obrigatórios."));
+      await window.TamoonLegal.mountGate(this, status);
+    },
+
+    async refreshLegalGate() {
+      if (this.legalGateVisible || !this.repo) return;
+      try { await this.repo.checkLegalAccess(); }
+      catch (error) {
+        if (error.legalAcceptanceRequired) await this.showLegalGate(error.legalStatus);
+        else { this.ready = false; this.renderBackendError(error); }
       }
     },
 
@@ -1312,7 +1358,10 @@
       if (!this.repo || !this.state?.profile || !navigator.onLine) return;
       try {
         await this.repo.claimBetaAccess();
+        await this.repo.checkLegalAccess();
       } catch (error) {
+        if (error?.legalAcceptanceRequired) return this.showLegalGate(error.legalStatus);
+        if (error?.message === "LEGAL_ACCEPTANCE_REQUIRED") return this.refreshLegalGate();
         if (error?.betaAccessDenied || /beta fechado|acesso ao beta|não está autorizado|acesso.*bloqueado/i.test(error?.message || "")) {
           clearInterval(this.accessCheckTimer);
           this.renderBetaAccessDenied(error);
@@ -1336,6 +1385,7 @@
     },
 
     bindGlobal() {
+      window.addEventListener("tamoon-legal-required", () => this.refreshLegalGate());
       document.addEventListener("click", event => {
         const nav = event.target.closest("[data-route]");
         const action = event.target.closest("[data-action]");
@@ -1425,7 +1475,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta156r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta157r1");
       }, true);
     },
 
@@ -2148,7 +2198,7 @@
       const pushConfigured = Boolean(String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim());
       const pushText = !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
       const adminTools = this.state.is_platform_admin ? '<div class="section-title"><h2>Operação do beta</h2><small>Acesso exclusivo da plataforma.</small></div><button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel Beta</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button><button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : "";
-      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>' : ""}<div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar e escolher outra conta Google.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta fechado</div>`;
+      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>' : ""}<button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Termos, privacidade, conduta e seus aceites.</small></div><strong>›</strong></button><div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar e escolher outra conta Google.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta fechado</div>`;
     },
 
     async handleAction(action, data) {
@@ -2187,6 +2237,7 @@
           announcement: () => this.openAnnouncementForm(),
           "announcement-center": () => this.openAnnouncementCenter(data.id),
           "notification-settings": () => this.openNotificationSettings(),
+          "legal-documents": () => window.TamoonLegal.openCenter(this),
           profile: () => this.openProfileModal(),
           export: () => this.exportData(),
           "report-problem": () => this.openProblemReport(),
@@ -2257,6 +2308,7 @@
     renderAuth() {
       const error = oauthErrorFromLocation();
       document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel"><div class="auth-stadium"><div class="auth-lights"></div><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><span class="auth-kicker">SUA PELADA. SEU GRUPO. SEU APP.</span></div><div class="auth-copy"><h1>Entre em campo</h1><p>Presença, times equilibrados, membros, caixa e churrasco em um único lugar.</p>${error ? `<div class="notice auth-error"><strong>Falha no login</strong><br>${escapeHtml(error)}</div>` : ""}<div class="google-card"><button id="googleLoginButton" class="google-oauth-button" type="button" aria-label="Continuar com Google"><svg class="google-g" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.23c1.89-1.74 2.99-4.3 2.99-7.41Z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.61-2.36l-3.23-2.54c-.9.6-2.04.96-3.38.96-2.6 0-4.81-1.76-5.6-4.13H3.07v2.62A9.99 9.99 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 13.93A6.02 6.02 0 0 1 6.08 12c0-.67.12-1.32.32-1.93V7.45H3.07A10 10 0 0 0 2 12c0 1.61.38 3.14 1.07 4.55l3.33-2.62Z"/><path fill="#EA4335" d="M12 5.94c1.47 0 2.79.51 3.83 1.5l2.87-2.88A9.64 9.64 0 0 0 12 2a9.99 9.99 0 0 0-8.93 5.45l3.33 2.62C7.19 7.7 9.4 5.94 12 5.94Z"/></svg><span>Continuar com Google</span><span class="google-login-spinner" aria-hidden="true"></span></button><p id="googleLoginMessage">Use sua conta Google para continuar. Não há cadastro por e-mail ou senha.</p></div><div class="auth-features"><span>✓ Acesso seguro</span><span>✓ Dados em nuvem</span><span>✓ Sincronização entre celulares</span></div></div></section></main><div id="toastRoot" class="toast-root"></div>`;
+      $(".auth-copy")?.insertAdjacentHTML("beforeend", '<p class="legal-auth-links"><strong>Disponível apenas para pessoas com 18 anos completos ou mais.</strong><br><a href="/legal/">Termos de Uso, Privacidade e Código de Conduta</a></p>');
       this.setupGoogleLogin();
       if (error && history.replaceState) history.replaceState({}, document.title, location.pathname);
     },
@@ -2293,7 +2345,13 @@
     },
 
     renderBackendError(error) {
-      document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel simple-auth"><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><h1>Falha na conexão</h1><p>${escapeHtml(error?.message || "Não foi possível acessar o backend.")}</p><button class="btn btn-primary" data-action="reload">Tentar novamente</button></section></main>`;
+      this.ready = false;
+      document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel simple-auth"><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><h1>Falha na conexão</h1><p>${escapeHtml(error?.message || "Não foi possível acessar o backend.")}</p><button class="btn btn-primary btn-block" id="backendRetry">Tentar novamente</button><button class="btn btn-secondary btn-block" id="backendSignOut">Sair da conta</button><p><a href="/legal/">Documentos e privacidade</a></p></section></main>`;
+      $("#backendRetry").addEventListener("click", () => location.reload());
+      $("#backendSignOut").addEventListener("click", async () => {
+        try { await this.repo?.signOut(); location.replace(appBaseUrl()); }
+        catch (error) { this.toast(error.message, true); }
+      });
     },
 
     modal(title, content, onReady) {
@@ -2537,7 +2595,7 @@
       const profile = this.state.profile || {};
       const player = this.myPlayer();
       const photo = safeImageUrl(profile.avatar_url);
-      this.modal("Meu perfil", `<div class="profile-summary">${photo ? `<img class="profile-photo" src="${escapeHtml(photo)}" alt="" referrerpolicy="no-referrer">` : `<div class="profile-photo profile-initials">${initials(profile.name)}</div>`}<div><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.email)}</small><span class="role-pill ${roleClass(this.currentRole())}">${roleLabels[this.currentRole()]}</span></div></div><form id="profileForm" class="form-grid"><div class="field"><label>Nome</label><input name="name" value="${escapeHtml(profile.name || "")}" required></div>${player ? `<div class="field"><label>Apelido no grupo</label><input name="nickname" value="${escapeHtml(player.nickname || "")}" placeholder="Como aparece na escalação"></div><div class="field-row"><div class="field"><label>Posição principal</label><select name="primary_position">${positionOptions.map(position => `<option ${position === player.primary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div><div class="field"><label>Posição secundária</label><select name="secondary_position"><option value="">Nenhuma</option>${positionOptions.map(position => `<option ${position === player.secondary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div></div><label class="check-row"><input name="goalkeeper" type="checkbox" ${player.goalkeeper ? "checked" : ""}> Também posso jogar no gol</label>` : ""}<button class="btn btn-primary btn-block">Salvar perfil</button></form><div class="account-separator"></div><button class="btn btn-danger btn-block" id="profileLogoutButton">Sair da conta</button>`, (root, close) => {
+      this.modal("Meu perfil", `<div class="profile-summary">${photo ? `<img class="profile-photo" src="${escapeHtml(photo)}" alt="" referrerpolicy="no-referrer">` : `<div class="profile-photo profile-initials">${initials(profile.name)}</div>`}<div><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.email)}</small><span class="role-pill ${roleClass(this.currentRole())}">${roleLabels[this.currentRole()]}</span></div></div><p><button type="button" id="profileLegalButton" class="btn btn-secondary btn-block">Documentos e privacidade</button></p><form id="profileForm" class="form-grid"><div class="field"><label>Nome</label><input name="name" value="${escapeHtml(profile.name || "")}" required></div>${player ? `<div class="field"><label>Apelido no grupo</label><input name="nickname" value="${escapeHtml(player.nickname || "")}" placeholder="Como aparece na escalação"></div><div class="field-row"><div class="field"><label>Posição principal</label><select name="primary_position">${positionOptions.map(position => `<option ${position === player.primary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div><div class="field"><label>Posição secundária</label><select name="secondary_position"><option value="">Nenhuma</option>${positionOptions.map(position => `<option ${position === player.secondary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div></div><label class="check-row"><input name="goalkeeper" type="checkbox" ${player.goalkeeper ? "checked" : ""}> Também posso jogar no gol</label>` : ""}<button class="btn btn-primary btn-block">Salvar perfil</button></form><div class="account-separator"></div><button class="btn btn-danger btn-block" id="profileLogoutButton">Sair da conta</button>`, (root, close) => {
         $("#profileForm", root).addEventListener("submit", async event => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
@@ -2552,6 +2610,9 @@
           close();
           this.render();
           this.toast("Perfil atualizado.");
+        });
+        $("#profileLegalButton", root)?.addEventListener("click", async () => {
+          try { await window.TamoonLegal.openCenter(this); } catch (error) { this.toast(error.message, true); }
         });
         $("#profileLogoutButton", root).addEventListener("click", async () => { close(); await this.logout(); });
       });
