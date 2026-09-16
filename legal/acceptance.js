@@ -21,6 +21,36 @@
     const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
   const signOut = async repo => { await repo.signOut(); window.location.replace(new URL('./',document.baseURI).href); };
+  const legalError = (code, message) => Object.assign(new Error(message), {code});
+  const request = async (repo, name, args) => {
+    const controller = new AbortController();
+    let timer;
+    try {
+      const query = repo.client.rpc(name, args);
+      const result = await Promise.race([
+        typeof query.abortSignal === 'function' ? query.abortSignal(controller.signal) : query,
+        new Promise((_, reject) => { timer = setTimeout(() => {
+          controller.abort();
+          reject(legalError('LEGAL_REQUEST_TIMEOUT', 'Tempo de conexão esgotado'));
+        }, 12000); })
+      ]);
+      if (result?.error) throw Object.assign(new Error(result.error.message || ''), {
+        code:result.error.code, status:result.status
+      });
+      if (typeof result?.data?.allowed !== 'boolean' || typeof result?.data?.enabled !== 'boolean') {
+        throw legalError('LEGAL_INVALID_RESPONSE', 'Resposta de confirmação incompleta');
+      }
+      return result.data;
+    } finally { clearTimeout(timer); }
+  };
+  const transient = error => ['LEGAL_REQUEST_TIMEOUT','LEGAL_INVALID_RESPONSE'].includes(error?.code)
+    || [0,408,429,500,502,503,504].includes(error?.status)
+    || /load failed|load error|failed to fetch|network|fetch failed|abort|timeout/i.test(error?.message || '');
+  const verifySaved = async repo => {
+    const result = await request(repo, 'get_community_legal_access_status');
+    if (!result.enabled) throw legalError('LEGAL_DOCUMENTS_CHANGED', 'Documentos indisponíveis');
+    return result.allowed === true;
+  };
   window.TamoonLegal = {
     validate,
     async mountGate(app,status) {
@@ -40,23 +70,61 @@
         if (!status.enabled) { window.location.reload(); return; }
         target.innerHTML=`${documentsHtml(status.documents)}<form id="legalAcceptanceForm"><fieldset><legend>Confirmação de maioridade</legend><label class="legal-check"><input type="radio" name="age" value="adult" required><span>Declaro ter 18 anos completos ou mais.</span></label><label class="legal-check"><input type="radio" name="age" value="minor"><span>Tenho menos de 18 anos.</span></label></fieldset><p id="legalAgeError" class="legal-status" role="alert" hidden>O uso do Tâmo On é permitido somente a pessoas com 18 anos completos ou mais. Você pode consultar os documentos ou sair da conta.</p>${['terms','conduct','privacy'].map(type=>`<label class="legal-check"><input type="checkbox" name="${type}" required><span>${statements[type]}</span></label>`).join('')}<p class="legal-muted">As notificações no celular são opcionais e configuradas separadamente.</p><p id="legalSubmitStatus" class="legal-status" role="status" aria-live="polite"></p><button id="legalAcceptButton" class="btn btn-primary btn-block" type="submit" disabled>Aceitar e continuar</button></form>`;
         const form=target.querySelector('form'), button=target.querySelector('#legalAcceptButton'),message=target.querySelector('#legalSubmitStatus');
-        let submitting=false;
+        let submitting=false, needsVerification=false, mustReopen=false;
         const complete=()=>form.elements.age.value==='adult' && ['terms','privacy','conduct'].every(type=>form.elements[type].checked);
-        form.addEventListener('change',()=>{button.disabled=submitting || !complete();target.querySelector('#legalAgeError').hidden=form.elements.age.value!=='minor';});
+        form.addEventListener('change',()=>{button.disabled=submitting || mustReopen || !complete();target.querySelector('#legalAgeError').hidden=form.elements.age.value!=='minor';});
         form.addEventListener('submit',async event=>{
           event.preventDefault();if(submitting || button.disabled || !complete())return;
           submitting=true;
+          const payload={
+            p_documents:status.documents.map(d=>({id:d.id,version:d.version,content_hash:d.content_hash})),
+            p_adult:form.elements.age.value==='adult',p_terms:form.elements.terms.checked,p_privacy:form.elements.privacy.checked,p_conduct:form.elements.conduct.checked,
+            p_app_build:app.build,p_source:window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone===true ? 'pwa':'web'
+          };
+          const inputs=[...form.querySelectorAll('input')];
+          inputs.forEach(input=>input.disabled=true);
           button.disabled=true;button.textContent='Registrando…';message.textContent='';
+          const proceed=()=>{if(form.isConnected){message.textContent='Confirmação registrada. Abrindo o aplicativo…';window.location.reload();}};
           try {
-            const {data,error}=await app.repo.client.rpc('accept_community_legal_documents',{
-              p_documents:status.documents.map(d=>({id:d.id,version:d.version,content_hash:d.content_hash})),
-              p_adult:form.elements.age.value==='adult',p_terms:form.elements.terms.checked,p_privacy:form.elements.privacy.checked,p_conduct:form.elements.conduct.checked,
-              p_app_build:157,p_source:window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone===true ? 'pwa':'web'
-            });
-            if(error)throw error;if(!data?.allowed)throw new Error('O aceite não foi confirmado. Tente novamente.');
-            window.location.reload();
-          }catch(error){submitting=false;message.textContent=error.message || 'Não foi possível registrar. Confira sua conexão e tente novamente.';button.disabled=!complete();button.textContent='Aceitar e continuar';
-            if(/atualizados|vigentes indisponíveis/.test(error.message||'')) {button.disabled=true;message.insertAdjacentHTML('beforeend',' <a href="">Reabrir os documentos</a>');}
+            if (!Number.isInteger(payload.p_app_build) || payload.p_app_build<157) throw legalError('LEGAL_DOCUMENTS_CHANGED','Atualize o aplicativo');
+            if(needsVerification){
+              message.textContent='Conferindo se sua confirmação já foi salva…';
+              if(await verifySaved(app.repo)){proceed();return;}
+              needsVerification=false;
+            }
+            // No máximo um reenvio automático por clique, com o mesmo aceite explícito.
+            // A RPC do banco é idempotente e preserva os registros originais.
+            for(let attempt=0;attempt<2;attempt++){
+              if(!form.isConnected)return;
+              message.textContent=attempt ? 'Tentando registrar novamente…' : 'Salvando sua confirmação…';
+              try{
+                const saved=await request(app.repo,'accept_community_legal_documents',payload);
+                if(saved.enabled && saved.allowed){proceed();return;}
+                throw legalError('LEGAL_INVALID_RESPONSE','O registro não foi confirmado');
+              }catch(error){
+                if(!transient(error))throw error;
+                needsVerification=true;
+                message.textContent='Conferindo se sua confirmação já foi salva…';
+                // Uma resposta perdida não significa que a transação falhou.
+                // Se a consulta também falhar, não envia outra gravação às cegas.
+                if(await verifySaved(app.repo)){proceed();return;}
+                if(attempt===1)throw error;
+              }
+            }
+          }catch(error){
+            if(!form.isConnected)return;
+            submitting=false;
+            inputs.forEach(input=>input.disabled=false);
+            const changed=error?.code==='LEGAL_DOCUMENTS_CHANGED' || /atualizados|vigentes indisponíveis/.test(error?.message||'');
+            const session=[401,403].includes(error?.status) || /sessão|autenticad|JWT|token.*expir/i.test(error?.message||'');
+            mustReopen=changed || session;
+            message.textContent=changed ? 'Os documentos ou o aplicativo precisam ser atualizados. Reabra a tela antes de confirmar.'
+              : session ? 'Sua sessão precisa ser renovada. Reabra o aplicativo para continuar.'
+              : needsVerification ? 'Não foi possível confirmar o registro. Seus campos foram mantidos. Confira a conexão e toque em “Verificar e continuar”.'
+              : 'Não foi possível registrar sua confirmação. Confira a conexão e tente novamente.';
+            button.disabled=mustReopen || !complete();
+            button.textContent=needsVerification ? 'Verificar e continuar' : 'Tentar novamente';
+            if(mustReopen)message.insertAdjacentHTML('beforeend',' <a href="">Reabrir o aplicativo</a>');
           }
         });
       } catch(error) {
