@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 157, database: 149, edge: 113 });
-  const APP_ASSET_TOKEN = "beta157r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 158, database: 149, edge: 114 });
+  const APP_ASSET_TOKEN = "beta158r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -150,7 +150,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta157r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta158r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -378,6 +378,12 @@
       if (unread.error) throw unread.error;
       if (recent.error) throw recent.error;
       const byId = new Map([...(unread.data || []), ...(recent.data || [])].map(item => [item.id, item]));
+      // Uma consulta iniciada antes de um clique não pode desfazer a leitura confirmada.
+      const knownRead = new Map((this.state.user_notifications || []).filter(item => item.read_at).map(item => [item.id, item]));
+      for (const [id, item] of byId) {
+        const saved = knownRead.get(id);
+        if (!item.read_at && saved) byId.set(id, { ...item, read_at: saved.read_at, read_method: saved.read_method });
+      }
       this.state.user_notifications = [...byId.values()].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       return this.state.user_notifications;
     }
@@ -890,14 +896,41 @@
       return data || { marked_count: ids.length };
     }
 
+    async notificationRequest(query) {
+      const controller = new AbortController();
+      let timer;
+      try {
+        return await Promise.race([
+          typeof query.abortSignal === "function" ? query.abortSignal(controller.signal) : query,
+          new Promise((_, reject) => { timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error("A conexão demorou demais. Tente novamente."));
+          }, 12000); })
+        ]);
+      } finally { clearTimeout(timer); }
+    }
+
+    async userNotification(id) {
+      const { data, error } = await this.notificationRequest(this.client.from("user_notifications")
+        .select("id,user_id,group_id,notification_type,title,body,target_url,source_id,metadata,read_at,read_method,created_at")
+        .eq("user_id", this.state.profile.id).eq("id", id).maybeSingle());
+      if (error) throw error;
+      return data || null;
+    }
+
     async markUserNotificationsRead(notificationIds) {
       const ids = [...new Set((notificationIds || []).map(String).filter(Boolean))];
       if (!ids.length) return { marked_count: 0 };
-      const { data, error } = await this.client.rpc("mark_user_notifications_read", {
+      const { data, error } = await this.notificationRequest(this.client.rpc("mark_user_notifications_read", {
         p_notification_ids: ids
-      });
+      }));
       if (error) throw error;
-      const readAt = data?.read_at || nowIso();
+      if (!data || !Number.isInteger(data.marked_count)) throw new Error("O banco não confirmou a leitura.");
+      if (data.marked_count < ids.length) {
+        const saved = await Promise.all(ids.map(id => this.userNotification(id)));
+        if (saved.some(item => !item?.read_at)) throw new Error("A leitura ainda não foi confirmada. Tente novamente.");
+      }
+      const readAt = data.read_at || nowIso();
       const selected = new Set(ids);
       this.state.user_notifications = (this.state.user_notifications || []).map(item =>
         selected.has(String(item.id))
@@ -930,7 +963,12 @@
           read_method: "notification_center_opened"
         };
       } catch (error) {
-        this.state.user_notifications = previous;
+        const previousById = new Map(previous.map(item => [item.id, item]));
+        this.state.user_notifications = this.state.user_notifications.map(item =>
+          item.read_at === optimisticReadAt && item.read_method === "notification_center_opened"
+            ? { ...item, read_at: previousById.get(item.id)?.read_at || null, read_method: previousById.get(item.id)?.read_method || null }
+            : item
+        );
         throw error;
       }
     }
@@ -1177,6 +1215,8 @@
     launchGroupId: "",
     launchAnnouncementId: "",
     launchMatchId: "",
+    pendingNotificationUrl: "",
+    notificationOpening: null,
     selectedTeamMatchId: "",
     selectedTeamMatchHistoryMode: false,
     swRegistration: null,
@@ -1298,11 +1338,10 @@
           swBuild: window.tamoonPwa?.getState?.().swBuild || null
         });
         this.checkForUpdates();
-        if (this.pendingInvite) setTimeout(() => this.openJoinGroupModal(this.pendingInvite), 80);
+        if (this.pendingNotificationUrl) await this.drainNotificationOpen();
+        else if (this.pendingInvite) setTimeout(() => this.openJoinGroupModal(this.pendingInvite), 80);
         else if (this.launchAction === "rsvp") setTimeout(() => this.openRsvp(this.nextMatch()?.id), 80);
-        else if (this.launchAnnouncementId) setTimeout(() => this.openAnnouncementCenter(this.launchAnnouncementId), 120);
-        else if (this.launchMatchId) setTimeout(() => this.openMatchDetails(this.launchMatchId), 120);
-        setTimeout(() => this.maybeShowNotificationOnboarding(), 650);
+        else setTimeout(() => this.maybeShowNotificationOnboarding(), 650);
       } catch (error) {
         this.cancelBootFeedback();
         console.error(error);
@@ -1382,10 +1421,23 @@
       this.launchGroupId = String(params.get("group") || "").trim();
       this.launchAnnouncementId = String(params.get("announcement") || "").trim();
       this.launchMatchId = String(params.get("match") || "").trim();
+      if (params.get("notification") || params.get("notification_type") || this.launchAnnouncementId || this.launchMatchId) {
+        this.pendingNotificationUrl = this.notificationAppUrl(location.href)?.href || "";
+      }
     },
 
     bindGlobal() {
       window.addEventListener("tamoon-legal-required", () => this.refreshLegalGate());
+      navigator.serviceWorker?.addEventListener("message", event => {
+        if (event.data?.type !== "TAMOON_OPEN_NOTIFICATION") return;
+        const url = this.notificationAppUrl(event.data.url);
+        if (!url) return;
+        this.pendingNotificationUrl = url.href;
+        // Mantém o destino durante login, aceite obrigatório ou inicialização.
+        history.replaceState({}, document.title, url.href);
+        event.ports?.[0]?.postMessage({ accepted: true });
+        if (this.ready && !this.legalGateVisible) void this.drainNotificationOpen();
+      });
       document.addEventListener("click", event => {
         const nav = event.target.closest("[data-route]");
         const action = event.target.closest("[data-action]");
@@ -1475,7 +1527,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta157r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta158r1");
       }, true);
     },
 
@@ -3984,6 +4036,145 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       }
     },
 
+    notificationAppUrl(value) {
+      try {
+        const url = new URL(String(value || appBaseUrl()), document.baseURI);
+        const base = new URL(appBaseUrl());
+        if (url.origin !== location.origin || ![base.pathname, `${base.pathname}index.html`].includes(url.pathname)) return null;
+        return url;
+      } catch { return null; }
+    },
+
+    async drainNotificationOpen() {
+      if (this.notificationOpening) return this.notificationOpening;
+      if (!this.ready || this.legalGateVisible) return;
+      this.notificationOpening = (async () => {
+        while (this.pendingNotificationUrl && this.ready && !this.legalGateVisible) {
+          const url = this.pendingNotificationUrl;
+          this.pendingNotificationUrl = "";
+          await this.openNotificationDestination(url);
+        }
+      })();
+      try { await this.notificationOpening; }
+      finally { this.notificationOpening = null; }
+    },
+
+    notificationReadFeedback(item) {
+      if (item.read_at) return;
+      const host = document.querySelector("#modalRoot .modal-content");
+      if (!host) return;
+      const status = document.createElement("div");
+      status.className = "notice";
+      status.setAttribute("role", "status");
+      status.setAttribute("aria-live", "polite");
+      status.dataset.notificationRead = item.id;
+      host.prepend(status);
+      const save = async () => {
+        status.textContent = "Registrando leitura…";
+        try {
+          await this.repo.markUserNotificationsRead([item.id]);
+          this.state = this.repo.state;
+          this.updateNotificationBadge();
+          status.remove();
+        } catch (error) {
+          if (error?.message === "LEGAL_ACCEPTANCE_REQUIRED") { await this.refreshLegalGate(); return; }
+          this.repo.logEvent("notification_read_failed", { notification_id: item.id, message: error?.message || "Falha de leitura" }, "error");
+          if (!status.isConnected) { this.toast("A leitura não foi salva. Abra o aviso novamente para tentar.", true); return; }
+          status.innerHTML = '<p>A leitura não foi salva. O aviso continua como novo.</p><button type="button" class="btn btn-secondary btn-small">Tentar novamente</button>';
+          status.querySelector("button").addEventListener("click", save, { once: true });
+        }
+      };
+      void save();
+    },
+
+    async openNotificationDestination(value) {
+      const requested = this.notificationAppUrl(value);
+      if (!requested || !this.ready || this.legalGateVisible) return;
+      this.modal("Abrindo aviso", '<p role="status">Carregando o conteúdo…</p>');
+      try {
+        await this.repo.checkLegalAccess();
+        if (!this.ready || this.legalGateVisible) return;
+        let item = null;
+        const id = requested.searchParams.get("notification");
+        if (id) {
+          item = (this.state.user_notifications || []).find(row => String(row.id) === id) || await this.repo.userNotification(id);
+          if (!item) {
+            this.modal("Notificação indisponível", '<p>Este aviso não está disponível para esta conta ou já foi removido.</p>');
+            history.replaceState({}, document.title, appBaseUrl());
+            return;
+          }
+          if (!this.state.user_notifications.some(row => row.id === item.id)) this.state.user_notifications.push(item);
+        } else {
+          // Pushes antigos não possuem ID individual. Só baixa uma correspondência inequívoca.
+          await this.repo.loadUserNotifications();
+          this.state = this.repo.state;
+          const eventType = requested.searchParams.get("notification_type");
+          const candidates = this.state.user_notifications.filter(row => {
+            if (eventType && row.notification_type !== eventType) return false;
+            const target = this.notificationAppUrl(row.target_url);
+            return target && ["group", "page", "announcement", "match", "action"].every(key =>
+              (target.searchParams.get(key) || "") === (requested.searchParams.get(key) || ""));
+          });
+          if (candidates.length > 1) {
+            this.openNotificationCenter();
+            this.toast("Há mais de um aviso para este conteúdo. Toque no aviso desejado.");
+            history.replaceState({}, document.title, appBaseUrl());
+            return;
+          }
+          item = candidates[0] || null;
+        }
+        // O destino salvo na caixa do próprio usuário prevalece sobre parâmetros do link.
+        const target = item ? this.notificationAppUrl(item.target_url) : requested;
+        if (!target) throw new Error("O destino deste aviso não é válido.");
+        const groupId = item?.group_id || target.searchParams.get("group");
+        const memberOfGroup = !groupId || this.state.groups.some(group => group.id === groupId);
+        const announcementId = target.searchParams.get("announcement");
+        const matchId = target.searchParams.get("match");
+        if (groupId && memberOfGroup && (this.state.currentGroupId !== groupId
+          || (announcementId && !this.state.announcements.some(row => row.id === announcementId))
+          || (matchId && !this.state.matches.some(row => row.id === matchId)))) {
+          const previousState = { ...this.repo.state };
+          try { await this.repo.loadGroup(groupId); }
+          catch (error) {
+            if (!this.legalGateVisible) { this.repo.state = previousState; this.state = previousState; }
+            throw error;
+          }
+          this.state = this.repo.state;
+          localStorage.setItem("tamoon-current-group", groupId);
+        }
+        if (!this.ready || this.legalGateVisible) return;
+        const page = target.searchParams.get("page");
+        if (memberOfGroup && ["home", "matches", "teams", "members", "finance", "more"].includes(page)) this.route = page;
+        this.render();
+        if (memberOfGroup && announcementId && this.state.announcements.some(row => row.id === announcementId)) {
+          this.openAnnouncementCenter(announcementId);
+        } else if (memberOfGroup && matchId && this.state.matches.some(row => row.id === matchId)) {
+          this.openMatchDetails(matchId);
+        } else {
+          const extra = !memberOfGroup ? "Você não participa mais deste grupo." : (matchId || announcementId) ? "O conteúdo vinculado não está mais disponível." : "";
+          this.modal(item?.title || "Aviso", `<p style="white-space:pre-wrap">${escapeHtml(item?.body || "Consulte os avisos na central de notificações.")}</p>${extra ? `<p class="muted">${escapeHtml(extra)}</p>` : ""}`);
+        }
+        this.launchAnnouncementId = "";
+        this.launchMatchId = "";
+        const clean = new URL(appBaseUrl());
+        clean.searchParams.set("page", this.route);
+        if (this.state.currentGroupId) clean.searchParams.set("group", this.state.currentGroupId);
+        if (!this.pendingNotificationUrl) history.replaceState({}, document.title, clean.href);
+        if (item) this.notificationReadFeedback(item);
+      } catch (error) {
+        if (error?.legalAcceptanceRequired) { await this.showLegalGate(error.legalStatus); return; }
+        if (error?.message === "LEGAL_ACCEPTANCE_REQUIRED") { await this.refreshLegalGate(); return; }
+        if (!this.ready || this.legalGateVisible) return;
+        this.modal("Não foi possível abrir o aviso", '<p>Confira sua conexão e tente novamente.</p><button id="retryNotificationOpen" type="button" class="btn btn-primary">Tentar novamente</button>', root => {
+          root.querySelector("button#retryNotificationOpen").addEventListener("click", () => {
+            this.pendingNotificationUrl = requested.href;
+            void this.drainNotificationOpen();
+          }, { once: true });
+        });
+        this.repo.logEvent("notification_open_failed", { message: error?.message || "Falha ao abrir aviso" }, "error");
+      }
+    },
+
     notificationPresentation(type = "") {
       const presentations = {
         announcement: { icon: "📣", label: "Aviso do grupo" },
@@ -4034,25 +4225,19 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       this.modal("Notificações", `<div class="notification-inbox-list">${list}</div>`, root => {
         $$('[data-notification-id]', root).forEach(link => {
           link.addEventListener("click", async event => {
-            const notificationId = String(link.dataset.notificationId || "");
-            const notification = (this.state?.user_notifications || []).find(item => String(item.id) === notificationId);
-            if (!notification || notification.read_at) return;
-
             event.preventDefault();
             if (link.dataset.reading === "true") return;
             link.dataset.reading = "true";
             link.classList.add("is-reading");
-            const target = link.href;
-            try {
-              await this.repo.markUserNotificationsRead([notificationId]);
-              this.state = this.repo.state;
-              this.updateNotificationBadge();
-            } catch (error) {
-              console.warn("Não foi possível marcar a notificação como lida.", error);
-              this.toast("A notificação foi aberta, mas a leitura não pôde ser registrada.", true);
-            } finally {
-              location.href = target;
+            const url = this.notificationAppUrl(link.href);
+            if (url) {
+              url.searchParams.set("notification", link.dataset.notificationId);
+              this.pendingNotificationUrl = url.href;
+              history.replaceState({}, document.title, url.href);
+              await this.drainNotificationOpen();
             }
+            link.dataset.reading = "false";
+            link.classList.remove("is-reading");
           });
         });
       });
@@ -4114,10 +4299,6 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
           }
         }));
       });
-      if (this.launchAnnouncementId && history.replaceState) {
-        this.launchAnnouncementId = "";
-        history.replaceState({}, document.title, appBaseUrl());
-      }
     },
 
     async currentPushSubscription() {

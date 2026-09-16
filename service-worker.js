@@ -1,44 +1,44 @@
-const SW_BUILD = 157;
-const CACHE = "tamo-on-beta-1.0-build-157-r1";
+const SW_BUILD = 158;
+const CACHE = "tamo-on-beta-1.0-build-158-r1";
 const BADGE_DB_NAME = "tamoon-pwa-state";
 const BADGE_DB_VERSION = 1;
 const BADGE_STORE_NAME = "app-state";
 const BADGE_COUNT_KEY = "unread-notification-count";
 const ASSETS = [
   "/",
-  "/legal/acceptance.js?v=beta157r1",
-  "/legal/legal.css?v=beta157r1",
+  "/legal/acceptance.js?v=beta158r1",
+  "/legal/legal.css?v=beta158r1",
   "/legal/",
-  "/legal/public.js?v=beta157r1",
+  "/legal/public.js?v=beta158r1",
   "/legal/termos-de-uso-v1.2.html",
   "/legal/privacidade-v1.2.html",
   "/legal/codigo-de-conduta-v1.2.html",
   "/index.html",
-  "/styles.css?v=beta157r1",
-  "/app.js?v=beta157r1",
-  "/pwa-bootstrap.js?v=beta157r1",
+  "/styles.css?v=beta158r1",
+  "/app.js?v=beta158r1",
+  "/pwa-bootstrap.js?v=beta158r1",
   "/supabase-config.js?v=0.3.3",
-  "/group-avatars-data.js?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-01.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-02.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-03.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-04.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-05.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-06.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-07.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-08.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-09.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-10.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-11.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-12.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-13.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-14.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-15.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-16.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-17.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-18.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-19.png?v=beta157r1",
-  "/assets/group-avatars-build-142/badge-20.png?v=beta157r1",
+  "/group-avatars-data.js?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-01.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-02.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-03.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-04.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-05.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-06.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-07.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-08.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-09.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-10.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-11.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-12.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-13.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-14.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-15.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-16.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-17.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-18.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-19.png?v=beta158r1",
+  "/assets/group-avatars-build-142/badge-20.png?v=beta158r1",
   "/manifest.json",
   "/offline.html",
   "/version.json",
@@ -184,14 +184,39 @@ self.addEventListener("push", event => {
 
 self.addEventListener("notificationclick", event => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || "./?page=home", self.location.origin).href;
+  const data = event.notification.data || {};
+  let target;
+  try {
+    target = new URL(data.url || "./?page=home", self.location.origin);
+    if (target.origin !== self.location.origin || !["/", "/index.html"].includes(target.pathname)) throw new Error("Destino externo");
+  } catch { target = new URL("/?page=home", self.location.origin); }
+  if (data.notificationId) target.searchParams.set("notification", String(data.notificationId));
+  if (data.eventType) target.searchParams.set("notification_type", String(data.eventType));
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const client of windows) {
-      if ("navigate" in client) await client.navigate(target);
-      if ("focus" in client) return client.focus();
+    const appWindows = windows.filter(client => {
+      try { const url = new URL(client.url); return url.origin === self.location.origin && ["/", "/index.html"].includes(url.pathname); }
+      catch { return false; }
+    }).sort((a, b) => Number(b.focused) - Number(a.focused));
+    for (const client of appWindows) {
+      try {
+        const accepted = await new Promise(resolve => {
+          const channel = new MessageChannel();
+          const finish = value => { clearTimeout(timer); channel.port1.close(); resolve(value); };
+          const timer = setTimeout(() => finish(false), 1500);
+          channel.port1.onmessage = message => finish(message.data?.accepted === true);
+          try { client.postMessage({ type: "TAMOON_OPEN_NOTIFICATION", url: target.href }, [channel.port2]); }
+          catch { finish(false); }
+        });
+        if (!accepted) {
+          // Compatibilidade com builds antigas ou páginas que ainda não iniciaram o app.
+          const navigated = await client.navigate(target.href);
+          if (!navigated) continue;
+        }
+        return await client.focus();
+      } catch { /* Tenta outra janela ou abre uma nova se o sistema encerrou esta. */ }
     }
-    return self.clients.openWindow(target);
+    return self.clients.openWindow(target.href);
   })());
 });
 

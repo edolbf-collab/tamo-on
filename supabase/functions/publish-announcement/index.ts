@@ -1,4 +1,4 @@
-// Tâmo On publish-announcement — Build 113
+// Tâmo On publish-announcement — Build 114
 import { createClient } from "npm:@supabase/supabase-js@2.110.7";
 import { sendNotification } from "npm:web-push-neo@0.1.2";
 
@@ -163,9 +163,10 @@ Deno.serve(async (req) => {
       options: InboxOptions,
       notificationGroupId: string | null,
     ) => {
-      if (options.recordInbox === false) return;
+      const notifications = new Map<string, { id: string; url: string }>();
+      if (options.recordInbox === false) return notifications;
       const userIds = [...new Set((recipientUserIds || []).map((id) => cleanText(id, 64)).filter(Boolean))];
-      if (!userIds.length) return;
+      if (!userIds.length) return notifications;
 
       const notificationType = cleanText(options.data.eventType || "notification", 80) || "notification";
       const sourceId = cleanText(
@@ -176,21 +177,30 @@ Deno.serve(async (req) => {
           || options.data.playerId,
         64,
       ) || null;
-      const rows = userIds.map((userId) => ({
-        user_id: userId,
-        group_id: notificationGroupId,
-        notification_type: notificationType,
-        title: cleanText(options.inboxTitle || options.title, 160),
-        body: cleanText(options.inboxBody || options.body, 1000),
-        target_url: cleanText(options.url, 2000),
-        source_id: sourceId,
-        metadata: options.data,
-        created_by: user.id,
-      }));
+      const rows = userIds.map((userId) => {
+        const id = crypto.randomUUID();
+        const target = new URL(options.url, appOrigin || "https://local.invalid");
+        target.searchParams.set("notification", id);
+        const url = appOrigin ? target.href : `${target.pathname}${target.search}`;
+        notifications.set(userId, { id, url });
+        return {
+          id,
+          user_id: userId,
+          group_id: notificationGroupId,
+          notification_type: notificationType,
+          title: cleanText(options.inboxTitle || options.title, 160),
+          body: cleanText(options.inboxBody || options.body, 1000),
+          target_url: cleanText(notifications.get(userId)!.url, 2000),
+          source_id: sourceId,
+          metadata: options.data,
+          created_by: user.id,
+        };
+      });
 
       stage = "store-user-notifications";
       const { error } = await adminClient.from("user_notifications").insert(rows);
       if (error) throw error;
+      return notifications;
     };
 
     const providerFromEndpoint = (endpoint: string) => {
@@ -389,26 +399,26 @@ Deno.serve(async (req) => {
         }
       }
 
-      await storeUserNotifications(activeUserIds, options, groupId);
+      const inboxNotifications = await storeUserNotifications(activeUserIds, options, groupId);
 
       let sent = 0;
       let failed = 0;
       const failures: PushFailure[] = [];
-      const notificationPayload = JSON.stringify({
+      const notificationPayload = (recipientId: string) => JSON.stringify({
         title: options.title,
         body: options.body.slice(0, 240),
         icon: appOrigin ? `${appOrigin}/tamo-on-icon-192.png?v=icon3dr1` : "/tamo-on-icon-192.png?v=icon3dr1",
         badge: appOrigin ? `${appOrigin}/icons/icon-64.png` : "/icons/icon-64.png",
         tag: options.tag,
         timestamp: Date.now(),
-        data: { ...options.data, url: options.url },
+        data: { ...options.data, url: inboxNotifications.get(recipientId)?.url || options.url, notificationId: inboxNotifications.get(recipientId)?.id || null },
       });
 
       if (subscriptions.length) {
         stage = "send-push";
         await Promise.allSettled(subscriptions.map(async (subscription) => {
           try {
-            await sendNotificationWithRetry(subscription, notificationPayload, {
+            await sendNotificationWithRetry(subscription, notificationPayload(subscription.user_id), {
               groupId,
               eventType: cleanText(options.data.eventType || "group-push", 80),
               eventId: eventIdFromData(options.data, options.tag),
@@ -473,26 +483,26 @@ Deno.serve(async (req) => {
         }
       }
 
-      await storeUserNotifications(activeUserIds, options, groupId || null);
+      const inboxNotifications = await storeUserNotifications(activeUserIds, options, groupId || null);
 
       let sent = 0;
       let failed = 0;
       const failures: PushFailure[] = [];
-      const notificationPayload = JSON.stringify({
+      const notificationPayload = (recipientId: string) => JSON.stringify({
         title: options.title,
         body: options.body.slice(0, 240),
         icon: appOrigin ? `${appOrigin}/tamo-on-icon-192.png?v=icon3dr1` : "/tamo-on-icon-192.png?v=icon3dr1",
         badge: appOrigin ? `${appOrigin}/icons/icon-64.png` : "/icons/icon-64.png",
         tag: options.tag,
         timestamp: Date.now(),
-        data: { ...options.data, url: options.url },
+        data: { ...options.data, url: inboxNotifications.get(recipientId)?.url || options.url, notificationId: inboxNotifications.get(recipientId)?.id || null },
       });
 
       if (subscriptions.length) {
         stage = "send-direct-push";
         await Promise.allSettled(subscriptions.map(async (subscription) => {
           try {
-            await sendNotificationWithRetry(subscription, notificationPayload, {
+            await sendNotificationWithRetry(subscription, notificationPayload(subscription.user_id), {
               groupId,
               eventType: cleanText(options.data.eventType || "direct-push", 80),
               eventId: eventIdFromData(options.data, options.tag),
@@ -548,23 +558,23 @@ Deno.serve(async (req) => {
         if (error) throw error;
         subscriptions = (data || []) as StoredSubscription[];
       }
-      await storeUserNotifications(activeUserIds, options, null);
+      const inboxNotifications = await storeUserNotifications(activeUserIds, options, null);
       let sent = 0;
       let failed = 0;
       const failures: PushFailure[] = [];
-      const notificationPayload = JSON.stringify({
+      const notificationPayload = (recipientId: string) => JSON.stringify({
         title: options.title,
         body: options.body.slice(0, 240),
         icon: appOrigin ? `${appOrigin}/tamo-on-icon-192.png?v=icon3dr1` : "/tamo-on-icon-192.png?v=icon3dr1",
         badge: appOrigin ? `${appOrigin}/icons/icon-64.png` : "/icons/icon-64.png",
         tag: options.tag,
         timestamp: Date.now(),
-        data: { ...options.data, url: options.url },
+        data: { ...options.data, url: inboxNotifications.get(recipientId)?.url || options.url, notificationId: inboxNotifications.get(recipientId)?.id || null },
       });
       stage = "send-system-push";
       await Promise.allSettled(subscriptions.map(async (subscription) => {
         try {
-          await sendNotificationWithRetry(subscription, notificationPayload, {
+          await sendNotificationWithRetry(subscription, notificationPayload(subscription.user_id), {
             groupId: null,
             eventType: cleanText(options.data.eventType || "system-push", 80),
             eventId: eventIdFromData(options.data, options.tag),
