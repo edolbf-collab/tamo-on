@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 160, database: 149, edge: 114 });
-  const APP_ASSET_TOKEN = "beta160r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 161, database: 149, edge: 114 });
+  const APP_ASSET_TOKEN = "beta161r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -150,7 +150,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta160r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta161r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -1528,7 +1528,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta160r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta161r1");
       }, true);
     },
 
@@ -1749,8 +1749,9 @@
       );
       return groups;
     },
-    attendanceShareText(match) {
+    attendanceShareText(match, selectedGroups = ["confirmed", "out", "waitlist", "pending"]) {
       const groups = this.attendanceShareGroups(match);
+      const selected = new Set(selectedGroups);
       const date = new Intl.DateTimeFormat("pt-BR", {
         day: "2-digit",
         month: "2-digit",
@@ -1767,14 +1768,13 @@
         `📅 ${date} — ${shortTime(match.starts_at)} às ${shortTime(matchEndAt(match))}`,
         `📍 ${String(match.location || "Local não informado").trim()}`,
         "",
-        section("✅", "VÃO", groups.confirmed),
-        "",
-        section("⏳", "ESPERA", groups.waitlist),
-        "",
-        section("❌", "NÃO VÃO", groups.out),
-        "",
-        section("❔", "SEM RESPOSTA", groups.pending),
-        "",
+        ...[
+          ["confirmed", "✅", "VÃO"],
+          ["waitlist", "⏳", "ESPERA"],
+          ["out", "❌", "NÃO VÃO"],
+          ["pending", "❔", "SEM RESPOSTA"]
+        ].filter(([key]) => selected.has(key))
+          .flatMap(([key, icon, title]) => [section(icon, title, groups[key]), ""]),
         "Lista gerada pelo Tâmo On."
       ].join("\n");
     },
@@ -1799,23 +1799,46 @@
       if (!match) return this.toast("Evento não encontrado.", true);
       if (!this.canManageMatches()) return this.toast("Somente administrador ou organizador pode compartilhar a lista.", true);
       if (!this.isMatchStarted(match)) return this.toast("A lista será liberada quando o prazo de confirmação terminar.", true);
-      const text = this.attendanceShareText(match);
-      this.modal("Compartilhar lista", `<div class="notice attendance-share-notice"><strong>Lista consolidada</strong><br>As confirmações já foram encerradas. Confira o texto antes de compartilhar.</div><pre class="attendance-share-preview">${escapeHtml(text)}</pre><div class="attendance-share-actions"><button type="button" class="btn btn-whatsapp btn-block" id="shareAttendanceWhatsApp">Enviar pelo WhatsApp</button><button type="button" class="btn btn-secondary btn-block" id="copyAttendanceList">Copiar lista</button></div>`, root => {
-        $("#shareAttendanceWhatsApp", root)?.addEventListener("click", () => {
+      const options = [["confirmed", "Vou"], ["out", "Não vou"], ["waitlist", "Espera"], ["pending", "Sem resposta"]];
+      this.modal("Compartilhar lista", `<p class="attendance-share-notice muted">Confirmações encerradas. Confira antes de compartilhar.</p><fieldset class="attendance-share-filters"><legend>Incluir na lista</legend>${options.map(([value, label]) => `<label><input type="checkbox" name="attendanceShareGroup" value="${value}" checked><span>${label}</span></label>`).join("")}</fieldset><pre class="attendance-share-preview" id="attendanceSharePreview"></pre><p class="attendance-share-empty muted" id="attendanceShareEmpty" role="status" hidden>Selecione pelo menos uma categoria.</p><div class="attendance-share-actions"><button type="button" class="btn btn-whatsapp btn-block" id="shareAttendanceWhatsApp">Enviar pelo WhatsApp</button><button type="button" class="btn btn-secondary btn-block" id="copyAttendanceList">Copiar lista</button></div>`, root => {
+        const checkboxes = [...root.querySelectorAll('input[name="attendanceShareGroup"]')];
+        const shareButton = $("#shareAttendanceWhatsApp", root);
+        const copyButton = $("#copyAttendanceList", root);
+        const preview = $("#attendanceSharePreview", root);
+        const empty = $("#attendanceShareEmpty", root);
+        let text = "", copying = false;
+        const update = () => {
+          const selected = checkboxes.filter(input => input.checked).map(input => input.value);
+          text = selected.length ? this.attendanceShareText(match, selected) : "";
+          preview.textContent = text;
+          preview.hidden = !selected.length;
+          empty.hidden = Boolean(selected.length);
+          shareButton.disabled = !selected.length;
+          copyButton.disabled = copying || !selected.length;
+          copyButton.textContent = copying ? "Copiando…" : "Copiar lista";
+        };
+        checkboxes.forEach(input => input.addEventListener("change", update));
+        update();
+        shareButton.addEventListener("click", () => {
+          if (!text) return;
           window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
         });
-        $("#copyAttendanceList", root)?.addEventListener("click", async event => {
-          const button = event.currentTarget;
-          const original = button.textContent;
-          button.disabled = true;
+        copyButton.addEventListener("click", async () => {
+          if (!text || copying) return;
+          const copiedText = text;
+          copying = true;
+          copyButton.disabled = true;
+          copyButton.textContent = "Copiando…";
           try {
-            await this.copyPlainText(text);
-            button.textContent = "Lista copiada";
+            await this.copyPlainText(copiedText);
+            copyButton.textContent = text === copiedText ? "Lista copiada" : "Copiar lista";
             this.toast("Lista copiada.");
           } catch (error) {
-            button.disabled = false;
-            button.textContent = original;
+            copyButton.textContent = "Copiar lista";
             this.toast(error?.message || "Não foi possível copiar a lista.", true);
+          } finally {
+            copying = false;
+            copyButton.disabled = !text;
           }
         });
       });
