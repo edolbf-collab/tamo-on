@@ -1,4 +1,4 @@
-// Tâmo On publish-announcement — Build 114
+// Tâmo On publish-announcement — Build 115
 import { createClient } from "npm:@supabase/supabase-js@2.110.7";
 import { sendNotification } from "npm:web-push-neo@0.1.2";
 
@@ -198,8 +198,11 @@ Deno.serve(async (req) => {
       });
 
       stage = "store-user-notifications";
-      const { error } = await adminClient.from("user_notifications").insert(rows);
+      const { data: inserted, error } = await adminClient.from("user_notifications").insert(rows).select("user_id");
       if (error) throw error;
+      // O trigger pode suprimir uma entrega após um bloqueio concorrente.
+      const insertedUsers = new Set((inserted || []).map(item => item.user_id));
+      for (const id of notifications.keys()) if (!insertedUsers.has(id)) notifications.delete(id);
       return notifications;
     };
 
@@ -365,6 +368,19 @@ Deno.serve(async (req) => {
       throw new Error("Falha não identificada no serviço de push.");
     };
 
+    const safetyRecipients = async (ids: string[], data: Record<string, unknown>) => {
+      if (!ids.length) return ids;
+      const { data: allowed, error } = await adminClient.rpc("community_push_recipients", {
+        p_author: user.id,
+        p_recipients: ids,
+        p_announcement: cleanText(data.announcementId, 64) || null,
+      });
+      // Falha fechada: não enviar sem conseguir verificar os bloqueios.
+      if (error) throw error;
+      if (!Array.isArray(allowed)) throw new Error("Não foi possível verificar os destinatários.");
+      return ids.filter(id => allowed.includes(id));
+    };
+
     const sendGroupPush = async (options: {
       title: string;
       body: string;
@@ -392,6 +408,7 @@ Deno.serve(async (req) => {
           .in("user_id", userIds);
         if (accessError) throw accessError;
         activeUserIds = [...new Set((activeRows || []).map((item) => item.user_id).filter(Boolean))];
+        activeUserIds = await safetyRecipients(activeUserIds, options.data);
         if (activeUserIds.length) {
           const { data, error } = await adminClient.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", activeUserIds).eq("enabled", true);
           if (error) throw error;
@@ -400,6 +417,7 @@ Deno.serve(async (req) => {
       }
 
       const inboxNotifications = await storeUserNotifications(activeUserIds, options, groupId);
+      if (options.recordInbox !== false) subscriptions = subscriptions.filter(item => inboxNotifications.has(item.user_id));
 
       let sent = 0;
       let failed = 0;
@@ -475,6 +493,7 @@ Deno.serve(async (req) => {
           .in("user_id", userIds);
         if (accessError) throw accessError;
         activeUserIds = [...new Set((activeRows || []).map((item) => item.user_id).filter(Boolean))];
+        activeUserIds = await safetyRecipients(activeUserIds, options.data);
         if (activeUserIds.length) {
           const { data, error } = await adminClient.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", activeUserIds).eq("enabled", true);
           if (error) throw error;
@@ -484,6 +503,7 @@ Deno.serve(async (req) => {
       }
 
       const inboxNotifications = await storeUserNotifications(activeUserIds, options, groupId || null);
+      if (options.recordInbox !== false) subscriptions = subscriptions.filter(item => inboxNotifications.has(item.user_id));
 
       let sent = 0;
       let failed = 0;

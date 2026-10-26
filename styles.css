@@ -862,3 +862,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .attendance-share-filters input:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
 .attendance-share-empty{font-size:13px;margin:8px 0}
 .attendance-share-preview[hidden],.attendance-share-empty[hidden]{display:none}
+
+/* Comunidade — Build 162 */
+.safety-stack { display: grid; gap: 12px; }
+.safety-tabs, .safety-row, .safety-pagination, .safety-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.safety-tabs { margin-bottom: 18px; }
+.safety-row { justify-content: space-between; padding: 12px; }
+.safety-report { padding: 14px; overflow-wrap: anywhere; }
+.safety-report .safety-row { padding: 0; }
+.safety-report p, .safety-help { font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.safety-report small, .safety-help { color: var(--muted, #62706b); }
+.safety-response { border-left: 3px solid var(--primary, #15835a); padding-left: 10px; }
+.safety-footer { margin-top: 10px; }
+.safety-link { border: 0; background: transparent; color: var(--muted, #62706b); text-decoration: underline; padding: 8px 4px; font: inherit; font-size: 13px; cursor: pointer; }
+.safety-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.safety-pagination, .safety-new { margin-top: 18px; }
+.safety-new summary, .safety-evidence summary { cursor: pointer; padding: 10px 0; }
+.safety-evidence pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; max-height: 260px; overflow-y: auto; }
+.safety-error { color: #b32828; font-size: 14px; }
+#safetyReportForm select, #safetyReportForm textarea, #safetyReviewForm select, #safetyReviewForm textarea, #safetyNotification, #safetyPlayer { font-size: 16px; }

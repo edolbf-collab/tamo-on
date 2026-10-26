@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 161, database: 149, edge: 114 });
-  const APP_ASSET_TOKEN = "beta161r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 162, database: 150, edge: 115 });
+  const APP_ASSET_TOKEN = "beta162r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -25,6 +25,7 @@
     user_notifications: [],
     push_subscriptions: [],
     is_platform_admin: false,
+    safety: { blocks: [] },
     beta_access: null
   });
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -150,7 +151,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta161r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta162r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -338,6 +339,7 @@
         await this.loadGroup(this.state.currentGroupId);
       } else {
         ["members", "players", "matches", "attendance", "assignments", "charges", "payments", "expenses", "member_ratings", "match_events", "announcements", "notification_receipts", "push_subscriptions"].forEach(key => { this.state[key] = []; });
+        await this.loadSafetyState();
         await this.loadUserNotifications();
       }
       this.subscribeNotifications();
@@ -388,9 +390,17 @@
       return this.state.user_notifications;
     }
 
+    async loadSafetyState() {
+      const { data, error } = await this.client.rpc("community_safety_state");
+      if (error) throw error;
+      this.state.safety = data || { blocks: [] };
+      return this.state.safety;
+    }
+
     async loadGroup(groupId, options = {}) {
       const { subscribe = true } = options;
       this.state.currentGroupId = groupId;
+      await this.loadSafetyState();
       const tableNames = ["players", "matches", "charges", "payments", "expenses", "announcements", "group_members", "member_ratings"];
       const announcementsVisibleSince = new Date();
       announcementsVisibleSince.setMonth(announcementsVisibleSince.getMonth() - ANNOUNCEMENT_VISIBLE_MONTHS);
@@ -1528,7 +1538,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta161r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta162r1");
       }, true);
     },
 
@@ -1871,7 +1881,7 @@
     },
 
     personAvatar(player, className = "player-avatar") {
-      const url = safeImageUrl(player?.avatar_url || "");
+      const url = this.isUserBlocked?.(player?.user_id) ? "" : safeImageUrl(player?.avatar_url || "");
       return url
         ? `<img class="${className} avatar-photo" src="${escapeHtml(url)}" alt="" referrerpolicy="no-referrer">`
         : `<div class="${className}">${initials(player?.name || "Jogador")}</div>`;
@@ -1925,7 +1935,7 @@
     },
 
     emptyGroupPage() {
-      return `<section class="welcome-field"><div class="welcome-overlay"><img src="brand/tamo-on-logo-horizontal-negative.svg" alt="" class="welcome-mark"><span class="eyebrow">CONTA GOOGLE CONECTADA</span><h1>Monte seu grupo</h1><p>Crie um grupo com escudo próprio ou entre usando um código de convite.</p><div class="welcome-actions"><button class="btn btn-primary btn-small" data-action="create-group">+ Criar grupo</button><button class="btn btn-secondary btn-small" data-action="join-group">Inserir código</button></div></div></section>`;
+      return `<section class="welcome-field"><div class="welcome-overlay"><img src="brand/tamo-on-logo-horizontal-negative.svg" alt="" class="welcome-mark"><span class="eyebrow">CONTA GOOGLE CONECTADA</span><h1>Monte seu grupo</h1><p>Crie um grupo com escudo próprio ou entre usando um código de convite.</p><div class="welcome-actions"><button class="btn btn-primary btn-small" data-action="create-group">+ Criar grupo</button><button class="btn btn-secondary btn-small" data-action="join-group">Inserir código</button><button class="btn btn-secondary btn-small" data-action="community-safety">Segurança e convivência</button></div></div></section>`;
     },
 
     homePage() {
@@ -2050,8 +2060,8 @@
       const player = this.memberPlayer(member) || { name: "Membro", primary_position: "Sem posição" };
       const summary = this.ratingSummary(player.id);
       const isMe = member.user_id === this.state.profile.id;
-      const canManageMember = this.canManageMatches() && !isMe && !["admin", "owner"].includes(member.role);
-      return `<article class="card member-row member-row-compact ${canManageMember ? "member-row-manageable" : ""}" ${canManageMember ? `data-action="manage-member" data-user-id="${member.user_id}" role="button" tabindex="0" aria-label="Gerenciar ${escapeHtml(player.name)}"` : ""}>${this.personAvatar(player)}<div class="list-main"><strong>${escapeHtml(player.name)}${isMe ? ' <span class="you-label">você</span>' : ""}</strong><small>${playerPositionHtml(player)}${player.nickname ? ` · ${escapeHtml(player.nickname)}` : ""}</small></div><div class="member-trailing"><span class="role-pill ${roleClass(member.role)}">${escapeHtml(roleLabels[member.role] || "Membro")}</span>${this.canSeeRatings() ? `<small class="private-score">${summary?.average ? `★ ${summary.average.toFixed(1)} (${summary.count})` : "Sem notas"}</small>` : ""}${canManageMember ? '<span class="member-manage-chevron">›</span>' : ""}</div></article>`;
+      const canManageMember = !isMe;
+      return `<article class="card member-row member-row-compact ${canManageMember ? "member-row-manageable" : ""}" ${canManageMember ? `data-action="member-safety" data-user-id="${member.user_id}" role="button" tabindex="0" aria-label="Opções de ${escapeHtml(player.name)}"` : ""}>${this.personAvatar(player)}<div class="list-main"><strong>${escapeHtml(player.name)}${isMe ? ' <span class="you-label">você</span>' : ""}</strong><small>${playerPositionHtml(player)}${player.nickname ? ` · ${escapeHtml(player.nickname)}` : ""}</small></div><div class="member-trailing"><span class="role-pill ${roleClass(member.role)}">${escapeHtml(roleLabels[member.role] || "Membro")}</span>${this.canSeeRatings() ? `<small class="private-score">${summary?.average ? `★ ${summary.average.toFixed(1)} (${summary.count})` : "Sem notas"}</small>` : ""}${canManageMember ? '<span class="member-manage-chevron">›</span>' : ""}</div></article>`;
     },
 
     privateRatingsPanel() {
@@ -2274,7 +2284,7 @@
       const pushConfigured = Boolean(String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim());
       const pushText = !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
       const adminTools = this.state.is_platform_admin ? '<div class="section-title"><h2>Operação do beta</h2><small>Acesso exclusivo da plataforma.</small></div><button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel Beta</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button><button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : "";
-      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>' : ""}<button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Termos, privacidade, conduta e seus aceites.</small></div><strong>›</strong></button><div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar e escolher outra conta Google.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta fechado</div>`;
+      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>' : ""}<button class="card menu-row" data-action="community-safety"><span class="menu-icon">🛡</span><div class="list-main"><strong>Segurança e convivência</strong><small>${this.state.is_platform_admin && this.state.safety?.pending_reports ? `${Number(this.state.safety.pending_reports)} denúncia(s) aguardando análise.` : "Denúncias e participantes bloqueados."}</small></div><strong>›</strong></button><button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Termos, privacidade, conduta e seus aceites.</small></div><strong>›</strong></button><div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar e escolher outra conta Google.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta fechado</div>`;
     },
 
     async handleAction(action, data) {
@@ -2310,6 +2320,8 @@
           "group-settings": () => this.openGroupSettings(),
           "manage-roles": () => this.openRoleManager(),
           "manage-member": () => this.openMemberManager(data.userId),
+          "member-safety": () => this.openMemberSafety(data.userId),
+          "community-safety": () => this.openSafetyCenter(),
           announcement: () => this.openAnnouncementForm(),
           "announcement-center": () => this.openAnnouncementCenter(data.id),
           "notification-settings": () => this.openNotificationSettings(),
@@ -2641,7 +2653,7 @@
 
     openMemberRatings() {
       const me = this.myPlayer();
-      const players = this.activePlayers().filter(player => player.id !== me?.id && player.user_id);
+      const players = this.activePlayers().filter(player => player.id !== me?.id && player.user_id && !this.isUserBlocked(player.user_id));
       if (!players.length) return this.toast("Ainda não há outros membros para avaliar.", true);
       this.modal("Avaliar membros", `<div class="notice"><strong>Avaliação confidencial</strong><br>Dê uma nota de 1 a 10 considerando o desempenho geral no futebol. Somente o administrador visualiza médias e quantidade de avaliações.</div><form id="memberRatingsForm" class="ratings-form">${players.map(player => {
         const existing = this.myRating(player.id);
@@ -2657,12 +2669,15 @@
           button.disabled = true;
           button.textContent = "Enviando...";
           const form = new FormData(event.currentTarget);
+          try {
           for (const player of players) await this.repo.rateMember(this.state.currentGroupId, player.id, form.get(`rating_${player.id}`));
           await this.repo.loadGroup(this.state.currentGroupId, { subscribe: false });
           this.state = this.repo.state;
           close();
           this.render();
           this.toast("Avaliações salvas com confidencialidade.");
+          } catch (error) { this.toast(error.message || "Não foi possível concluir as avaliações.", true); }
+          finally { button.disabled = false; button.textContent = "Enviar avaliações"; }
         });
       });
     },
@@ -2849,7 +2864,8 @@
       const canOpenTeams = future ? (this.canManageMatches() || hasSavedTeams) : hasSavedTeams;
       const canShareAttendance = started && this.canManageMatches();
       const statusLabel = future ? (started ? "Em andamento" : "Agendado") : "Histórico";
-      this.modal(match.title, `<div class="match-detail-banner"><span class="status-pill ${future ? "status-maybe" : "status-confirmed"}">${statusLabel}</span><strong>${escapeHtml(matchSchedule(match))}</strong><p>${escapeHtml(match.location)}</p>${eventCapacity}${started && future ? `<small>Separação dos times disponível até ${escapeHtml(shortTime(matchHistoryAt(match)))}.</small>` : match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}${started && future && match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}</div>${recurringInfo}${managerControls}${drawSection}${bbqExpanded}<div class="actions">${responsesOpen ? `<button class="btn btn-primary" data-modal-rsvp="${match.id}">Minha presença</button>` : ""}${canOpenTeams ? `<button class="btn btn-secondary" data-modal-teams="${match.id}">Abrir Times</button>` : ""}${canShareAttendance ? `<button class="btn btn-secondary attendance-share-button" data-share-attendance="${match.id}">Compartilhar lista</button>` : ""}</div>${deleteControls}${groupHtml("Começam jogando", "confirmed")}${groupHtml("Não vão", "out")}${groupHtml("Espera inicial", "waitlist")}${pendingHtml}`, (root, close) => {
+      this.modal(match.title, `<div class="match-detail-banner"><span class="status-pill ${future ? "status-maybe" : "status-confirmed"}">${statusLabel}</span><strong>${escapeHtml(matchSchedule(match))}</strong><p>${escapeHtml(match.location)}</p>${eventCapacity}${started && future ? `<small>Separação dos times disponível até ${escapeHtml(shortTime(matchHistoryAt(match)))}.</small>` : match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}${started && future && match.notes ? `<small>${escapeHtml(match.notes)}</small>` : ""}</div>${recurringInfo}${managerControls}${drawSection}${bbqExpanded}<div class="actions">${responsesOpen ? `<button class="btn btn-primary" data-modal-rsvp="${match.id}">Minha presença</button>` : ""}${canOpenTeams ? `<button class="btn btn-secondary" data-modal-teams="${match.id}">Abrir Times</button>` : ""}${canShareAttendance ? `<button class="btn btn-secondary attendance-share-button" data-share-attendance="${match.id}">Compartilhar lista</button>` : ""}</div>${deleteControls}${groupHtml("Começam jogando", "confirmed")}${groupHtml("Não vão", "out")}${groupHtml("Espera inicial", "waitlist")}${pendingHtml}<div class="safety-footer">${this.safetyReportButton("match", match.id, "Denunciar evento")}</div>`, (root, close) => {
+        this.bindSafetyReports(root, () => this.openMatchDetails(match.id));
         $("[data-modal-rsvp]", root)?.addEventListener("click", () => {
           close();
           this.openRsvp(match.id);
@@ -3833,7 +3849,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         const systemStatus = Number(s.errors_24h || 0) ? "Sistema requer análise" : "Sistema operacional";
         const errorSubtitle = `${Number(s.errors_24h || 0)} registro(s) distribuído(s) em ${Number(s.error_groups_24h || 0)} erro(s) distinto(s)`;
 
-        this.modal("Painel Beta", `<div class="health-strip ${Number(s.errors_24h || 0) ? "warn" : "ok"}"><span></span><div><strong>${systemStatus}</strong><small>${escapeHtml(errorSubtitle)}</small></div></div><div class="admin-toolbar"><button id="sendSystemNotification" class="btn btn-primary">Enviar notificação</button><button id="refreshPlatformPanel" class="btn btn-secondary">Atualizar painel</button></div><div class="admin-stats">${stat("Usuários", s.users_total)}${stat("Acessos ativos", s.beta_active)}${stat("Push ativo", s.push_users_active)}${stat("Push saudável", s.push_devices_healthy)}${stat("Instáveis", s.push_devices_unstable, Number(s.push_devices_unstable || 0) ? "warning" : "")}${stat("Atenção", s.push_devices_attention, Number(s.push_devices_attention || 0) ? "warning" : "")}${stat("Reativar", s.push_devices_reactivation, Number(s.push_devices_reactivation || 0) ? "danger" : "")}${stat("Configuração", s.push_devices_configuration_error, Number(s.push_devices_configuration_error || 0) ? "danger" : "")}${stat("Recuperados 30d", s.push_recovered_30d)}${stat("Falhas finais 30d", s.push_final_failures_30d, Number(s.push_final_failures_30d || 0) ? "danger" : "")}${stat("Tentativas técnicas", s.push_attempts_30d)}${stat("Assinaturas expiradas", s.push_devices_invalid, Number(s.push_devices_invalid || 0) ? "warning" : "")}${stat("Sem notificações", s.push_users_without_active, Number(s.push_users_without_active || 0) ? "warning" : "")}${stat("Convites pendentes", s.beta_invited, Number(s.beta_invited || 0) ? "warning" : "")}${stat("Bloqueados", s.beta_blocked, Number(s.beta_blocked || 0) ? "danger" : "")}${stat("Grupos", s.groups_total)}${stat("Peladas futuras", s.matches_upcoming)}${stat("Relatos abertos", s.feedback_open, Number(s.feedback_open || 0) ? "warning" : "")}${stat("Erros 24h", s.errors_24h, Number(s.errors_24h || 0) ? "danger" : "")}</div>
+        this.modal("Painel Beta", `<div class="health-strip ${Number(s.errors_24h || 0) ? "warn" : "ok"}"><span></span><div><strong>${systemStatus}</strong><small>${escapeHtml(errorSubtitle)}</small></div></div><div class="admin-toolbar"><button id="openCommunityModeration" class="btn btn-secondary">Denúncias da comunidade</button><button id="sendSystemNotification" class="btn btn-primary">Enviar notificação</button><button id="refreshPlatformPanel" class="btn btn-secondary">Atualizar painel</button></div><div class="admin-stats">${stat("Usuários", s.users_total)}${stat("Acessos ativos", s.beta_active)}${stat("Push ativo", s.push_users_active)}${stat("Push saudável", s.push_devices_healthy)}${stat("Instáveis", s.push_devices_unstable, Number(s.push_devices_unstable || 0) ? "warning" : "")}${stat("Atenção", s.push_devices_attention, Number(s.push_devices_attention || 0) ? "warning" : "")}${stat("Reativar", s.push_devices_reactivation, Number(s.push_devices_reactivation || 0) ? "danger" : "")}${stat("Configuração", s.push_devices_configuration_error, Number(s.push_devices_configuration_error || 0) ? "danger" : "")}${stat("Recuperados 30d", s.push_recovered_30d)}${stat("Falhas finais 30d", s.push_final_failures_30d, Number(s.push_final_failures_30d || 0) ? "danger" : "")}${stat("Tentativas técnicas", s.push_attempts_30d)}${stat("Assinaturas expiradas", s.push_devices_invalid, Number(s.push_devices_invalid || 0) ? "warning" : "")}${stat("Sem notificações", s.push_users_without_active, Number(s.push_users_without_active || 0) ? "warning" : "")}${stat("Convites pendentes", s.beta_invited, Number(s.beta_invited || 0) ? "warning" : "")}${stat("Bloqueados", s.beta_blocked, Number(s.beta_blocked || 0) ? "danger" : "")}${stat("Grupos", s.groups_total)}${stat("Peladas futuras", s.matches_upcoming)}${stat("Relatos abertos", s.feedback_open, Number(s.feedback_open || 0) ? "warning" : "")}${stat("Erros 24h", s.errors_24h, Number(s.errors_24h || 0) ? "danger" : "")}</div>
 
         <details class="admin-section-card" open><summary><div><strong>Acessos do beta</strong><small>Autorize, bloqueie ou exclua permanentemente.</small></div><span>${accessList.length}</span></summary><form id="betaAccessForm" class="beta-access-form"><div class="field"><label>E-mail da conta Google</label><input type="email" name="email" required autocomplete="off" placeholder="membro@gmail.com"></div><div class="field"><label>Observação <span class="optional-label">opcional</span></label><input name="notes" maxlength="500" placeholder="Grupo ou responsável pelo convite"></div><button type="submit" class="btn btn-primary btn-block">Autorizar e-mail</button></form><div class="beta-access-list">${accessRows}</div></details>
 
@@ -3846,6 +3862,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         <details class="admin-section-card"><summary><div><strong>Relatos recentes</strong><small>Descrição e contexto técnico completo.</small></div><span>${(data.reports || []).length}</span></summary><div class="admin-feed">${reports}</div></details>
         <details class="admin-section-card"><summary><div><strong>Logs recentes</strong><small>Abra cada registro para consultar os metadados.</small></div><span>${(data.logs || []).length}</span></summary><div class="admin-logs">${logs}</div></details>
         <button id="exportOperationalSnapshot" class="btn btn-secondary btn-block">Exportar dados operacionais — 30 dias</button>`, (root, close) => {
+          $("#openCommunityModeration", root)?.addEventListener("click", () => this.openSafetyCenter("admin"));
           $("#sendSystemNotification", root)?.addEventListener("click", () => this.openSystemNotificationForm());
           $("#refreshPlatformPanel", root)?.addEventListener("click", () => { close(); this.openPlatformAdmin(); });
           $("#betaAccessForm", root)?.addEventListener("submit", async event => {
@@ -4285,9 +4302,11 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       const announcements = [...(this.state.announcements || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       const canManage = this.canManageMatches();
       const list = announcements.length ? announcements.map(item => {
-        return `<article class="announcement-card ${item.id === selectedId ? "is-selected" : ""}"><div class="announcement-icon">📣</div><div class="announcement-content"><div class="announcement-title-row"><strong>${escapeHtml(item.title)}</strong></div><small>${escapeHtml(shortDate(item.created_at))}${item.push_sent_count || item.push_failed_count ? ` · ${Number(item.push_sent_count || 0)} enviado(s)` : ""}</small><p>${escapeHtml(item.body)}</p>${canManage ? `<div class="announcement-actions"><button class="announcement-action resend" data-resend-announcement="${item.id}">↻ Reenviar</button><button class="announcement-action delete" data-delete-announcement="${item.id}">Excluir</button></div>` : ""}</div></article>`;
+        return `<article class="announcement-card ${item.id === selectedId ? "is-selected" : ""}"><div class="announcement-icon">📣</div><div class="announcement-content"><div class="announcement-title-row"><strong>${escapeHtml(item.title)}</strong></div><small>${escapeHtml(shortDate(item.created_at))}${item.push_sent_count || item.push_failed_count ? ` · ${Number(item.push_sent_count || 0)} enviado(s)` : ""}</small><p>${escapeHtml(item.body)}</p>${canManage ? `<div class="announcement-actions"><button class="announcement-action resend" data-resend-announcement="${item.id}">↻ Reenviar</button><button class="announcement-action delete" data-delete-announcement="${item.id}">Excluir</button></div>` : ""}${item.created_by !== this.state.profile.id ? `<div class="safety-footer">${this.safetyReportButton("announcement", item.id, "Denunciar aviso")}${item.created_by && this.state.members.some(member => member.user_id === item.created_by) ? `<button class="safety-link" data-safety-author="${escapeHtml(item.created_by)}">Opções do autor</button>` : ""}</div>` : ""}</div></article>`;
       }).join("") : '<div class="card empty"><strong>Nenhum aviso publicado</strong><span>Os comunicados do grupo aparecerão aqui.</span></div>';
       this.modal("Avisos do grupo", `<div class="announcement-list">${list}</div>`, (root, close) => {
+        this.bindSafetyReports(root, () => this.openAnnouncementCenter(selectedId));
+        $$("[data-safety-author]", root).forEach(button => button.addEventListener("click", () => this.openMemberSafety(button.dataset.safetyAuthor)));
         if (selectedId) root.querySelector(".announcement-card.is-selected")?.scrollIntoView({ block: "center" });
         $$('[data-resend-announcement]', root).forEach(button => button.addEventListener("click", async event => {
           const target = event.currentTarget;

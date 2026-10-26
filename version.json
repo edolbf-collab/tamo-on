@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 161,
-  "database": 149,
-  "edge": 114,
+  "build": 162,
+  "database": 150,
+  "edge": 115,
   "mandatory": false,
-  "notes": "Seleção compacta das categorias da lista compartilhada no WhatsApp.",
-  "label": "Tâmo On Beta 1.0 Build 161"
+  "notes": "Denúncias, acompanhamento pela administração e bloqueio pessoal na Comunidade.",
+  "label": "Tâmo On Beta 1.0 Build 162"
 }
