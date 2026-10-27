@@ -25,3 +25,14 @@ body:has(.legal-gate-overlay){overflow:hidden}
 @media(max-height:540px){.legal-gate-overlay{padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}.legal-gate-header{padding:12px 18px}.legal-gate-header .auth-brand-logo{display:none}.legal-gate-header h1{font-size:22px}.legal-gate-footer{padding:8px 18px}.legal-gate-footer p{display:none}}
 
 .legal-gate-footer #legalSignOut{margin-top:4px;background:transparent;color:#173c30;box-shadow:none;border-color:transparent}
+
+/* Build 163: acesso permanente ao procedimento público de exclusão. */
+.legal-deletion-card{margin:0 0 24px;padding:18px;border:1px solid #769c89;border-radius:16px;line-height:1.5;overflow-wrap:anywhere}
+.legal-deletion-card h2,.legal-deletion-card h3{margin:0 0 8px;font-size:20px;line-height:1.3}
+.legal-deletion-card p{margin:8px 0 14px}
+.legal-deletion-card .legal-deletion-link{display:inline-flex;align-items:center;justify-content:center;min-height:48px;box-sizing:border-box;max-width:100%;padding:12px 16px;border:1px solid #087346;border-radius:10px;background:#087346;color:#fff;font-weight:bold;line-height:1.5;text-align:center;text-decoration:none}
+.modal .legal-center .legal-deletion-link{background:#b3f6cd;color:#103e2c;border-color:#b3f6cd}
+.legal-deletion-card .legal-deletion-link:hover{filter:brightness(.94)}
+.legal-deletion-card .legal-deletion-link:focus-visible{outline:3px solid currentColor;outline-offset:4px;text-decoration:underline}
+.legal-deletion-card .legal-deletion-hint{margin:10px 0 0;font-size:14px}
+@media(max-width:480px){.legal-deletion-card{padding:16px}.legal-deletion-card .legal-deletion-link{width:100%}}

@@ -1,10 +1,10 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 162,
+  "build": 163,
   "database": 150,
   "edge": 115,
   "mandatory": false,
-  "notes": "Denúncias, acompanhamento pela administração e bloqueio pessoal na Comunidade.",
-  "label": "Tâmo On Beta 1.0 Build 162"
+  "notes": "Página pública e caminho no aplicativo para solicitar exclusão da conta.",
+  "label": "Tâmo On Beta 1.0 Build 163"
 }

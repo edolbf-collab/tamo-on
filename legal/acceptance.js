@@ -145,8 +145,17 @@
       }
     },
     async openCenter(app) {
-      const {data,error}=await app.repo.client.rpc('get_community_legal_status');if(error)throw error;await validate(data);
-      app.modal('Documentos e privacidade',`<div class="legal-center"><p>Uso exclusivo para pessoas com <strong>18 anos completos ou mais</strong>.</p>${data.enabled?'':'<p class="legal-meta">Textos preparados para publicação. A vigência ainda será definida.</p>'}${documentsHtml(data.documents)}<p>Dados pessoais e pedidos LGPD: <a href="mailto:privacidade@tamoon.app.br">privacidade@tamoon.app.br</a></p><p>Suporte e moderação: <a href="mailto:suporte@tamoon.app.br">suporte@tamoon.app.br</a></p><button class="btn btn-secondary btn-block" id="downloadLegalReceipt">Baixar meus registros de aceite</button>${app.state.is_platform_admin?'<details><summary>Auditoria de aceites</summary><form id="legalAuditForm" class="form-grid"><div class="field"><label>Identificador do usuário (UUID)</label><input name="user_id" required placeholder="UUID do usuário" pattern="[a-fA-F0-9-]{36}"></div><div class="field"><label>Motivo da consulta</label><input name="purpose" required minlength="10" maxlength="500"></div><button class="btn btn-secondary" type="submit">Exportar registros</button></form><p class="legal-meta">Consulta restrita à administração e registrada para auditoria.</p></details>':''}<p id="legalCenterStatus" class="legal-status" role="status"></p></div>`,root=>{
+      // O pedido de exclusão é público e não depende da consulta dos documentos.
+      let documents;
+      app.modal('Documentos e privacidade',`<div class="legal-center"><section class="legal-deletion-card" aria-labelledby="legalDeletionTitle"><h3 id="legalDeletionTitle">Excluir minha conta</h3><p>Consulte os dados envolvidos, os prazos e como enviar seu pedido por e-mail.</p><a class="legal-deletion-link" href="/legal/excluir-conta.html" target="_blank" rel="noopener noreferrer">Solicitar exclusão da conta</a><p class="legal-deletion-hint">Abre a página pública em uma nova aba.</p></section><div id="legalCenterDocuments"><p role="status">Carregando documentos…</p></div></div>`,root=>{
+        documents=root.querySelector('#legalCenterDocuments');
+      });
+      try {
+        const data=await request(app.repo,'get_community_legal_status');
+        await validate(data);
+        if(!documents?.isConnected)return;
+        documents.innerHTML=`<p>Uso exclusivo para pessoas com <strong>18 anos completos ou mais</strong>.</p>${data.enabled?'':'<p class="legal-meta">Textos preparados para publicação. A vigência ainda será definida.</p>'}${documentsHtml(data.documents)}<p>Dados pessoais e pedidos LGPD: <a href="mailto:privacidade@tamoon.app.br">privacidade@tamoon.app.br</a></p><p>Suporte e moderação: <a href="mailto:suporte@tamoon.app.br">suporte@tamoon.app.br</a></p><button class="btn btn-secondary btn-block" id="downloadLegalReceipt">Baixar meus registros de aceite</button>${app.state.is_platform_admin?'<details><summary>Auditoria de aceites</summary><form id="legalAuditForm" class="form-grid"><div class="field"><label>Identificador do usuário (UUID)</label><input name="user_id" required placeholder="UUID do usuário" pattern="[a-fA-F0-9-]{36}"></div><div class="field"><label>Motivo da consulta</label><input name="purpose" required minlength="10" maxlength="500"></div><button class="btn btn-secondary" type="submit">Exportar registros</button></form><p class="legal-meta">Consulta restrita à administração e registrada para auditoria.</p></details>':''}<p id="legalCenterStatus" class="legal-status" role="status"></p>`;
+        const root=documents;
         root.querySelector('#downloadLegalReceipt').addEventListener('click',async event=>{
           event.currentTarget.disabled=true;
           try{const {data,error}=await app.repo.client.rpc('export_my_legal_acceptances');if(error)throw error;download(data,'tamo-on-meus-aceites.json');}
@@ -157,7 +166,10 @@
           try{const {data,error}=await app.repo.client.rpc('platform_export_legal_acceptances',{p_user_id:form.elements.user_id.value.trim(),p_purpose:form.elements.purpose.value.trim()});if(error)throw error;download(data,'tamo-on-auditoria-aceites.json');}
           catch(e){root.querySelector('#legalCenterStatus').textContent=e.message;}finally{button.disabled=false;}
         });
-      });
+      }catch(error){
+        if(!documents?.isConnected)return;
+        documents.innerHTML='<p class="legal-status" role="status">Não foi possível carregar os documentos agora. O pedido de exclusão continua disponível acima.</p><p><a href="/legal/" target="_blank" rel="noopener noreferrer">Consultar os documentos na página pública</a></p>';
+      }
     }
   };
 })();
