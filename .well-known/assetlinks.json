@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.app.tamoon",
+      "sha256_cert_fingerprints": [
+        "1B:7B:5C:4B:81:40:D7:02:B7:4E:89:6B:11:D4:9D:4E:B6:01:A4:BB:75:B0:45:63:E7:35:90:0B:E3:B6:13:D7",
+        "47:2B:69:59:2D:CB:EA:AB:5B:D0:B2:49:9F:15:C0:45:01:6C:96:2D:9B:84:86:4A:6D:B1:64:3A:8F:98:A4:C7"
+      ]
+    }
+  }
+]
