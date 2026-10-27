@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 163, database: 150, edge: 115 });
-  const APP_ASSET_TOKEN = "beta163r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 164, database: 151, edge: 115 });
+  const APP_ASSET_TOKEN = "beta164r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -151,7 +151,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta163r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta164r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -273,8 +273,9 @@
     async claimBetaAccess() {
       const { data, error } = await this.client.rpc("claim_beta_access");
       if (error) {
-        const denied = new Error(error.message || "Acesso ao beta não autorizado.");
-        denied.betaAccessDenied = true;
+        const denied = new Error(error.message || "Não foi possível verificar o acesso. Tente novamente.");
+        denied.betaAccessDenied = ["PT403", "PT409"].includes(error.code)
+          || (error.code === "P0001" && /beta fechado|bloqueado|vinculado a outra conta/i.test(error.message || ""));
         throw denied;
       }
       this.state.beta_access = data || null;
@@ -1538,7 +1539,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta163r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta164r1");
       }, true);
     },
 
@@ -2284,7 +2285,7 @@
       const pushConfigured = Boolean(String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim());
       const pushText = !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
       const adminTools = this.state.is_platform_admin ? '<div class="section-title"><h2>Operação do beta</h2><small>Acesso exclusivo da plataforma.</small></div><button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel Beta</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button><button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : "";
-      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>' : ""}<button class="card menu-row" data-action="community-safety"><span class="menu-icon">🛡</span><div class="list-main"><strong>Segurança e convivência</strong><small>${this.state.is_platform_admin && this.state.safety?.pending_reports ? `${Number(this.state.safety.pending_reports)} denúncia(s) aguardando análise.` : "Denúncias e participantes bloqueados."}</small></div><strong>›</strong></button><button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Documentos, aceites e exclusão da conta.</small></div><strong>›</strong></button><div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar e escolher outra conta Google.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta fechado</div>`;
+      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>' : ""}<button class="card menu-row" data-action="community-safety"><span class="menu-icon">🛡</span><div class="list-main"><strong>Segurança e convivência</strong><small>${this.state.is_platform_admin && this.state.safety?.pending_reports ? `${Number(this.state.safety.pending_reports)} denúncia(s) aguardando análise.` : "Denúncias e participantes bloqueados."}</small></div><strong>›</strong></button><button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Documentos, aceites e exclusão da conta.</small></div><strong>›</strong></button><div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar e escolher outra conta Google.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta aberto</div>`;
     },
 
     async handleAction(action, data) {
@@ -2349,7 +2350,7 @@
       clearInterval(this.matchTimelineTimer);
       const email = this.repo?.state?.profile?.email || "E-mail não identificado";
       const hasIdentifiedEmail = email !== "E-mail não identificado";
-      document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel simple-auth access-denied-panel"><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><span class="access-denied-icon">!</span><h1>Aguardando liberação</h1><p>O Tâmo On está em beta fechado. Antes de continuar, a administração precisa autorizar a conta Google usada no login.</p><div class="denied-account-card"><small>CONTA UTILIZADA</small><div><strong id="deniedAccountEmail">${escapeHtml(email)}</strong>${hasIdentifiedEmail ? '<button id="copyDeniedEmail" class="copy-email-button" type="button" aria-label="Copiar e-mail">Copiar</button>' : ''}</div></div><div class="notice auth-error"><strong>Situação do acesso</strong><br><span id="deniedAccessMessage">${escapeHtml(error?.message || "Este e-mail ainda não está autorizado.")}</span></div><div class="access-denied-instructions"><strong>Como liberar</strong><ol><li>Envie o e-mail acima para a administração do beta.</li><li>Aguarde a confirmação de que o acesso foi autorizado.</li><li>Volte a esta tela e toque em <b>Verificar liberação</b>.</li></ol></div><div id="deniedCheckStatus" class="denied-check-status" role="status" aria-live="polite"></div><button id="deniedCheckAccess" class="btn btn-primary btn-block">Verificar liberação</button><button id="deniedSignOut" class="btn btn-secondary btn-block">Sair e usar outra conta</button></section></main><div id="toastRoot" class="toast-root"></div>`;
+      document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel simple-auth access-denied-panel"><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><span class="access-denied-icon">!</span><h1>Acesso indisponível</h1><p>O beta é aberto e não exige autorização prévia de e-mail. Confira abaixo a situação desta conta.</p><div class="denied-account-card"><small>CONTA UTILIZADA</small><div><strong id="deniedAccountEmail">${escapeHtml(email)}</strong>${hasIdentifiedEmail ? '<button id="copyDeniedEmail" class="copy-email-button" type="button" aria-label="Copiar e-mail">Copiar</button>' : ''}</div></div><div class="notice auth-error"><strong>Situação do acesso</strong><br><span id="deniedAccessMessage">${escapeHtml(error?.message || "Não foi possível liberar o acesso desta conta.")}</span></div><div class="access-denied-instructions"><strong>Precisa de ajuda?</strong><p>Se o acesso estiver bloqueado, entre em contato com <a href="mailto:suporte@tamoon.app.br">suporte@tamoon.app.br</a> e informe o e-mail acima. Você também pode sair e entrar novamente.</p></div><div id="deniedCheckStatus" class="denied-check-status" role="status" aria-live="polite"></div><button id="deniedCheckAccess" class="btn btn-primary btn-block">Verificar acesso</button><button id="deniedSignOut" class="btn btn-secondary btn-block">Sair e usar outra conta</button></section></main><div id="toastRoot" class="toast-root"></div>`;
 
       $("#copyDeniedEmail")?.addEventListener("click", async event => {
         try {
@@ -2367,7 +2368,7 @@
         button.disabled = true;
         button.textContent = "Verificando...";
         status.className = "denied-check-status is-checking";
-        status.textContent = "Consultando a autorização desta conta...";
+        status.textContent = "Consultando a situação desta conta...";
         try {
           await this.repo.claimBetaAccess();
           status.className = "denied-check-status is-success";
@@ -2376,14 +2377,14 @@
         } catch (checkError) {
           if (checkError?.betaAccessDenied || /beta fechado|acesso ao beta|não está autorizado|acesso.*bloqueado/i.test(checkError?.message || "")) {
             status.className = "denied-check-status is-pending";
-            status.textContent = "O acesso ainda não foi liberado. Confirme com a administração se este é o e-mail autorizado.";
-            $("#deniedAccessMessage").textContent = checkError.message || "Este e-mail ainda não está autorizado.";
+            status.textContent = "O acesso continua indisponível. Consulte a mensagem acima ou entre em contato com o suporte.";
+            $("#deniedAccessMessage").textContent = checkError.message || "Não foi possível liberar o acesso desta conta.";
           } else {
             status.className = "denied-check-status is-error";
             status.textContent = "Não foi possível verificar agora. Confira sua conexão e tente novamente.";
           }
           button.disabled = false;
-          button.textContent = "Verificar liberação";
+          button.textContent = "Verificar acesso";
         }
       });
 
@@ -3851,13 +3852,13 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
         this.modal("Painel Beta", `<div class="health-strip ${Number(s.errors_24h || 0) ? "warn" : "ok"}"><span></span><div><strong>${systemStatus}</strong><small>${escapeHtml(errorSubtitle)}</small></div></div><div class="admin-toolbar"><button id="openCommunityModeration" class="btn btn-secondary">Denúncias da comunidade</button><button id="sendSystemNotification" class="btn btn-primary">Enviar notificação</button><button id="refreshPlatformPanel" class="btn btn-secondary">Atualizar painel</button></div><div class="admin-stats">${stat("Usuários", s.users_total)}${stat("Acessos ativos", s.beta_active)}${stat("Push ativo", s.push_users_active)}${stat("Push saudável", s.push_devices_healthy)}${stat("Instáveis", s.push_devices_unstable, Number(s.push_devices_unstable || 0) ? "warning" : "")}${stat("Atenção", s.push_devices_attention, Number(s.push_devices_attention || 0) ? "warning" : "")}${stat("Reativar", s.push_devices_reactivation, Number(s.push_devices_reactivation || 0) ? "danger" : "")}${stat("Configuração", s.push_devices_configuration_error, Number(s.push_devices_configuration_error || 0) ? "danger" : "")}${stat("Recuperados 30d", s.push_recovered_30d)}${stat("Falhas finais 30d", s.push_final_failures_30d, Number(s.push_final_failures_30d || 0) ? "danger" : "")}${stat("Tentativas técnicas", s.push_attempts_30d)}${stat("Assinaturas expiradas", s.push_devices_invalid, Number(s.push_devices_invalid || 0) ? "warning" : "")}${stat("Sem notificações", s.push_users_without_active, Number(s.push_users_without_active || 0) ? "warning" : "")}${stat("Convites pendentes", s.beta_invited, Number(s.beta_invited || 0) ? "warning" : "")}${stat("Bloqueados", s.beta_blocked, Number(s.beta_blocked || 0) ? "danger" : "")}${stat("Grupos", s.groups_total)}${stat("Peladas futuras", s.matches_upcoming)}${stat("Relatos abertos", s.feedback_open, Number(s.feedback_open || 0) ? "warning" : "")}${stat("Erros 24h", s.errors_24h, Number(s.errors_24h || 0) ? "danger" : "")}</div>
 
-        <details class="admin-section-card" open><summary><div><strong>Acessos do beta</strong><small>Autorize, bloqueie ou exclua permanentemente.</small></div><span>${accessList.length}</span></summary><form id="betaAccessForm" class="beta-access-form"><div class="field"><label>E-mail da conta Google</label><input type="email" name="email" required autocomplete="off" placeholder="membro@gmail.com"></div><div class="field"><label>Observação <span class="optional-label">opcional</span></label><input name="notes" maxlength="500" placeholder="Grupo ou responsável pelo convite"></div><button type="submit" class="btn btn-primary btn-block">Autorizar e-mail</button></form><div class="beta-access-list">${accessRows}</div></details>
+        <details class="admin-section-card" open><summary><div><strong>Acessos do beta</strong><small>Cadastro automático, bloqueio e exclusão de contas.</small></div><span>${accessList.length}</span></summary><div class="notice">No beta aberto, novas contas são cadastradas automaticamente no primeiro acesso. Os bloqueios administrativos continuam válidos.</div><div class="beta-access-list">${accessRows}</div></details>
 
         <details class="admin-section-card" open><summary><div><strong>Saúde das notificações</strong><small>Estado atual, repetições automáticas, recuperações e falhas finais.</small></div><span class="push-summary-count ${pushReview.length ? "warn" : "ok"}">${pushReview.length}</span></summary><div class="push-status-summary"><strong>${Number(s.push_devices_healthy || 0)} aparelho(s) saudável(is)</strong><small>${Number(s.push_notifications_30d || 0)} envio(s) · ${Number(s.push_attempts_30d || 0)} tentativa(s) técnica(s) · ${Number(s.push_recovered_30d || 0)} recuperado(s) · ${Number(s.push_final_failures_30d || 0)} falha(s) final(is), nos últimos 30 dias.</small></div><div class="push-status-list">${pushRows}</div></details>
 
         <details class="admin-section-card" open><summary><div><strong>Erros agrupados — 24 horas</strong><small>Analise causas distintas, não apenas o contador bruto.</small></div><span>${errorGroups.length}</span></summary><div class="admin-error-list">${errorRows}</div></details>
 
-        <details class="admin-section-card"><summary><div><strong>Segurança e integridade</strong><small>Verificações automáticas do banco.</small></div><span class="security-mini ${securityTone}">${securityTone === "ok" ? "OK" : "Atenção"}</span></summary><div class="security-grid">${stat("Tabelas sem RLS", security.tables_without_rls, Number(security.tables_without_rls || 0) ? "danger" : "")}${stat("Auth sem acesso", security.auth_users_without_access, Number(security.auth_users_without_access || 0) ? "danger" : "")}${stat("Vínculos bloqueados", security.blocked_group_memberships, Number(security.blocked_group_memberships || 0) ? "warning" : "")}${stat("Função do hook", security.hook_function_ready ? "Preparada" : "Ausente", security.hook_function_ready ? "" : "danger")}</div><div class="notice"><strong>Proteção de novos cadastros</strong><br>A função do hook foi instalada. Ative-a uma vez em Authentication → Hooks → Before User Created para impedir que contas não autorizadas sejam criadas.</div></details>
+        <details class="admin-section-card"><summary><div><strong>Segurança e integridade</strong><small>Verificações automáticas do banco.</small></div><span class="security-mini ${securityTone}">${securityTone === "ok" ? "OK" : "Atenção"}</span></summary><div class="security-grid">${stat("Tabelas sem RLS", security.tables_without_rls, Number(security.tables_without_rls || 0) ? "danger" : "")}${stat("Auth sem acesso", security.auth_users_without_access, Number(security.auth_users_without_access || 0) ? "danger" : "")}${stat("Vínculos bloqueados", security.blocked_group_memberships, Number(security.blocked_group_memberships || 0) ? "warning" : "")}${stat("Função do hook", security.hook_function_ready ? "Preparada" : "Ausente", security.hook_function_ready ? "" : "danger")}</div><div class="notice"><strong>Beta aberto</strong><br>Novas contas entram sem convite. O controle de acesso mantém os bloqueios administrativos e as permissões dos grupos. O hook existente, quando ativado, impede novos cadastros com e-mails bloqueados.</div></details>
 
         <details class="admin-section-card"><summary><div><strong>Relatos recentes</strong><small>Descrição e contexto técnico completo.</small></div><span>${(data.reports || []).length}</span></summary><div class="admin-feed">${reports}</div></details>
         <details class="admin-section-card"><summary><div><strong>Logs recentes</strong><small>Abra cada registro para consultar os metadados.</small></div><span>${(data.logs || []).length}</span></summary><div class="admin-logs">${logs}</div></details>
@@ -3865,23 +3866,6 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
           $("#openCommunityModeration", root)?.addEventListener("click", () => this.openSafetyCenter("admin"));
           $("#sendSystemNotification", root)?.addEventListener("click", () => this.openSystemNotificationForm());
           $("#refreshPlatformPanel", root)?.addEventListener("click", () => { close(); this.openPlatformAdmin(); });
-          $("#betaAccessForm", root)?.addEventListener("submit", async event => {
-            event.preventDefault();
-            const form = new FormData(event.currentTarget);
-            const button = event.submitter;
-            button.disabled = true;
-            button.textContent = "Autorizando…";
-            try {
-              await this.repo.inviteBetaAccess(String(form.get("email") || ""), String(form.get("notes") || ""));
-              close();
-              this.toast("E-mail autorizado para o beta.");
-              this.openPlatformAdmin();
-            } catch (error) {
-              button.disabled = false;
-              button.textContent = "Autorizar e-mail";
-              this.toast(error.message || "Não foi possível autorizar o e-mail.", true);
-            }
-          });
           $$('[data-access-email]', root).forEach(button => button.addEventListener("click", async event => {
             const target = event.currentTarget;
             const email = target.dataset.accessEmail;
