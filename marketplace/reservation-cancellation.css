@@ -1,0 +1,6 @@
+.detail-line > strong.reservation-cancelled-value {
+  color: #ff8b8b;
+}
+html[data-theme="light"] .detail-line > strong.reservation-cancelled-value {
+  color: #b42318;
+}

@@ -1,0 +1,9854 @@
+(function () {
+  "use strict";
+
+  const VERSION = "0.2.0";
+  const STORAGE_KEY = "tamo_on_marketplace_0200_local_fallback";
+  const THEME_STORAGE_KEY = "tamo_on_marketplace_theme";
+  const app = document.getElementById("app");
+  const roleButtons = [...document.querySelectorAll(".role-chip")];
+  const roleSwitcher = document.getElementById("marketplaceRoleSwitcher");
+  const sessionButton = document.getElementById("marketplaceSessionButton");
+  const themeButton = document.getElementById("toggleMarketplaceTheme");
+  const marketplaceThemeColor = document.getElementById("marketplaceThemeColor");
+  const toast = document.getElementById("toast");
+  const reservationDialog = document.getElementById("reservationDialog");
+  const reservationForm = document.getElementById("reservationForm");
+  const reservationTitle = document.getElementById("reservationTitle");
+  const reservationSummary = document.getElementById("reservationSummary");
+  const reservationSummaryHead = document.getElementById("reservationSummaryHead");
+  const reservationSummaryTotal = document.getElementById("reservationSummaryTotal");
+  const groupSelect = document.getElementById("groupSelect");
+  const groupPermissionNote = document.getElementById("groupPermissionNote");
+  const eventSelect = document.getElementById("eventSelect");
+  const newEventPanel = document.getElementById("newEventPanel");
+  const newEventTitle = document.getElementById("newEventTitle");
+  const reservationAutomationPreview = document.getElementById("reservationAutomationPreview");
+  const voucherSelect = document.getElementById("voucherSelect");
+  const reservationVoucherPreview = document.getElementById("reservationVoucherPreview");
+  const paymentMethodSelect = document.getElementById("paymentMethodSelect");
+  const paymentMethodNote = document.getElementById("paymentMethodNote");
+  const paymentProviderPreview = document.getElementById("paymentProviderPreview");
+  const automationPaymentText = document.getElementById("automationPaymentText");
+  const singlePayerPanel = document.getElementById("singlePayerPanel");
+  const singlePayerSelect = document.getElementById("singlePayerSelect");
+  const pixSplitPanel = document.getElementById("pixSplitPanel");
+  const pixSplitToggle = document.getElementById("pixSplitToggle");
+  const pixSplitConfig = document.getElementById("pixSplitConfig");
+  const pixSplitMode = document.getElementById("pixSplitMode");
+  const pixSplitMembers = document.getElementById("pixSplitMembers");
+  const pixSplitSummary = document.getElementById("pixSplitSummary");
+  const reservationPolicyAcknowledge = document.getElementById("reservationPolicyAcknowledge");
+  const reservationPolicyText = document.getElementById("reservationPolicyText");
+  const galleryDialog = document.getElementById("galleryDialog");
+  const galleryTitle = document.getElementById("galleryTitle");
+  const galleryBody = document.getElementById("galleryBody");
+  const monthlyReservationToggle = document.getElementById("monthlyReservationToggle");
+  const monthlyReservationPanel = document.getElementById("monthlyReservationPanel");
+  const monthlyReservationPreview = document.getElementById("monthlyReservationPreview");
+  const formDialog = document.getElementById("formDialog");
+  const dynamicForm = document.getElementById("dynamicForm");
+  const formEyebrow = document.getElementById("formEyebrow");
+  const formTitle = document.getElementById("formTitle");
+  const formDescription = document.getElementById("formDescription");
+  const formFields = document.getElementById("formFields");
+  const formSubmit = document.getElementById("formSubmit");
+  const formSecondarySubmit = document.getElementById("formSecondarySubmit");
+  let formSubmitting = false;
+  const detailDialog = document.getElementById("detailDialog");
+  const detailEyebrow = document.getElementById("detailEyebrow");
+  const detailTitle = document.getElementById("detailTitle");
+  const detailBody = document.getElementById("detailBody");
+  const confirmDialog = document.getElementById("confirmDialog");
+  const confirmForm = document.getElementById("confirmForm");
+  const confirmTitle = document.getElementById("confirmTitle");
+  const confirmMessage = document.getElementById("confirmMessage");
+  const confirmSubmit = document.getElementById("confirmSubmit");
+  const infoDialog = document.getElementById("infoDialog");
+  const cancellationDialog = document.getElementById("cancellationDialog");
+  const cancellationForm = document.getElementById("cancellationForm");
+  const cancellationEyebrow = document.getElementById("cancellationEyebrow");
+  const cancellationTitle = document.getElementById("cancellationTitle");
+  const cancellationSummary = document.getElementById("cancellationSummary");
+  const cancellationImpactList = document.getElementById("cancellationImpactList");
+  const cancellationWarningText = document.getElementById("cancellationWarningText");
+  const cancellationReasonLabel = document.getElementById("cancellationReasonLabel");
+  const cancellationReason = document.getElementById("cancellationReason");
+  const cancellationAcknowledge = document.getElementById("cancellationAcknowledge");
+  const cancellationAcknowledgeText = document.getElementById("cancellationAcknowledgeText");
+  const cancellationSubmit = document.getElementById("cancellationSubmit");
+  const chatDialog = document.getElementById("chatDialog");
+  const chatTitle = document.getElementById("chatTitle");
+  const chatSubtitle = document.getElementById("chatSubtitle");
+  const chatMessages = document.getElementById("chatMessages");
+  const chatForm = document.getElementById("chatForm");
+  const chatInput = document.getElementById("chatInput");
+  const chatSend = document.getElementById("chatSend");
+  const chatStatus = document.getElementById("chatStatus");
+
+  // Rascunho apenas em memória: F5, saída da conta, limpeza ou envio encerram o preenchimento.
+  let partnerInterestDraft = null;
+  let partnerInterestSubmitting = false;
+  let formHandler = null;
+  let formChangeHandler = null;
+  let confirmHandler = null;
+  let selectedReservation = null;
+  let selectedVenueSchedule = null;
+  let detailReturnContext = null;
+  let reservationReturnContext = null;
+  let selectedCancellation = null;
+  let selectedChatReservationId = null;
+  const allowAutomaticFieldFocus = window.matchMedia("(min-width: 701px) and (pointer: fine)").matches;
+
+  const menus = {
+    user: [
+      ["discover", "⌕", "Buscar quadras"],
+      ["reservations", "▣", "Minhas reservas"],
+      ["shares", "$", "Minhas cotas"],
+      ["favorites", "♡", "Favoritos"],
+      ["promotions", "%", "Meus vouchers"],
+      ["profile", "○", "Conta Tâmo On"]
+    ],
+    partner: [
+      ["overview", "⌂", "Visão geral"],
+      ["agenda", "▦", "Agenda"],
+      ["reservations", "▣", "Reservas"],
+      ["spaces", "◇", "Espaços"],
+      ["clients", "◎", "Clientes"],
+      ["team", "♙", "Equipe"],
+      ["vouchers", "%", "Vouchers"],
+      ["finance", "$", "Financeiro"],
+      ["registration", "≡", "Cadastro"]
+    ],
+    admin: [
+      ["overview", "⌂", "Visão geral"],
+      ["partners", "◇", "Parceiros"],
+      ["reservations", "▣", "Reservas"],
+      ["users", "◎", "Usuários"],
+      ["finance", "$", "Financeiro"],
+      ["vouchers", "%", "Vouchers"],
+      ["settings", "⚙", "Configurações"]
+    ]
+  };
+
+  function initialState() {
+    return {
+      role: "user",
+      activePage: { user: "discover", partner: "overview", admin: "overview", candidate: "apply" },
+      userReservationTab: "single",
+      search: { venue: "", adminPartner: "", adminUser: "" },
+      filters: { userReservationStatus: "Todas", userShareStatus: "Todas", adminPartnerStatus: "Todos", adminReservationStatus: "Todos", adminReservationPartner: "Todos", adminReservationUser: "Todos", adminReservationDate: "", partnerReservationStatus: "Todos" },
+      partnerDay: 6,
+      userProfile: {
+        name: "Eduardo Batista",
+        email: "eduardo.teste@exemplo.com",
+        phone: "(41) 99988-7766",
+        city: "Curitiba",
+        notification: "Ativadas",
+        preferredTime: "Noite",
+        accountProvider: "Google",
+        accountSource: "Conta Google vinculada ao Tâmo On",
+        complementarySource: "Perfil principal do Tâmo On",
+        lastSync: "05/08/2026 às 15:54",
+        centralProfileStatus: "Completo",
+        marketplaceEditable: false
+      },
+      userGroups: [
+        { id: "G-001", name: "Quinta sem Falta", role: "Administrador", memberCount: 18, canCreateEvents: true, canEditEvents: true },
+        { id: "G-002", name: "Amigos do Bairro", role: "Organizador", memberCount: 14, canCreateEvents: true, canEditEvents: true },
+        { id: "G-003", name: "Família FC", role: "Membro", memberCount: 22, canCreateEvents: false, canEditEvents: false }
+      ],
+      groupMembers: [
+        { id:"GM-001", groupId:"G-001", name:"Eduardo Batista", role:"Administrador" },
+        { id:"GM-002", groupId:"G-001", name:"Carlos Mendes", role:"Membro" },
+        { id:"GM-003", groupId:"G-001", name:"Rafael Souza", role:"Membro" },
+        { id:"GM-004", groupId:"G-001", name:"Marcos Lima", role:"Membro" },
+        { id:"GM-005", groupId:"G-001", name:"João Martins", role:"Membro" },
+        { id:"GM-006", groupId:"G-001", name:"Paulo Reis", role:"Membro" },
+        { id:"GM-101", groupId:"G-002", name:"Eduardo Batista", role:"Organizador" },
+        { id:"GM-102", groupId:"G-002", name:"Mariana Lopes", role:"Membro" },
+        { id:"GM-103", groupId:"G-002", name:"Ana Paula Costa", role:"Membro" },
+        { id:"GM-104", groupId:"G-002", name:"Lucas Ferreira", role:"Membro" },
+        { id:"GM-105", groupId:"G-002", name:"Bruno Alves", role:"Membro" }
+      ],
+      groupEvents: [
+        { id: "EV-0101", groupId: "G-001", title: "Pelada de quinta-feira", date: "13/08/2026", time: "20:00", statusKey: "published", status: "Publicado", published: true, source: "existing" },
+        { id: "EV-0102", groupId: "G-002", title: "Amistoso de sábado", date: "15/08/2026", time: "16:00", statusKey: "published", status: "Publicado", published: true, source: "existing" },
+        { id: "EV-0201", groupId: "G-001", title: "Arena Central · 06/08 às 20:00", date: "06/08/2026", time: "20:00", venue: "Arena Central", statusKey: "standby_payment", status: "Aguardando pagamento", published: false, source: "reservation", sourceReservationId: "R-0007", publicationEndpoint: "waiting.payment.confirmed", pushStatus: "Aguardando publicação" },
+        { id: "EV-0202", groupId: "G-002", title: "Arena Central · 07/08 às 18:00", date: "07/08/2026", time: "18:00", venue: "Arena Central", statusKey: "published", status: "Publicado", published: true, source: "reservation", sourceReservationId: "R-0008", publicationEndpoint: "event.publish_after_payment", pushStatus: "Enviado", pushEndpoint: "push.group_members" }
+      ],
+      communityMarketplaceNotifications: [],
+      monthlyCustomerLinks: [],
+      monthlyCycles: [],
+      monthlyLinkRequests: [],
+      monthlyLinkNotifications: [],
+      occurrenceTransfers: [],
+      occurrenceTransferNotifications: [],
+      pushLog: [],
+      cancellationLog: [],
+      cancellationVouchers: [
+        { id: "VC-0001", code: "CANCELA-0001", sourceReservationId: "R-0004", partnerReservationId: "RP-099", user: "Eduardo Batista", venueId: "arena-central", venue: "Arena Central", value: 120, originalValue: 120, originalTime: "18:00", originalPeriod: "Noite", compatibilityWindow: "16:00–20:00", minimumCompatibleDates: 4, compatibleDatesCount: 4, compatibleSlotsCount: 4, compatibleDates: ["06/08/2026","13/08/2026","20/08/2026","27/08/2026"], status: "active", issuedAt: "05/08/2026, 10:00:00", issuedDate: "05/08/2026", expiresAt: "04/09/2026", validityDays: 30, useType: "single", eligibleBookingMode: "any", originBookingMode: "single", minimumReservationValue: 120, partnerLiability: true, accountingOriginMonth: "08/2026", accountingTreatment: "Pagamento original mantido; resgate sem nova obrigação, salvo complemento", cancellationSource: "user", cancellationReason: "Cancelamento dentro do prazo", reassignmentStatus: "Vinculado ao parceiro original" }
+      ],
+      cancellationExceptionReviews: [],
+      accountingLedger: [
+        { id: "LED-0001", type: "service_payment", reservationId: "R-0008", venueId: "arena-central", venue: "Arena Central", amount: 130, accountingMonth: "08/2026", fiscalAmount: 130, description: "Pagamento original da reserva" },
+        { id: "LED-0002", type: "service_payment", reservationId: "R-0006", venueId: "cancha-horizonte", venue: "Cancha Horizonte", amount: 105, accountingMonth: "08/2026", fiscalAmount: 105, description: "Pagamento original da reserva" }
+      ],
+      pixCollections: [],
+      paymentIntents: [
+        { id:"PAY-0001", reservationId:"R-0008", method:"credit_card_asaas", provider:"ASAAS", status:"CONFIRMED", amount:130, route:"credit_card_asaas", externalReference:"R-0008", createdAt:"07/08/2026 18:01" },
+        { id:"PAY-0002", reservationId:"R-0006", method:"pix_direct_partner", provider:"SICOOB", status:"CONFIRMED", amount:105, route:"pix_direct_partner_api", externalReference:"R-0006", txid:"R0006TOTAL", createdAt:"06/08/2026 18:55" }
+      ],
+      paymentWebhookLog: [
+        { id:"WH-0001", provider:"ASAAS", event:"PAYMENT_CONFIRMED", reservationId:"R-0008", status:"Processado", createdAt:"07/08/2026 18:02" },
+        { id:"WH-0002", provider:"SICOOB", event:"PIX_RECEIVED", reservationId:"R-0006", status:"Processado", createdAt:"06/08/2026 18:56" }
+      ],
+      chatThreads: [
+        { id:"CHAT-R-0008", reservationId:"R-0008", partnerReservationId:"RP-103", venueId:"arena-central", venue:"Arena Central", user:"Eduardo Batista", createdAt:"07/08/2026 18:03", unlockedAt:"07/08/2026 18:02", status:"active", unread:{user:0,partner:1}, lastReadAt:{user:"07/08/2026 18:07",partner:"07/08/2026 18:05"}, messages:[
+          { id:"MSG-0001", senderType:"partner", senderName:"Arena Central", text:"Olá! Sua reserva está confirmada. Se precisar combinar algum detalhe sobre acesso ou estrutura da quadra, pode falar por aqui.", createdAt:"07/08/2026 18:05" },
+          { id:"MSG-0002", senderType:"user", senderName:"Eduardo Batista", text:"Perfeito. Vamos chegar alguns minutos antes para organizar o grupo.", createdAt:"07/08/2026 18:07" }
+        ] }
+      ],
+      favorites: ["arena-central"],
+      appliedVouchers: [],
+      ui: { selectedAvailabilityKeys: [] },
+      venues: [
+        {
+          id: "arena-central", name: "Arena Central", city: "Curitiba", neighborhood: "Água Verde", distance: "2,4 km",
+          rating: 4.8, reviews: 126, ratingSource: "users", types: ["Futsal", "Society"], price: 120, address: "Rua das Palmeiras, 250", zip: "80.000-000",
+          facadeImage: "assets/venues/arena-central-fachada.png", facadeSource: "partner_upload", amenities: ["Vestiário", "Estacionamento", "Churrasqueira"], bankProviderId:"SICOOB", bankLabel:"Sicoob", pixKey:"CNPJ cadastrado", asaasWalletId:"wallet_preview_arena_central",
+          schedule: [
+            { date: "06/08/2026", shortDate: "06/08", weekday: "Qui", dayLabel: "6 ago", slots: [{ time: "18:00", endTime: "19:00", price: 120, monthlyEligible: true, monthlyPrice: 440, space: "Quadra Society 1" }, { time: "19:00", endTime: "20:00", price: 120, blocked: true, space: "Quadra Society 1" }, { time: "20:00", endTime: "21:30", price: 150, space: "Quadra Society 1" }, { time: "21:30", endTime: "22:30", price: 130, space: "Quadra Society 1" }] },
+            { date: "07/08/2026", shortDate: "07/08", weekday: "Sex", dayLabel: "7 ago", slots: [{ time: "18:00", price: 130 }, { time: "19:00", price: 140 }, { time: "20:00", price: 140 }, { time: "21:00", price: 140 }] },
+            { date: "08/08/2026", shortDate: "08/08", weekday: "Sáb", dayLabel: "8 ago", slots: [{ time: "14:00", price: 150 }, { time: "16:00", price: 150 }, { time: "18:00", price: 160 }, { time: "20:00", price: 160 }] },
+            { date: "09/08/2026", shortDate: "09/08", weekday: "Dom", dayLabel: "9 ago", slots: [{ time: "10:00", price: 150 }, { time: "12:00", price: 150 }, { time: "16:00", price: 160 }, { time: "18:00", price: 160 }] },
+            { date: "10/08/2026", shortDate: "10/08", weekday: "Seg", dayLabel: "10 ago", slots: [{ time: "18:30", endTime: "19:30", price: 120, space: "Quadra Society 1" }, { time: "19:30", endTime: "20:30", price: 120, space: "Quadra Society 1" }, { time: "20:30", endTime: "22:00", price: 150, space: "Quadra Society 1" }] },
+            { date: "11/08/2026", shortDate: "11/08", weekday: "Ter", dayLabel: "11 ago", slots: [{ time: "18:00", price: 120 }, { time: "19:00", price: 120 }, { time: "20:00", price: 130 }, { time: "21:00", price: 130 }] },
+            { date: "12/08/2026", shortDate: "12/08", weekday: "Qua", dayLabel: "12 ago", slots: [{ time: "18:00", endTime: "19:00", price: 120, space: "Quadra Society 1" }, { time: "19:00", endTime: "20:00", price: 120, space: "Quadra Society 1" }, { time: "20:00", endTime: "21:30", price: 150, space: "Quadra Society 1" }, { time: "21:30", endTime: "22:30", price: 130, space: "Quadra Society 1" }] },
+            { date: "13/08/2026", shortDate: "13/08", weekday: "Qui", dayLabel: "13 ago", slots: [{ time: "18:00", endTime: "19:00", price: 120, monthlyEligible: true, monthlyPrice: 440, space: "Quadra Society 1" }, { time: "19:00", endTime: "20:00", price: 120, space: "Quadra Society 1" }, { time: "20:00", endTime: "21:30", price: 150, space: "Quadra Society 1" }] },
+            { date: "20/08/2026", shortDate: "20/08", weekday: "Qui", dayLabel: "20 ago", slots: [{ time: "18:00", endTime: "19:00", price: 120, monthlyEligible: true, monthlyPrice: 440, space: "Quadra Society 1" }, { time: "19:00", endTime: "20:00", price: 120, space: "Quadra Society 1" }, { time: "20:00", endTime: "21:30", price: 150, space: "Quadra Society 1" }] },
+            { date: "27/08/2026", shortDate: "27/08", weekday: "Qui", dayLabel: "27 ago", slots: [{ time: "18:00", endTime: "19:00", price: 120, monthlyEligible: true, monthlyPrice: 440, space: "Quadra Society 1" }, { time: "19:00", endTime: "20:00", price: 120, space: "Quadra Society 1" }, { time: "20:00", endTime: "21:30", price: 150, space: "Quadra Society 1" }] }
+          ]
+        },
+        {
+          id: "cancha-horizonte", name: "Cancha Horizonte", city: "São José dos Pinhais", neighborhood: "Centro", distance: "8,1 km",
+          rating: 4.6, reviews: 74, ratingSource: "users", types: ["Society"], price: 105, address: "Avenida Central, 840", zip: "83.005-000",
+          facadeImage: "assets/venues/cancha-horizonte.svg", facadeSource: "partner_upload", amenities: ["Estacionamento", "Lanchonete"], bankProviderId:"SICREDI", bankLabel:"Sicredi", pixKey:"Chave Pix cadastrada", asaasWalletId:"wallet_preview_cancha_horizonte",
+          schedule: [
+            { date: "06/08/2026", shortDate: "06/08", weekday: "Qui", dayLabel: "6 ago", slots: [{ time: "17:30", price: 105 }, { time: "19:00", price: 105 }, { time: "20:30", price: 115, blocked: true }, { time: "22:00", price: 105 }] },
+            { date: "07/08/2026", shortDate: "07/08", weekday: "Sex", dayLabel: "7 ago", slots: [{ time: "17:30", price: 110 }, { time: "19:00", price: 120 }, { time: "20:30", price: 120 }, { time: "22:00", price: 110 }] },
+            { date: "09/08/2026", shortDate: "09/08", weekday: "Dom", dayLabel: "9 ago", slots: [{ time: "10:00", price: 120 }, { time: "12:00", price: 120 }, { time: "16:00", price: 130 }, { time: "18:00", price: 130 }] }
+          ]
+        },
+        {
+          id: "vale-verde", name: "Complexo Vale Verde", city: "Colombo", neighborhood: "Roça Grande", distance: "11,7 km",
+          rating: 4.7, reviews: 91, ratingSource: "users", types: ["Futsal", "Campo"], price: 95, address: "Estrada do Vale, 41", zip: "83.414-000",
+          facadeImage: "assets/venues/vale-verde.svg", facadeSource: "partner_upload", amenities: ["Vestiário", "Arquibancada", "Iluminação"], bankProviderId:"BB", bankLabel:"Banco do Brasil", pixKey:"Chave Pix cadastrada", asaasWalletId:"wallet_preview_vale_verde",
+          schedule: [
+            { date: "06/08/2026", shortDate: "06/08", weekday: "Qui", dayLabel: "6 ago", slots: [{ time: "18:00", price: 95 }, { time: "19:30", price: 105 }, { time: "21:00", price: 105 }] },
+            { date: "08/08/2026", shortDate: "08/08", weekday: "Sáb", dayLabel: "8 ago", slots: [{ time: "09:00", price: 120 }, { time: "11:00", price: 120 }, { time: "15:00", price: 140 }, { time: "17:00", price: 140 }] },
+            { date: "09/08/2026", shortDate: "09/08", weekday: "Dom", dayLabel: "9 ago", slots: [{ time: "09:00", price: 130 }, { time: "11:00", price: 130 }, { time: "15:00", price: 150 }, { time: "17:00", price: 150 }] }
+          ]
+        }
+      ],
+      promotions: [
+        { id: "P-01", title: "Primeira reserva", code: "BEMVINDO10", benefit: "10% de desconto", discountType:"percentage", discountValue:10, minimumReservationValue:0, bookingMode:"any", venueId:"all", venue: "Todos os parceiros", validUntil: "31/08/2026", active: true, issuerType:"admin", issuerName:"Tâmo On" },
+        { id: "P-02", title: "Fora do horário de pico", code: "FORADEPICO", benefit: "R$ 15,00 de desconto", discountType:"fixed", discountValue:15, minimumReservationValue:15, bookingMode:"any", venueId:"cancha-horizonte", venue: "Cancha Horizonte", validUntil: "20/08/2026", active: true, issuerType:"partner", issuerName:"Cancha Horizonte" },
+        { id: "P-03", title: "Grupo recorrente", code: "GRUPO4X", benefit: "20% de desconto", discountType:"percentage", discountValue:20, minimumReservationValue:0, bookingMode:"any", venueId:"arena-central", venue: "Arena Central", validUntil: "30/09/2026", active: true, issuerType:"partner", issuerName:"Arena Central" }
+      ],
+      reservations: [
+        { id: "R-0007", venueId: "arena-central", venue: "Arena Central", user: "Eduardo Batista", date: "06/08/2026", shortDate: "06/08", time: "20:00", value: 120, statusKey: "pending", status: "Reserva pendente", endpoint: "reservation.created", groupId: "G-001", groupName: "Quinta sem Falta", groupRole: "Administrador", eventId: "EV-0201", event: "Arena Central · 06/08 às 20:00", eventMode: "new", eventPublicationStatus: "standby_payment", pushStatus: "Aguardando pagamento", voucher: "" },
+        { id: "R-0008", venueId: "arena-central", venue: "Arena Central", user: "Eduardo Batista", date: "07/08/2026", shortDate: "07/08", time: "18:00", value: 130, statusKey: "confirmed", status: "Confirmada e paga", endpoint: "asaas.webhook.payment_confirmed", paymentStatus: "Pago via cartão", paymentMethod: "credit_card_asaas", paymentProvider: "ASAAS", paymentIntentId:"PAY-0001", accountingRecognizedValue: 130, accountingMonth: "08/2026", fiscalObligationValue: 130, cancellationPolicyAccepted: true, cancellationPolicyVersion: "voucher-responsibility-availability-v2", groupId: "G-002", groupName: "Amigos do Bairro", groupRole: "Organizador", eventId: "EV-0202", event: "Arena Central · 07/08 às 18:00", eventMode: "new", eventPublicationStatus: "published", pushStatus: "Enviado", voucher: "" },
+        { id: "R-0006", venueId: "cancha-horizonte", venue: "Cancha Horizonte", user: "Marcos Lima", date: "06/08/2026", shortDate: "06/08", time: "19:00", value: 105, statusKey: "confirmed", status: "Confirmada", endpoint: "bank_pix.webhook.received", paymentStatus:"Pix confirmado pelo banco", paymentMethod:"pix_direct_partner", paymentProvider:"SICOOB", paymentIntentId:"PAY-0002", accountingRecognizedValue: 105, accountingMonth: "08/2026", fiscalObligationValue: 105, cancellationPolicyAccepted: true, cancellationPolicyVersion: "voucher-responsibility-availability-v2", groupId: "G-010", groupName: "Amigos do Bairro", eventId: "EV-0901", event: "Amistoso do bairro", eventMode: "existing", eventPublicationStatus: "linked_existing", pushStatus: "Não aplicável", voucher: "FORADEPICO" },
+        { id: "R-0005", venueId: "arena-central", venue: "Arena Central", user: "Paulo Reis", date: "05/08/2026", shortDate: "05/08", time: "21:00", value: 120, statusKey: "cancelled", status: "Cancelada", endpoint: "reservation.cancelled", groupId: "G-020", groupName: "Grupo do Paulo", eventId: "", event: "", eventMode: "none", eventPublicationStatus: "cancelled", pushStatus: "Não enviado", voucher: "" }
+      ],
+      financialReconciliation: [],
+      partnerAgenda: [
+        { id: "A-01", day: 6, time: "18:00", endTime: "19:00", title: "Grupo Quinta sem Falta", space: "Quadra Society 1", type: "confirmed", detail: "Reserva R-0010 · 1 hora" },
+        { id: "A-02", day: 6, time: "19:00", endTime: "20:00", title: "Solicitação pendente", space: "Quadra Society 1", type: "pending", detail: "Aguardando confirmação" },
+        { id: "A-03", day: 6, time: "20:00", endTime: "21:00", title: "Pelada dos Amigos", space: "Quadra Futsal", type: "confirmed", detail: "Evento vinculado" },
+        { id: "A-04", day: 6, time: "21:00", endTime: "22:00", title: "Manutenção do gramado", space: "Quadra Society 1", type: "blocked", detail: "Bloqueio interno" },
+        { id: "A-05", day: 7, time: "19:00", endTime: "20:00", title: "Grupo Sexta FC", space: "Quadra Society 1", type: "confirmed", detail: "Reserva recorrente" }
+      ],
+      partnerSpaces: [
+        { id: "E-01", name: "Quadra Society 1", type: "Society", floor: "Grama sintética", capacity: 14, price: 120, monthlyPrice: 440, status: "Ativo", lights: "Sim", covered: "Não", maintenance: "15/08/2026" },
+        { id: "E-02", name: "Quadra Futsal", type: "Futsal", floor: "Piso esportivo", capacity: 12, price: 95, monthlyPrice: 350, status: "Ativo", lights: "Sim", covered: "Sim", maintenance: "22/08/2026" }
+      ],
+      partnerReservations: [
+        { id: "RP-101", client: "Grupo Quinta sem Falta", date: "06/08/2026", time: "18:00", space: "Quadra Society 1", value: 120, status: "Confirmada", payment: "Externo" },
+        { id: "RP-102", client: "Amigos do Bairro", date: "06/08/2026", time: "19:00", space: "Quadra Society 1", value: 120, status: "Pendente", payment: "Não iniciado" },
+        { id: "RP-103", client: "Amigos do Bairro", date: "07/08/2026", time: "18:00", space: "Quadra Society 1", value: 130, status: "Confirmada", payment: "Pago no cartão", userReservationId: "R-0008", groupName: "Amigos do Bairro", eventId: "EV-0202", accountingRecognizedValue: 130, accountingMonth: "08/2026" },
+        { id: "RP-104", client: "Turma do Sábado", date: "08/08/2026", time: "16:00", space: "Quadra Society 1", value: 120, status: "Cancelada", payment: "Estornado externamente" }
+      ],
+      partnerClients: [
+        { id: "C-01", name: "Grupo Quinta sem Falta", contact: "Carlos Mendes", phone: "(41) 99876-1102", frequency: "Semanal", lastBooking: "30/07/2026", notes: "Prefere o horário das 18h." },
+        { id: "C-02", name: "Pelada dos Amigos", contact: "Rafael Souza", phone: "(41) 99700-3321", frequency: "Quinzenal", lastBooking: "06/08/2026", notes: "Solicita coletes quando disponíveis." },
+        { id: "C-03", name: "Turma do Sábado", contact: "Mariana Lopes", phone: "(41) 99621-8240", frequency: "Mensal", lastBooking: "11/07/2026", notes: "Contato preferencial por WhatsApp." }
+      ],
+      partnerTeam: [
+        { id: "T-01", name: "Lucas Ferreira", role: "Administrador", email: "lucas@arenacentral.exemplo", permission: "Total", status: "Ativo" },
+        { id: "T-02", name: "Ana Paula Costa", role: "Atendimento", email: "ana@arenacentral.exemplo", permission: "Agenda e reservas", status: "Ativo" },
+        { id: "T-03", name: "João Martins", role: "Manutenção", email: "joao@arenacentral.exemplo", permission: "Agenda e bloqueios", status: "Ativo" }
+      ],
+      partnerProfile: {
+        tradeName: "Arena Central",
+        legalName: "Arena Central Espaços Esportivos Ltda.",
+        cnpj: "12.345.678/0001-90",
+        legalNature: "Sociedade limitada",
+        taxRegime: "Simples Nacional",
+        declaredActivity: "Gestão e locação de espaços esportivos",
+        municipalRegistration: "987654-3",
+        responsibleName: "Lucas Henrique Ferreira",
+        responsibleCpf: "***.456.789-**",
+        responsibleRole: "Sócio-administrador",
+        email: "contato@arenacentral.exemplo",
+        phone: "(41) 3333-4455",
+        whatsapp: "(41) 99911-2233",
+        address: "Rua das Palmeiras, 250",
+        neighborhood: "Água Verde",
+        city: "Curitiba",
+        state: "PR",
+        zip: "80.000-000",
+        contractStatus: "Assinado",
+        termsStatus: "Aceitos",
+        privacyStatus: "Aceita",
+        cancellationPolicy: "Reserva avulsa paga: cancelamento com voucher em até 24 horas após a confirmação. Mensalista: prazo próprio antes da primeira ocorrência. Cancelamento pelo parceiro ou Tâmo On gera reembolso integral. Fora do prazo, não há crédito automático.",
+        venueId: "arena-central",
+        fiscalIssuer: "Parceiro emite documento fiscal ao usuário",
+        commissionInvoice: "Tâmo On emite NFS-e da comissão ao parceiro",
+        paymentModel: "Pix e cartão",
+        bank: "Sicoob",
+        bankProviderId: "SICOOB",
+        branch: "0001",
+        account: "****-5",
+        pixKey: "CNPJ cadastrado",
+        pixApiStatus: "Estrutura pronta · credenciais não configuradas",
+        pixAutoReconciliation: true,
+        pixWebhookStatus: "Rota preparada",
+        asaasSubaccount: "Sandbox não provisionado",
+        asaasWalletId: "wallet_preview_arena_central",
+        asaasCardStatus: "Checkout hospedado preparado",
+        commissionRate: 6,
+        favoritePhotoId: "PHOTO-001",
+        photos: [
+          { id:"PHOTO-001", name:"Fachada principal", src:"assets/venues/arena-central-fachada.png", favorite:true, uploadedAt:"Cadastro inicial", tone:"dark", luminance:133 }
+        ],
+        documents: [
+          { name: "Cartão CNPJ", status: "Validado" },
+          { name: "Contrato social", status: "Validado" },
+          { name: "Comprovante de endereço", status: "Validado" },
+          { name: "Dados bancários", status: "Pendente de conferência" },
+          { name: "Contrato de parceria", status: "Assinado" }
+        ]
+      },
+      adminPartners: [
+        { id: 1, venueId: "arena-central", tradeName: "Arena Central", legalName: "Arena Central Espaços Esportivos Ltda.", cnpj: "12.345.678/0001-90", city: "Curitiba", spaces: 2, types: "Futsal · Society", status: "Aprovado", responsible: "Lucas Ferreira", email: "contato@arenacentral.exemplo", phone: "(41) 3333-4455", taxRegime: "Simples Nacional", activity: "Gestão e locação de espaços esportivos", contract: "Assinado", terms:"Aceitos", privacy:"Aceita", fiscal: "Parceiro emite ao usuário", banking: "Em conferência", commission: 6, score: 92, source:"Administração" },
+        { id: 2, venueId: "cancha-horizonte", tradeName: "Cancha Horizonte", legalName: "Horizonte Esportes e Eventos Ltda.", cnpj: "23.456.789/0001-01", city: "São José dos Pinhais", spaces: 2, types: "Society", status: "Em análise", responsible: "Fernanda Ribeiro", email: "financeiro@horizonte.exemplo", phone: "(41) 3344-7788", taxRegime: "Simples Nacional", activity: "Locação de espaços esportivos", contract: "Enviado", terms:"Pendente", privacy:"Pendente", fiscal: "A validar", banking: "Pendente", commission: 6, score: 68, source:"Administração" },
+        { id: 3, venueId: "vale-verde", tradeName: "Complexo Vale Verde", legalName: "Vale Verde Centro Esportivo Ltda.", cnpj: "34.567.890/0001-12", city: "Colombo", spaces: 4, types: "Futsal · Campo", status: "Pendente", responsible: "Gustavo Almeida", email: "gestao@valeverde.exemplo", phone: "(41) 3656-2010", taxRegime: "Lucro Presumido", activity: "Centro esportivo e eventos", contract: "Não enviado", terms:"Pendente", privacy:"Pendente", fiscal: "A validar", banking: "Não informado", commission: 6, score: 41, source:"Administração" }
+      ],
+      partnerApplications: [],
+      adminUsers: [
+        { id: "U-1001", name: "Eduardo Batista", email: "eduardo.teste@exemplo.com", city: "Curitiba", groups: 3, reservations: 4, status: "Ativo", createdAt: "14/06/2026" },
+        { id: "U-1002", name: "Marcos Lima", email: "marcos.lima@exemplo.com", city: "São José dos Pinhais", groups: 1, reservations: 2, status: "Ativo", createdAt: "20/06/2026" },
+        { id: "U-1003", name: "Paulo Reis", email: "paulo.reis@exemplo.com", city: "Curitiba", groups: 2, reservations: 1, status: "Bloqueado", createdAt: "02/07/2026" },
+        { id: "U-1004", name: "Mariana Lopes", email: "mariana.lopes@exemplo.com", city: "Colombo", groups: 1, reservations: 3, status: "Ativo", createdAt: "08/07/2026" }
+      ],
+      settings: {
+        marketplaceEnabled: true,
+        newPartners: true,
+        vouchersEnabled: true,
+        realMoney: false,
+        automaticApproval: false,
+        notificationEmails: true,
+        defaultCommission: 6,
+        asaasCommissionRate: 2,
+        asaasPixFixedFee: 1.99,
+        asaasCardFixedFee: 0.49,
+        asaasCardPercentageFee: 2.99,
+        cancellationHours: 24,
+        voucherValidityDays: 30,
+        voucherCompatibilityWindowHours: 2,
+        voucherMinimumCompatibleDates: 4,
+        voucherExtensionDays: 7,
+        cancellationVoucherPolicy: true
+      }
+    };
+  }
+
+  function storedMarketplaceTheme() {
+    try {
+      return localStorage.getItem(THEME_STORAGE_KEY) === "light" ? "light" : "dark";
+    } catch (_error) {
+      return "dark";
+    }
+  }
+
+  function applyMarketplaceTheme(theme, persist = true) {
+    const normalized = theme === "light" ? "light" : "dark";
+    if (normalized === "light") document.documentElement.dataset.theme = "light";
+    else delete document.documentElement.dataset.theme;
+
+    if (marketplaceThemeColor) marketplaceThemeColor.content = normalized === "light" ? "#f4faf6" : "#0b1f17";
+    if (themeButton) {
+      const isLight = normalized === "light";
+      themeButton.setAttribute("aria-pressed", String(isLight));
+      themeButton.setAttribute("aria-label", isLight ? "Ativar tema escuro" : "Ativar tema claro");
+      themeButton.title = isLight ? "Ativar tema escuro" : "Ativar tema claro";
+      const icon = themeButton.querySelector(".theme-button-icon");
+      const label = themeButton.querySelector(".theme-button-label");
+      if (icon) icon.textContent = isLight ? "☾" : "☀";
+      if (label) label.textContent = isLight ? "Tema escuro" : "Tema claro";
+    }
+    if (persist) {
+      try { localStorage.setItem(THEME_STORAGE_KEY, normalized); } catch (_error) {}
+    }
+  }
+
+  function toggleMarketplaceTheme() {
+    const current = document.documentElement.dataset.theme === "light" ? "light" : "dark";
+    const next = current === "light" ? "dark" : "light";
+    applyMarketplaceTheme(next);
+    showToast(next === "light" ? "Tema claro ativado no Marketplace." : "Tema escuro ativado no Marketplace.");
+  }
+
+  function loadState() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
+      if (!(saved && saved.activePage && saved.venues)) return initialState();
+      saved.ui = saved.ui || {};
+      saved.ui.selectedAvailabilityKeys = Array.isArray(saved.ui.selectedAvailabilityKeys) ? saved.ui.selectedAvailabilityKeys : [];
+      saved.filters = saved.filters || {};
+      saved.filters.adminReservationStatus = saved.filters.adminReservationStatus || "Todos";
+      saved.filters.adminReservationPartner = saved.filters.adminReservationPartner || "Todos";
+      saved.filters.adminReservationUser = saved.filters.adminReservationUser || "Todos";
+      saved.filters.adminReservationDate = saved.filters.adminReservationDate || "";
+      saved.filters.userReservationStatus = saved.filters.userReservationStatus || "Todas";
+      saved.filters.userShareStatus = saved.filters.userShareStatus || "Todas";
+      saved.partnerProfile = saved.partnerProfile || {};
+      if (!Array.isArray(saved.partnerProfile.photos) || !saved.partnerProfile.photos.length) {
+        const currentVenue = saved.venues?.find((venue) => venue.id === saved.partnerProfile.venueId);
+        saved.partnerProfile.photos = currentVenue?.facadeImage ? [{ id:"PHOTO-001", name:"Fachada principal", src:currentVenue.facadeImage, favorite:true, uploadedAt:"Cadastro existente" }] : [];
+      }
+      const existingFavorite = saved.partnerProfile.photos.find((photo) => photo.favorite) || saved.partnerProfile.photos[0];
+      if (existingFavorite) {
+        saved.partnerProfile.favoritePhotoId = saved.partnerProfile.favoritePhotoId || existingFavorite.id;
+        saved.partnerProfile.photos.forEach((photo) => { photo.favorite = photo.id === saved.partnerProfile.favoritePhotoId; });
+      }
+      saved.activePage = saved.activePage || { user:"discover", partner:"overview", admin:"overview", candidate:"apply" };
+      saved.userReservationTab = saved.userReservationTab === "monthly" ? "monthly" : "single";
+      if (saved.activePage.user === "monthly") {
+        saved.activePage.user = "reservations";
+        saved.userReservationTab = "monthly";
+      }
+      saved.activePage.candidate = saved.activePage.candidate || "apply";
+      saved.partnerApplications = Array.isArray(saved.partnerApplications) ? saved.partnerApplications : [];
+      saved.adminPartners = Array.isArray(saved.adminPartners) ? saved.adminPartners : [];
+      saved.adminPartners.forEach((partner) => {
+        partner.source = partner.source || "Administração";
+        partner.terms = partner.terms || (partner.venueId === "arena-central" ? "Aceitos" : "Pendente");
+        partner.privacy = partner.privacy || (partner.venueId === "arena-central" ? "Aceita" : "Pendente");
+        partner.requestedAt = partner.requestedAt || "";
+      });
+      saved.chatThreads = Array.isArray(saved.chatThreads) ? saved.chatThreads : [];
+      saved.chatThreads.forEach((thread) => {
+        if (!thread.unread || typeof thread.unread !== "object") {
+          const last = Array.isArray(thread.messages) && thread.messages.length ? thread.messages[thread.messages.length - 1] : null;
+          thread.unread = { user: last?.senderType === "partner" ? 1 : 0, partner: last?.senderType === "user" ? 1 : 0 };
+        } else {
+          thread.unread.user = Number(thread.unread.user || 0);
+          thread.unread.partner = Number(thread.unread.partner || 0);
+        }
+        thread.lastReadAt = thread.lastReadAt || { user:"", partner:"" };
+      });
+      return saved;
+    } catch (_error) {
+      return initialState();
+    }
+  }
+
+
+  let state = loadState();
+
+  const backendRuntime = {
+    enabled: Boolean(window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG?.enabled),
+    initialized: false,
+    loading: false,
+    mutating: false,
+    session: null,
+    bootstrap: null,
+    error: "",
+    realtimeSubscribed: false,
+    identityId: ""
+  };
+  let backendBootstrapPromise = null;
+  let financialPaymentAuditSequence = 0;
+  let financialPeriodRuntime = {key:"",loadingKey:"",data:null,error:"",sequence:0};
+  let backendRealtimeRefreshTimer = null;
+  let backendRefreshQueued = false;
+  let backendRefreshTables = new Set();
+  let backendRefreshSignature = "";
+
+  function scheduleBackendRefresh(table = "") {
+    backendRefreshQueued=true;
+    backendRefreshTables.add(table || "full");
+    if(backendBootstrapPromise || backendRealtimeRefreshTimer)return;
+    backendRealtimeRefreshTimer=setTimeout(()=>{
+      backendRealtimeRefreshTimer=null;
+      if(!backendRefreshQueued)return;
+      refreshBackendBootstrap(true).catch(()=>{});
+    },180);
+  }
+
+  function backendSyncStatus() {
+    const element=document.getElementById("backendSyncStatus");
+    if(!element)return;
+    const message=backendRuntime.mutating ? (window.MarketplaceAsaasCommunication?.isBusy()
+      ? "Processando solicitação… Aguarde a conclusão." : "Salvando alteração… Você pode continuar navegando.")
+      : backendRuntime.refreshError ? "Não foi possível atualizar agora. Confira sua conexão."
+      : backendRuntime.refreshing ? "Atualizando informações…" : "";
+    element.textContent=message;element.hidden=!message;
+  }
+
+
+  function backendIsOnline() {
+    return Boolean(backendRuntime.enabled && backendRuntime.session?.user && backendRuntime.bootstrap);
+  }
+
+  function backendScheduleIsOfficial(venue) {
+    return Boolean(backendIsOnline() && venue?.backendVenueId && Array.isArray(backendRuntime.bootstrap?.schedule));
+  }
+
+  function backendStatusLabel(status) {
+    return ({ approved:"Aprovado", pending:"Pendente", under_review:"Em análise", suspended:"Suspenso", rejected:"Rejeitado", closed:"Encerrado" })[status] || String(status || "Não localizado");
+  }
+
+  function backendApplicationStatusLabel(status) {
+    return ({ approved:"Aprovado", pending:"Pendente", under_review:"Em análise", withdrawn:"Encerrado", rejected:"Rejeitado" })[status] || String(status || "Pendente");
+  }
+
+  function backendDateLabel(value) {
+    if (!value) return "";
+    const source = String(value).slice(0, 10).split("-");
+    return source.length === 3 ? `${source[2]}/${source[1]}/${source[0]}` : String(value);
+  }
+
+  function backendDateTimeLabel(value) {
+    if (!value) return "";
+    try { return new Date(value).toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short", timeZone:"America/Sao_Paulo" }); }
+    catch (_error) { return String(value); }
+  }
+
+  function partnerReadonlyActive() {
+    return Boolean((typeof backendRuntime!=="undefined" && backendRuntime.bootstrap?.preview?.active) || (typeof window!=="undefined" && window.MarketplaceBackend?.readonlyStatus?.active));
+  }
+
+  const partnerReadonlyActions = new Set(["partner-finance-tab","finance-reservation-open","finance-payment-details","export-reservation-payment-audit","finance-period-prev","finance-period-next","finance-period-today","finance-period-all","finance-period-retry","export-finance-movements","exit-partner-readonly","partner-schedule-date","partner-agenda-prev","partner-agenda-next","partner-agenda-month","partner-agenda-year","partner-agenda-today","schedule-slot-details","partner-reservation-details","reservation-details","pix-split-details","client-details","open-reservation-chat","open-monthly-request","open-occurrence-transfer-chat","open-partner-document","onboarding-open-dossier","partner-application-details","admin-partner-details","venue-details","venue-gallery","venue-schedule-day","export-partner-finance","export-partner-reservations","notification-inbox","notification-open"]);
+
+  function applyPartnerReadonlyControls() {
+    if(!partnerReadonlyActive()){
+      document.querySelectorAll('[data-readonly-disabled]').forEach(control=>{control.disabled=false;control.removeAttribute("aria-disabled");control.removeAttribute("title");delete control.dataset.readonlyDisabled;});
+      return;
+    }
+    document.querySelectorAll('[data-action]').forEach(button=>{
+      if(!partnerReadonlyActions.has(button.dataset.action)){
+        if(!button.disabled)button.dataset.readonlyDisabled="true";
+        button.disabled=true;button.setAttribute("aria-disabled","true");button.title="Somente leitura — volte à administração para sair desta visualização.";
+      }
+    });
+    document.querySelectorAll('dialog button[type="submit"],input[type="file"],#chatInput,#chatSend').forEach(control=>{
+      if(control.value!=="cancel"){if(!control.disabled)control.dataset.readonlyDisabled="true";control.disabled=true;}
+    });
+  }
+
+  function partnerReadonlyBanner() {
+    const preview=backendRuntime.bootstrap?.preview || (window.MarketplaceBackend?.readonlyStatus?.active ? {active:true,partner_name:"Parceiro selecionado"}:null);
+    if(!preview?.active)return "";
+    return `<aside class="partner-readonly-banner" role="status"><div><strong>Somente leitura · ${esc(preview.partner_name)}</strong><span>Você está visualizando a área deste parceiro. Alterações ficam bloqueadas até sair desta visualização.</span></div><button type="button" class="button secondary" data-action="exit-partner-readonly">Voltar à administração</button></aside>`;
+  }
+
+  async function changePartnerReadonly(partnerId = null) {
+    if(backendRuntime.mutating)return;
+    backendRuntime.mutating=true;
+    try {
+      document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());
+      if(partnerId)await window.MarketplaceBackend.beginPartnerReadonly(partnerId);
+      else await window.MarketplaceBackend.endPartnerReadonly();
+      // Aguarda eventual carregamento anterior antes de buscar o novo escopo.
+      if(backendBootstrapPromise)await backendBootstrapPromise.catch(()=>{});
+      backendRuntime.bootstrap=null;
+      state.activePage.partner="overview";state.ui.partnerAgendaDate="";state.ui.partnerAgendaMonth="";state.ui.selectedAvailabilityKeys=[];
+      state.role=partnerId?"partner":"admin";
+      await refreshBackendBootstrap(true);
+      render();
+    } catch(error) {showToast(backendErrorMessage(error));await refreshBackendBootstrap(true).catch(()=>{});}
+    finally {backendRuntime.mutating=false;}
+  }
+
+  function backendAllowedRoles() {
+    const boot = backendRuntime.bootstrap || {};
+    if(boot.profile?.status==="blocked")return new Set();
+    if(boot.preview?.active)return new Set(["partner"]);
+    const allowed = new Set(["user", "candidate"]);
+    if (Array.isArray(boot.partner_memberships) && boot.partner_memberships.length) allowed.add("partner");
+    if (boot.is_admin === true) allowed.add("admin");
+    return allowed;
+  }
+
+  function updateBackendRoleAccess() {
+    if (!backendRuntime.enabled) return;
+    const signedIn = Boolean(backendRuntime.session?.user && backendRuntime.bootstrap);
+    const allowed = backendAllowedRoles();
+    roleSwitcher.hidden = !signedIn;
+    roleButtons.forEach((button) => {
+      const available = signedIn && allowed.has(button.dataset.role);
+      button.hidden = false;
+      button.disabled = !available;
+      button.setAttribute("aria-hidden", "false");
+      button.classList.toggle("backend-role-disabled", !available);
+      if (!available) button.title = "Esta conta não possui permissão para esta área";
+      else button.removeAttribute("title");
+    });
+    sessionButton.hidden = !signedIn;
+    const resetButton = document.getElementById("resetPreview");
+    if (resetButton) resetButton.hidden = true;
+    if (signedIn) {
+      const display = backendRuntime.bootstrap?.profile?.display_name || backendRuntime.session.user.email || "Conta";
+      sessionButton.title = `${display} · sair`;
+      sessionButton.setAttribute("aria-label", `${display} · sair do Marketplace`);
+    }
+  }
+
+  function backendPhotoUrl(photo) {
+    if (!photo?.storage_path) return "";
+    try { return window.MarketplaceBackend?.publicVenuePhotoUrl(photo.storage_path) || ""; }
+    catch (_error) { return ""; }
+  }
+
+  function mapBackendPhoto(photo) {
+    return {
+      id: photo.id,
+      backendId: photo.id,
+      storagePath: photo.storage_path,
+      name: photo.display_name || "Foto do estabelecimento",
+      src: backendPhotoUrl(photo),
+      favorite: Boolean(photo.is_favorite),
+      uploadedAt: backendDateTimeLabel(photo.created_at),
+      tone: photo.tone || "dark",
+      luminance: photo.luminance == null ? null : Number(photo.luminance),
+      sortOrder: Number(photo.sort_order || 0)
+    };
+  }
+
+  function mapBackendPartnerDocument(document) {
+    return {
+      id:document.id,
+      backendId:document.id,
+      partnerId:document.partner_id,
+      name:document.document_type || "Documento",
+      status:document.status || "Pendente",
+      storagePath:document.storage_path || "",
+      originalName:document.original_name || "Arquivo protegido",
+      mimeType:document.mime_type || "",
+      sizeBytes:Number(document.size_bytes || 0),
+      uploadedAt:backendDateTimeLabel(document.created_at),
+      updatedAt:backendDateTimeLabel(document.updated_at),
+      reviewedAt:backendDateTimeLabel(document.reviewed_at),
+      reviewNotes:document.review_notes || "",
+      uploadedBy:document.uploaded_by || ""
+    };
+  }
+
+  function backendPartnerDocuments(partnerId) {
+    return (backendRuntime.bootstrap?.partner_documents || [])
+      .filter((document) => document.partner_id === partnerId)
+      .map(mapBackendPartnerDocument);
+  }
+
+  function backendPartnerDocumentById(documentId) {
+    const raw=(backendRuntime.bootstrap?.partner_documents || []).find((document)=>document.id===documentId);
+    return raw ? mapBackendPartnerDocument(raw) : null;
+  }
+
+  async function openPartnerDocument(documentId, button) {
+    if (button?.dataset.documentOpening === "true") return;
+    const file = backendPartnerDocumentById(documentId);
+    if (!backendIsOnline() || !file?.storagePath) {
+      showToast("Documento indisponível nesta sessão. Atualize a página e tente novamente.");
+      return;
+    }
+    const identity = backendRuntime.identityId;
+    let tab = null, status = button?.nextElementSibling;
+    if (!status?.matches("[data-document-access-status]")) {
+      status = document.createElement("span");
+      status.dataset.documentAccessStatus = "";
+      status.className = "document-access-status field-help";
+      status.setAttribute("role", "status");
+      button?.insertAdjacentElement("afterend", status);
+    }
+    status.textContent = "Preparando documento…";
+    if (button) { button.dataset.documentOpening = "true"; button.disabled = true; }
+    try {
+      // Abre durante o clique, antes de aguardar a URL privada do servidor.
+      try {
+        tab = window.open("about:blank", "_blank");
+        if (tab) {
+          tab.opener = null;
+          tab.document.title = "Abrindo documento — Tâmo On";
+          tab.document.body.textContent = "Preparando documento…";
+        }
+      } catch (_) { if (tab && !tab.closed) tab.close(); tab = null; }
+      const signedUrl = await window.MarketplaceBackend.createPartnerDocumentSignedUrl(file.storagePath, 300);
+      if (backendRuntime.identityId !== identity || !backendIsOnline()) {
+        if (tab && !tab.closed) tab.close();
+        status.textContent = "A sessão mudou. Abra o documento novamente na conta atual.";
+        return;
+      }
+      if (!signedUrl) throw new Error("Não foi possível preparar o documento.");
+      const url = new URL(signedUrl, window.location.href);
+      if (!["https:", "http:"].includes(url.protocol)) throw new Error("O endereço do documento é inválido.");
+      if (tab && !tab.closed) tab.location.replace(url.href);
+      status.textContent = tab && !tab.closed ? "Documento aberto em outra aba. " : "Documento pronto. Use o link para abrir: ";
+      const link = document.createElement("a");
+      link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer";
+      link.textContent = "Abrir documento";
+      status.append(link);
+    } catch (error) {
+      if (tab && !tab.closed) tab.close();
+      status.textContent = "Não foi possível abrir o documento. Tente novamente.";
+      showToast(backendErrorMessage(error));
+    } finally {
+      if (button) { delete button.dataset.documentOpening; button.disabled = false; }
+    }
+  }
+
+  const TEAM_PERMISSION_DEFINITIONS = [
+    { key:"manage_profile", label:"Cadastro do parceiro", help:"Editar empresa, responsável, endereço e fotos." },
+    { key:"manage_team", label:"Equipe", help:"Adicionar integrantes e alterar funções, permissões ou status." },
+    { key:"manage_finance", label:"Financeiro", help:"Consultar financeiro e administrar vouchers." },
+    { key:"manage_schedule", label:"Agenda", help:"Criar, editar, bloquear e excluir horários." },
+    { key:"manage_spaces", label:"Espaços", help:"Cadastrar e alterar quadras ou locais." },
+    { key:"manage_documents", label:"Documentos", help:"Enviar, visualizar e remover documentos permitidos." }
+  ];
+
+  const TEAM_ROLE_PERMISSION_PRESETS = {
+    owner:{ manage_profile:true, manage_team:true, manage_finance:true, manage_schedule:true, manage_spaces:true, manage_documents:true },
+    manager:{ manage_profile:true, manage_team:true, manage_finance:true, manage_schedule:true, manage_spaces:true, manage_documents:true },
+    attendant:{ manage_profile:false, manage_team:false, manage_finance:false, manage_schedule:true, manage_spaces:false, manage_documents:false },
+    schedule:{ manage_profile:false, manage_team:false, manage_finance:false, manage_schedule:true, manage_spaces:false, manage_documents:false },
+    finance:{ manage_profile:false, manage_team:false, manage_finance:true, manage_schedule:false, manage_spaces:false, manage_documents:false }
+  };
+
+  function backendTeamRoleLabel(role) {
+    return ({ owner:"Proprietário", manager:"Gerente", attendant:"Atendimento", schedule:"Agenda", finance:"Financeiro" })[role] || "Atendimento";
+  }
+
+  function backendTeamPermissionLabel(role, permissions = {}) {
+    if (role === "owner") return "Todas as permissões";
+    const enabled=TEAM_PERMISSION_DEFINITIONS.filter((permission)=>Boolean(permissions?.[permission.key]));
+    if (!enabled.length) return "Somente leitura";
+    if (enabled.length===TEAM_PERMISSION_DEFINITIONS.length) return "Todas as permissões";
+    return enabled.map((permission)=>permission.label).join(", ");
+  }
+
+  function teamPermissionsFromForm(data, role) {
+    if (role === "owner") return { ...TEAM_ROLE_PERMISSION_PRESETS.owner };
+    return Object.fromEntries(TEAM_PERMISSION_DEFINITIONS.map((permission)=>[permission.key,data[permission.key]==="true"]));
+  }
+
+  function configureTeamPermissionRolePresets(existingRole = "") {
+    const roleSelect=formFields.querySelector('[name="role"]');
+    const permissionGroup=formFields.querySelector('[data-team-permission-group]');
+    if (!roleSelect || !permissionGroup) return;
+    const permissionInputs=[...permissionGroup.querySelectorAll('input[type="checkbox"][data-team-permission]')];
+    const help=permissionGroup.parentElement?.querySelector('[data-team-permission-help]');
+    const updateOwnerState=(role)=>{
+      const owner=role==="owner";
+      permissionInputs.forEach((input)=>{input.disabled=owner;});
+      permissionGroup.classList.toggle("owner-locked",owner);
+      if (help) help.textContent=owner ? "O Proprietário mantém obrigatoriamente todas as permissões." : "A função aplica uma sugestão inicial. Você pode personalizar as permissões antes de salvar.";
+    };
+    const applyPreset=(role)=>{
+      const preset=TEAM_ROLE_PERMISSION_PRESETS[role] || TEAM_ROLE_PERMISSION_PRESETS.attendant;
+      permissionInputs.forEach((input)=>{input.checked=Boolean(preset[input.name]);});
+      updateOwnerState(role);
+    };
+    roleSelect.addEventListener("change",()=>applyPreset(roleSelect.value));
+    if (roleSelect.value==="owner") applyPreset("owner");
+    else updateOwnerState(roleSelect.value || existingRole);
+  }
+
+  function mapBackendTeamMember(member) {
+    return {
+      id:member.member_id,
+      backendId:member.member_id,
+      partnerId:member.partner_id,
+      profileId:member.profile_id,
+      accessPending:Boolean(member.access_pending),
+      name:member.display_name || "Membro",
+      email:member.email || "",
+      roleKey:member.role || "attendant",
+      role:backendTeamRoleLabel(member.role),
+      permissions:member.permissions || {},
+      permission:backendTeamPermissionLabel(member.role,member.permissions || {}),
+      active:Boolean(member.active),
+      status:member.active ? "Ativo" : "Inativo",
+      createdAt:backendDateTimeLabel(member.created_at),
+      updatedAt:backendDateTimeLabel(member.updated_at)
+    };
+  }
+
+  function backendTeamMembers(partnerId) {
+    return (backendRuntime.bootstrap?.partner_team_directory || [])
+      .filter((member)=>!partnerId || member.partner_id===partnerId)
+      .map(mapBackendTeamMember);
+  }
+
+  function currentBackendTeamMember() {
+    const userId=backendRuntime.session?.user?.id;
+    return state.partnerTeam.find((member)=>member.profileId===userId) || null;
+  }
+
+  let partnerActionContext = null;
+  let partnerAccessGeneration = 0;
+  let partnerAccessPending = false;
+  let partnerAccessRefreshPromise = null;
+  let partnerAccessRetryTimer = null;
+  let partnerAccessRetryAttempt = 0;
+
+  function hasPartnerPermission(permission) {
+    const member=backendRuntime.bootstrap?.partner_memberships?.find(m=>m.partner_id===state.partnerProfile.backendPartnerId) || currentBackendTeamMember();
+    return window.MarketplacePartnerOperations.allowed({official:backendRuntime.enabled,connected:backendIsOnline(),pending:partnerAccessPending,preview:partnerReadonlyActive(),member},permission);
+  }
+
+  function partnerPageAllowed(page) {
+    return window.MarketplacePartnerOperations.pageAllowed(page,hasPartnerPermission);
+  }
+
+  function partnerRestrictedSection(title) {
+    if(partnerAccessPending)return `<article class="card partner-permission-restricted" role="status"><h2>Atualizando permissões</h2><p>Conferindo os acessos da sua conta. As funções autorizadas serão liberadas automaticamente.</p></article>`;
+    return `<article class="card partner-permission-restricted"><h2>${esc(title)}</h2><strong>Acesso Restrito</strong><p>Esta função depende de autorização do responsável pelo parceiro.</p></article>`;
+  }
+
+  function guardPartnerOperation(handler) {
+    if(!backendRuntime.enabled || state.role!=="partner")return handler;
+    const rules=partnerActionContext ? [partnerActionContext] : (window.MarketplacePartnerOperations.pages[state.activePage.partner] || []);
+    const identity=backendRuntime.identityId,partnerId=state.partnerProfile.backendPartnerId;
+    return async(...args)=>{
+      const permission=rules.find(hasPartnerPermission);
+      if(identity!==backendRuntime.identityId || partnerId!==state.partnerProfile.backendPartnerId || partnerAccessPending || (rules.length&&!permission)){
+        showToast("Acesso Restrito. Suas permissões foram atualizadas.");return false;
+      }
+      if(permission){
+        try{await window.MarketplaceBackend.assertPartnerOperation(partnerId,permission);}
+        catch(error){showToast(backendErrorMessage(error));await refreshBackendAfterMutation().catch(()=>{});return false;}
+      }
+      if(!backendIsOnline() || identity!==backendRuntime.identityId || partnerId!==state.partnerProfile.backendPartnerId || partnerAccessPending || (permission&&!hasPartnerPermission(permission)))return false;
+      return handler?.(...args);
+    };
+  }
+
+  function closePartnerAccessDialogs() {
+    if(state.role==="partner"){
+      for(const dialog of [formDialog,detailDialog,confirmDialog,chatDialog,cancellationDialog])if(dialog?.open)dialog.close();
+      formHandler=null;formChangeHandler=null;confirmHandler=null;
+    }
+  }
+
+  function invalidatePartnerAccess() {
+    partnerAccessGeneration++;partnerAccessPending=true;
+    closePartnerAccessDialogs();
+    if(state.role==="partner")render();
+  }
+
+  function partnerAccessChange(change) {
+    const identity=backendRuntime.identityId;
+    if(!identity)return false;
+    const payload=change?.payload||{},row=payload.new||{},previous=payload.old||{};
+    if(change?.table==="notifications")return payload.eventType==="INSERT"&&row.profile_id===identity&&row.type==="partner_access_changed";
+    if(change?.table!=="partner_members")return false;
+    const membership=(backendRuntime.bootstrap?.partner_memberships||[]).find(member=>member.profile_id===identity
+      && member.id && (member.id===row.id || member.id===previous.id));
+    const own=row.profile_id===identity || previous.profile_id===identity || Boolean(membership)
+      || Boolean(previous.id && previous.id===currentBackendTeamMember()?.backendId);
+    if(!own)return false;
+    if(payload.eventType!=="UPDATE" || partnerAccessPending || !membership)return true;
+    return row.active!==membership.active || row.role!==membership.role
+      || TEAM_PERMISSION_DEFINITIONS.some(({key})=>(row.permissions?.[key]===true)!==(membership.permissions?.[key]===true));
+  }
+
+  function refreshPartnerAccess() {
+    if(!partnerAccessPending || !backendRuntime.enabled || !window.MarketplaceBackend?.session?.user)return Promise.resolve(null);
+    clearTimeout(partnerAccessRetryTimer);partnerAccessRetryTimer=null;
+    if(partnerAccessRefreshPromise)return partnerAccessRefreshPromise;
+    const identity=window.MarketplaceBackend.session.user.id;
+    partnerAccessRefreshPromise=(async()=>{
+      try {
+        while(partnerAccessPending && window.MarketplaceBackend?.session?.user?.id===identity){
+          const generation=partnerAccessGeneration;
+          const result=await refreshBackendAfterMutation();
+          if(!result && partnerAccessPending && generation===partnerAccessGeneration
+            && window.MarketplaceBackend?.session?.user?.id===identity)throw new Error("PARTNER_ACCESS_REFRESH_PENDING");
+        }
+        partnerAccessRetryAttempt=0;
+      } catch(_error) {
+        if(partnerAccessPending && window.MarketplaceBackend?.session?.user?.id===identity){
+          const delay=[1000,2000,5000,10000,30000][Math.min(partnerAccessRetryAttempt++,4)];
+          partnerAccessRetryTimer=setTimeout(()=>{
+            partnerAccessRetryTimer=null;
+            if(window.MarketplaceBackend?.session?.user?.id===identity)refreshPartnerAccess();
+          },delay);
+        }
+      } finally {
+        partnerAccessRefreshPromise=null;
+      }
+    })();
+    return partnerAccessRefreshPromise;
+  }
+
+  function canManageBackendTeam() {
+    return hasPartnerPermission("manage_team");
+  }
+
+  function canManageBackendFinance() {
+    return hasPartnerPermission("manage_finance");
+  }
+
+  function documentCanBeRemovedByPartner(document) {
+    const preserved = typeof backendRuntime === "undefined" ? [] : (backendRuntime.bootstrap?.partner_onboarding || []).flatMap(item=>item.preserved_document_ids || []);
+    return !preserved.includes(document?.id) && ["Pendente","Rejeitado"].includes(document?.status || "");
+  }
+
+  function documentFileSizeLabel(sizeBytes) {
+    const size=Number(sizeBytes || 0);
+    if (!size) return "";
+    if (size < 1048576) return `${Math.max(1,Math.round(size/1024))} KB`;
+    return `${(size/1048576).toFixed(1).replace(".",",")} MB`;
+  }
+
+  function mapBackendSpace(space) {
+    return {
+      id: space.id,
+      backendId: space.id,
+      venueId: space.venue_id,
+      name: space.name,
+      type: space.type,
+      floor: space.floor || "A informar",
+      capacity: Number(space.capacity || 0),
+      price: Number(space.base_price || 0),
+      monthlyPrice: Number(space.monthly_price || 0),
+      status: space.active ? "Ativo" : "Inativo",
+      lights: space.lights == null ? "A informar" : space.lights ? "Sim" : "Não",
+      covered: space.covered == null ? "A informar" : space.covered ? "Sim" : "Não",
+      maintenance: backendDateLabel(space.maintenance_date) || "Não agendada",
+      maintenanceIso: space.maintenance_date || ""
+    };
+  }
+
+  function backendZonedDateTime(value, timeZone = "America/Sao_Paulo") {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("pt-BR", {
+      timeZone,
+      year:"numeric",
+      month:"2-digit",
+      day:"2-digit",
+      hour:"2-digit",
+      minute:"2-digit",
+      hourCycle:"h23"
+    }).formatToParts(date).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+    const localDate = new Date(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 12, 0, 0);
+    const meta = scheduleDayFromDate(localDate);
+    return { ...meta, isoDate:`${parts.year}-${parts.month}-${parts.day}`, time:`${parts.hour}:${parts.minute}` };
+  }
+
+  function backendEndTime(start, end) {
+    return end?.time === "00:00" && Date.parse(end.isoDate) - Date.parse(start?.isoDate) === 86400000
+      ? "24:00" : end?.time || "";
+  }
+
+  function backendWallTimeToIso(dateIso, time, timeZone = "America/Sao_Paulo") {
+    const [year, month, day] = String(dateIso || "").split("-").map(Number);
+    const [hour, minute] = String(time || "").split(":").map(Number);
+    const desired = Date.UTC(year, month - 1, day, hour, minute, 0);
+    let guess = desired;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year:"numeric",
+        month:"2-digit",
+        day:"2-digit",
+        hour:"2-digit",
+        minute:"2-digit",
+        hourCycle:"h23"
+      }).formatToParts(new Date(guess)).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+      const represented = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), 0);
+      guess += desired - represented;
+    }
+    return new Date(guess).toISOString();
+  }
+
+  function backendWeekdaysForPreset(startIso, preset) {
+    if (preset === "Todos os dias") return [1,2,3,4,5,6,7];
+    if (preset === "Segunda a sexta") return [1,2,3,4,5];
+    if (preset === "Segunda a sábado") return [1,2,3,4,5,6];
+    if (preset === "Sábados e domingos") return [6,7];
+    const start = isoToLocalDate(startIso);
+    return [start.getDay() === 0 ? 7 : start.getDay()];
+  }
+
+  function mapBackendScheduleForVenue(bootstrap, venue, mappedSpaces) {
+    const details = new Map((bootstrap?.schedule_details || []).map((item) => [item.id, item]));
+    const reservations = new Map((bootstrap?.reservations || []).map((item) => [item.id, item]));
+    const spaces = new Map(mappedSpaces.map((item) => [item.id, item]));
+    const initialHolds = new Map((bootstrap?.agenda_initial_slots || []).map(row=>[row.slot_id,row]));
+    const days = new Map();
+    (bootstrap?.schedule || []).filter((item) => item.venue_id === venue.id).forEach((item) => {
+      const start = backendZonedDateTime(item.starts_at, venue.timezone || "America/Sao_Paulo");
+      const end = backendZonedDateTime(item.ends_at, venue.timezone || "America/Sao_Paulo");
+      if (!start || !end) return;
+      const detail = details.get(item.schedule_slot_id) || {};
+      const monthlyContext = item.monthly_context || {};
+      const initialHold=initialHolds.get(item.schedule_slot_id);
+      const reservation = reservations.get(item.active_reservation_id) || null;
+      if (!days.has(start.date)) days.set(start.date, { date:start.date, shortDate:start.shortDate, weekday:start.weekday, dayLabel:start.dayLabel, slots:[] });
+      days.get(start.date).slots.push({
+        backendId:item.schedule_slot_id,
+        backendInitialEntryId:initialHold?.entry_id||"",
+        backendInitialLabel:initialHold?.label||"",
+        backendSeriesId:detail.series_id || "",
+        backendMonthlyLinkKey:detail.monthly_link_key || "",
+        backendStartsAt:item.starts_at,
+        backendEndsAt:item.ends_at,
+        backendMarketplaceStatus:item.marketplace_status || item.operational_status || "available",
+        backendReservationId:item.active_reservation_id || "",
+        backendReservationStatus:reservation?.status || "",
+        backendReservationOwned:Boolean(bootstrap?.profile?.id && reservation?.user_id === bootstrap.profile.id),
+        backendMonthlyProtected:Boolean(monthlyContext.protected),
+        backendMonthlyAuthorized:Boolean(monthlyContext.authorized),
+        backendMonthlyOwned:monthlyContext.owned_by_current_user === true,
+        backendMonthlyCycleId:monthlyContext.monthly_cycle_id || "",
+        backendMonthlyCycleStatus:monthlyContext.monthly_cycle_status || "",
+        backendMonthlyCustomerLinkId:monthlyContext.monthly_link_id || "",
+        backendMonthlyGroupId:monthlyContext.monthly_group_id || "",
+        backendMonthlyGroupName:monthlyContext.monthly_group_name || "",
+        backendMonthlyPaymentAvailableAt:monthlyContext.monthly_payment_available_at || "",
+        backendMonthlyInitialDueAt:monthlyContext.monthly_initial_due_at || "",
+        backendMonthlyBalanceDueAt:monthlyContext.monthly_balance_due_at || "",
+        backendMonthlyInitialRequired:Number(monthlyContext.monthly_initial_required || 0),
+        backendMonthlyBalanceRequired:Number(monthlyContext.monthly_balance_required || 0),
+        backendMonthlyTotal:Number(monthlyContext.monthly_total || 0),
+        time:start.time,
+        endTime:backendEndTime(start,end),
+        price:Number(item.price || 0),
+        space:spaces.get(item.venue_space_id)?.name || "Espaço",
+        backendSpaceId:item.venue_space_id,
+        monthlyEligible:Boolean(item.monthly_eligible),
+        monthlyPrice:item.monthly_package_price == null ? 0 : Number(item.monthly_package_price),
+        blocked:item.operational_status === "blocked",
+        blockTitle:item.operational_status === "blocked" ? "Bloqueio operacional" : "",
+        blockDetail:detail.blocked_reason || (item.operational_status === "blocked" ? "Horário indisponível no marketplace" : "")
+      });
+    });
+    return [...days.values()].map((day) => ({ ...day, slots:day.slots.sort((a,b) => a.time.localeCompare(b.time) || normalizedSlotSpace(a).localeCompare(normalizedSlotSpace(b))) }))
+      .sort((a,b) => ptDateToIso(a.date).localeCompare(ptDateToIso(b.date)));
+  }
+
+  function syncMarketplaceCatalogFromBackend(bootstrap) {
+    const visibleVenueIds = new Set((bootstrap?.venues || []).map((venue) => venue.id));
+    state.venues = state.venues.filter((venue) => visibleVenueIds.has(venue.id));
+    (bootstrap?.venues || []).forEach((venue) => {
+      const partner = (bootstrap.partners || []).find((item) => item.id === venue.partner_id);
+      if (!partner) return;
+      const spaces = (bootstrap.spaces || []).filter((item) => item.venue_id === venue.id).map(mapBackendSpace);
+      const photos = (bootstrap.venue_photos || []).filter((item) => item.venue_id === venue.id).map(mapBackendPhoto);
+      const favorite = photos.find((photo) => photo.favorite) || photos[0] || null;
+      const current = state.venues.find((item) => item.id === venue.id) || {};
+      const activePrices = spaces.filter((space) => space.status === "Ativo" && space.price > 0).map((space) => space.price);
+      const mappedVenue = {
+        ...current,
+        id:venue.id,
+        backendVenueId:venue.id,
+        backendPartnerId:partner.id,
+        name:venue.name,
+        timezone:venue.timezone || "America/Sao_Paulo",
+        city:venue.city,
+        neighborhood:venue.neighborhood || "A informar",
+        distance:current.distance || "—",
+        rating:Number(venue.rating || 0),
+        reviews:Number(venue.reviews_count || 0),
+        ratingSource:"users",
+        types:[...new Set(spaces.filter((space) => space.status === "Ativo").map((space) => space.type))],
+        price:activePrices.length ? Math.min(...activePrices) : 0,
+        address:[venue.street, venue.street_number, venue.neighborhood, venue.city, venue.zip].filter(Boolean).join(", "),
+        zip:venue.zip || "",
+        facadeImage:favorite?.src || "assets/preview-icon.svg",
+        facadeSource:favorite ? "supabase_storage" : "partner_upload_pending",
+        facadeTone:favorite?.tone || "dark",
+        facadeLuminance:favorite?.luminance ?? null,
+        gallery:photos,
+        amenities:venue.amenities || [],
+        published:Boolean(venue.published),
+        marketplacePublished:Boolean(venue.published && partner.status === "approved"),
+        partnerStatus:backendStatusLabel(partner.status),
+        schedule:mapBackendScheduleForVenue(bootstrap, venue, spaces)
+      };
+      const venueIndex = state.venues.findIndex((item) => item.id === venue.id);
+      if (venueIndex >= 0) state.venues[venueIndex] = mappedVenue;
+      else state.venues.push(mappedVenue);
+
+      const adminRecord = state.adminPartners.find((item) => item.backendPartnerId === partner.id || item.venueId === venue.id);
+      const publicPartner = {
+        ...(adminRecord || {}),
+        id:partner.id,
+        backendPartnerId:partner.id,
+        venueId:venue.id,
+        tradeName:partner.trade_name,
+        status:backendStatusLabel(partner.status)
+      };
+      const adminIndex = state.adminPartners.findIndex((item) => item.backendPartnerId === partner.id || item.venueId === venue.id);
+      if (adminIndex >= 0) state.adminPartners[adminIndex] = publicPartner;
+      else state.adminPartners.push(publicPartner);
+    });
+  }
+
+  function syncIdentityFromBackend(bootstrap) {
+    const profile = bootstrap?.profile;
+    if (profile) {
+      Object.assign(state.userProfile, {
+        name: profile.display_name || backendRuntime.session?.user?.email || "Usuário Tâmo On",
+        email: profile.email || backendRuntime.session?.user?.email || "",
+        phone: profile.phone || "Não informado",
+        city: profile.city || "Não informada",
+        accountProvider: profile.account_provider || "Conta Tâmo On",
+        accountSource: "Perfil único autenticado do Tâmo On",
+        avatar: profile.avatar_url || state.userProfile.avatar,
+        lastSync: new Date().toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short" })
+      });
+    }
+
+    const settings = bootstrap?.settings;
+    if (settings) {
+      Object.assign(state.settings, {
+        marketplaceEnabled:Boolean(settings.marketplace_enabled),
+        newPartners:Boolean(settings.new_partner_applications_enabled),
+        vouchersEnabled:Boolean(settings.vouchers_enabled),
+        notificationEmails:Boolean(settings.notification_emails),
+        defaultCommission:Number(settings.default_commission_rate || 0),
+        asaasCommissionRate:Number(settings.asaas_reference_fee_rate || 0),
+        asaasPixFixedFee:Number(settings.asaas_pix_fixed_fee ?? 1.99),
+        asaasCardFixedFee:Number(settings.asaas_card_fixed_fee ?? 0.49),
+        asaasCardPercentageFee:Number(settings.asaas_card_percentage_fee ?? 2.99),
+        cancellationHours:Number(settings.cancellation_hours || 24),
+        voucherValidityDays:Number(settings.voucher_validity_days || 30),
+        voucherCompatibilityWindowHours:Number(settings.voucher_compatibility_window_hours || 2),
+        voucherMinimumCompatibleDates:Number(settings.voucher_minimum_compatible_dates || 4),
+        voucherExtensionDays:Number(settings.voucher_extension_days || 7),
+        realMoney:false
+      });
+    }
+
+    if (Array.isArray(bootstrap?.partner_applications)) {
+      state.partnerApplications = bootstrap.partner_applications.map((application) => ({
+        id: application.id,
+        requesterUserId: application.requester_user_id,
+        tradeName: application.trade_name,
+        legalName: application.legal_name,
+        cnpj: application.cnpj,
+        city: application.city,
+        spaces: Number(application.spaces_count || 1),
+        types: (application.space_types || []).join(" · "),
+        responsible: application.responsible_name,
+        email: application.email,
+        secondaryEmail: application.secondary_email || "",
+        validationStartedAt: application.validation_started_at || null,
+        phone: application.phone,
+        notes: application.notes || "",
+        reviewNotes: application.review_notes || "",
+        reviewedAt: backendDateTimeLabel(application.reviewed_at || application.updated_at),
+        statusKey: application.status,
+        contactConsent: Boolean(application.contact_consent),
+        status: backendApplicationStatusLabel(application.status),
+        requestedAt: backendDateTimeLabel(application.created_at),
+        backendRecord: true
+      }));
+    }
+  }
+
+  function backendGroupRoleLabel(role) {
+    return ({ admin:"Administrador", organizer:"Organizador", member:"Membro" })[role] || "Membro";
+  }
+
+  function syncCommunityFromBackend(bootstrap) {
+    state.userGroups = currentAccountGroups(bootstrap);
+
+    const visibleGroupIds = new Set(state.userGroups.map((group) => group.id));
+    state.groupMembers = (bootstrap?.group_member_directory || [])
+      .filter((member) => visibleGroupIds.has(member.group_id))
+      .map((member) => ({
+        id:`${member.group_id}:${member.profile_id}`,
+        backendProfileId:member.profile_id,
+        groupId:member.group_id,
+        name:member.display_name || "Membro Tâmo On",
+        role:backendGroupRoleLabel(member.role),
+        backendOfficial:true
+      }));
+
+    state.groupEvents = (bootstrap?.events || []).map((event) => {
+      const start = backendZonedDateTime(event.starts_at);
+      const end = backendZonedDateTime(event.ends_at);
+      return {
+        id:event.id,
+        backendId:event.id,
+        groupId:event.group_id,
+        title:event.title,
+        date:start?.date || backendDateLabel(event.starts_at),
+        shortDate:start?.shortDate || "",
+        time:start?.time || "",
+        endTime:backendEndTime(start,end),
+        venue:event.venue_name || "",
+        statusKey:event.status,
+        status:event.status === "published" ? "Publicado" : event.status === "standby_payment" ? "Aguardando pagamento" : event.status === "cancelled" ? "Cancelado" : "Vinculado",
+        published:event.status === "published",
+        source:event.source || "marketplace",
+        sourceReservationId:event.source_reservation_id || "",
+        backendOfficial:true
+      };
+    });
+
+    state.communityMarketplaceNotifications = (bootstrap?.community_marketplace_notifications || []).map((notification) => ({
+      id:notification.id,
+      profileId:notification.profile_id,
+      type:notification.type,
+      title:notification.title,
+      body:notification.body || "",
+      status:notification.status,
+      groupId:notification.group_id || notification.data?.group_id || "",
+      externalGroupId:notification.external_group_id || notification.data?.external_group_id || "",
+      reservationId:notification.entity_id || notification.data?.reservation_id || "",
+      reservationCode:notification.data?.reservation_code || "",
+      action:notification.action || notification.data?.action || "",
+      amount:Number(notification.data?.amount || 0),
+      txid:notification.data?.txid || "",
+      createdAt:backendDateTimeLabel(notification.created_at),
+      readAt:backendDateTimeLabel(notification.read_at),
+      backendOfficial:true
+    }));
+  }
+
+  function backendReservationVisual(status) {
+    if (["confirmed","completed"].includes(status)) return { key:"confirmed", label:status === "completed" ? "Concluída" : "Confirmada" };
+    if (["cancelled","expired","refund_pending","refunded"].includes(status)) {
+      return { key:"cancelled", label:status === "expired" ? "Expirada" : status === "refund_pending" ? "Reembolso pendente" : status === "refunded" ? "Reembolsada" : "Cancelada" };
+    }
+    return { key:"pending", label:"Reserva pendente" };
+  }
+
+  function reservationEventOriginLabel(mode) {
+    if (mode === "new") return "Criado pela reserva";
+    if (mode === "existing") return "Evento existente";
+    return "Não informada";
+  }
+
+  function backendVoucherStatus(row) {
+    const status = String(row?.effective_status || row?.status || "active");
+    if (status === "active" && Number(row?.extension_count || 0) > 0) return "active_extended";
+    return status;
+  }
+
+  function backendVoucherVenue(row) {
+    if (!row?.partner_id) return { id:"all", name:"Todos os parceiros" };
+    const venue = state.venues.find((item) => item.backendPartnerId === row.partner_id || item.partnerId === row.partner_id);
+    return { id:venue?.id || row.partner_id, name:row.partner_name || venue?.name || "Parceiro Tâmo On" };
+  }
+
+  function backendVoucherDate(value) {
+    return backendZonedDateTime(value)?.date || "—";
+  }
+
+  function syncVouchersFromBackend(bootstrap) {
+    const rows = Array.isArray(bootstrap?.voucher_effective_state) ? bootstrap.voucher_effective_state : (bootstrap?.vouchers || []);
+    const usages = bootstrap?.voucher_usages || [];
+    const currentProfileId = backendRuntime.session?.user?.id || "";
+    const usageByVoucher = new Map();
+    usages.forEach((usage) => {
+      if (!usageByVoucher.has(usage.voucher_id)) usageByVoucher.set(usage.voucher_id, []);
+      usageByVoucher.get(usage.voucher_id).push(usage);
+    });
+
+    const originals=new Map((bootstrap?.vouchers||[]).map(row=>[row.id,row]));
+    state.promotions = rows.filter((row) => ["admin_promo","partner_promo"].includes(row.origin)).map((row) => {
+      const venue = backendVoucherVenue(row);
+      const status = backendVoucherStatus(row);
+      const archivedAsDeleted = status === "deleted" || (status === "archived" && /^Excluído/i.test(String(row.archived_reason || "")));
+      const rowUsages = usageByVoucher.get(row.id) || [];
+      const lastUsage = [...rowUsages].sort((a,b) => String(b.consumed_at || b.reserved_at || "").localeCompare(String(a.consumed_at || a.reserved_at || "")))[0];
+      return {
+        id:row.id,
+        backendId:row.id,
+        backendOfficial:true,
+        title:row.title,
+        code:String(row.code || "").toUpperCase(),
+        discountType:row.discount_type,
+        discountValue:Number(row.discount_value || 0),
+        minimumReservationValue:Number(row.minimum_reservation_value || 0),
+        bookingMode:row.booking_scope || "any",
+        eventDate:originals.get(row.id)?.event_date||row.event_date||null,
+        eventStartTime:originals.get(row.id)?.event_start_time||row.event_start_time||null,
+        eventEndTime:originals.get(row.id)?.event_end_time||row.event_end_time||null,
+        singleUse:Boolean(row.single_use),
+        venueId:venue.id,
+        venue:venue.name,
+        validUntil:backendVoucherDate(row.effective_expires_at || row.expires_at),
+        active:status === "active" || status === "active_extended",
+        status,
+        deleted:archivedAsDeleted,
+        archivedReason:row.archived_reason || "",
+        issuerType:row.origin === "partner_promo" ? "partner" : "admin",
+        issuerName:row.origin === "partner_promo" ? venue.name : "Tâmo On",
+        usedCount:Number(row.used_count ?? rowUsages.filter((usage) => usage.status === "used").length),
+        reservedCount:Number(row.reserved_count ?? rowUsages.filter((usage) => usage.status === "reserved").length),
+        lastUsedAt:backendDateTimeLabel(row.last_used_at || lastUsage?.consumed_at),
+        createdAt:backendDateTimeLabel(row.created_at),
+        deletedAt:archivedAsDeleted ? backendDateTimeLabel(row.updated_at) : ""
+      };
+    });
+
+    state.cancellationVouchers = rows.filter((row) => row.origin === "cancellation").map((row) => {
+      const venue = backendVoucherVenue(row);
+      const status = backendVoucherStatus(row);
+      const originalTime = String(row.original_start_time || "").slice(0,5);
+      const tolerance = Number(row.compatibility_window_hours ?? state.settings.voucherCompatibilityWindowHours ?? 2) * 60;
+      const center = timeToMinutes(originalTime || "20:00");
+      const ownerIsCurrent = row.owner_user_id === currentProfileId;
+      return {
+        id:row.id,
+        backendId:row.id,
+        backendOfficial:true,
+        code:String(row.code || "").toUpperCase(),
+        sourceReservationId:row.source_reservation_code || (bootstrap?.reservations||[]).find(reservation=>reservation.id===row.source_reservation_id)?.public_code || row.source_reservation_id || "",
+        backendSourceReservationId:row.source_reservation_id || "",
+        ownerUserId:row.owner_user_id || "",
+        user:row.owner_name || (ownerIsCurrent ? state.userProfile.name : "Usuário da reserva"),
+        venueId:venue.id,
+        venue:venue.name,
+        value:Number(row.discount_value || 0),
+        originalValue:Number(row.discount_value || 0),
+        originalTime,
+        originalPeriod:row.original_period || timePeriod(originalTime || "20:00"),
+        compatibilityWindow:`${minutesToTime(Math.max(0,center-tolerance))}–${minutesToTime(Math.min(1439,center+tolerance))}`,
+        minimumCompatibleDates:Number(row.minimum_compatible_dates ?? state.settings.voucherMinimumCompatibleDates ?? 4),
+        compatibleDatesCount:Number(row.compatible_dates_count || 0),
+        status,
+        issuedAt:backendDateTimeLabel(row.created_at),
+        issuedDate:backendVoucherDate(row.created_at),
+        expiresAt:backendVoucherDate(row.effective_expires_at || row.expires_at),
+        validityDays:Number(state.settings.voucherValidityDays || 30),
+        useType:row.single_use ? "single" : "multiple",
+        eligibleBookingMode:row.booking_scope || "any",
+        originBookingMode:row.original_booking_mode || "single",
+        minimumReservationValue:Number(row.minimum_reservation_value || row.discount_value || 0),
+        partnerLiability:Boolean(row.partner_liability),
+        extensionCount:Number(row.extension_count || 0),
+        extensionReason:row.extension_reason || "",
+        lastExtendedAt:backendDateTimeLabel(row.last_extended_at),
+        reassignmentStatus:"Vinculado ao parceiro original"
+      };
+    });
+
+    state.accountingLedger = (bootstrap?.accounting_ledger || []).map((entry) => {
+      const reservation = state.reservations.find((item) => item.backendId === entry.reservation_id);
+      const venue = state.venues.find((item) => item.backendPartnerId === entry.partner_id);
+      return {
+        id:entry.id,
+        backendOfficial:true,
+        type:entry.entry_type,
+        reservationId:reservation?.id || entry.reservation_id || "",
+        venueId:reservation?.venueId || venue?.id || "",
+        venue:reservation?.venue || venue?.name || "Parceiro Tâmo On",
+        amount:Number(entry.amount || 0),
+        fiscalAmount:Number(entry.fiscal_amount || 0),
+        accountingMonth:entry.accounting_month,
+        description:entry.description,
+        metadata:entry.metadata || {},
+        createdAt:backendDateTimeLabel(entry.created_at)
+      };
+    });
+  }
+
+  function backendReservationHasPixSplit(reservation,participantRows=[]) {
+    return Boolean(reservation?.split_pix||participantRows.some((participant)=>participant.payment_role==="pix_share"));
+  }
+
+  function reservationSubjectLabel(reservation) {
+    if (!reservation) return "Reserva";
+    if (reservation.groupId) return reservation.groupName || "Grupo Tâmo On";
+    // Legacy/manual entries and public occupancy may not carry a group field.
+    if (!Object.prototype.hasOwnProperty.call(reservation, "groupId")) {
+      return reservation.groupName || reservation.client || reservation.user || "Reserva";
+    }
+    const ownerName = String(reservation.user || "").trim();
+    return ownerName && ownerName !== "Usuário Tâmo On" ? ownerName : "Reserva pessoal";
+  }
+
+  function backendReservationRows(bootstrap) {
+    // The administrative directory is a display projection, not the reservation record.
+    // Keep payment, ownership, lifecycle and occurrences from the authorized snapshot.
+    const rows = bootstrap?.reservations || [];
+    if (bootstrap?.preview?.active || !bootstrap?.is_admin) return rows;
+    const directory = new Map((bootstrap.admin_reservations || []).map((row) => [row.id, row]));
+    const displayFields = ["partner_name", "venue_name", "space_name", "user_name", "user_email", "group_name", "group_role"];
+    return rows.map((row) => {
+      const display = directory.get(row.id) || {};
+      const labels = Object.fromEntries(displayFields.filter((key) => display[key] !== undefined).map((key) => [key, display[key]]));
+      return { ...labels, ...row };
+    });
+  }
+
+  function syncReservationsFromBackend(bootstrap) {
+    const profileId = backendRuntime.session?.user?.id || "";
+    const rawReservations = backendReservationRows(bootstrap);
+    const rawOccurrences = bootstrap?.occurrences || [];
+    const monthlyStages = bootstrap?.monthly_payment_stages || [];
+    const groups = new Map((bootstrap?.groups || []).map((group) => [group.id, group]));
+    const events = new Map((bootstrap?.events || []).map((event) => [event.id, event]));
+    const directory = new Map((bootstrap?.group_member_directory || []).map((member) => [member.profile_id, member]));
+    const monthlySplitDirectory = new Map((bootstrap?.monthly_reservation_split_directory || []).map((member) => [`${member.reservation_id}:${member.profile_id}`,member]));
+    const paymentResponsibleDirectory = new Map((bootstrap?.payment_responsible_directory || []).map((entry) => [entry.reservation_id, entry]));
+    const participantsByReservation = new Map();
+    (bootstrap?.reservation_participants || []).forEach((participant) => {
+      if (!participantsByReservation.has(participant.reservation_id)) participantsByReservation.set(participant.reservation_id, []);
+      participantsByReservation.get(participant.reservation_id).push(participant);
+    });
+    const installmentsByReservation = new Map();
+    (bootstrap?.pix_installments || []).forEach((installment) => {
+      if (!installmentsByReservation.has(installment.reservation_id)) installmentsByReservation.set(installment.reservation_id, []);
+      installmentsByReservation.get(installment.reservation_id).push(installment);
+    });
+    const paymentIntents = new Map((bootstrap?.payment_intents || []).map((intent) => [intent.reservation_id, intent]));
+    const payments = new Map();
+    const confirmedPaymentsByReservation = new Map();
+    (bootstrap?.payments || []).forEach((payment) => {
+      if (!payments.has(payment.reservation_id)) payments.set(payment.reservation_id, payment);
+      if (payment.status === "confirmed") {
+        confirmedPaymentsByReservation.set(
+          payment.reservation_id,
+          Number(confirmedPaymentsByReservation.get(payment.reservation_id) || 0) + Number(payment.amount || 0)
+        );
+      }
+    });
+    const voucherRows = new Map((bootstrap?.voucher_effective_state || bootstrap?.vouchers || []).map((voucher) => [voucher.id, voucher]));
+    const voucherUsageByReservation = new Map();
+    (bootstrap?.voucher_usages || []).forEach((usage) => {
+      if (!voucherUsageByReservation.has(usage.reservation_id)) voucherUsageByReservation.set(usage.reservation_id, usage);
+    });
+    const cancellationByReservation = new Map();
+    (bootstrap?.cancellation_requests || []).forEach((request) => {
+      if (!cancellationByReservation.has(request.reservation_id)) cancellationByReservation.set(request.reservation_id, request);
+    });
+    const cancellationVoucherByReservation = new Map();
+    (bootstrap?.voucher_effective_state || bootstrap?.vouchers || []).filter((voucher) => voucher.origin === "cancellation" && voucher.source_reservation_id).forEach((voucher) => {
+      if (!cancellationVoucherByReservation.has(voucher.source_reservation_id)) cancellationVoucherByReservation.set(voucher.source_reservation_id, []);
+      cancellationVoucherByReservation.get(voucher.source_reservation_id).push(voucher);
+    });
+    const ledgerByReservation = new Map();
+    (bootstrap?.accounting_ledger || []).forEach((entry) => {
+      if (!ledgerByReservation.has(entry.reservation_id)) ledgerByReservation.set(entry.reservation_id, []);
+      ledgerByReservation.get(entry.reservation_id).push(entry);
+    });
+    const venues = new Map(state.venues.map((venue) => [venue.id, venue]));
+    const spaces = new Map(state.partnerSpaces.filter((space) => space.backendId).map((space) => [space.backendId, space]));
+    (bootstrap?.spaces || []).forEach((space) => { if (!spaces.has(space.id)) spaces.set(space.id, mapBackendSpace(space)); });
+
+    state.reservations = rawReservations.map((reservation) => {
+      const venueId = reservation.venue_id;
+      const venue = venues.get(venueId);
+      const timezone = venue?.timezone || "America/Sao_Paulo";
+      const sourceOccurrences = Array.isArray(reservation.occurrences)
+        ? reservation.occurrences
+        : rawOccurrences.filter((occurrence) => occurrence.reservation_id === reservation.id);
+      const allOccurrences = sourceOccurrences.map((occurrence) => {
+        const start = backendZonedDateTime(occurrence.starts_at, timezone);
+        const end = backendZonedDateTime(occurrence.ends_at, timezone);
+        return {
+          id:occurrence.id,
+          backendId:occurrence.id,
+          backendSlotId:occurrence.schedule_slot_id,
+          date:start?.date || "",
+          shortDate:start?.shortDate || "",
+          weekday:start?.weekday || "",
+          dayLabel:start?.dayLabel || "",
+          time:start?.time || "",
+          endTime:backendEndTime(start,end),
+          space:spaces.get(reservation.venue_space_id)?.name || reservation.space_name || "Espaço",
+          value:Number(occurrence.allocated_value || 0),
+          status:occurrence.status || "active",
+          rescheduledFromOccurrenceId:occurrence.rescheduled_from_occurrence_id || "",
+          transferRequestId:occurrence.transfer_request_id || ""
+        };
+      }).sort((a,b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+      const effectiveOccurrences=allOccurrences.filter((occurrence)=>occurrence.status!=="cancelled");
+      const occurrences=effectiveOccurrences.length?effectiveOccurrences:allOccurrences;
+      const first = occurrences[0] || {};
+      const visual = backendReservationVisual(reservation.status);
+      const group = groups.get(reservation.group_id);
+      const event = events.get(reservation.event_id);
+      const intent = paymentIntents.get(reservation.id);
+      const payment = payments.get(reservation.id);
+      const voucherUsage = voucherUsageByReservation.get(reservation.id);
+      const voucherRow = voucherRows.get(voucherUsage?.voucher_id);
+      const cancellation = cancellationByReservation.get(reservation.id);
+      const generatedVouchers=(cancellationVoucherByReservation.get(reservation.id)||[]).map(v=>({id:v.id,code:v.code,ownerUserId:v.owner_user_id,ownerName:directory.get(v.owner_user_id)?.display_name || "Beneficiário",amount:Number(v.discount_value||0)}));
+      const individualCancellationVouchers=cancellation?.resolution_details?.distribution==="individual";
+      const generatedVoucher = !individualCancellationVouchers ? generatedVouchers[0] : null;
+      const ledgerEntries = ledgerByReservation.get(reservation.id) || [];
+      const refundEntry = ledgerEntries.find((entry) => entry.entry_type === "refund_required");
+      const cancellationMode = cancellation?.resolution === "voucher" ? "voucher" : cancellation?.resolution === "refund_required" ? "refund" : cancellation ? "no_compensation" : "";
+      const isCurrentUser = reservation.user_id === profileId;
+      const reservationMonthlyStages=monthlyStages.filter((stage)=>stage.reservation_id===reservation.id)
+        .sort((a,b)=>String(a.due_at||"").localeCompare(String(b.due_at||"")));
+      const rawMonthlyCycle=(bootstrap?.monthly_cycles||[]).find((cycle)=>cycle.id===reservation.monthly_cycle_id||cycle.reservation_id===reservation.id)||null;
+      const monthlyStagesPaid=reservationMonthlyStages.reduce((total,stage)=>total+Number(stage.amount_paid||0),0);
+      const confirmedPaymentsPaid=Number(confirmedPaymentsByReservation.get(reservation.id)||0);
+      const actuallyPaid=reservation.booking_mode==="monthly"?Number(rawMonthlyCycle?.total_paid??Math.max(monthlyStagesPaid,confirmedPaymentsPaid)):Math.max(monthlyStagesPaid,confirmedPaymentsPaid,visual.key==="confirmed"?Number(reservation.net_value||0):0);
+      const currentMonthlyStage=reservationMonthlyStages.find((stage)=>!["paid","expired","cancelled"].includes(stage.status))
+        ||[...reservationMonthlyStages].reverse().find((stage)=>!["expired","cancelled"].includes(stage.status))||[...reservationMonthlyStages].reverse()[0]||null;
+      const allParticipantRows = participantsByReservation.get(reservation.id) || [];
+      const hasPixSplitParticipants=backendReservationHasPixSplit(reservation,allParticipantRows);
+      const participantRows = currentMonthlyStage
+        ? allParticipantRows.filter((participant)=>participant.monthly_payment_stage_id===currentMonthlyStage.id)
+        : allParticipantRows.filter((participant)=>!participant.monthly_payment_stage_id);
+      const participantById = new Map(participantRows.map((participant) => [participant.id, participant]));
+      const allInstallmentRows = installmentsByReservation.get(reservation.id) || [];
+      const installmentRows = currentMonthlyStage
+        ? allInstallmentRows.filter((installment)=>installment.monthly_payment_stage_id===currentMonthlyStage.id)
+        : allInstallmentRows.filter((installment)=>!installment.monthly_payment_stage_id);
+      const paymentParticipants = participantRows.map((participant) => ({
+        id:participant.id,
+        profileId:participant.profile_id,
+        name:monthlySplitDirectory.get(`${reservation.id}:${participant.profile_id}`)?.display_name || directory.get(participant.profile_id)?.display_name || (participant.profile_id === profileId ? backendRuntime.bootstrap?.profile?.display_name : "Membro do grupo"),
+        role:participant.payment_role || "pix_share",
+        amountDue:Number(participant.amount_due || 0),
+        amountPaid:Number(participant.amount_paid || 0),
+        status:participant.status || "pending",
+        manualSettlementMethod:participant.manual_settlement_method||"",
+        manualSettledAt:participant.manual_settled_at||"",
+        manualSettlementReference:participant.manual_settlement_reference||"",
+        manualSettlementNotes:participant.manual_settlement_notes||""
+      }));
+      const currentParticipant = paymentParticipants.find((participant) => participant.profileId === profileId);
+      const currentInstallment = installmentRows.find((installment) => participantById.get(installment.participant_id)?.profile_id === profileId);
+      const personalResponsible = !reservation.group_id ? paymentResponsibleDirectory.get(reservation.id) : null;
+      // Reuse the authorized directory only when the payment responsible IS the owner.
+      const personalOwnerName = reservation.user_id && personalResponsible?.profile_id === reservation.user_id ? personalResponsible.display_name : "";
+      const userName = reservation.user_name || (isCurrentUser ? backendRuntime.bootstrap?.profile?.display_name : directory.get(reservation.user_id)?.display_name) || personalOwnerName || "Usuário Tâmo On";
+      return {
+        id:reservation.public_code || reservation.id,
+        backendId:reservation.id,
+        backendOfficial:true,
+        backendStatus:reservation.status,
+        userId:reservation.user_id,
+        venueId,
+        venue:reservation.venue_name || venue?.name || "Estabelecimento",
+        space:reservation.space_name || spaces.get(reservation.venue_space_id)?.name || "Espaço",
+        user:userName,
+        date:first.date || "",
+        shortDate:first.shortDate || "",
+        time:first.time || "",
+        endTime:first.endTime || "",
+        value:Number(reservation.gross_value || 0),
+        bookingMode:reservation.booking_mode || "single",
+        monthly:reservation.booking_mode === "monthly",
+        occurrenceCount:occurrences.length,
+        occurrences,
+        allOccurrences,
+        statusKey:visual.key,
+        status:visual.label,
+        endpoint:visual.key === "confirmed" && payment ? (payment.metadata?.simulation ? "supabase.payment-simulator.confirmed" : `supabase.payments.${payment.status || "confirmed"}`) : `supabase.reservations.${reservation.status || "unknown"}`,
+        paymentStatus:reservation.status === "expired" ? "Prazo de pagamento encerrado" : rawMonthlyCycle
+          ? monthlyPaymentPresentation({backendStatus:reservation.status,financialClosedAt:reservation.financial_closed_at},rawMonthlyCycle).label
+          : visual.key === "confirmed" ? (payment?.metadata?.simulation ? "Pagamento confirmado · simulação staging" : "Pagamento confirmado") : visual.key === "pending" ? (reservation.payment_configured_at ? "Pagamento pendente" : "Defina o pagamento em Minhas reservas") : cancellationMode === "voucher" ? "Cancelada · voucher integral emitido" : cancellationMode === "refund" ? (reservation.status === "refunded" ? "Cancelada · reembolso concluído" : "Cancelada · reembolso pendente") : "Cancelada sem compensação financeira",
+        paymentDue:Number(reservation.payment_due || 0),
+        paymentConfigured:Boolean(reservation.payment_configured_at),
+        prebookingRevision:Number(reservation.prebooking_revision || 0),
+        paymentConfiguredAt:backendDateTimeLabel(reservation.payment_configured_at),
+        paymentMethod:reservation.payment_method || "",
+        paymentMethodLabel:reservation.payment_method ? paymentMethodLabel(reservation.payment_method) : "",
+        paymentProvider:reservation.payment_provider ? String(reservation.payment_provider).toUpperCase() : "",
+        paymentExpiresAt:reservation.payment_expires_at || "",
+        paymentIntentId:intent?.id || "",
+        paymentResponsibleId:reservation.payment_responsible_id || reservation.user_id,
+        paymentResponsibleName:paymentResponsibleDirectory.get(reservation.id)?.display_name || directory.get(reservation.payment_responsible_id || reservation.user_id)?.display_name || (reservation.payment_responsible_id === profileId ? backendRuntime.bootstrap?.profile?.display_name : userName),
+        paymentResponsibilityMode:reservation.payment_responsibility_mode || (reservation.split_pix ? "group_split" : "creator"),
+        monthlyCycleStatus:rawMonthlyCycle?.status||"",
+        financialClosedAt:reservation.financial_closed_at||"",
+        finalDueValue:reservation.final_due_value??null,
+        monthlyBalanceDueAt:rawMonthlyCycle?.balance_due_at||"",
+        monthlyCycleId:reservation.monthly_cycle_id || rawMonthlyCycle?.id || "",
+        monthlyCollectionMode:rawMonthlyCycle?.collection_mode||"legacy_staged",
+        monthlyGuaranteeRequired:Number(rawMonthlyCycle?.guarantee_required??rawMonthlyCycle?.initial_required??0),
+        monthlyGuaranteePaid:Number(rawMonthlyCycle?.guarantee_paid??rawMonthlyCycle?.initial_paid??0),
+        monthlyTotalPaid:Number(rawMonthlyCycle?.total_paid??actuallyPaid),
+        monthlyGuaranteeReached:Boolean(rawMonthlyCycle?.guarantee_reached_at||Number(rawMonthlyCycle?.total_paid||0)+0.009>=Number(rawMonthlyCycle?.guarantee_required||Infinity)),
+        monthlyGuaranteeReachedAt:rawMonthlyCycle?.guarantee_reached_at||"",
+        monthlyStageId:currentMonthlyStage?.id||"",
+        monthlyStage:currentMonthlyStage?.stage||"",
+        monthlyStageStatus:currentMonthlyStage?.status||"",
+        monthlyStageAmount:Number(currentMonthlyStage?.amount_required||0),
+        monthlyStageAvailableAt:currentMonthlyStage?.available_from||"",
+        monthlyStageDueAt:currentMonthlyStage?.due_at||"",
+        paymentParticipants,
+        currentUserPaymentRole:currentParticipant?.role || ((reservation.payment_responsible_id || reservation.user_id) === profileId ? "single_payer" : ""),
+        currentUserInstallmentId:currentInstallment?.id || "",
+        currentUserShareStatus:currentParticipant?.status || currentInstallment?.status || "",
+        pixSplit:Boolean(reservation.split_pix||hasPixSplitParticipants),
+        pixSplitMemberCount:hasPixSplitParticipants ? participantRows.filter((participant)=>participant.payment_role==="pix_share").length : 0,
+        voucher:voucherRow?.code || "",
+        voucherAppliedValue:Number(reservation.voucher_discount || voucherUsage?.consumed_value || voucherUsage?.reserved_value || 0),
+        promotionalVoucherId:["admin_promo","partner_promo"].includes(voucherRow?.origin) ? voucherRow.id : "",
+        groupId:reservation.group_id || "",
+        groupName:reservation.group_name || group?.name || (reservation.group_id ? "Grupo Tâmo On" : "Reserva pessoal"),
+        groupRole:reservation.group_role ? backendGroupRoleLabel(reservation.group_role) : isCurrentUser ? state.userGroups.find((item) => item.id === reservation.group_id)?.role || "" : "",
+        eventId:reservation.event_id || "",
+        event:event?.title || (reservation.group_id ? "Evento vinculado à reserva" : "Reserva pessoal · sem evento"),
+        eventMode:reservation.event_mode || "none",
+        eventPublicationStatus:!reservation.event_id && (reservation.status === "expired" || reservation.event_mode === "none") ? "none" : visual.key === "cancelled" ? (reservation.status === "expired" ? event?.status || reservation.event_publication_status || "standby_payment" : "cancelled") : (event?.status || reservation.event_publication_status || "standby_payment"),
+        cancellationPolicyAccepted:Boolean(reservation.cancellation_policy_accepted_at),
+        cancellationPolicyAcceptedAt:backendDateTimeLabel(reservation.cancellation_policy_accepted_at),
+        cancellationPolicyVersion:reservation.cancellation_policy_version || "marketplace-0.2.0",
+        amountPaid:actuallyPaid,
+        accountingRecognizedValue:visual.key === "confirmed" ? Number(reservation.net_value || 0) : 0,
+        fiscalObligationValue:visual.key === "confirmed" ? Number(reservation.net_value || 0) : 0,
+        slotReleased:visual.key === "cancelled",
+        paymentConfirmedAt:backendDateTimeLabel(payment?.paid_at || intent?.confirmed_at || reservation.confirmed_at),
+        paymentConfirmedAtIso:payment?.paid_at || intent?.confirmed_at || reservation.confirmed_at || "",
+        pushStatus:reservation.status === "expired" ? "Expiração registrada" : visual.key === "confirmed" ? "Notificação registrada no staging" : visual.key === "cancelled" ? "Cancelamento comunicado" : "Aguardando confirmação financeira",
+        createdAt:backendDateTimeLabel(reservation.created_at),
+        createdAtIso:reservation.created_at || "",
+        cancellationSource:cancellation?.requester_type || "",
+        cancellationMode,
+        cancellationReason:cancellation?.reason || "",
+        generatedVouchers,individualCancellationVouchers,
+        cancellationVoucherCount:Number(cancellation?.resolution_details?.voucher_count ?? generatedVouchers.length),
+        cancellationVoucherTotal:Number(cancellation?.resolution_details?.voucher_total ?? generatedVouchers.reduce((sum,v)=>sum+v.amount,0)),
+        voucherGeneratedId:generatedVoucher?.id || "",
+        voucherGeneratedCode:generatedVoucher?.code || "",
+        refundValue:Number(refundEntry?.amount || (cancellationMode === "refund" ? reservation.gross_value : 0) || 0),
+        refundStatus:refundEntry ? "pending" : "not_applicable",
+        refundFeePayer:cancellation?.resolution === "refund_required" ? cancellation.requester_type : "",
+        outsideDeadline:Boolean(cancellation && cancellation.requester_type === "user" && cancellation.within_deadline === false),
+        cancelledAt:backendDateTimeLabel(reservation.cancelled_at)
+      };
+    });
+
+    state.reservations.forEach((reservation)=>{if(reservation.eventMode==="none")reservation.event="Nenhum evento vinculado";});
+
+    const backendCollections = state.reservations.filter((reservation) => reservation.backendOfficial && (reservation.pixSplit||reservation.monthlyCollectionMode==="single_monthly_pool")).map((reservation) => {
+      const participantRows = reservation.monthlyStageId
+        ? (participantsByReservation.get(reservation.backendId)||[]).filter((participant)=>participant.monthly_payment_stage_id===reservation.monthlyStageId)
+        : (participantsByReservation.get(reservation.backendId)||[]).filter((participant)=>!participant.monthly_payment_stage_id);
+      const installmentRows = reservation.monthlyStageId
+        ? (installmentsByReservation.get(reservation.backendId)||[]).filter((installment)=>installment.monthly_payment_stage_id===reservation.monthlyStageId)
+        : (installmentsByReservation.get(reservation.backendId)||[]).filter((installment)=>!installment.monthly_payment_stage_id);
+      const participantById = new Map(participantRows.map((participant) => [participant.id, participant]));
+      const items = participantRows.map((participant) => {
+        const installment = installmentRows.find((item) => item.participant_id === participant.id);
+        const rawStatus=String(participant.status || installment?.status || "pending");
+        const status=["paid","confirmed"].includes(rawStatus)?"PAID":["cancelled","expired"].includes(rawStatus)?"CLOSED":"PENDING";
+        return {
+          participantId:participant.id,
+          memberId:participant.profile_id,
+          profileId:participant.profile_id,
+          memberName:monthlySplitDirectory.get(`${reservation.backendId}:${participant.profile_id}`)?.display_name || directory.get(participant.profile_id)?.display_name || (participant.profile_id === profileId ? backendRuntime.bootstrap?.profile?.display_name : "Membro do grupo"),
+          amount:Number(participant.amount_due || installment?.amount_due || 0),
+          amountPaid:Number(participant.amount_paid || installment?.amount_paid || 0),
+          status,
+          paymentIntentId:installment?.id || "",
+          installmentId:installment?.id || "",
+          txid:installment?.txid || "",
+          paymentRole:participant.payment_role||"pix_share",
+          manualSettlementMethod:participant.manual_settlement_method||"",
+          manualSettledAt:participant.manual_settled_at||"",
+          manualSettlementReference:participant.manual_settlement_reference||"",
+          manualSettlementNotes:participant.manual_settlement_notes||"",
+          own:participant.profile_id === profileId
+        };
+      });
+      const paidItems = items.filter((item) => item.status === "PAID");
+      return {
+        id:`OFFICIAL-${reservation.backendId}`,
+        backendOfficial:true,
+        reservationId:reservation.id,
+        groupId:reservation.groupId,
+        groupName:reservation.groupName,
+        venueId:reservation.venueId,
+        venue:reservation.venue,
+        amount:items.reduce((sum,item) => sum + item.amount, 0),
+        paidAmount:paidItems.reduce((sum,item) => sum + (item.amountPaid || item.amount), 0),
+        paidCount:paidItems.length,
+        memberCount:items.length,
+        status:reservation.statusKey==="cancelled"?"CLOSED":paidItems.length === items.length && items.length ? "SETTLED" : "PENDING",
+        items
+      };
+    });
+    state.pixCollections = [...state.pixCollections.filter((collection) => !collection.backendOfficial), ...backendCollections];
+
+    state.cancellationLog = (bootstrap?.cancellation_requests || []).map((request) => {
+      const reservation = state.reservations.find((item) => item.backendId === request.reservation_id);
+      const ledgerEntries = ledgerByReservation.get(request.reservation_id) || [];
+      const refund = ledgerEntries.find((entry) => entry.entry_type === "refund_required");
+      const generatedVoucher = request.resolution_details?.distribution==="individual" ? null : (cancellationVoucherByReservation.get(request.reservation_id)||[])[0];
+      return {
+        id:request.id,
+        backendOfficial:true,
+        source:request.requester_type,
+        mode:request.resolution === "voucher" ? "voucher" : request.resolution === "refund_required" ? "refund" : "no_compensation",
+        reservationId:reservation?.id || request.reservation_id,
+        reason:request.reason || "",
+        voucherCount:Number(request.resolution_details?.voucher_count || 0),
+        voucherTotal:Number(request.resolution_details?.voucher_total || 0),
+        voucherId:generatedVoucher?.id || "",
+        voucherCode:generatedVoucher?.code || "",
+        refundValue:Number(refund?.amount || 0),
+        feeResponsibility:request.resolution === "refund_required" ? request.requester_type : "",
+        outsideDeadline:request.within_deadline === false,
+        slotReleased:true,
+        eventId:reservation?.eventId || "",
+        createdAt:backendDateTimeLabel(request.created_at)
+      };
+    });
+
+    state.partnerReservations = [];
+    state.reservations.filter((reservation) => reservation.venueId === state.partnerProfile.venueId).forEach((reservation) => syncPartnerReservationFromUser(reservation));
+  }
+
+  function backendChatSenderLabel(message, reservation, profileId) {
+    if (message.sender_user_id === profileId) return "Você";
+    if (message.sender_type === "partner") return reservation?.venue ? `Equipe ${reservation.venue}` : "Equipe do parceiro";
+    if (message.sender_type === "admin") return "Administração Tâmo On";
+    return reservation?.user || "Usuário Tâmo On";
+  }
+
+  function syncChatsFromBackend(bootstrap) {
+    const profileId = backendRuntime.session?.user?.id || "";
+    const partnerIds = new Set((bootstrap?.partner_memberships || []).filter((item) => item.active !== false).map((item) => item.partner_id));
+    const effectiveStates = new Map((bootstrap?.chat_effective_state || []).map((item) => [item.id, item]));
+    const unreadCounts = new Map((bootstrap?.chat_unread || []).map((item) => [item.chat_id, Number(item.unread_count || 0)]));
+    const reservations = new Map(state.reservations.filter((item) => item.backendId).map((item) => [item.backendId, item]));
+    const messagesByChat = new Map();
+
+    (bootstrap?.chat_messages || []).filter((message) => !message.deleted_at).forEach((message) => {
+      if (!messagesByChat.has(message.chat_id)) messagesByChat.set(message.chat_id, []);
+      messagesByChat.get(message.chat_id).push(message);
+    });
+
+    state.chatThreads = (bootstrap?.chats || []).map((chat) => {
+      const reservation = reservations.get(chat.reservation_id);
+      if (!reservation) return null;
+      const effective = effectiveStates.get(chat.id) || chat;
+      const viewerSide = bootstrap?.preview?.active ? "partner" : chat.user_id === profileId ? "user" : partnerIds.has(chat.partner_id) ? "partner" : "admin";
+      const unread = unreadCounts.get(chat.id) || 0;
+      const messages = (messagesByChat.get(chat.id) || []).map((message) => ({
+        id:message.id,
+        backendId:message.id,
+        senderUserId:message.sender_user_id,
+        senderType:message.sender_type,
+        senderName:backendChatSenderLabel(message, reservation, profileId),
+        text:message.body,
+        createdAt:backendDateTimeLabel(message.created_at),
+        createdAtIso:message.created_at,
+        editedAt:backendDateTimeLabel(message.edited_at),
+        backendOfficial:true
+      })).sort((a,b) => String(a.createdAtIso || "").localeCompare(String(b.createdAtIso || "")));
+      return {
+        id:chat.id,
+        backendId:chat.id,
+        backendOfficial:true,
+        backendReservationId:chat.reservation_id,
+        reservationId:reservation.id,
+        partnerReservationId:partnerReservationForUserReservation(reservation.id)?.id || "",
+        venueId:reservation.venueId,
+        venue:reservation.venue,
+        user:reservation.user,
+        createdAt:backendDateTimeLabel(chat.created_at),
+        unlockedAt:backendDateTimeLabel(chat.unlocked_at),
+        unlockedAtIso:chat.unlocked_at,
+        readOnlyAt:backendDateTimeLabel(chat.read_only_at),
+        readOnlyAtIso:chat.read_only_at,
+        updatedAt:backendDateTimeLabel(chat.updated_at),
+        updatedAtIso:chat.updated_at,
+        effectiveStatus:effective.effective_status || chat.status || "locked",
+        status:chat.status || "locked",
+        viewerSide,
+        unread:{ user:viewerSide === "user" ? unreadChatAfterConfirmedReads(chat.id,messages,unread,profileId) : 0, partner:viewerSide === "partner" ? unreadChatAfterConfirmedReads(chat.id,messages,unread,profileId) : 0 },
+        lastReadAt:{ user:"", partner:"" },
+        messages
+      };
+    }).filter(Boolean).sort((a,b) => String(b.updatedAtIso || "").localeCompare(String(a.updatedAtIso || "")));
+  }
+
+  function syncPartnerDomainFromBackend(bootstrap) {
+    const membership = bootstrap?.preview?.active ? {partner_id:bootstrap.preview.partner_id,id:null} : bootstrap?.partner_memberships?.[0];
+    if (!membership) {
+      state.partnerProfile = { backendPartnerId:"", venueId:"", tradeName:"", photos:[], documents:[] };
+      state.partnerSpaces = [];
+      state.partnerTeam = [];
+      state.partnerClients = [];
+      return;
+    }
+    const partner = (bootstrap.partners || []).find((item) => item.id === membership.partner_id);
+    if (!partner) return;
+    const venue = (bootstrap.venues || []).find((item) => item.partner_id === partner.id) || null;
+    const spaces = venue ? (bootstrap.spaces || []).filter((item) => item.venue_id === venue.id).map(mapBackendSpace) : [];
+    const photos = venue ? (bootstrap.venue_photos || []).filter((item) => item.venue_id === venue.id).map(mapBackendPhoto) : [];
+    const favorite = photos.find((photo) => photo.favorite) || photos[0] || null;
+    const status = backendStatusLabel(partner.status);
+    if (state.partnerProfile.backendPartnerId !== partner.id) state.partnerProfile = {photos:[],documents:[]};
+    const p = state.partnerProfile;
+
+    Object.assign(p, {
+      backendPartnerId: partner.id,
+      onboardingVersion: Number(partner.onboarding_version || 0),
+      secondaryEmail: partner.secondary_email || "",
+      backendMembershipId: membership.id,
+      venueId: venue?.id || "",
+      backendVenueId: venue?.id || "",
+      tradeName: partner.trade_name || "",
+      legalName: partner.legal_name || "",
+      cnpj: partner.cnpj || "",
+      taxRegime: partner.tax_regime || "A informar",
+      declaredActivity: partner.declared_activity || "A informar",
+      municipalRegistration: partner.municipal_registration || "A informar",
+      responsibleName: partner.responsible_name || "A informar",
+      email: partner.email || "A informar",
+      phone: partner.phone || "A informar",
+      city: venue?.city || partner.city || "",
+      state: venue?.state || "PR",
+      street: venue?.street || "",
+      streetNumber: venue?.street_number || "",
+      address: [venue?.street, venue?.street_number].filter(Boolean).join(", ") || "A informar",
+      neighborhood: venue?.neighborhood || "A informar",
+      zip: venue?.zip || "A informar",
+      amenities: venue?.amenities || [],
+      contractStatus: partner.contract_status || "Não enviado",
+      termsStatus: partner.terms_status || "Pendente",
+      privacyStatus: partner.privacy_status || "Pendente",
+      fiscalIssuer: partner.fiscal_status || "A validar",
+      commissionRate: Number(partner.commission_rate || 0),
+      adminStatus: status,
+      photos,
+      favoritePhotoId: favorite?.id || "",
+      documents:backendPartnerDocuments(partner.id)
+    });
+    state.partnerSpaces = spaces;
+    state.partnerTeam = backendTeamMembers(partner.id);
+    state.partnerClients = (bootstrap.partner_clients || []).filter(c=>c.partner_id===partner.id).map(c=>({
+      id:c.id,backendId:c.id,backendOfficial:true,groupId:c.group_id,profileId:c.profile_id,groupName:c.group_name,
+      source:c.source,name:c.name,contact:c.contact,phone:c.phone,frequency:c.frequency,notes:c.notes,
+      lastBooking:c.last_booking?backendDateTimeLabel(c.last_booking):"—",reservationCount:Number(c.reservation_count||0),users:c.users||[]
+    }));
+
+    const adminRecord = {
+      id: partner.id,
+      backendPartnerId: partner.id,
+      applicationId: partner.application_id, onboardingVersion: Number(partner.onboarding_version || 0), secondaryEmail: partner.secondary_email || "",
+      venueId: venue?.id || "",
+      tradeName: partner.trade_name,
+      legalName: partner.legal_name,
+      cnpj: partner.cnpj,
+      city: partner.city,
+      spaces: Number(partner.spaces_count || spaces.length),
+      types: (partner.space_types || spaces.map((space) => space.type)).join(" · "),
+      status,
+      responsible: partner.responsible_name,
+      email: partner.email,
+      phone: partner.phone,
+      taxRegime: partner.tax_regime || "A informar",
+      activity: partner.declared_activity || "A informar",
+      contract: partner.contract_status,
+      terms: partner.terms_status,
+      privacy: partner.privacy_status,
+      fiscal: partner.fiscal_status,
+      banking: partner.banking_status,
+      commission: Number(partner.commission_rate || 0),
+      source: "Supabase staging",
+      score: 100
+    };
+    const adminIndex = state.adminPartners.findIndex((item) => item.backendPartnerId === partner.id || item.venueId === venue?.id);
+    if (adminIndex >= 0) state.adminPartners[adminIndex] = adminRecord;
+    else state.adminPartners.push(adminRecord);
+
+    if (venue) {
+      const current = state.venues.find((item) => item.id === venue.id) || {};
+      const mappedVenue = {
+        ...current,
+        id: venue.id,
+        backendVenueId: venue.id,
+        backendPartnerId: partner.id,
+        name: venue.name,
+        timezone: venue.timezone || "America/Sao_Paulo",
+        city: venue.city,
+        neighborhood: venue.neighborhood || "A informar",
+        distance: current.distance || "—",
+        rating: Number(venue.rating || 0),
+        reviews: Number(venue.reviews_count || 0),
+        ratingSource: "users",
+        types: [...new Set(spaces.filter((space) => space.status === "Ativo").map((space) => space.type))],
+        price: Math.min(...spaces.filter((space) => space.status === "Ativo" && space.price > 0).map((space) => space.price), Infinity),
+        address: [venue.street, venue.street_number, venue.neighborhood, venue.city, venue.zip].filter(Boolean).join(", "),
+        zip: venue.zip || "",
+        facadeImage: favorite?.src || "assets/preview-icon.svg",
+        facadeSource: favorite ? "supabase_storage" : "partner_upload_pending",
+        facadeTone: favorite?.tone || "dark",
+        facadeLuminance: favorite?.luminance ?? null,
+        gallery: photos,
+        amenities: venue.amenities || [],
+        published: Boolean(venue.published),
+        marketplacePublished: Boolean(venue.published && partner.status === "approved"),
+        partnerStatus: status,
+        schedule: current.schedule || []
+      };
+      if (!Number.isFinite(mappedVenue.price)) mappedVenue.price = 0;
+      const venueIndex = state.venues.findIndex((item) => item.id === venue.id);
+      if (venueIndex >= 0) state.venues[venueIndex] = mappedVenue;
+      else state.venues.push(mappedVenue);
+    }
+  }
+
+  function syncAdminPartnersFromBackend(bootstrap) {
+    state.adminPartners = (bootstrap?.partners || []).map((partner) => {
+      const venue = (bootstrap.venues || []).find((item) => item.partner_id === partner.id);
+      const spaces = (bootstrap.spaces || []).filter((item) => item.venue_id === venue?.id);
+      const application = (bootstrap.partner_applications || []).find((item) => item.id === partner.application_id);
+      const complete = [partner.trade_name, partner.legal_name, partner.cnpj, partner.city,
+        partner.responsible_name, partner.email, partner.phone, venue?.street, spaces.length,
+        (bootstrap.partner_documents || []).some((item) => item.partner_id === partner.id)].filter(Boolean).length;
+      return {
+        id:partner.id, backendPartnerId:partner.id, applicationId:partner.application_id,
+        onboardingVersion:Number(partner.onboarding_version || 0), secondaryEmail:partner.secondary_email || "",
+        venueId:venue?.id || "", tradeName:partner.trade_name || "", legalName:partner.legal_name || "",
+        cnpj:partner.cnpj || "", city:partner.city || "", spaces:Number(partner.spaces_count ?? spaces.length),
+        types:(partner.space_types || []).join(" · "), status:backendStatusLabel(partner.status),
+        responsible:partner.responsible_name || "", email:partner.email || "", phone:partner.phone || "",
+        taxRegime:partner.tax_regime || "A informar", activity:partner.declared_activity || "A informar",
+        contract:partner.contract_status || "Não enviado", terms:partner.terms_status || "Pendente",
+        privacy:partner.privacy_status || "Pendente", fiscal:partner.fiscal_status || "A validar",
+        banking:partner.banking_status || "Não informado", commission:Number(partner.commission_rate || 0),
+        source:partner.application_id ? "Solicitação pelo app" : "Cadastro administrativo",
+        requestedAt:backendDateTimeLabel(application?.created_at || partner.created_at), score:(()=>{ const steps=(bootstrap.partner_onboarding || []).find(x=>x.partner_id===partner.id && x.flow==="22x")?.steps; return steps?.length ? Math.round(100*steps.filter(x=>x.done).length/steps.length) : complete*10; })()
+      };
+    });
+  }
+
+  function chooseBackendRole(bootstrap) {
+    const userId = backendRuntime.session?.user?.id || "";
+    if(bootstrap?.preview?.active){backendRuntime.identityId=userId;state.role="partner";return;}
+    const isNewIdentity = backendRuntime.identityId !== userId;
+    backendRuntime.identityId = userId;
+    const allowed = backendAllowedRoles();
+    if (isNewIdentity) partnerInterestDraft = null;
+    if (!isNewIdentity && allowed.has(state.role)) return;
+    state.role = bootstrap?.is_admin ? "admin" : bootstrap?.partner_memberships?.length ? "partner" : "user";
+  }
+
+  function monthlyPaymentPresentation(reservation = {}, suppliedCycle = null) {
+    const cycle=suppliedCycle||(state.monthlyCycles||[]).find(item=>item.id===reservation.monthlyCycleId)||{};
+    const f=reservation.financialSummary||{};
+    const status=cycle.status||reservation.monthlyCycleStatus||"";
+    const total=Number(f.contracted_value??cycle.monthlyTotal??cycle.monthly_total??reservation.paymentDue??reservation.value??0);
+    const paid=Number(f.received_net??cycle.totalPaid??cycle.total_paid??reservation.monthlyTotalPaid??reservation.amountPaid??0);
+    const minimum=Number(cycle.guaranteeRequired??cycle.guarantee_required??cycle.initialRequired??cycle.initial_required??reservation.monthlyGuaranteeRequired??0);
+    const closed=f.financial_closed===true||Boolean(reservation.financialClosedAt)||["suspended","cancelled","completed"].includes(status)
+      ||["cancelled","expired","refund_pending","refunded"].includes(reservation.backendStatus);
+    const balance=closed?0:Math.max(0,Number(f.balance_pending??(total-paid)));
+    const full=!closed&&(total>0||status==="fully_paid")&&Math.round(paid*100)>=Math.round(total*100)&&Math.round(balance*100)===0;
+    const minimumReached=minimum>0&&Math.round(paid*100)>=Math.round(minimum*100);
+    const label=closed?(status==="cancelled"?"Ciclo cancelado · sem saldo a pagar":"Ciclo encerrado · sem saldo a pagar")
+      :full?"Mensal garantido · integralmente quitado":minimumReached?"Mínimo atingido · saldo pendente":"Mínimo inicial pendente";
+    return {closed,full,minimumReached,total,paid,minimum,balance,label,
+      finalDue:f.final_due_value??reservation.finalDueValue??null,
+      dueAt:cycle.balanceDueAt||cycle.balance_due_at||reservation.monthlyBalanceDueAt||""};
+  }
+
+  function monthlyCollectionNotice(reservation) {
+    const view=monthlyPaymentPresentation(reservation);
+    const body=view.closed?"O ciclo foi encerrado. Não há saldo restante a cobrar; os pagamentos válidos permanecem no histórico."
+      :view.full?"O valor integral foi pago. As datas ativas do mensal estão confirmadas para o grupo."
+      :view.minimumReached?`O mínimo de ${money(view.minimum)} foi atingido para liberar os primeiros eventos cobertos. O saldo de ${money(view.balance)} permanece nas cotas não pagas até o vencimento.`
+      :`Os pagamentos são somados. O mínimo de ${money(view.minimum)} libera os primeiros eventos cobertos; a quitação integral confirma o mensal completo.`;
+    return `<div class="callout ${view.full?"monthly-guarantee-ok":""}"><strong>${esc(view.label)}</strong><p>${body}</p></div>`;
+  }
+
+  function monthlyCycleStatusLabel(status) {
+    return ({pending_acceptance:"Aguardando aceite do grupo",pre_reserved:"Pré-reservado para o grupo",
+      awaiting_initial:"Mínimo inicial pendente",initial_confirmed:"Mínimo atingido",
+      awaiting_full:"Mínimo atingido · saldo pendente",fully_paid:"Mensal garantido · integralmente quitado",suspended:"Vínculo suspenso",
+      cancelled:"Cancelado",completed:"Concluído"})[status] || "Ciclo mensalista";
+  }
+
+  function monthlyLinkRequestStatusLabel(status) {
+    return ({pending_partner:"Aguardando parceiro",in_conversation:"Em conversa",proposal_sent:"Proposta recebida",converted:"Vínculo aceito",rejected:"Não aprovado",cancelled:"Cancelada",expired:"Expirada"})[status]||"Solicitação mensalista";
+  }
+
+  function occurrenceTransferStatusLabel(status) {
+    return ({
+      requested:"Aguardando análise do parceiro",
+      awaiting_group_choice:"Aguardando escolha do cliente",
+      proposed:"Nova data aguardando aceite",
+      accepted:"Remarcação concluída",
+      declined:"Pedido não aprovado",
+      refund_selected:"Restituição integral solicitada",
+      cancelled:"Pedido cancelado"
+    })[status]||"Remarcação mensalista";
+  }
+
+  function occurrenceTransferStatusClass(status) {
+    if(status==="accepted")return "status-ok";
+    if(["declined","refund_selected","cancelled"].includes(status))return "status-neutral";
+    return "status-warning";
+  }
+
+  function partnerMonthlyLinkRequestStatusLabel(status) {
+    return ({pending_partner:"Nova solicitação",in_conversation:"Em conversa",proposal_sent:"Proposta enviada",converted:"Vínculo aceito",rejected:"Recusada",cancelled:"Cancelada pelo grupo",expired:"Expirada"})[status]||"Solicitação mensalista";
+  }
+
+  function monthlyPeriodLabel(value) {
+    const normalized=String(value||"");
+    return normalized.length>=7?`${normalized.slice(5,7)}/${normalized.slice(0,4)}`:"Período não informado";
+  }
+
+  function syncMonthlyCustomersFromBackend(bootstrap) {
+    const groups=new Map((bootstrap?.groups||[]).map((item)=>[item.id,item]));
+    const venues=new Map((bootstrap?.venues||[]).map((item)=>[item.id,item]));
+    const spaces=new Map((bootstrap?.spaces||[]).map((item)=>[item.id,item]));
+    const monthlyDirectory=new Map((bootstrap?.monthly_customer_link_directory||[]).map((item)=>[item.monthly_link_id,item]));
+    const cycles=bootstrap?.monthly_cycles||[];
+    const stages=bootstrap?.monthly_payment_stages||[];
+    state.monthlyCustomerLinks=(bootstrap?.monthly_customer_links||[]).map((link)=>({
+      id:link.id,partnerId:link.partner_id,venueId:link.venue_id,spaceId:link.venue_space_id,groupId:link.group_id,customerProfileId:link.customer_profile_id||"",
+      groupName:monthlyDirectory.get(link.id)?.group_name||groups.get(link.group_id)?.name||(link.group_id?"Grupo Tâmo On":"Reserva pessoal"),
+      venueName:monthlyDirectory.get(link.id)?.venue_name||venues.get(link.venue_id)?.name||"Estabelecimento",
+      spaceName:monthlyDirectory.get(link.id)?.space_name||spaces.get(link.venue_space_id)?.name||"Espaço",weekday:Number(link.weekday),startTime:String(link.start_time||"").slice(0,5),
+      endTime:String(link.end_time||"").slice(0,5),monthlyPrice:Number(link.monthly_price||0),initialGuaranteePercent:Number(link.initial_guarantee_percent||30),
+      startMonth:link.start_month,endMonth:link.end_month||"",origin:link.origin,status:link.status,acceptedAt:link.accepted_at||"",
+      requireRenewalConfirmation:Boolean(link.require_renewal_confirmation),suspensionReason:link.suspension_reason||"",backendOfficial:true
+    }));
+    state.monthlyCycles=cycles.map((cycle)=>{
+      const link=state.monthlyCustomerLinks.find((item)=>item.id===cycle.monthly_link_id);
+      return {id:cycle.id,monthlyLinkId:cycle.monthly_link_id,groupId:link?.groupId||"",customerProfileId:link?.customerProfileId||"",groupName:link?.groupName||"Reserva pessoal",
+        venueName:link?.venueName||"Estabelecimento",spaceName:link?.spaceName||"Espaço",serviceMonth:cycle.service_month,
+        status:cycle.status,statusLabel:monthlyCycleStatusLabel(cycle.status),reservationId:cycle.reservation_id||"",
+        paymentAvailableAt:cycle.payment_available_at,firstOccurrenceAt:cycle.first_occurrence_at,initialDueAt:cycle.initial_due_at,
+        balanceDueAt:cycle.balance_due_at,monthlyTotal:Number(cycle.monthly_total||0),initialRequired:Number(cycle.initial_required||0),
+        balanceRequired:Number(cycle.balance_required||0),initialPaid:Number(cycle.initial_paid||0),balancePaid:Number(cycle.balance_paid||0),
+        collectionMode:cycle.collection_mode||"legacy_staged",guaranteeRequired:Number(cycle.guarantee_required??cycle.initial_required??0),
+        guaranteePaid:Number(cycle.guarantee_paid??cycle.initial_paid??0),totalPaid:Number(cycle.total_paid??(Number(cycle.initial_paid||0)+Number(cycle.balance_paid||0))),
+        guaranteeReachedAt:cycle.guarantee_reached_at||"",
+        occurrenceCount:Number(cycle.occurrence_count||0),renewalConfirmedAt:cycle.renewal_confirmed_at||"",
+        stages:stages.filter((stage)=>stage.monthly_cycle_id===cycle.id),link,backendOfficial:true};
+    });
+    state.monthlyLinkRequests=(bootstrap?.monthly_link_requests||[]).map((request)=>({
+      id:request.request_id,requesterProfileId:request.requester_profile_id,requesterName:request.requester_name||"Usuário Tâmo On",
+      partnerId:request.partner_id,venueId:request.venue_id,spaceId:request.venue_space_id,groupId:request.group_id,
+      groupName:request.group_name||"Grupo Tâmo On",venueName:request.venue_name||"Estabelecimento",spaceName:request.space_name||"Espaço",
+      requestedStartMonth:request.requested_start_month,weekday:Number(request.weekday),startTime:String(request.start_time||"").slice(0,5),
+      endTime:String(request.end_time||"").slice(0,5),initialMessage:request.initial_message||"",status:request.status,
+      proposedMonthlyPrice:Number(request.proposed_monthly_price||0),proposedStartMonth:request.proposed_start_month||"",
+      proposedRequireRenewalConfirmation:Boolean(request.proposed_require_renewal_confirmation),monthlyLinkId:request.monthly_link_id||"",
+      partnerResponse:request.partner_response||"",proposedAt:request.proposed_at||"",createdAt:request.created_at||"",updatedAt:request.updated_at||"",
+      canManageAsGroup:Boolean(request.can_manage_as_group),canManageAsPartner:Boolean(request.can_manage_as_partner),backendOfficial:true
+    }));
+    state.monthlyLinkNotifications=(bootstrap?.notifications||[])
+      .filter((notification)=>notification.entity_type==="monthly_link_request")
+      .map((notification)=>({
+        id:notification.id,requestId:notification.entity_id||notification.data?.request_id||"",
+        type:notification.type,title:notification.title||"Atualização mensalista",body:notification.body||"",
+        targetArea:notification.data?.target_area||"",status:notification.status||"unread",
+        createdAt:notification.created_at||"",readAt:notification.read_at||""
+      }));
+  }
+
+  function mapOccurrenceTransferRequest(request) {
+      const reservation=state.reservations.find((item)=>item.backendId===request.reservation_id);
+      const timezone=state.venues.find((item)=>item.id===reservation?.venueId)?.timezone||"America/Sao_Paulo";
+      const originalStart=backendZonedDateTime(request.original_starts_at,timezone);
+      const originalEnd=backendZonedDateTime(request.original_ends_at,timezone);
+      const targetStart=request.target_starts_at?backendZonedDateTime(request.target_starts_at,timezone):null;
+      const targetEnd=request.target_ends_at?backendZonedDateTime(request.target_ends_at,timezone):null;
+      return {
+        id:request.request_id,reservationBackendId:request.reservation_id,reservationId:request.reservation_code||reservation?.id||"",
+        originalOccurrenceId:request.original_occurrence_id,replacementOccurrenceId:request.replacement_occurrence_id||"",
+        targetScheduleSlotId:request.target_schedule_slot_id||"",requestedByType:request.requested_by_type,
+        proposalRevision:Number(request.proposal_revision||0),hasCustomerReply:Boolean(request.has_customer_reply),
+        originalDurationMinutes:Math.round((Date.parse(request.original_ends_at)-Date.parse(request.original_starts_at))/60000),
+        targetDurationMinutes:request.target_starts_at&&request.target_ends_at?Math.round((Date.parse(request.target_ends_at)-Date.parse(request.target_starts_at))/60000):0,
+        reason:request.reason||"",status:request.status,statusLabel:occurrenceTransferStatusLabel(request.status),
+        originalDate:originalStart?.date||"",originalTime:originalStart?.time||"",originalEndTime:backendEndTime(originalStart,originalEnd),
+        targetDate:targetStart?.date||"",targetTime:targetStart?.time||"",targetEndTime:backendEndTime(targetStart,targetEnd),
+        value:Number(request.allocated_value||0),groupId:request.group_id,groupName:request.group_name||reservation?.groupName||"Grupo Tâmo On",
+        partnerId:request.partner_id,venueName:request.venue_name||reservation?.venue||"Estabelecimento",
+        spaceName:request.space_name||reservation?.space||"Espaço",requestedByName:request.requested_by_name||"",
+        proposedByName:request.proposed_by_name||"",resolutionNotes:request.resolution_notes||"",
+        canManageAsGroup:Boolean(request.can_manage_as_group),canManageAsPartner:Boolean(request.can_manage_as_partner),
+        createdAt:request.created_at||"",updatedAt:request.updated_at||"",backendOfficial:true
+      };
+  }
+
+  function syncOccurrenceTransfersFromBackend(bootstrap) {
+    state.occurrenceTransfers=(bootstrap?.occurrence_transfer_requests||[]).map(mapOccurrenceTransferRequest);
+    state.occurrenceTransferNotifications=(bootstrap?.notifications||[])
+      .filter((notification)=>notification.entity_type==="occurrence_transfer"||(!/chat/i.test(notification.type||"")
+        &&(notification.entity_type==="reservation"||(["monthly_customer_link","monthly_cycle"].includes(notification.entity_type)&&notification.data?.reservation_id))))
+      .map((notification)=>({
+        id:notification.id,requestId:notification.entity_type==="occurrence_transfer"?(notification.entity_id||notification.data?.transfer_request_id||""):"",
+        reservationId:notification.entity_type==="reservation"?notification.entity_id:(notification.data?.reservation_id||""),
+        type:notification.type,title:notification.title||"Atualização da reserva",
+        body:notification.body||"",status:notification.status||"unread",
+        createdAt:notification.created_at||"",readAt:notification.read_at||""
+      }));
+  }
+
+  function syncFinancialReconciliationFromBackend(bootstrap) {
+    state.financialReconciliation=(bootstrap?.financial_reconciliation||[]).map((item)=>({
+      partnerId:item.partner_id,
+      partnerName:item.partner_name||"Parceiro",
+      recognizedReservations:Number(item.recognized_reservations||0),
+      grossValue:Number(item.gross_value||0),
+      voucherDiscount:Number(item.voucher_discount||0),
+      commissionBase:Number(item.commission_base||0),
+      commissionRate:Number(item.commission_rate||0),
+      asaasProcessed:Number(item.asaas_processed||0),
+      externalReceived:Number(item.external_received||0),
+      asaasPixCount:Number(item.asaas_pix_count||0),
+      asaasCardCount:Number(item.asaas_card_count||0),
+      asaasFeeEstimated:Number(item.asaas_fee_estimated||0),
+      commissionTotal:Number(item.commission_total||0),
+      commissionRetained:Number(item.commission_retained||0),
+      commissionPending:Number(item.commission_pending||0),
+      asaasPartnerPayout:Number(item.asaas_partner_payout||0),
+      contractedValue:Number(item.contracted_value||0),
+      finalDueValue:Number(item.final_due_value||0),
+      cancelledValue:Number(item.cancelled_value||0),
+      receivedTotal:Number(item.received_total||0),
+      receivedNet:Number(item.received_net||0),
+      refundCompleted:Number(item.refund_completed||0),
+      refundPending:Number(item.refund_pending||0),
+      balancePending:Number(item.balance_pending||0),
+      liquidatedValue:Number(item.liquidated_value||0),
+      unliquidatedValue:Number(item.unliquidated_value||0),
+      asaasPixValue:Number(item.asaas_pix_value||0),
+      asaasCardValue:Number(item.asaas_card_value||0),
+      asaasBlocked:Number(item.asaas_blocked||0),
+      asaasBlockedReview:Number(item.asaas_blocked_review||0),
+      blockedReview:Number(item.blocked_review||0),
+      asaasBlockedPartial:Number(item.asaas_blocked_partial||0),
+      blockedPartial:Number(item.blocked_partial||0),
+      asaasBlockedExcess:Number(item.asaas_blocked_excess||0),
+      blockedExcess:Number(item.blocked_excess||0),
+      asaasBlockedResolution:Number(item.asaas_blocked_resolution||0),
+      blockedResolution:Number(item.blocked_resolution||0),
+      asaasBlockedRefund:Number(item.asaas_blocked_refund||0),
+      blockedRefund:Number(item.blocked_refund||0),
+      asaasAwaitingCredit:Number(item.asaas_awaiting_credit||0),
+      asaasFeeTotal:Number(item.asaas_fee_total||0),
+      commissionProvisional:Number(item.commission_provisional||0),
+      partnerPaid:Number(item.partner_paid||0),
+      commissionSettled:Number(item.commission_settled||0),
+      reservationBreakdown:item.reservations||[],
+      backendOfficial:true
+    }));
+  }
+
+  function monthlyCycleForSlot(slot) {
+    return state.monthlyCycles?.find((cycle)=>cycle.id===slot?.backendMonthlyCycleId)||null;
+  }
+
+  function syncAdminUsersFromBackend(bootstrap) {
+    state.adminUsers=(bootstrap?.is_admin===true&&!bootstrap?.preview?.active?bootstrap.admin_users||[]:[]).map(user=>({
+      id:user.id,backendId:user.id,name:user.display_name||user.email||"Usuário",email:user.email||"",city:user.city||"—",
+      groups:Number(user.groups_count||0),reservations:Number(user.reservations_count||0),createdAt:backendDateTimeLabel(user.created_at),
+      status:({active:"Ativo",blocked:"Bloqueado",pending:"Pendente"})[user.status]||user.status,
+      protected:Boolean(user.protected),statusHistory:user.status_history||[]
+    }));
+  }
+
+  let notificationReadIdentity = "";
+  const confirmedNotificationReads = new Map();
+  const notificationReadRequests = new Map();
+  const confirmedChatMessages = new Map();
+  const chatReadRequests = new Map();
+  let monthlyConversationEpoch = 0;
+
+  function notificationReadContext(identity = backendRuntime.identityId) {
+    if(!identity || identity!==backendRuntime.identityId || identity!==window.MarketplaceBackend?.session?.user?.id || partnerReadonlyActive())return false;
+    if(notificationReadIdentity!==identity){
+      notificationReadIdentity=identity;
+      confirmedNotificationReads.clear();notificationReadRequests.clear();
+      confirmedChatMessages.clear();chatReadRequests.clear();
+    }
+    return true;
+  }
+
+  function reconcileNotificationReads(bootstrap) {
+    if(!notificationReadContext(bootstrap?.profile?.id))return;
+    for(const list of [bootstrap.notifications,bootstrap.community_marketplace_notifications])for(const row of list||[]){
+      if(row.profile_id!==notificationReadIdentity)continue;
+      if(row.status==="read")confirmedNotificationReads.set(row.id,row.read_at||new Date().toISOString());
+      const readAt=confirmedNotificationReads.get(row.id);
+      if(readAt){row.status="read";row.read_at=readAt;}
+    }
+  }
+
+  function confirmNotificationReads(ids, identity = backendRuntime.identityId) {
+    if(!notificationReadContext(identity))return false;
+    const selected=new Set(ids||[]),readAt=new Date().toISOString();
+    for(const id of selected)confirmedNotificationReads.set(id,readAt);
+    const lists=[state.personalNotifications,state.monthlyLinkNotifications,state.occurrenceTransferNotifications,
+      state.communityMarketplaceNotifications,backendRuntime.bootstrap?.notifications,backendRuntime.bootstrap?.community_marketplace_notifications];
+    for(const list of lists)for(const row of list||[])if(selected.has(row.id)){
+      row.status="read";row.read_at=readAt;row.readAt=readAt;
+    }
+    return true;
+  }
+
+  function renderNotificationReadState() {
+    render();
+    if(detailDialog.open&&detailDialog.dataset.view==="notifications")openNotificationInbox();
+  }
+
+  async function persistNotificationReads(notificationIds) {
+    const identity=backendRuntime.identityId;
+    if(!notificationReadContext(identity))return false;
+    const ids=[...new Set(notificationIds||[])].filter(id=>(state.personalNotifications||[]).some(row=>row.id===id&&row.profile_id===identity));
+    const pending=ids.filter(id=>!confirmedNotificationReads.has(id)&&!notificationReadRequests.has(id));
+    if(pending.length){
+      const task=(async()=>{
+        try{
+          const rows=await window.MarketplaceBackend.markReservationNotificationsRead(pending);
+          if(!notificationReadContext(identity))return false;
+          const requested=new Set(pending),saved=(rows||[]).map(row=>row.id).filter(id=>requested.has(id));
+          confirmNotificationReads(saved,identity);renderNotificationReadState();
+          if(saved.length!==pending.length)throw Error("Não foi possível confirmar a leitura de todos os avisos. Abra a atualização novamente.");
+          return true;
+        }catch(error){if(identity===backendRuntime.identityId)showToast(backendErrorMessage(error));return false;}
+        finally{for(const id of pending)if(notificationReadRequests.get(id)===task)notificationReadRequests.delete(id);}
+      })();
+      for(const id of pending)notificationReadRequests.set(id,task);
+    }
+    const results=await Promise.all([...new Set(ids.map(id=>notificationReadRequests.get(id)).filter(Boolean))]);
+    return results.every(Boolean)&&notificationReadContext(identity)&&ids.every(id=>confirmedNotificationReads.has(id));
+  }
+
+  function mergeNotificationRealtime(change) {
+    const row=change?.payload?.new;
+    if(change?.table!=="notifications"||row?.status!=="read"||row.profile_id!==backendRuntime.identityId)return;
+    if(confirmNotificationReads([row.id]))renderNotificationReadState();
+  }
+
+  function unreadChatAfterConfirmedReads(chatId, messages, count, identity) {
+    if(!notificationReadContext(identity))return count;
+    const seen=confirmedChatMessages.get(chatId);
+    if(!seen)return count;
+    const remaining=(messages||[]).filter(message=>message.senderUserId!==identity&&!seen.has(message.backendId||message.id)).length;
+    return Math.min(count,remaining);
+  }
+
+  function syncStateFromBackend(bootstrap) {
+    reconcileNotificationReads(bootstrap);
+    chooseBackendRole(bootstrap);
+    syncIdentityFromBackend(bootstrap);
+    operationalAlerts.setProfile(backendRuntime.identityId);
+    state.personalNotifications=(bootstrap?.notifications||[]).filter((item)=>bootstrap?.preview?.active || item.profile_id===backendRuntime.identityId);
+    if(!bootstrap?.preview?.active)operationalAlerts.ingest(personalNotificationsForRole());
+    syncMarketplaceCatalogFromBackend(bootstrap);
+    syncPartnerDomainFromBackend(bootstrap);
+    syncAdminPartnersFromBackend(bootstrap);
+    syncAdminUsersFromBackend(bootstrap);
+    syncCommunityFromBackend(bootstrap);
+    syncReservationsFromBackend(bootstrap);
+    syncMonthlyCustomersFromBackend(bootstrap);
+    syncOccurrenceTransfersFromBackend(bootstrap);
+    syncFinancialReconciliationFromBackend(bootstrap);
+    const financialStatuses=new Map((bootstrap?.reservation_financial_status||[]).map((item)=>[item.reservation_id,item]));
+    state.reservations.forEach((reservation)=>{
+      const f=financialStatuses.get(reservation.backendId);
+      if(f){reservation.financialSummary=f;reservation.amountPaid=Number(f.received_net||0);
+        reservation.accountingRecognizedValue=Number(f.liquidated_value||0);reservation.fiscalObligationValue=Number(f.liquidated_value||0);}
+      if(reservation.monthlyCycleId)reservation.paymentStatus=monthlyPaymentPresentation(reservation).label;
+    });
+    (state.monthlyCycles||[]).forEach(cycle=>{
+      const reservation=state.reservations.find(item=>item.backendId===cycle.reservationId);
+      if(reservation)cycle.statusLabel=monthlyPaymentPresentation(reservation,cycle).label;
+    });
+    syncVouchersFromBackend(bootstrap);
+    syncChatsFromBackend(bootstrap);
+    updateBackendRoleAccess();
+    saveState();
+  }
+
+  function backendErrorMessage(error) {
+    if(String(error?.message||error).includes("AGENDA_INITIAL_"))return window.MarketplaceAgendaInitial.errorMessage(error);
+    const message = String(error?.message || error || "");
+    if(/PREBOOKING_DETAILS_STALE/.test(message))return "Os dados da reserva mudaram. Feche esta janela e abra novamente para conferir o grupo e os participantes antes de continuar.";
+    if(/PREBOOKING_EDIT_PAYMENT_LOCKED/.test(message))return "O pagamento já foi configurado. Os dados da reserva estão bloqueados para alteração.";
+    if(/PREBOOKING_EDIT_CLOSED/.test(message))return "Esta pré-reserva não está mais disponível para edição. Confira a situação atual em Minhas reservas.";
+    if(/PREBOOKING_EDIT_FORBIDDEN|PREBOOKING_GROUP_FORBIDDEN/.test(message))return "Confira sua permissão para reservar pelo grupo. Apenas o titular pode alterar os dados da pré-reserva.";
+    if(/PREBOOKING_EVENT_INVALID/.test(message))return "O evento não está mais disponível para este grupo e horário. Abra novamente a edição para escolher outro evento ou reservar sem evento.";
+    if(/PREBOOKING_EVENT_LOCKED/.test(message))return "O evento vinculado já foi alterado ou publicado. Confira o vínculo antes de continuar.";
+    if(/PREBOOKING_EDIT_SINGLE_ONLY/.test(message))return "Esta edição está disponível para pré-reservas avulsas. O vínculo mensalista tem regras próprias.";
+    if(/REFUND_FORBIDDEN/.test(message))return "Você não tem permissão financeira para esta reserva.";
+    if(/REFUND_SCOPE_UNSUPPORTED|REFUND_PAYMENT_REVIEW_REQUIRED/.test(message))return "Esta reserva exige conferência antes do reembolso. A ação disponível atende ao Pix integral avulso, sem rateio ou crédito de cancelamento utilizado.";
+    if(/REFUND_SANDBOX_REQUIRED|REFUND_API_KEY_REQUIRED/.test(message))return "A integração de reembolso Sandbox precisa ser conferida pela administração.";
+    if(/PIX_PAYER_INVALID/.test(message))return "Confira o nome completo e informe um CPF ou CNPJ válido.";
+    if(/PIX_CUSTOMER_REJECTED|PIX_CUSTOMER_INVALID|PIX_CUSTOMER_REVIEW_REQUIRED/.test(message))return "Não foi possível confirmar os dados do pagador no Asaas. Confira o cadastro antes de tentar novamente.";
+    if(/PIX_MAINTENANCE_UNAVAILABLE/.test(message))return "O Pix está temporariamente indisponível. Aguarde a verificação do serviço de pagamentos.";
+    if(/PIX_PAYMENT_WINDOW_TOO_SHORT/.test(message))return "O prazo da reserva está terminando. Não há tempo suficiente para gerar outro pagamento.";
+    if(/PIX_LEGACY_CHECKOUT_REVIEW_REQUIRED/.test(message))return "Esta reserva tem uma cobrança anterior que precisa ser conferida. Nenhum novo Pix foi gerado.";
+    if(/ASAAS_PIX_|PIX_QR_INVALID/.test(message))return "Não foi possível apresentar o Pix agora. Reabra o pagamento para consultar a mesma cobrança.";
+    if(message==="ASAAS_COMMUNICATION_BUSY")return "Aguarde a comunicação com o Asaas que está em andamento.";
+    if(message==="ASAAS_COMMUNICATION_TIMEOUT")return "O Asaas ainda não confirmou o resultado. A solicitação não será reenviada automaticamente. Consulte a situação do pagamento antes de tentar novamente.";
+    if(/REFUND_/.test(message))return "Não foi possível confirmar o resultado da devolução. O acompanhamento automático verificará o status antes de liberar outra solicitação.";
+    if(message.includes("PARTNER_ACCESS_RESTRICTED"))return "Acesso Restrito. Sua conta não tem autorização para esta função.";
+    if(message.includes("MARKETPLACE_ACCOUNT_BLOCKED"))return "Sua conta está bloqueada. Entre em contato com o suporte.";
+    if(/PARTNER_PREVIEW_READ_ONLY/.test(message))return "Somente leitura. Nenhum dado foi alterado.";
+    if(/PARTNER_PREVIEW_FORBIDDEN/.test(message))return "Esta visualização é exclusiva da conta administradora autorizada.";
+    if(/PREVIEW_CONTEXT_CHANGED/.test(message))return "A visualização mudou. Atualizando os dados.";
+    if (/Cancele a cobranca online|Cobranca emitida exige cancelamento/.test(message)) return "Já existe uma cobrança emitida no Asaas. Cancele-a e aguarde a confirmação antes de registrar o pagamento externo.";
+    if (/ASAAS_PARTNER_ACCOUNT_REQUIRED|ASAAS_ISSUER_KEY_REQUIRED|ASAAS_ACCOUNTS_INVALID|ASAAS_PARTNER_ACCOUNT_MISMATCH|ASAAS_PARTNER_KEY_MISMATCH|ASAAS_COMMISSION_WALLET_MISMATCH/.test(message)) return "A conta de recebimento do parceiro precisa ser configurada ou conferida pela administração.";
+    if (/ASAAS_SANDBOX_DISABLED|ASAAS_NOT_CONFIGURED|ASAAS_MODE_CONFLICT/.test(message)) return "O Sandbox de pagamentos ainda não foi configurado. Avise a administração.";
+    if (/ASAAS_FIRST_TEST_SCOPE|ASAAS_CHECKOUT_SCOPE/.test(message)) return "Esta etapa do Sandbox aceita reservas avulsas com cartão integral, Pix integral ou Pix por cotas. Mensalistas serão habilitados em uma próxima etapa.";
+    if (/CHECKOUT_CONFIGURATION_LOCKED/.test(message)) return "Já existe uma cobrança iniciada para esta reserva. A forma de pagamento e as cotas ficam preservadas até a conferência dessa cobrança.";
+    if (/CHECKOUT_BINDING_MISMATCH/.test(message)) return "A cobrança precisa de conferência antes de continuar. Nenhum novo pagamento foi emitido.";
+    if (/CHECKOUT_MINIMUM_WINDOW/.test(message)) return "Não há tempo suficiente para abrir um novo checkout. Este teste exige mais de 10 minutos restantes no prazo da pré-reserva.";
+    if (/CHECKOUT_RETRY_AVAILABLE/.test(message)) return "A tentativa anterior foi recusada. Se a causa já foi corrigida, você pode tentar novamente nesta mesma reserva.";
+    if (/CHECKOUT_RETRY_STALE|CHECKOUT_RETRY_INVALID/.test(message)) return "Esta tentativa já foi atualizada. Abra o pagamento novamente para conferir a situação atual.";
+    if (/CHECKOUT_PREVIOUS_FAILED/.test(message)) return "A tentativa anterior de abrir o pagamento falhou. Avise o suporte para conferir a causa. Nenhuma nova emissão foi solicitada.";
+    if (/CHECKOUT_IN_PROGRESS/.test(message)) return "A solicitação de pagamento ainda está em processamento. Se persistir, avise o suporte. Nenhuma nova emissão foi solicitada.";
+    if (/CHECKOUT_ALREADY_PAID/.test(message)) return "O checkout já consta como pago. A confirmação financeira da reserva está sendo verificada; não realize outro pagamento.";
+    if (/CHECKOUT_CLOSED/.test(message)) return "Este checkout foi encerrado. Confira a situação da reserva antes de iniciar outro pagamento.";
+    if (/ASAAS_CHECKOUT_ERROR/.test(message)) return asaasCheckoutFailureMessage(error);
+    if (/ASAAS_INVALID_RESPONSE|ASAAS_INCOMPLETE_RESPONSE|CHECKOUT_AWAITING_RECONCILIATION|CHECKOUT_RESULT_UNKNOWN/.test(message)) return "Não foi possível confirmar o resultado da emissão. O suporte precisa conferir a tentativa antes de liberar outra cobrança.";
+    if (/invalid login credentials/i.test(message)) return "E-mail ou senha inválidos.";
+    if (/email not confirmed/i.test(message)) return "Confirme o e-mail antes de entrar.";
+    if (/failed to fetch|network/i.test(message)) return "Não foi possível conectar ao staging. Verifique a internet e tente novamente.";
+    if (/jwt|session|refresh token/i.test(message)) return "A sessão expirou. Entre novamente.";
+    if (/duplicate|unique constraint/i.test(message)) return "Já existe um cadastro com estes dados.";
+    if (/COMMUNITY_PROFILE_NOT_FOUND/i.test(message)) return "Essa conta ainda não acessou a Comunidade do Tâmo On. Peça para a pessoa entrar na Comunidade com a conta Google informada.";
+    if (/COMMUNITY_PROFILE_NOT_ACTIVE|COMMUNITY_GOOGLE_REQUIRED/i.test(message)) return "A conta precisa estar ativa na Comunidade e usar o login Google para receber esse acesso.";
+    if (/COMMUNITY_IDENTITY_CONFLICT/i.test(message)) return "A identidade Google não corresponde à conta encontrada. Confira a conta com o suporte antes de conceder o acesso.";
+    if (/COMMUNITY_DIRECTORY_NOT_CONFIGURED|COMMUNITY_DIRECTORY_UNAVAILABLE|COMMUNITY_DIRECTORY_FORBIDDEN/i.test(message)) return "A consulta à Comunidade ainda não está disponível. Tente novamente após a ativação da integração.";
+    if (/COMMUNITY_VERIFICATION_EXPIRED/i.test(message)) return "A confirmação da conta expirou. Tente salvar novamente.";
+    if (/TEAM_PROFILE_NOT_FOUND/i.test(message)) return "Não encontramos essa conta. Peça para a pessoa acessar a Comunidade do Tâmo On com a conta Google informada.";
+    if (/TEAM_PROFILE_NOT_ACTIVE/i.test(message)) return "A conta informada não está ativa.";
+    if (/LAST_ACTIVE_OWNER_REQUIRED/i.test(message)) return "O último proprietário ativo não pode ser desativado ou rebaixado.";
+    if (/OWNER_MANAGEMENT_REQUIRES_OWNER/i.test(message)) return "Somente um proprietário ativo pode alterar outro proprietário.";
+    if (/TEAM_MANAGEMENT_FORBIDDEN/i.test(message)) return "Sua função não permite gerenciar a equipe.";
+    if (/row-level security|permission denied|not authorized/i.test(message)) return "Sua conta não tem permissão para realizar esta alteração.";
+    if (/payload too large|maximum.*size|exceeded.*size/i.test(message)) return "O arquivo excede o limite permitido. Escolha uma imagem menor.";
+    if (/MONTHLY_PAYMENT_NOT_AVAILABLE_BEFORE_FIRST_DAY/i.test(message)) return "Não foi possível iniciar esta etapa de pagamento. Atualize a tela e tente novamente.";
+    if (/MONTHLY_LINK_TIME_CONFLICT/i.test(message)) return "Já existe um vínculo mensalista protegendo este horário no período informado.";
+    if (/MONTHLY_OFFER_DISCONTINUOUS/i.test(message)) return "A oferta mensalista não mantém todas as datas semanais disponíveis no mesmo espaço e horário até o fim do mês. Atualize a agenda e escolha outra data ou reserve como avulso.";
+    if (/Ja existe uma solicitacao mensalista aberta/i.test(message)) return "Este grupo já possui uma solicitação mensalista aberta para o horário.";
+    if (/Horario nao esta disponivel para solicitacao mensalista|Horario indisponivel/i.test(message)) return "Este horário não está disponível para uma nova solicitação.";
+    if (/Sem acesso a conversa mensalista/i.test(message)) return "Sua conta não participa desta conversa mensalista.";
+    if (/Edge Function returned a non-2xx status code/i.test(message)) return "Não foi possível iniciar o pagamento agora. Confira a data de liberação e tente novamente.";
+    return message || "Não foi possível concluir a operação.";
+  }
+
+  function backendAuthView() {
+    if(partnerAccessPending && backendRuntime.session?.user?.id===backendRuntime.identityId && window.MarketplaceBackend?.session?.user?.id===backendRuntime.identityId){
+      return `<section class="backend-auth-gate"><div class="backend-auth-card" role="status"><span class="backend-auth-spinner" aria-hidden="true"></span><h1>Atualizando permissões</h1><p>${backendRuntime.error ? "Não foi possível conferir os acessos agora. Tentaremos novamente automaticamente." : "Conferindo os acessos da sua conta. Aguarde um instante."}</p></div></section>`;
+    }
+    if (!backendRuntime.initialized || backendRuntime.loading) {
+      return `<section class="backend-auth-gate"><div class="backend-auth-card backend-auth-loading"><span class="backend-auth-spinner" aria-hidden="true"></span><h1>Conectando ao Marketplace</h1><p>Carregando a sessão segura do ambiente de homologação.</p></div></section>`;
+    }
+    return `<section class="backend-auth-gate"><div class="backend-auth-card"><div class="backend-auth-brand"><span aria-hidden="true">✓</span><div><strong>Tâmo On</strong><small>Marketplace · staging</small></div></div><span class="eyebrow">Acesso de homologação</span><h1>Entre para continuar</h1><p>Use uma das contas de teste liberadas para Usuário, Parceiro ou Administração.</p>${backendRuntime.error ? `<div class="backend-auth-error" role="alert">${esc(backendRuntime.error)}</div>` : ""}<form id="marketplaceLoginForm" class="backend-auth-form"><label class="field"><span>E-mail</span><input name="email" type="email" autocomplete="username" required></label><label class="field"><span>Senha</span><input name="password" type="password" autocomplete="current-password" required></label><button class="button primary full" type="submit">Entrar</button><button class="button ghost full" type="button" data-action="backend-google-login">Entrar com Google</button></form><small class="backend-auth-note">Ambiente de staging · sem transações financeiras reais</small></div></section>`;
+  }
+
+  async function refreshBackendBootstrap(force = true) {
+    if (!backendRuntime.enabled || !window.MarketplaceBackend?.session?.user) return null;
+    if (backendBootstrapPromise) return backendBootstrapPromise;
+    const requestedIdentity = window.MarketplaceBackend.session.user.id;
+    const requestedAccessGeneration=partnerAccessGeneration;
+    let applied=false;
+    let changed=true;
+    const changes=[...backendRefreshTables];
+    backendRefreshTables.clear();backendRefreshQueued=false;
+    clearTimeout(backendRealtimeRefreshTimer);backendRealtimeRefreshTimer=null;
+    backendRuntime.loading = !backendIsOnline();
+    backendRuntime.refreshing = true;
+    backendRuntime.error = "";
+    backendRuntime.refreshError = "";
+    backendSyncStatus();
+    if(!backendIsOnline())render();
+    backendBootstrapPromise = (async () => {
+      try {
+        backendRuntime.session = window.MarketplaceBackend.session;
+        const [bootstrap,initialSlotFlags] = await Promise.all([
+          window.MarketplaceBackend.bootstrap({ force, changes }),
+          window.MarketplaceBackend.rpc("agenda_initial_slot_flags",{})
+        ]);
+        bootstrap.agenda_initial_slots=initialSlotFlags||[];
+        if (window.MarketplaceBackend.session?.user?.id !== requestedIdentity || bootstrap?.profile?.id !== requestedIdentity) return null;
+        if(requestedAccessGeneration!==partnerAccessGeneration)return null;
+        if(JSON.stringify(backendRuntime.bootstrap?.partner_memberships||[])!==JSON.stringify(bootstrap?.partner_memberships||[]))closePartnerAccessDialogs();
+        const signature=JSON.stringify({...bootstrap,generated_at:undefined});
+        changed=signature!==backendRefreshSignature || !backendRuntime.bootstrap || partnerAccessPending;
+        backendRuntime.bootstrap = bootstrap || {};
+        syncStateFromBackend(backendRuntime.bootstrap);
+        window.TamoonMarketplacePilot?.ready();
+        backendRefreshSignature=signature;applied=true;
+        partnerAccessPending=false;
+        clearTimeout(partnerAccessRetryTimer);partnerAccessRetryTimer=null;partnerAccessRetryAttempt=0;
+        if (!backendRuntime.realtimeSubscribed) {
+          window.MarketplaceBackend.subscribeRealtime((change) => {
+            if(partnerAccessChange(change)){
+              invalidatePartnerAccess();
+              refreshPartnerAccess();
+              return;
+            }
+            mergeNotificationRealtime(change);
+            const realtimeNotification=change?.table==="notifications"&&change?.payload?.eventType==="INSERT"?change.payload.new:null;
+            if(!partnerReadonlyActive()&&realtimeNotification?.profile_id===backendRuntime.identityId){
+              const current=state.personalNotifications||[];
+              state.personalNotifications=[realtimeNotification,...current.filter((item)=>item.id!==realtimeNotification.id)];
+              if(!partnerReadonlyActive()&&notificationVisibleForRole(realtimeNotification))operationalAlerts.ingest([realtimeNotification]);
+              renderNotificationControls();
+            }
+            // Read acknowledgements are already merged locally; no financial data changed.
+            if(change?.table==="notifications" && change.payload?.eventType==="UPDATE"
+              && change.payload.new?.status==="read" && change.payload.new?.profile_id===backendRuntime.identityId)return;
+            scheduleBackendRefresh(change?.table);
+          });
+          backendRuntime.realtimeSubscribed = true;
+        }
+        return bootstrap;
+      } catch (error) {
+        window.TamoonMarketplacePilot?.fail();
+        if(window.MarketplaceBackend?.session?.user?.id===requestedIdentity){
+          const transient=/failed to fetch|network|timeout|timed out|load failed|fetch failed|temporarily|502|503|504/i.test(String(error?.message||error));
+          if(!transient || partnerAccessPending)backendRuntime.bootstrap = null;
+          backendRuntime.error = backendErrorMessage(error);
+          backendRuntime.refreshError = backendRuntime.error;
+        }
+        throw error;
+      } finally {
+        backendRuntime.loading = false;
+        backendRuntime.refreshing = false;
+        backendBootstrapPromise = null;
+        backendSyncStatus();
+        updateBackendRoleAccess();
+        if(changed || !applied)render();
+        if(applied && changed && backendIsOnline()&&["partner","admin"].includes(state.role)&&state.activePage?.[state.role]==="finance")loadFinancialPeriod(true).catch(()=>{});
+        if(applied && changed)refreshOpenVenueScheduleFromBackend();
+        if(detailDialog?.open&&detailDialog.dataset.view==="asaas-payment")refreshOpenAsaasPaymentFromBackend();
+        if(applied && changed && detailDialog?.open&&detailDialog.dataset.view==="occurrence-transfer-chat"&&!formDialog.open&&!transferChatSending) {
+          openOccurrenceTransferConversation(detailDialog.dataset.requestId,{refresh:true});
+        }
+        if (reservationDialog.open) refreshOpenReservationFromBackend();
+        if(applied && changed && detailDialog?.open&&detailDialog.dataset.view==="notifications")openNotificationInbox();
+        if(applied && changed && detailDialog?.open&&detailDialog.dataset.view==="partner-application"&&!formDialog.open){
+          const application=(state.partnerApplications||[]).find((item)=>item.id===detailDialog.dataset.applicationId);
+          if(application)detailBody.innerHTML=partnerApplicationDetailsBody(application);
+        }
+        if (applied && changed && detailDialog?.open && detailDialog.dataset.view === "partner-dossier" && !formDialog.open) {
+          const partner = state.adminPartners.find((item) => String(item.id) === detailDialog.dataset.partnerId);
+          if (partner) detailBody.innerHTML = partnerDetailsBody(partner);
+        }
+        if (applied && changed && chatDialog?.open && selectedChatReservationId) renderOpenChat();
+        if(applied && changed && detailDialog?.open&&!formDialog.open&&detailDialog.dataset.view==="monthly-request-chat")refreshMonthlyLinkRequestConversation(detailDialog.dataset.requestId);
+        if(applied && changed && detailDialog?.open&&!formDialog.open&&detailDialog.dataset.view==="reservation-notices"){
+          handleAction({dataset:{action:detailDialog.dataset.reservationAction,id:detailDialog.dataset.reservationId}});
+        }
+        if(applied)restoreAsaasReturn();
+        if(backendRefreshQueued)scheduleBackendRefresh([...backendRefreshTables][0]);
+        if (window.MarketplaceBackend.session?.user?.id && window.MarketplaceBackend.session.user.id !== requestedIdentity) {
+          setTimeout(() => refreshBackendBootstrap(true).catch(() => {}), 0);
+        }
+      }
+    })();
+    return backendBootstrapPromise;
+  }
+
+  async function handleBackendStatus(detail = {}) {
+    if (!backendRuntime.enabled) return;
+    if (detail.type === "team_access_pending") { showToast("O acesso à equipe aguarda confirmação da Comunidade. Tente recarregar a página em alguns instantes."); return; }
+    if (detail.type === "loader_error") {
+      backendRuntime.initialized = true;
+      backendRuntime.loading = false;
+      backendRuntime.error = backendErrorMessage(detail.error);
+      render();
+      return;
+    }
+    backendRuntime.initialized = Boolean(window.MarketplaceBackend);
+    const nextSession = window.MarketplaceBackend?.session || null;
+    if (backendRuntime.session?.user?.id !== nextSession?.user?.id) {
+      notificationReadIdentity="";confirmedNotificationReads.clear();notificationReadRequests.clear();
+      confirmedChatMessages.clear();chatReadRequests.clear();monthlyConversationEpoch++;
+      backendRuntime.bootstrap = null;
+      backendRefreshSignature="";backendRefreshTables.clear();backendRefreshQueued=false;
+      clearTimeout(backendRealtimeRefreshTimer);backendRealtimeRefreshTimer=null;
+      backendRuntime.realtimeSubscribed = false;
+      state.userGroups = []; state.groupMembers = []; state.groupEvents = [];
+      groupSelect.innerHTML = '<option value="">Selecione um grupo</option>';
+      selectedReservation = null;
+      if (reservationDialog.open) reservationDialog.close();
+    }
+    backendRuntime.session = nextSession;
+    if (!backendRuntime.session?.user) {
+      operationalAlerts.setProfile("");
+      state.personalNotifications=[];
+      backendRuntime.bootstrap = null;
+      backendRuntime.realtimeSubscribed = false;
+      backendRuntime.loading = false;
+      updateBackendRoleAccess();
+      render();
+      return;
+    }
+    if (["ready", "signed_in", "auth"].includes(detail.type) || !backendRuntime.bootstrap) {
+      try { await refreshBackendBootstrap(true); } catch (_error) {}
+    }
+  }
+
+  async function refreshBackendAfterMutation() {
+    // A Realtime read started before the write may still contain the old reservation.
+    const inFlight = backendBootstrapPromise;
+    if (inFlight) await inFlight.catch(() => {});
+    backendRefreshTables.add("full");
+    return refreshBackendBootstrap(true);
+  }
+
+  async function runBackendMutation(successMessage, operation) {
+    if(partnerReadonlyActive()){showToast("Somente leitura. Volte à administração para sair da visualização.");return null;}
+    if (!backendIsOnline()) return null;
+    if(backendRuntime.mutating){showToast("Uma alteração está em andamento. Aguarde a conclusão antes de enviar outra.");return null;}
+    const mutationIdentity=backendRuntime.identityId;
+    backendRuntime.mutating = true;
+    backendSyncStatus();
+    try {
+      const result = await operation();
+      await refreshBackendAfterMutation();
+      if(mutationIdentity!==backendRuntime.identityId)return null;
+      if (successMessage) showToast(successMessage);
+      return result;
+    } catch (error) {
+      try { await refreshBackendAfterMutation(); } catch (_refreshError) {}
+      showToast(backendErrorMessage(error));
+      return null;
+    } finally {
+      backendRuntime.mutating = false;
+      backendSyncStatus();
+    }
+  }
+
+  function currentUserPixShareState(reservation) {
+    const profileId = backendRuntime.identityId;
+    if (!(reservation?.pixSplit && profileId)) return null;
+    const currentParticipant = reservation.paymentParticipants?.find((participant) => participant.profileId === profileId) || null;
+    const currentCollectionItem = pixCollectionForReservation(reservation.id)?.items?.find((item) => item.own) || null;
+    if (!(currentParticipant || currentCollectionItem)) return null;
+    const statuses = [currentParticipant?.status, currentCollectionItem?.status, reservation.currentUserShareStatus]
+      .filter(Boolean)
+      .map((status) => String(status).toLowerCase());
+    return { currentParticipant, currentCollectionItem, paid:statuses.some((status) => ["paid","confirmed"].includes(status)) };
+  }
+
+  function stagingPaymentSimulationAvailable(reservation) {
+    if(reservation?.monthlyCycleId&&monthlyPaymentPresentation(reservation).closed)return false;
+    const cfg = window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG || {};
+    if (!(backendIsOnline() && (cfg.simulationPayments === true || cfg.asaasSandboxCheckout === true) && reservation?.backendOfficial && reservation?.backendId && reservation.statusKey === "pending")) return false;
+    const profileId = backendRuntime.identityId;
+    if (!profileId) return false;
+    if (reservation.pixSplit) {
+      const ownShare = currentUserPixShareState(reservation);
+      return Boolean(ownShare && !ownShare.paid);
+    }
+    if (!reservation.paymentConfigured) return false;
+    return (reservation.paymentResponsibleId || reservation.userId) === profileId;
+  }
+
+  function monthlyStageLabel(stage) {
+    return ({initial:"garantia inicial",balance:"saldo mensal",full:"mensalidade integral"})[stage]||"etapa mensalista";
+  }
+
+  function stagingPaymentResultMessage(reservation, response, updated) {
+    const result = response?.result;
+    const sameReservation = result?.reservation_id === reservation.backendId && updated?.backendId === reservation.backendId;
+    const validMode = ["pix_installment", "single_payment"].includes(response?.mode);
+    const recorded = response?.simulated === true && validMode && sameReservation && Boolean(result?.payment_id);
+    const confirmed = result?.reservation_confirmed === true || result?.confirmed === true;
+    if (recorded && confirmed && updated.statusKey === "confirmed") {
+      return `${reservation.id}: pagamento de teste confirmado; reserva confirmada.`;
+    }
+    if (recorded && reservation.pixSplit && currentUserPixShareState(updated)?.paid) {
+      return `${reservation.id}: sua cota de teste foi paga. Confira o saldo e a situação da reserva em Minhas reservas.`;
+    }
+    if (recorded) {
+      return `${reservation.id}: pagamento de teste registrado; a confirmação integral da reserva ainda não foi verificada. Confira os detalhes antes de tentar pagar novamente.`;
+    }
+    return `${reservation.id}: não foi possível verificar a confirmação do pagamento. Confira os detalhes da reserva antes de tentar novamente.`;
+  }
+
+  async function confirmOfficialStagingPayment(reservation, actorLabel = "Usuário") {
+    if (!stagingPaymentSimulationAvailable(reservation) || window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG?.simulationPayments !== true) {
+      showToast("A confirmação de teste só está disponível para reservas oficiais pendentes no staging.");
+      return;
+    }
+    const result = await runBackendMutation("", async () => {
+      if (reservation.paymentMethod === "pix_direct_partner") {
+        const charge = await window.MarketplaceBackend.createPixCharges(reservation.backendId);
+        const ownCollectionItem = reservation.pixSplit ? pixCollectionForReservation(reservation.id)?.items?.find((item) => item.own) : null;
+        const installmentId = reservation.pixSplit ? reservation.currentUserInstallmentId || ownCollectionItem?.installmentId || null : null;
+        if(reservation.pixSplit&&!installmentId)throw new Error("Sua cota ainda não foi carregada. Atualize Minhas reservas para continuar.");
+        return window.MarketplaceBackend.simulatePayment(reservation.backendId, installmentId);
+      } else {
+        await window.MarketplaceBackend.routePayment(reservation.backendId);
+        return window.MarketplaceBackend.simulatePayment(reservation.backendId);
+      }
+    });
+    if (!result) return;
+    const updated = state.reservations.find((item) => item.backendId === reservation.backendId);
+    showToast(stagingPaymentResultMessage(reservation, result, updated));
+  }
+
+  function requestOfficialStagingPaymentConfirmation(reservation, actorLabel = "Usuário") {
+    if (!reservation) return;
+    const cfg=window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG||{};
+    if(cfg.simulationPayments!==true)return openOfficialAsaasPayment(reservation);
+    const ownShare = reservation.pixSplit ? reservation.paymentParticipants?.find((participant) => participant.profileId === backendRuntime.identityId) : null;
+    const amount = ownShare?.amountDue || reservation.monthlyStageAmount || reservation.paymentDue || reservation.value;
+    const stageLabel=reservation.monthlyStageId?monthlyStageLabel(reservation.monthlyStage):"pagamento";
+    const early=Boolean(reservation.monthlyStageId&&reservation.monthlyStageAvailableAt&&Date.now()<new Date(reservation.monthlyStageAvailableAt).getTime());
+    askConfirm({
+      title:reservation.pixSplit ? `${early?"Pagar antecipadamente":"Confirmar"} minha cota da ${stageLabel}` : `${early?"Pagar antecipadamente":"Confirmar"} ${stageLabel}`,
+      message:`${early?"Realizar antecipadamente":"Confirmar"} ${money(amount)} da reserva ${reservation.id} no staging?${early?` A obrigação começa somente em ${backendDateTimeLabel(reservation.monthlyStageAvailableAt)}.`:""} Esta ação não movimenta dinheiro real e será registrada como simulação por ${actorLabel}.${reservation.pixSplit||reservation.monthlyCollectionMode==="single_monthly_pool"?" "+splitCancellationPolicyText(reservation):""}`,
+      confirmLabel:"Confirmar no staging",
+      onConfirm:() => confirmOfficialStagingPayment(reservation, actorLabel)
+    });
+  }
+
+  function asaasCheckoutFailureMessage(error) {
+    const reasons = {
+      authentication:"O Asaas recusou a autenticação da integração. A administração precisa conferir a chave do Sandbox.",
+      access_denied:"O Asaas não autorizou esta operação. A administração precisa conferir as permissões da integração.",
+      callback:"O Asaas recusou os endereços de retorno do pagamento. A administração precisa revisar essa configuração.",
+      pix_configuration:"O Asaas indicou um problema na configuração do Pix da conta Sandbox.",
+      expiration:"O Asaas recusou o prazo de validade do checkout. Avise o suporte.",
+      customer:"O Asaas recusou dados relacionados ao pagador. Avise o suporte.",
+      request_data:"O Asaas recusou dados enviados para criar o checkout. Avise o suporte.",
+      account_configuration:"O Asaas indicou uma pendência na configuração da conta. Avise a administração.",
+      rate_limit:"O Asaas limitou as solicitações. O suporte precisa conferir a tentativa antes de outra emissão.",
+      provider_unavailable:"O Asaas não concluiu a solicitação. O suporte precisa conferir se houve emissão antes de liberar outra cobrança."
+    };
+    return reasons[error?.paymentDiagnostic?.category] || "O Asaas recusou a criação do checkout. Avise o suporte para conferir o motivo antes de repetir.";
+  }
+
+  let asaasCheckoutRetryContext = null;
+
+  function showAsaasCheckoutFailure(reservation, error) {
+    const d=error?.paymentDiagnostic;
+    const http=Number.isInteger(d?.providerStatus)&&d.providerStatus>=100&&d.providerStatus<=599?`HTTP ${d.providerStatus}`:"";
+    const reference=typeof d?.diagnosticId==="string"&&/^[0-9a-f-]{36}$/i.test(d.diagnosticId)?d.diagnosticId:"";
+    const support=(http||reference)?`<details><summary>Detalhes para o suporte</summary>${http?`<p>${esc(http)}</p>`:""}${reference?`<p>Referência: ${esc(reference)}</p>`:""}</details>`:"";
+    const token=error?.paymentRetryToken;
+    const canRetry=typeof token==="string" && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(token)
+      && stagingPaymentSimulationAvailable(reservation);
+    asaasCheckoutRetryContext=canRetry?{identity:backendRuntime.identityId,reservationId:reservation.backendId,token}:null;
+    const retry=canRetry?`<p>Após a correção, tente novamente. Sua reserva, sua cota e os valores serão mantidos.</p><div class="dialog-actions"><button type="button" class="button primary" data-action="retry-asaas-checkout" data-id="${esc(reservation.id)}">Tentar novamente</button></div>`:"";
+    openDetail({eyebrow:"Pagamento",title:"Não foi possível abrir o pagamento",body:`<p><strong>${esc(reservation.id)}</strong></p><p role="alert">${esc(backendErrorMessage(error))}</p>${retry}<p>O prazo de pagamento da reserva permanece o mesmo. Esta mensagem não confirma pagamento.</p>${support}`});
+  }
+
+  function officialSinglePaymentConfirmed(reservation) {
+    return Boolean(reservation?.backendOfficial && !reservation.monthly
+      && ["confirmed","completed"].includes(reservation.backendStatus)
+      && reservation.paymentConfirmedAtIso);
+  }
+
+  function officialAsaasPaymentMessage(reservation) {
+    if(!reservation?.backendOfficial)return "";
+    if(reservation.pixSplit && currentUserPixShareState(reservation)?.paid){
+      return officialSinglePaymentConfirmed(reservation)
+        ? `Reserva ${reservation.id}: sua cota foi paga e a reserva está confirmada.`
+        : reservation.backendStatus==="pending_payment"
+          ? `Reserva ${reservation.id}: sua cota foi paga. A reserva aguarda as demais cotas.`
+          : `Reserva ${reservation.id}: sua cota consta como paga. Confira a situação atual da reserva.`;
+    }
+    return officialSinglePaymentConfirmed(reservation)?`Reserva ${reservation.id}: reserva e pagamento confirmados.`:"";
+  }
+
+  function asaasReturnBelongsToCurrentUser(reservation) {
+    return Boolean(reservation?.backendOfficial && (reservationBelongsToCurrentUser(reservation) || reservationPaymentAssignedToCurrentUser(reservation)));
+  }
+
+  function refreshOpenAsaasPaymentFromBackend() {
+    if(!detailDialog?.open || detailDialog.dataset.view!=="asaas-payment" || !backendIsOnline())return;
+    const identity=detailDialog.dataset.paymentIdentity;
+    if(!identity || identity!==backendRuntime.identityId || identity!==window.MarketplaceBackend?.session?.user?.id)return;
+    const reservation=(state.reservations||[]).find(item=>item.backendId===detailDialog.dataset.paymentReservationId);
+    const message=officialAsaasPaymentMessage(reservation);
+    if(!message)return;
+    detailDialog.close();
+    delete detailDialog.dataset.paymentReservationId;
+    delete detailDialog.dataset.paymentIdentity;
+    showToast(message);
+  }
+
+  function rememberAsaasReturn(reservationId) {
+    const reservation=(state.reservations||[]).find(item=>item.backendId===reservationId);
+    if(!asaasReturnBelongsToCurrentUser(reservation))return;
+    try { sessionStorage.setItem("tamo-on-asaas-return",JSON.stringify({identity:backendRuntime.identityId,reservationId,createdAt:Date.now()})); } catch(_) {}
+  }
+
+  function restoreAsaasReturn() {
+    const url=new URL(window.location.href);
+    if(url.searchParams.get("payment-return")!=="1" || !backendIsOnline() || backendRuntime.bootstrap?.profile?.status==="blocked" || partnerReadonlyActive())return;
+    let context=null;
+    try { context=JSON.parse(sessionStorage.getItem("tamo-on-asaas-return")||"null");sessionStorage.removeItem("tamo-on-asaas-return"); } catch(_) {}
+    url.searchParams.delete("payment-return");window.history.replaceState(null,"",url.href);
+    state.role="user";state.activePage.user="reservations";state.userReservationTab="single";
+    const reservation=context?.identity===backendRuntime.identityId && Date.now()-context.createdAt>=0 && Date.now()-context.createdAt<7200000
+      ? (state.reservations||[]).find(item=>item.backendId===context.reservationId && asaasReturnBelongsToCurrentUser(item)) : null;
+    if(reservation && !reservationManagedByCurrentUser(reservation))state.activePage.user="shares";
+    render();
+    if(reservation)handleAction({dataset:{action:reservation.pixSplit?"pix-split-details":"reservation-details",id:reservation.id}});
+    showToast(officialAsaasPaymentMessage(reservation) || "Retorno do pagamento. Confira o status da sua cobrança; a confirmação será atualizada pelo sistema.");
+  }
+
+  async function runAsaasPaymentFlow(reservation,operation) {
+    const identity=backendRuntime.identityId;
+    try {
+      if(!window.MarketplaceAsaasCommunication?.flow)throw new Error("ASAAS_COMMUNICATION_UNAVAILABLE");
+      return await window.MarketplaceAsaasCommunication.flow("Preparando seu pagamento…",operation);
+    } catch(error) {
+      if(identity!==backendRuntime.identityId)return false;
+      if(error?.message==="ASAAS_COMMUNICATION_BUSY")showToast("Aguarde a comunicação que está em andamento.");
+      else showAsaasCheckoutFailure(reservation,error);
+      return false;
+    }
+  }
+
+  async function openOfficialAsaasPayment(reservation,retryToken=null,communicationScope=null,payer=null){
+    if(!stagingPaymentSimulationAvailable(reservation))return;
+    if(!communicationScope)return runAsaasPaymentFlow(reservation,scope=>openOfficialAsaasPayment(reservation,retryToken,scope,payer));
+    communicationScope.assertActive();
+    const identity=backendRuntime.identityId;
+    let checkoutError=null,pixReceivedAt=performance.now();
+    const result=await runBackendMutation("",async()=>{
+      try { const paymentResult=await (reservation.paymentMethod==="pix_direct_partner"
+        ?window.MarketplaceBackend.createPixCharges(reservation.backendId,retryToken,communicationScope,payer):window.MarketplaceBackend.routePayment(reservation.backendId,retryToken,communicationScope));
+        pixReceivedAt=performance.now();return paymentResult; }
+      catch(error){checkoutError=error;throw error;}
+    });
+    communicationScope.assertActive();
+    if(identity!==backendRuntime.identityId)return;
+    if(!result){if(checkoutError)showAsaasCheckoutFailure(reservation,checkoutError);return;}
+    if(reservation.paymentMethod==="pix_direct_partner"&&["asaas_pix","asaas_pix_payer_required"].includes(result.mode)){
+      if(result.status==="paid"){
+        if(detailDialog.open&&detailDialog.dataset.paymentIdentity===identity)detailDialog.close();
+        const updated=(state.reservations||[]).find(item=>item.backendId===reservation.backendId);
+        showToast(officialAsaasPaymentMessage(updated)||"Pagamento recebido. Atualizando a situação da reserva.");
+        return;
+      }
+      openDetail({eyebrow:"Pagamento por Pix",title:result.mode==="asaas_pix_payer_required"?"Dados do pagador":reservation.pixSplit?"Pagar minha cota Pix":"Pagar com Pix",body:""});
+      detailDialog.dataset.view="asaas-payment";
+      detailDialog.dataset.paymentReservationId=reservation.backendId;
+      detailDialog.dataset.paymentIdentity=identity;
+      window.MarketplaceInlinePix.mount({dialog:detailDialog,body:detailBody,result,reservation,identity,
+        isCurrent:()=>identity===backendRuntime.identityId&&identity===window.MarketplaceBackend?.session?.user?.id&&backendIsOnline()&&state.role==="user",
+        refresh:()=>refreshBackendBootstrap(true),money,toast:showToast,receivedAt:pixReceivedAt,
+        onPayer:input=>openOfficialAsaasPayment(reservation,null,null,input)});
+      refreshOpenAsaasPaymentFromBackend();return;
+    }
+    let url;try{url=new URL(result.checkoutUrl);}catch(_){showToast("O checkout ainda não está disponível.");return;}
+    if(result.mode!=="asaas_checkout"||url.protocol!=="https:"||!(url.hostname==="sandbox.asaas.com"&&url.port===""&&!url.username&&!url.password)){showToast("Endereço de pagamento inválido.");return;}
+    const updated=(state.reservations||[]).find(item=>item.backendId===reservation.backendId);
+    const confirmedMessage=officialAsaasPaymentMessage(updated);
+    if(confirmedMessage){showToast(confirmedMessage);return;}
+    const paymentAmount=Number(result.amount);
+    if(!Number.isFinite(paymentAmount)||paymentAmount<=0){showToast("Não foi possível conferir o valor da cobrança.");return;}
+    openDetail({eyebrow:"Pagamento de homologação",title:reservation.paymentMethod==="pix_direct_partner"?(reservation.pixSplit?"Pagar minha cota Pix":"Pagar com Pix pelo Asaas"):"Pagar com cartão pelo Asaas",body:`<p><strong>${esc(reservation.id)} · ${money(paymentAmount)}</strong>${reservation.pixSplit?" · sua cota":" · pagamento integral"}</p><p>Continue no ambiente de testes do Asaas. ${reservation.pixSplit?"Somente a sua cota será quitada por este pagamento. A reserva será confirmada quando o total for pago.":"Sua reserva será atualizada quando o pagamento for confirmado."}</p>${reservation.pixSplit||reservation.monthlyCollectionMode==="single_monthly_pool"?`<p>${esc(splitCancellationPolicyText(reservation))}</p>`:""}<div class="dialog-actions"><a class="button primary" href="${esc(url.href)}" target="_self" rel="noreferrer" data-asaas-checkout="true" data-id="${esc(reservation.backendId)}">Abrir pagamento Asaas</a></div>`});
+    detailDialog.dataset.view="asaas-payment";
+    detailDialog.dataset.paymentReservationId=reservation.backendId;
+    detailDialog.dataset.paymentIdentity=identity;
+    refreshOpenAsaasPaymentFromBackend();
+  }
+
+  async function backendEmailLogin(form) {
+    if (!window.MarketplaceBackend || backendRuntime.loading) return;
+    const data = new FormData(form);
+    backendRuntime.error = "";
+    backendRuntime.loading = true;
+    render();
+    try {
+      await window.MarketplaceBackend.signInWithPassword(String(data.get("email") || "").trim(), String(data.get("password") || ""));
+      backendRuntime.session = window.MarketplaceBackend.session;
+      await refreshBackendBootstrap(true);
+    } catch (error) {
+      backendRuntime.loading = false;
+      backendRuntime.error = backendErrorMessage(error);
+      render();
+    }
+  }
+
+  async function backendGoogleLogin() {
+    if (!window.MarketplaceBackend || backendRuntime.loading) return;
+    backendRuntime.error = "";
+    backendRuntime.loading = true;
+    render();
+    try { await window.MarketplaceBackend.signInWithGoogle(window.location.href.split("#")[0]); }
+    catch (error) { backendRuntime.loading = false; backendRuntime.error = backendErrorMessage(error); render(); }
+  }
+
+  async function backendSignOut() {
+    if (!window.MarketplaceBackend) return;
+    partnerInterestDraft = null;
+    try { await window.MarketplaceBackend.signOut(); }
+    catch (error) { showToast(backendErrorMessage(error)); }
+  }
+
+  function splitPartnerTypes(value) {
+    const items = Array.isArray(value) ? value : String(value || "").split(/[·,;/|]+/);
+    return [...new Set(items.map((item) => String(item).trim()).filter(Boolean))];
+  }
+
+  function adminPartnerForVenue(venueId) {
+    return state.adminPartners.find((partner) => partner.venueId === venueId) || null;
+  }
+
+  function partnerVisibleInMarketplace(venue) {
+    if (!venue) return false;
+    const partner = adminPartnerForVenue(venue.id);
+    return partner ? partner.status === "Aprovado" : true;
+  }
+
+  function marketplaceVenuesFromActiveSource() {
+    const officialVenues = state.venues.filter((venue) => venue.backendVenueId);
+    return backendIsOnline() && officialVenues.length ? officialVenues : state.venues;
+  }
+
+  function partnerApplicationForAdminPartner(partner) {
+    if (!partner) return null;
+    return state.partnerApplications.find((application) =>
+      (partner.applicationId && application.id === partner.applicationId) ||
+      (application.adminPartnerId && String(application.adminPartnerId) === String(partner.id))
+    ) || null;
+  }
+
+  function uniqueVenueId(label, currentId = "") {
+    const base = String(label || "novo-parceiro")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "novo-parceiro";
+    let candidate = base;
+    let suffix = 2;
+    const used = (id) => id !== currentId && (state.venues.some((venue) => venue.id === id) || state.adminPartners.some((partner) => partner.venueId === id));
+    while (used(candidate)) candidate = `${base}-${suffix++}`;
+    return candidate;
+  }
+
+  function syncVenueNameReferences(venueId, oldName, newName) {
+    if (!venueId || !newName || oldName === newName) return;
+    state.reservations.forEach((item) => { if (item.venueId === venueId) item.venue = newName; });
+    state.cancellationVouchers.forEach((item) => { if (item.venueId === venueId) item.venue = newName; });
+    state.promotions.forEach((item) => { if (item.venueId === venueId) item.venue = newName; });
+    state.chatThreads.forEach((item) => { if (item.venueId === venueId) item.venue = newName; });
+    state.accountingLedger.forEach((item) => { if (item.venueId === venueId) item.venue = newName; });
+  }
+
+  function defaultVenueForPartner(partner) {
+    return {
+      id: partner.venueId,
+      name: partner.tradeName,
+      city: partner.city || "",
+      neighborhood: "A cadastrar",
+      distance: "—",
+      rating: 0,
+      reviews: 0,
+      ratingSource: "users",
+      types: splitPartnerTypes(partner.types),
+      price: 0,
+      address: "Endereço a cadastrar",
+      facadeImage: "assets/preview-icon.svg",
+      facadeSource: "partner_upload_pending",
+      amenities: [],
+      bankProviderId: "GENERIC_MANUAL",
+      bankLabel: "Banco a configurar",
+      pixKey: "Chave Pix a configurar",
+      asaasWalletId: "",
+      schedule: [],
+      partnerStatus: partner.status,
+      marketplacePublished: partner.status === "Aprovado"
+    };
+  }
+
+  function updateApplicationFromAdminPartner(partner) {
+    const application = partnerApplicationForAdminPartner(partner);
+    if (!application) return;
+    Object.assign(application, {
+      tradeName: partner.tradeName,
+      legalName: partner.legalName,
+      cnpj: partner.cnpj,
+      city: partner.city,
+      spaces: partner.spaces,
+      types: partner.types,
+      responsible: partner.responsible,
+      email: partner.email,
+      phone: partner.phone,
+      status: partner.status,
+      adminPartnerId: partner.id,
+      venueId: partner.venueId
+    });
+    if (["Aprovado","Rejeitado","Suspenso","Encerrado"].includes(partner.status)) {
+      application.reviewedAt = new Date().toLocaleString("pt-BR");
+    }
+  }
+
+  function syncCurrentPartnerSpacesFromAdmin(partner) {
+    if (!partner || state.partnerProfile?.venueId !== partner.venueId) return;
+    const venue = state.venues.find((item) => item.id === partner.venueId);
+    const desiredCount = Math.max(0, Number(partner.spaces || 0));
+    const desiredTypes = splitPartnerTypes(partner.types);
+    while (state.partnerSpaces.length < desiredCount) {
+      const index = state.partnerSpaces.length;
+      const type = desiredTypes[index % Math.max(1, desiredTypes.length)] || desiredTypes[0] || "Espaço esportivo";
+      state.partnerSpaces.push({ id:nextId("E-",state.partnerSpaces), name:`Espaço ${index + 1}`, type, floor:"A cadastrar", capacity:0, price:0, monthlyPrice:0, status:"Ativo", lights:"A informar", covered:"A informar", maintenance:"A definir" });
+    }
+    while (state.partnerSpaces.length > desiredCount) {
+      const removed = state.partnerSpaces.pop();
+      if (venue && removed) {
+        venue.schedule.forEach((day) => { day.slots = day.slots.filter((slot) => normalizedSlotSpace(slot) !== removed.name); });
+        venue.schedule = venue.schedule.filter((day) => day.slots.length);
+      }
+    }
+    state.partnerSpaces.forEach((space,index) => {
+      if (desiredTypes.length && !desiredTypes.includes(space.type)) space.type = desiredTypes[index % desiredTypes.length];
+    });
+  }
+
+  function syncAdminPartnerToConnectedAreas(partner) {
+    if (!partner) return;
+    partner.venueId = partner.venueId || uniqueVenueId(partner.tradeName);
+    partner.source = partner.source || "Administração";
+    partner.terms = partner.terms || "Pendente";
+    partner.privacy = partner.privacy || "Pendente";
+
+    let venue = state.venues.find((item) => item.id === partner.venueId);
+    if (!venue && partner.status === "Aprovado") {
+      venue = defaultVenueForPartner(partner);
+      state.venues.push(venue);
+    }
+    if (venue) {
+      const oldName = venue.name;
+      venue.name = partner.tradeName;
+      venue.city = partner.city || venue.city || "";
+      venue.types = splitPartnerTypes(partner.types);
+      venue.partnerStatus = partner.status;
+      venue.marketplacePublished = partner.status === "Aprovado";
+      syncVenueNameReferences(partner.venueId, oldName, venue.name);
+    }
+
+    if (state.partnerProfile?.venueId === partner.venueId) {
+      syncCurrentPartnerSpacesFromAdmin(partner);
+      const profile = state.partnerProfile;
+      profile.tradeName = partner.tradeName;
+      profile.legalName = partner.legalName;
+      profile.cnpj = partner.cnpj;
+      profile.city = partner.city;
+      profile.responsibleName = partner.responsible;
+      profile.email = partner.email;
+      profile.phone = partner.phone;
+      profile.taxRegime = partner.taxRegime;
+      profile.declaredActivity = partner.activity;
+      profile.contractStatus = partner.contract;
+      profile.fiscalIssuer = partner.fiscal;
+      profile.commissionRate = Number(partner.commission || profile.commissionRate || state.settings.defaultCommission);
+      profile.termsStatus = partner.terms || profile.termsStatus;
+      profile.privacyStatus = partner.privacy || profile.privacyStatus;
+      profile.adminStatus = partner.status;
+    }
+    updateApplicationFromAdminPartner(partner);
+  }
+
+  function syncCurrentPartnerToConnectedAreas() {
+    const profile = state.partnerProfile;
+    if (!profile?.venueId) return;
+    const partner = adminPartnerForVenue(profile.venueId);
+    const venue = state.venues.find((item) => item.id === profile.venueId);
+    const types = [...new Set(state.partnerSpaces.filter((space) => space.status !== "Inativo").map((space) => space.type).filter(Boolean))];
+
+    if (partner) {
+      partner.tradeName = profile.tradeName;
+      partner.legalName = profile.legalName;
+      partner.cnpj = profile.cnpj;
+      partner.city = profile.city;
+      partner.spaces = state.partnerSpaces.length;
+      partner.types = types.join(" · ") || partner.types;
+      partner.responsible = profile.responsibleName;
+      partner.email = profile.email;
+      partner.phone = profile.phone;
+      partner.taxRegime = profile.taxRegime;
+      partner.activity = profile.declaredActivity;
+      partner.contract = profile.contractStatus;
+      partner.fiscal = profile.fiscalIssuer;
+      partner.banking = profile.bank ? `${profile.bank} · ${profile.pixApiStatus || "Configuração pendente"}` : partner.banking;
+      partner.commission = Number(profile.commissionRate || state.settings.defaultCommission);
+      partner.terms = profile.termsStatus;
+      partner.privacy = profile.privacyStatus;
+      updateApplicationFromAdminPartner(partner);
+    }
+
+    if (venue) {
+      const oldName = venue.name;
+      venue.name = profile.tradeName;
+      venue.city = profile.city;
+      venue.neighborhood = profile.neighborhood;
+      venue.address = profile.address;
+      venue.zip = profile.zip || venue.zip || "";
+      venue.types = types.length ? types : venue.types;
+      venue.bankProviderId = profile.bankProviderId || venue.bankProviderId;
+      venue.bankLabel = profile.bank || venue.bankLabel;
+      venue.pixKey = profile.pixKey || venue.pixKey;
+      venue.asaasWalletId = profile.asaasWalletId || venue.asaasWalletId;
+      const favoritePhoto = (profile.photos || []).find((photo) => photo.id === profile.favoritePhotoId) || (profile.photos || []).find((photo) => photo.favorite);
+      if (favoritePhoto?.src) {
+        venue.facadeImage = favoritePhoto.src;
+        venue.facadeSource = "partner_upload";
+        venue.facadeTone = favoritePhoto.tone === "light" ? "light" : "dark";
+        venue.facadeLuminance = Number.isFinite(Number(favoritePhoto.luminance)) ? Number(favoritePhoto.luminance) : null;
+      }
+      if (state.partnerSpaces.length) venue.price = Math.min(...state.partnerSpaces.map((space) => Number(space.price || 0)).filter((value) => value > 0)) || venue.price;
+      syncVenueNameReferences(profile.venueId, oldName, venue.name);
+    }
+  }
+
+  function currentPartnerAccessStatus() {
+    const partner = adminPartnerForVenue(state.partnerProfile?.venueId);
+    if (!partner) return { allowed:false, status:"Cadastro removido", partner:null };
+    return { allowed:Boolean(backendRuntime.bootstrap?.preview?.active) || partner.status === "Aprovado", status:partner.status, partner };
+  }
+
+  function removePartnerFromConnectedAreas(partner) {
+    if (!partner) return;
+    const liability = activeVoucherLiability(partner.venueId);
+    if (liability.count > 0) return { ok:false, liability };
+    const application = partnerApplicationForAdminPartner(partner);
+    if (application) {
+      application.status = "Excluído pela administração";
+      application.reviewedAt = new Date().toLocaleString("pt-BR");
+    }
+    state.adminPartners = state.adminPartners.filter((item) => String(item.id) !== String(partner.id));
+    state.venues = state.venues.filter((venue) => venue.id !== partner.venueId);
+    state.favorites = state.favorites.filter((venueId) => venueId !== partner.venueId);
+    state.promotions.forEach((promotion) => {
+      if (promotion.venueId === partner.venueId) promotion.active = false;
+    });
+    return { ok:true, liability:{count:0,value:0} };
+  }
+
+  function saveState() {
+    if(partnerReadonlyActive())return;
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function esc(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function money(value) {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
+  }
+
+  function digitsOnly(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  function maskCnpj(value) {
+    const digits = digitsOnly(value).slice(0, 14);
+    return digits
+      .replace(/^(\d{2})(\d)/, "$1.$2")
+      .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1/$2")
+      .replace(/(\d{4})(\d)/, "$1-$2");
+  }
+
+  function maskPhone(value) {
+    const digits = digitsOnly(value).slice(0, 11);
+    if (!digits) return "";
+    if (digits.length <= 10) return digits
+      .replace(/^(\d{0,2})/, "($1")
+      .replace(/^\((\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{4})(\d{1,4})$/, "$1-$2");
+    return digits
+      .replace(/^(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{5})(\d{1,4})$/, "$1-$2");
+  }
+
+  function maskedFieldType(input) {
+    const name = String(input?.name || "").toLowerCase();
+    if (name === "cnpj") return "cnpj";
+    if (name === "phone" || name === "whatsapp") return "phone";
+    return "";
+  }
+
+  function validateMaskedField(input) {
+    const type = maskedFieldType(input);
+    if (!type) return true;
+    const digits = digitsOnly(input.value);
+    const valid = !digits.length ? !input.required : type === "cnpj" ? digits.length === 14 : [10,11].includes(digits.length);
+    input.setCustomValidity(valid ? "" : type === "cnpj" ? "Informe o CNPJ completo no formato 00.000.000/0000-00." : "Informe o telefone completo com DDD.");
+    return valid;
+  }
+
+  function applyMaskToField(input) {
+    const type = maskedFieldType(input);
+    if (!type) return;
+    input.value = type === "cnpj" ? maskCnpj(input.value) : maskPhone(input.value);
+    validateMaskedField(input);
+  }
+
+  function validateMaskedFields(root) {
+    let valid = true;
+    root?.querySelectorAll?.('input[name="cnpj"],input[name="phone"],input[name="whatsapp"]').forEach((input) => {
+      applyMaskToField(input);
+      if (!validateMaskedField(input)) valid = false;
+    });
+    return valid;
+  }
+
+
+  function parsePtDateTime(date, time = "00:00") {
+    const [day, month, year] = String(date || "").split("/").map(Number);
+    const [hour, minute] = String(time || "00:00").split(":").map(Number);
+    return new Date(year, Math.max(0, month - 1), day, hour || 0, minute || 0, 0, 0);
+  }
+
+  function formatPtDate(date) {
+    return new Intl.DateTimeFormat("pt-BR").format(date);
+  }
+
+  function accountingMonth(date = new Date()) {
+    return new Intl.DateTimeFormat("pt-BR", { month: "2-digit", year: "numeric" }).format(date);
+  }
+
+  function firstReservationOccurrence(reservation) {
+    const occurrences = Array.isArray(reservation?.occurrences) && reservation.occurrences.length
+      ? [...reservation.occurrences].sort((a,b) => parsePtDateTime(a.date,a.time).getTime() - parsePtDateTime(b.date,b.time).getTime())
+      : [{ date: reservation?.date, time: reservation?.time, endTime: reservation?.endTime }];
+    return occurrences[0] || { date: reservation?.date, time: reservation?.time, endTime: reservation?.endTime };
+  }
+
+  function cancellationEligibility(reservation, source = "user") {
+    if (!reservation) return { eligible: false, hoursRemaining: 0, mode: "none" };
+    const firstOccurrence = firstReservationOccurrence(reservation);
+    const useAt = parsePtDateTime(firstOccurrence.date, firstOccurrence.time);
+    const hoursRemaining = (useAt.getTime() - Date.now()) / 3600000;
+    if (source === "partner" || source === "tamo") return { eligible: true, hoursRemaining, mode: "refund", firstOccurrence };
+    if (reservation.monthly) {
+      const eligible=hoursRemaining>=Number(state.settings.cancellationHours||24);
+      if(!eligible)return {eligible:false,hoursRemaining,mode:"monthly_locked",firstOccurrence};
+      return {eligible:true,hoursRemaining,mode:"voucher",firstOccurrence};
+    }
+    const confirmedAt=reservation.paymentConfirmedAtIso?new Date(reservation.paymentConfirmedAtIso):null;
+    const cancellationDeadline=confirmedAt&&Number.isFinite(confirmedAt.getTime())?new Date(confirmedAt.getTime()+24*3600000):null;
+    const eligible=Boolean(cancellationDeadline&&Date.now()<=cancellationDeadline.getTime()&&Date.now()<useAt.getTime());
+    return {eligible,hoursRemaining:cancellationDeadline?(cancellationDeadline.getTime()-Date.now())/3600000:0,mode:eligible?"voucher":"no_compensation",firstOccurrence,cancellationDeadline};
+  }
+
+  function timeToMinutes(time) {
+    const match = /^(\d{1,2}):([0-5]\d)(?::00)?$/.exec(String(time || "00:00"));
+    if (!match) return NaN;
+    const value = Number(match[1]) * 60 + Number(match[2]);
+    return value <= 1440 ? value : NaN;
+  }
+  function minutesToTime(minutes) {
+    const normalized = Math.max(0, Math.min(1440, Number(minutes || 0)));
+    return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;
+  }
+
+  function slotEndTime(slot) {
+    return slot?.endTime || minutesToTime(timeToMinutes(slot?.time || "00:00") + 60);
+  }
+
+  function timeRange(startTime, endTime) {
+    const end = endTime || minutesToTime(timeToMinutes(startTime) + 60);
+    return `${startTime} às ${end === "24:00" ? "00:00 (meia-noite)" : end}`;
+  }
+
+  function isoToLocalDate(isoDate) {
+    const [year, month, day] = String(isoDate || "").split("-").map(Number);
+    return new Date(year, Math.max(0, month - 1), day || 1, 12, 0, 0);
+  }
+
+  function scheduleDayFromDate(date) {
+    const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+    return { date: formatPtDate(date), shortDate: `${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}`, weekday: weekdays[date.getDay()], dayLabel: `${date.getDate()} ${months[date.getMonth()]}` };
+  }
+
+  function isoDateString(date) {
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+  }
+
+  function ptDateToIso(date) {
+    const [day, month, year] = String(date || "").split("/");
+    return day && month && year ? `${year}-${month.padStart(2,"0")}-${day.padStart(2,"0")}` : "";
+  }
+
+  function timeRangesOverlap(startA, endA, startB, endB) {
+    return timeToMinutes(startA) < timeToMinutes(endB) && timeToMinutes(startB) < timeToMinutes(endA);
+  }
+
+  function normalizedSlotSpace(slot) {
+    return slot?.space || state.partnerSpaces[0]?.name || "Espaço principal";
+  }
+
+  function scheduleConflict(venue, dateMeta, space, startTime, endTime, excludeSlot = null) {
+    const day = venue.schedule.find((item) => item.date === dateMeta.date);
+    if (!day) return null;
+    return day.slots.find((slot) => slot !== excludeSlot && normalizedSlotSpace(slot) === space && timeRangesOverlap(startTime, endTime, slot.time, slotEndTime(slot))) || null;
+  }
+
+  function availabilityKey(shortDate, time, space) {
+    return `${String(shortDate || "")}::${String(time || "")}::${String(space || "")}`;
+  }
+
+  function selectedAvailabilityKeys() {
+    state.ui = state.ui || {};
+    state.ui.selectedAvailabilityKeys = Array.isArray(state.ui.selectedAvailabilityKeys) ? state.ui.selectedAvailabilityKeys : [];
+    return state.ui.selectedAvailabilityKeys;
+  }
+
+  function publicAvailabilityEntries(venue) {
+    return (venue?.schedule || []).flatMap((day) => day.slots.map((slot) => ({ day, slot, key: availabilityKey(window.MarketplaceAgendaNavigation.dayIso(day), slot.time, normalizedSlotSpace(slot)) })));
+  }
+
+  function blockableAvailabilityEntries(venue) {
+    return publicAvailabilityEntries(venue)
+      .filter(({day,slot}) => !slot.blocked && !availabilityHasActiveReservation(venue,day,slot))
+      .sort((a,b) => parsePtDateTime(a.day.date,a.slot.time) - parsePtDateTime(b.day.date,b.slot.time) || normalizedSlotSpace(a.slot).localeCompare(normalizedSlotSpace(b.slot)));
+  }
+
+  function availabilityHasActiveReservation(venue, day, slot) {
+    return ["reserved","monthly_pre_reserved","unavailable"].includes(slot?.backendMarketplaceStatus)
+      || Boolean(findReservationForSlot(venue.id, slot.time, day.date, slotEndTime(slot), normalizedSlotSpace(slot)));
+  }
+
+  function availabilitySelectionProtected(venue, day, slot) {
+    return Boolean(slot?.backendInitialEntryId) || availabilityHasActiveReservation(venue,day,slot) || partnerSlotHasMonthlyLink(slot);
+  }
+
+  function selectableAvailabilityEntries(venue, selectedDate) {
+    return publicAvailabilityEntries(venue).filter(({day,slot}) => window.MarketplaceAgendaNavigation.dayIso(day) === selectedDate
+      && !availabilitySelectionProtected(venue,day,slot));
+  }
+
+  function removeAvailabilityEntries(venue, keys) {
+    const keySet = new Set(keys);
+    let removed = 0;
+    venue.schedule.forEach((day) => {
+      const before = day.slots.length;
+      day.slots = day.slots.filter((slot) => !keySet.has(availabilityKey(window.MarketplaceAgendaNavigation.dayIso(day), slot.time, normalizedSlotSpace(slot))));
+      removed += before - day.slots.length;
+    });
+    venue.schedule = venue.schedule.filter((day) => day.slots.length);
+    state.ui.selectedAvailabilityKeys = selectedAvailabilityKeys().filter((key) => !keySet.has(key));
+    return removed;
+  }
+
+  function partnerScheduleDays(venue) {
+    return [...(venue?.schedule || [])].filter((day) => Array.isArray(day.slots) && day.slots.length).sort((a,b) => parsePtDateTime(a.date,"12:00") - parsePtDateTime(b.date,"12:00"));
+  }
+
+  function partnerAgendaView(venue) {
+    state.ui = state.ui || {};
+    const context=`${backendRuntime.identityId || "local"}:${state.partnerProfile.backendPartnerId || venue.id}:${venue.id}`;
+    if(state.ui.partnerAgendaContext!==context){state.ui.partnerAgendaContext=context;state.ui.partnerAgendaDate="";state.ui.partnerAgendaMonth="";state.ui.selectedAvailabilityKeys=[];}
+    const view=window.MarketplaceAgendaNavigation.resolve({days:partnerScheduleDays(venue),month:state.ui.partnerAgendaMonth,selectedDate:state.ui.partnerAgendaDate,
+      today:window.MarketplaceAgendaNavigation.today(venue.timezone || "America/Sao_Paulo")});
+    state.ui.partnerAgendaDate=view.selectedDate;state.ui.partnerAgendaMonth=view.month;
+    return view;
+  }
+
+  function selectedPartnerAgendaDate(venue) { return partnerAgendaView(venue).selectedDate; }
+
+  function focusPartnerAgendaDate(day) {
+    const date=window.MarketplaceAgendaNavigation.dayIso(day);
+    state.ui.partnerAgendaDate=date;state.ui.partnerAgendaMonth=date.slice(0,7);state.ui.selectedAvailabilityKeys=[];
+  }
+
+  function partnerAgendaDateStrip(venue) { return window.MarketplaceAgendaNavigation.render(partnerAgendaView(venue)); }
+
+  function partnerScheduleSelection(venue,button) {
+    return reservationSelectionForSlot(venue,button.dataset.time,button.dataset.fullDate || button.dataset.date,
+      button.dataset.end,button.dataset.space,button.dataset.slotId);
+  }
+
+  function partnerInitialImportCard(venue) {
+    if(!backendScheduleIsOfficial(venue)||!hasPartnerPermission("manage_schedule")||partnerReadonlyActive())return "";
+    return `<section class="partner-initial-entry card"><div><span class="eyebrow">Primeiros passos</span><h2>Traga seus mensalistas para a agenda</h2><p>Já tem uma lista de grupos que usam a quadra? Importe os horários após publicar sua agenda. Os grupos podem entrar e aceitar o vínculo depois.</p></div><button type="button" class="button secondary" data-action="partner-initial-agenda">Importar agenda inicial</button></section>`;
+  }
+
+  function operationalSlotInfo(venue, day, slot) {
+    if (slot.blocked) {
+      return {
+        type:"blocked",
+        title:slot.backendInitialEntryId ? `Mensalista importado · ${slot.backendInitialLabel}` : slot.blockTitle || "Bloqueio operacional",
+        detail:slot.backendInitialEntryId ? "Aguardando primeira vinculação. Gerencie em Importar agenda inicial." : slot.blockDetail || "Horário indisponível no marketplace",
+        statusLabel:"Bloqueado",
+        reservation:null
+      };
+    }
+    if (slot.backendMonthlyProtected && slot.backendMarketplaceStatus !== "reserved") {
+      const authorized=slot.backendMonthlyAuthorized;
+      return {
+        type:"monthly",
+        title:authorized ? `Mensalista · ${slot.backendMonthlyGroupName||"grupo protegido"}` : "Horário mensalista protegido",
+        detail:authorized
+          ? "Reserva mensal ainda não criada. O horário permanece protegido para o grupo."
+          : "Identidade do grupo protegida; horário indisponível para terceiros.",
+        statusLabel:authorized ? "Horário protegido" : "Indisponível",
+        reservation:null
+      };
+    }
+    const reservation = findReservationForSlot(venue.id, slot.time, day.date, slotEndTime(slot), normalizedSlotSpace(slot)) || (slot.backendMarketplaceStatus === "reserved" ? {
+      id:slot.backendReservationId || "Reserva ativa",
+      statusKey:slot.backendReservationStatus === "confirmed" ? "confirmed" : "pending",
+      paymentStatus:slot.backendReservationStatus === "confirmed" ? "Confirmada" : "Aguardando pagamento"
+    } : null);
+    if (!reservation) {
+      return {
+        type:"available",
+        title:"Disponível no marketplace",
+        detail:`${money(slot.price)}${slot.monthlyEligible ? ` · Mensalista ${money(slot.monthlyPrice)}` : ""}`,
+        statusLabel:"Disponível",
+        reservation:null
+      };
+    }
+    const statusKey = reservation.statusKey || partnerReservationStatusKey(reservation);
+    const confirmed = statusKey === "confirmed";
+    return {
+      type:confirmed ? "confirmed" : "pending",
+      title:reservationSubjectLabel(reservation),
+      detail:`${reservation.id || "Reserva"} · ${reservation.paymentStatus || reservation.payment || (confirmed ? "Confirmada" : "Pendente")}`,
+      statusLabel:confirmed ? "Reservado · confirmado" : "Reserva pendente",
+      reservation
+    };
+  }
+
+  function partnerSlotHasMonthlyLink(slot, reservation = null) {
+    return Boolean(slot?.backendMonthlyProtected||slot?.backendMonthlyCustomerLinkId||slot?.backendMonthlyCycleId||reservation?.monthly);
+  }
+
+  function partnerSlotReservationFinancialDetails(reservation = null) {
+    if(!reservation)return "";
+    const total=Number(reservation.value||0);
+    const paid=Number(reservation.amountPaid??reservation.accountingRecognizedValue??0);
+    const balance=reservation.monthlyCycleId?monthlyPaymentPresentation(reservation).balance:Math.max(0,total-paid-Number(reservation.voucherAppliedValue||0));
+    const confirmed=(reservation.statusKey||partnerReservationStatusKey(reservation))==="confirmed";
+    return `<div class="detail-group reservation-slot-financial-detail-group"><h3>Financeiro da reserva</h3><div class="detail-list"><div class="detail-line"><span>Valor da reserva</span><strong>${money(total)}</strong></div><div class="detail-line"><span>Valor pago</span><strong>${money(paid)}</strong></div>${balance>0?`<div class="detail-line"><span>Saldo a pagar</span><strong>${money(balance)}</strong></div>`:""}<div class="detail-line"><span>Situação</span><strong>${esc(reservation.paymentStatus||reservation.payment||(confirmed?"Pagamento confirmado":"Pagamento pendente"))}</strong></div></div></div>`;
+  }
+
+  function partnerMonthlySlotDetails(slot, reservation = null) {
+    if(!partnerSlotHasMonthlyLink(slot,reservation))return "";
+    const cycle=monthlyCycleForSlot(slot)||(state.monthlyCycles||[]).find((item)=>item.id===reservation?.monthlyCycleId)||null;
+    const link=(state.monthlyCustomerLinks||[]).find((item)=>item.id===(slot.backendMonthlyCustomerLinkId||cycle?.monthlyLinkId))||cycle?.link||null;
+    const groupName=slot.backendMonthlyGroupName||cycle?.groupName||link?.groupName||reservation?.groupName||"Grupo mensalista";
+    const linkStatus=link?.status==="active"?"Ativo":link?.status==="suspended"?"Suspenso":link?.status==="cancelled"?"Cancelado":"Protegido";
+    const monthlyTotal=Number(cycle?.monthlyTotal||slot.backendMonthlyTotal||link?.monthlyPrice||slot.monthlyPrice||reservation?.value||0);
+    if(cycle&&!reservation&&!cycle.reservationId){
+      const step=monthlyPendingStep(cycle),summary=monthlyCycleReservationSummary(cycle);
+      return `<div class="detail-group monthly-slot-detail-group"><h3>Mensalista · ${esc(monthlyPeriodTitle(cycle.serviceMonth))}</h3><div class="detail-list"><div class="detail-line"><span>Grupo</span><strong>${esc(groupName)}</strong></div><div class="detail-line"><span>Mensalidade a revisar no aceite</span><strong>${money(monthlyTotal)}</strong></div><div class="detail-line"><span>Jogos protegidos no mês</span><strong>${esc(cycle.occurrenceCount)}</strong></div><div class="detail-line"><span>Próxima etapa do cliente</span><strong>${esc(step.button||step.label)}</strong></div></div><p class="dialog-description">A reserva ainda não foi criada. O cliente precisa revisar e aceitar o valor deste mês antes de definir o pagamento.</p>${monthlyFirstGameDate(summary.dates)}${monthlyPendingConditions(cycle,summary.dates)}</div>`;
+    }
+    const detailReservation=reservation||{monthlyCycleId:cycle?.id||slot.backendMonthlyCycleId,monthlyCycleStatus:slot.backendMonthlyCycleStatus,monthlyTotalPaid:cycle?.totalPaid,
+      value:monthlyTotal,monthlyGuaranteeRequired:cycle?.guaranteeRequired,monthlyBalanceDueAt:slot.backendMonthlyBalanceDueAt};
+    return `<div class="detail-group monthly-slot-detail-group"><h3>Vínculo mensalista</h3><div class="detail-list"><div class="detail-line"><span>Grupo</span><strong>${esc(groupName)}</strong></div><div class="detail-line"><span>Status do vínculo</span><strong>${esc(linkStatus)}</strong></div><div class="detail-line"><span>Mês do ciclo</span><strong>${esc(monthlyPeriodLabel(cycle?.serviceMonth))}</strong></div><div class="detail-line"><span>Ocorrências do ciclo</span><strong>${esc(cycle?.occurrenceCount||reservation?.occurrenceCount||1)}</strong></div>${monthlyFinancialDetail(detailReservation)}</div></div>`;
+  }
+
+  function ensureScheduleDay(venue, meta) {
+    let day = venue.schedule.find((item) => item.date === meta.date);
+    if (!day) {
+      day = {...meta, slots:[]};
+      venue.schedule.push(day);
+      venue.schedule.sort((a,b) => parsePtDateTime(a.date,"12:00") - parsePtDateTime(b.date,"12:00"));
+    }
+    return day;
+  }
+
+  function slotForSchedulePeriod(venue, meta, space, startTime, endTime) {
+    const day = venue.schedule.find((item) => item.date === meta.date);
+    const slot = day?.slots.find((item) => normalizedSlotSpace(item) === space && item.time === startTime && slotEndTime(item) === endTime) || null;
+    return { day, slot };
+  }
+
+  function cascadeAvailabilityPlan(venue, editDay, editSlot, nextEndTime) {
+    const space = normalizedSlotSpace(editSlot);
+    const ordered = editDay.slots.filter((slot) => normalizedSlotSpace(slot) === space).sort((a,b) => a.time.localeCompare(b.time));
+    const index = ordered.indexOf(editSlot);
+    if (index < 0) return { valid: true, changes: [] };
+    const following = [];
+    let originalCursor = slotEndTime(editSlot);
+    for (const candidate of ordered.slice(index + 1)) {
+      if (candidate.time !== originalCursor) break;
+      following.push(candidate);
+      originalCursor = slotEndTime(candidate);
+    }
+    let cursor = timeToMinutes(nextEndTime);
+    const changes = [];
+    for (const slot of following) {
+      const duration = Math.max(1, timeToMinutes(slotEndTime(slot)) - timeToMinutes(slot.time));
+      const nextStart = minutesToTime(cursor);
+      if ((slot.blocked || partnerSlotHasMonthlyLink(slot) || availabilityHasActiveReservation(venue, editDay, slot)) && slot.time !== nextStart) {
+        return { valid:false, reason:`O horário ${timeRange(slot.time,slotEndTime(slot))} possui reserva ativa e não pode ser deslocado automaticamente.` };
+      }
+      const endMinutes = cursor + duration;
+      if (endMinutes > 1440) return { valid:false, reason:"A reorganização ultrapassaria a meia-noite. Ajuste a duração ou reorganize a grade manualmente." };
+      changes.push({ slot, startTime: nextStart, endTime: minutesToTime(endMinutes) });
+      cursor = endMinutes;
+    }
+    return { valid:true, changes };
+  }
+
+  function scheduleSlotProtectionReason(venue, day, slot) {
+    if (partnerSlotHasMonthlyLink(slot)) return "Vínculo mensalista protegido";
+    if (slot.blocked) return "Horário bloqueado";
+    if (availabilityHasActiveReservation(venue,day,slot)) return "Horário com reserva ativa";
+    return "";
+  }
+
+  function scheduleSlotReference(venue, day, slot) {
+    return {venueId:venue.id,date:day.date,time:slot.time,endTime:slotEndTime(slot),
+      space:normalizedSlotSpace(slot),spaceId:slot.backendSpaceId || "",slotId:slot.backendId || ""};
+  }
+
+  function resolveScheduleReference(reference) {
+    const venue=state.venues.find((item)=>item.id===reference.venueId);
+    const matches=(venue?.schedule || []).flatMap((day)=>day.date!==reference.date?[]:day.slots
+      .filter((slot)=>slot.time===reference.time && slotEndTime(slot)===reference.endTime &&
+        (reference.slotId?slot.backendId===reference.slotId:!slot.backendId) &&
+        (reference.spaceId?slot.backendSpaceId===reference.spaceId:!slot.backendSpaceId && normalizedSlotSpace(slot)===reference.space))
+      .map((slot)=>({venue,day,slot})));
+    return matches.length===1?matches[0]:null;
+  }
+
+  function resolveScheduleSelection(references) {
+    const entries=references.map(resolveScheduleReference);
+    if(entries.some((entry)=>!entry || scheduleSlotProtectionReason(entry.venue,entry.day,entry.slot))) {
+      return {valid:false,reason:"A agenda mudou: um horário selecionado foi alterado, removido ou protegido. Feche e reabra o formulário para atualizar a seleção.",entries:[]};
+    }
+    return {valid:true,entries};
+  }
+
+  function scheduleOccurrenceCandidates(venue, sourceDay, sourceSlot, sameMonth = true) {
+    const sourceDate=parsePtDateTime(sourceDay.date,"12:00");
+    return venue.schedule.flatMap((day)=>{
+      const date=parsePtDateTime(day.date,"12:00");
+      if(date<=sourceDate || (sameMonth && (date.getMonth()!==sourceDate.getMonth() || date.getFullYear()!==sourceDate.getFullYear())))return [];
+      const matches=day.slots.filter((item)=>sameReservationSpace(item,sourceSlot) && item.time===sourceSlot.time && slotEndTime(item)===slotEndTime(sourceSlot));
+      if(!matches.length)return [];
+      const slot=matches[0];
+      const reason=matches.length!==1?"Mais de um horário equivalente nesta data":scheduleSlotProtectionReason(venue,day,slot);
+      return [{day,slot,date:isoDateString(date),key:`schedule_date_${isoDateString(date)}`,disabled:Boolean(reason),reason,reference:scheduleSlotReference(venue,day,slot)}];
+    }).sort((a,b)=>a.key.localeCompare(b.key));
+  }
+
+  function scheduleEditCandidates(venue, sourceDay, sourceSlot) {
+    return scheduleOccurrenceCandidates(venue,sourceDay,sourceSlot,true);
+  }
+
+  function scheduleCalendarField(name, label, sourceDay, candidates, help) {
+    return {name,label,type:"date-selection",full:true,sourceDate:ptDateToIso(sourceDay.date),help,
+      options:candidates.map((item)=>({value:item.key,date:item.date,disabled:item.disabled,reason:item.reason}))};
+  }
+
+  function openScheduleDeletion(venue, day, slot) {
+    if(scheduleSlotProtectionReason(venue,day,slot)){showToast("Este horário está protegido e não pode ser excluído.");return;}
+    const official=backendScheduleIsOfficial(venue);
+    const source=scheduleSlotReference(venue,day,slot);
+    const candidates=scheduleOccurrenceCandidates(venue,day,slot,false);
+    const totalLabel=(count)=>`${count} horário${count===1?"":"s"}`;
+    let deleting=false;
+    openForm({eyebrow:"Agenda pública",title:"Excluir horário",submitLabel:"Revisar exclusão",
+      description:`${day.date} · ${timeRange(slot.time,slotEndTime(slot))} · ${normalizedSlotSpace(slot)}. Este horário será incluído. Se desejar, selecione suas próximas ocorrências no calendário.`,
+      fields:[scheduleCalendarField("deleteDates","Excluir também nas próximas datas (opcional)",day,candidates,
+        "São exibidas as próximas ocorrências publicadas do mesmo espaço, início e término, inclusive em outros meses. Reservas, bloqueios e vínculos mensalistas ficam protegidos.")],
+      onChange:()=>{
+        const count=1+formFields.querySelectorAll('[data-calendar-input]:checked:not(:disabled)').length;
+        formSubmit.textContent=`Revisar exclusão de ${totalLabel(count)}`;
+      },
+      onSubmit:async(data)=>{
+        if(deleting || partnerReadonlyActive())return false;
+        const selected=candidates.filter((item)=>data[item.key]==="true");
+        if(selected.some((item)=>item.disabled)){showToast("Remova as datas protegidas da seleção.");return false;}
+        const references=[source,...selected.map((item)=>item.reference)];
+        if(official){
+          try { if(!await refreshBackendBootstrap(true))throw Error("Não foi possível atualizar a agenda oficial. Tente novamente."); }
+          catch(error){showToast(backendErrorMessage(error));return false;}
+        }
+        const checked=resolveScheduleSelection(references);
+        if(!checked.valid){showToast(checked.reason);return false;}
+        if(official && !backendScheduleIsOfficial(checked.entries[0].venue)){showToast("Reconecte-se para excluir horários da agenda oficial.");return false;}
+        const last=checked.entries.at(-1).day.date;
+        askConfirm({title:`Excluir ${totalLabel(references.length)}?`,
+          message:`Excluir ${totalLabel(references.length)} de ${timeRange(source.time,source.endTime)}, em ${source.space}, ${references.length===1?`no dia ${source.date}`:`nas datas escolhidas entre ${source.date} e ${last}`}? Somente os horários selecionados serão excluídos. Esta ação não pode ser desfeita.`,
+          confirmLabel:`Excluir ${totalLabel(references.length)}`,
+          onConfirm:async()=>{
+            if(deleting || partnerReadonlyActive())return;
+            deleting=true;formSubmit.disabled=true;
+            try {
+              let deleted=0,protectedCount=0,missing=0;
+              if(official){
+                const result=await runBackendMutation("",async()=>{
+                  if(!await refreshBackendBootstrap(true))throw Error("Não foi possível atualizar a agenda oficial. Tente novamente.");
+                  const fresh=resolveScheduleSelection(references);
+                  if(!fresh.valid)throw Error(fresh.reason);
+                  if(!backendScheduleIsOfficial(fresh.entries[0].venue) || fresh.entries.some((entry)=>!entry.slot.backendId))throw Error("Reconecte-se para excluir horários da agenda oficial.");
+                  return window.MarketplaceBackend.deleteScheduleSlots(fresh.entries.map((entry)=>entry.slot.backendId));
+                });
+                if(!result)return;
+                if(!Array.isArray(result.deleted) || !Array.isArray(result.protected)){showToast("Consulte a agenda atualizada para verificar o resultado da exclusão.");return;}
+                const sent=new Set(references.map((reference)=>reference.slotId));
+                deleted=new Set(result.deleted.filter((id)=>sent.has(id))).size;
+                protectedCount=new Set(result.protected.filter((id)=>sent.has(id))).size;
+                missing=Math.max(0,sent.size-deleted-protectedCount);
+              } else {
+                const fresh=resolveScheduleSelection(references);
+                if(!fresh.valid){showToast(fresh.reason);return;}
+                for(const entry of fresh.entries){
+                  entry.day.slots=entry.day.slots.filter((item)=>item!==entry.slot);
+                  if(!entry.day.slots.length)entry.venue.schedule=entry.venue.schedule.filter((item)=>item!==entry.day);
+                  deleted++;
+                }
+                state.ui.selectedAvailabilityKeys=[];saveState();render();
+              }
+              if(formDialog.open)formDialog.close();formHandler=null;formChangeHandler=null;
+              showToast(`${totalLabel(deleted)} excluído${deleted===1?"":"s"}.${protectedCount?` ${totalLabel(protectedCount)} preservado${protectedCount===1?"":"s"} por reserva ativa.`:""}${missing?` ${totalLabel(missing)} já não estava${missing===1?"":"m"} na agenda.`:""}`);
+            } finally {deleting=false;formSubmit.disabled=false;}
+          }});
+        return false;
+      }});
+  }
+
+  function monthlyAvailabilityPropagationPlan(venue, sourceDay, sourceSlot, desiredStartTime, desiredEndTime, selectedDays = null, propagateFollowing = true) {
+    const sourceDate = parsePtDateTime(sourceDay.date, "12:00");
+    const originalStart = sourceSlot.time;
+    const originalSpace = normalizedSlotSpace(sourceSlot);
+    const targetDuration = timeToMinutes(desiredEndTime) - timeToMinutes(desiredStartTime);
+    if (targetDuration <= 0) return { valid:false, reason:"A duração mensalista precisa ser maior que zero.", dayPlans:[] };
+    const dayPlans = [];
+    const candidateDays = venue.schedule.filter((day) => {
+      if (day === sourceDay) return false;
+      if (selectedDays !== null) return selectedDays.includes(day);
+      const date = parsePtDateTime(day.date, "12:00");
+      return date >= sourceDate && date.getMonth() === sourceDate.getMonth() && date.getFullYear() === sourceDate.getFullYear() && date.getDay() === sourceDate.getDay();
+    });
+    for (const day of candidateDays) {
+      const slot = day.slots.find((item) => normalizedSlotSpace(item) === originalSpace && item.time === originalStart);
+      if (!slot) continue;
+      if (slot.blocked || partnerSlotHasMonthlyLink(slot)) return { valid:false, reason:`${day.date} possui o período ${timeRange(slot.time,slotEndTime(slot))} bloqueado e ele não pode integrar a sequência mensalista.`, dayPlans:[] };
+      if (availabilityHasActiveReservation(venue, day, slot) && (slot.time !== desiredStartTime || slotEndTime(slot) !== desiredEndTime)) {
+        return { valid:false, reason:`${day.date} · ${timeRange(slot.time,slotEndTime(slot))} já possui reserva ativa e não pode ter sua duração alterada.`, dayPlans:[] };
+      }
+      const cascade = propagateFollowing ? cascadeAvailabilityPlan(venue, day, slot, desiredEndTime) : {valid:true,changes:[]};
+      if (!cascade.valid) return { valid:false, reason:`${day.date}: ${cascade.reason}`, dayPlans:[] };
+      const followingSet = new Set(cascade.changes.map((change) => change.slot));
+      const unaffected = day.slots.filter((item) => item !== slot && !followingSet.has(item) && normalizedSlotSpace(item) === originalSpace);
+      const proposed = [{ startTime:desiredStartTime, endTime:desiredEndTime }, ...cascade.changes];
+      const collision = proposed.find((period) => unaffected.some((item) => timeRangesOverlap(period.startTime,period.endTime,item.time,slotEndTime(item))));
+      if (collision) {
+        const conflict = unaffected.find((item) => timeRangesOverlap(collision.startTime,collision.endTime,item.time,slotEndTime(item)));
+        return { valid:false, reason:`${day.date}: a grade ajustada em ${timeRange(collision.startTime,collision.endTime)} encontraria o horário independente ${timeRange(conflict.time,slotEndTime(conflict))}.`, dayPlans:[] };
+      }
+      dayPlans.push({ day, slot, cascade });
+    }
+    return { valid:true, dayPlans };
+  }
+
+  function applyMonthlyAvailabilityPropagation(plan, desiredStartTime, desiredEndTime, monthlyPrice, price = null, monthlyEligible = true) {
+    let changedDays = 0;
+    let shiftedSlots = 0;
+    (plan?.dayPlans || []).forEach(({day,slot,cascade}) => {
+      slot.time = desiredStartTime;
+      slot.endTime = desiredEndTime;
+      slot.monthlyEligible = monthlyEligible;
+      slot.monthlyPrice = monthlyEligible ? Number(monthlyPrice || 0) : 0;
+      if (price !== null) slot.price = Number(price);
+      cascade.changes.forEach((change) => {
+        change.slot.time = change.startTime;
+        change.slot.endTime = change.endTime;
+        shiftedSlots += 1;
+      });
+      day.slots.sort((a,b) => a.time.localeCompare(b.time));
+      changedDays += 1;
+    });
+    return { changedDays, shiftedSlots };
+  }
+
+  function datesForAgendaRange(startIso, endIso, preset) {
+    const start = isoToLocalDate(startIso);
+    const end = isoToLocalDate(endIso);
+    if (end < start) return [];
+    const initialWeekday = start.getDay();
+    const dates = [];
+    for (let date = new Date(start); date <= end; date.setDate(date.getDate()+1)) {
+      const weekday = date.getDay();
+      const include = preset === "Todos os dias" ||
+        (preset === "Segunda a sexta" && weekday >= 1 && weekday <= 5) ||
+        (preset === "Segunda a sábado" && weekday >= 1 && weekday <= 6) ||
+        (preset === "Sábados e domingos" && (weekday === 0 || weekday === 6)) ||
+        (preset === "Mesmo dia da semana da data inicial" && weekday === initialWeekday);
+      if (include) dates.push(new Date(date));
+    }
+    return dates;
+  }
+
+  function rangesForAgendaGeneration(mode, startTime, lastStartTime, durationMinutes, intervalMinutes) {
+    const start = timeToMinutes(startTime);
+    const recurring = mode === "Um horário recorrente";
+    const lastStart = recurring ? start : timeToMinutes(lastStartTime);
+    const duration = Number(durationMinutes);
+    const interval = recurring ? 0 : Number(intervalMinutes ?? 0);
+    if (!["Grade automática do dia", "Um horário recorrente"].includes(mode)
+      || !Number.isFinite(start) || !Number.isFinite(lastStart) || start >= 1440
+      || lastStart < start || lastStart >= 1440 || !Number.isInteger(duration) || duration < 15
+      || !Number.isInteger(interval) || interval < 0 || interval > 1440 || lastStart + duration > 1440) return [];
+    const ranges = [];
+    for (let cursor = start; cursor <= lastStart; cursor += duration + interval) {
+      ranges.push({ startTime:minutesToTime(cursor), endTime:minutesToTime(cursor + duration) });
+    }
+    return ranges;
+  }
+
+  function updateAgendaGenerationFields(_event, form) {
+    const recurring = form.elements.namedItem("generationMode")?.value === "Um horário recorrente";
+    for (const name of ["lastStartTime", "intervalMinutes"]) {
+      const input = form.elements.namedItem(name);
+      if (!input) continue;
+      input.disabled = recurring;
+      input.closest("[data-field-name]").hidden = recurring;
+    }
+  }
+  function showIncrementalAgendaResult(createdCount, skippedCount, requestedCount, conflicts = []) {
+    const created = Math.max(0, Number(createdCount || 0));
+    const skipped = Math.max(0, Number(skippedCount || 0));
+    const requested = Math.max(created + skipped, Number(requestedCount || 0));
+    const toast = skipped
+      ? created
+        ? `${created} horário(s) criado(s); ${skipped} período(s) existente(s) preservado(s).`
+        : `A grade já estava preenchida: ${skipped} período(s) existente(s) preservado(s).`
+      : `${created} horário(s) criado(s) e publicados.`;
+    showToast(toast);
+    if (!skipped) return;
+    const samples = conflicts.slice(0,8);
+    setTimeout(() => openDetail({
+      eyebrow:created?"Agenda preenchida":"Sobreposição preservada",
+      title:created ? "Novos horários adicionados" : "Nenhuma alteração realizada",
+      body:`${created?`<div class="summary-card"><strong>Preenchimento concluído sem alterar horários existentes</strong><div class="meta-row" style="margin-top:7px"><span>${esc(created)} criado(s)</span><span>${esc(skipped)} preservado(s)</span><span>${esc(requested)} solicitado(s)</span></div><p class="dialog-description">Cada ocorrência foi analisada separadamente. Os períodos livres foram publicados e os já existentes, reservados ou protegidos permaneceram intactos.</p></div>`:`<div class="cancellation-warning agenda-overlap-notice" role="status"><strong>Nenhum horário foi criado</strong><p>O período solicitado se sobrepõe a um horário já publicado. Para proteger a agenda, o sistema não dividiu, substituiu nem alterou nenhum horário.</p><div class="meta-row"><span>0 criado</span><span>${esc(skipped)} preservado(s)</span><span>${esc(requested)} solicitado(s)</span></div></div>`}${samples.length?`<div class="detail-list">${samples.map((item)=>`<div class="detail-line"><span>Sobreposição preservada</span><strong>${esc(item)}</strong></div>`).join("")}</div>${skipped>samples.length?`<p class="dialog-description">E mais ${esc(skipped-samples.length)} período(s) preservado(s).</p>`:""}`:""}`
+    }),80);
+  }
+
+  function sameReservationSpace(first, second) {
+    if (first?.backendSpaceId || second?.backendSpaceId) {
+      return Boolean(first?.backendSpaceId && first.backendSpaceId === second?.backendSpaceId);
+    }
+    return normalizedSlotSpace(first) === normalizedSlotSpace(second);
+  }
+
+  function reservationSelectionForSlot(venue, time, date, endTime = "", space = "", slotId = "") {
+    const candidates = (venue?.schedule || []).flatMap((day) => {
+      if (day.date !== date && day.shortDate !== date) return [];
+      return (day.slots || []).filter((slot) => slot.time === time
+        && (!endTime || slotEndTime(slot) === endTime)
+        && (!space || normalizedSlotSpace(slot) === space)
+        && (!slotId || slot.backendId === slotId))
+        .map((slot) => ({venue, day, slot, time:slot.time, endTime:slotEndTime(slot), value:Number(slot.price)}));
+    });
+    // Um atalho sem identidade suficiente nunca escolhe silenciosamente outra quadra.
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+
+  function currentReservationSelection(selection) {
+    if (!selection) return null;
+    const venue = state.venues.find((item) => item.id === selection.venue.id);
+    const current = reservationSelectionForSlot(venue, selection.time, selection.day.date,
+      selection.endTime || slotEndTime(selection.slot), "", selection.slot.backendId || "");
+    if (current && sameReservationSpace(current.slot, selection.slot)) return current;
+    if (selection.slot.backendId) return null;
+    return reservationSelectionForSlot(venue, selection.time, selection.day.date,
+      selection.endTime || slotEndTime(selection.slot), normalizedSlotSpace(selection.slot));
+  }
+
+  function reservationSelectionAvailable(selection) {
+    if (!selection?.slot || selection.slot.blocked || selection.slot.backendMonthlyProtected) return false;
+    if (selection.slot.backendId) {
+      // A visão oficial já considera reservas e proteções de outros usuários.
+      return selection.slot.backendMarketplaceStatus === "available" && !selection.slot.backendReservationId;
+    }
+    return !findReservationForSlot(selection.venue.id, selection.time, selection.day.date,
+      selection.endTime || slotEndTime(selection.slot), normalizedSlotSpace(selection.slot));
+  }
+
+  function monthlyOfferContinuity(selection) {
+    const current = currentReservationSelection(selection);
+    const result = { eligible:false, expectedDates:[], missingDates:[], occurrences:[] };
+    if (!current) return result;
+    const startDate = parsePtDateTime(current.day.date, "12:00");
+    if (!Number.isFinite(startDate.getTime())) return result;
+    const endTime = slotEndTime(current.slot);
+    // O calendário define as datas esperadas. Filtrar só as datas existentes
+    // esconderia lacunas e ofereceria uma mensalidade para um ciclo incompleto.
+    for (const date = new Date(startDate); date.getMonth() === startDate.getMonth()
+      && date.getFullYear() === startDate.getFullYear(); date.setDate(date.getDate() + 7)) {
+      const expectedDate = formatPtDate(date);
+      result.expectedDates.push(expectedDate);
+      const day = current.venue.schedule.find((item) => item.date === expectedDate);
+      const slot = day?.slots.find((item) => item.time === current.time && slotEndTime(item) === endTime
+        && sameReservationSpace(item, current.slot) && item.monthlyEligible
+        && reservationSelectionAvailable({venue:current.venue, day, slot:item, time:item.time, endTime}));
+      if (!slot) { result.missingDates.push(expectedDate); continue; }
+      result.occurrences.push({ date:day.date, shortDate:day.shortDate, weekday:day.weekday, dayLabel:day.dayLabel,
+        time:current.time, endTime, space:normalizedSlotSpace(slot), value:Number(slot.price ?? current.slot.price) });
+    }
+    result.eligible = Boolean(current.slot.monthlyEligible && Number(current.slot.monthlyPrice) > 0
+      && result.expectedDates.length && !result.missingDates.length);
+    return result;
+  }
+
+  function monthlyOccurrencesForSelection(selection) {
+    const offer = monthlyOfferContinuity(selection);
+    return offer.eligible ? offer.occurrences : [];
+  }
+
+  function reservationReviewSignature(selection, monthly) {
+    const current = currentReservationSelection(selection);
+    if (!current) return "";
+    return JSON.stringify({slot:current.slot.backendId || normalizedSlotSpace(current.slot), date:current.day.date,
+      time:current.time, endTime:current.endTime, available:reservationSelectionAvailable(current), monthly,
+      value:monthly ? Number(current.slot.monthlyPrice) : current.value,
+      dates:monthly ? monthlyOccurrencesForSelection(current).map((item) => item.date) : []});
+  }
+
+  function isMonthlySelection() {
+    return Boolean(selectedReservation?.slot?.monthlyEligible && monthlyReservationToggle?.checked);
+  }
+
+  function currentReservationValue() {
+    if (!selectedReservation) return 0;
+    return isMonthlySelection() ? Number(selectedReservation.slot.monthlyPrice || selectedReservation.value) : Number(selectedReservation.value);
+  }
+
+  function timePeriod(time) {
+    const minutes = timeToMinutes(time);
+    if (minutes < 360) return "madrugada";
+    if (minutes < 720) return "manhã";
+    if (minutes < 1080) return "tarde";
+    return "noite";
+  }
+
+  function voucherCompatibleWindow(originalTime) {
+    const center = timeToMinutes(originalTime);
+    const tolerance = Number(state.settings.voucherCompatibilityWindowHours || 2) * 60;
+    return { start: Math.max(0, center - tolerance), end: Math.min(1439, center + tolerance), period: timePeriod(originalTime) };
+  }
+
+  function compatibleAvailabilityForVoucher(voucher) {
+    const venue = state.venues.find((item) => item.id === voucher.venueId);
+    if (!venue) return { dates: [], count: 0, slots: 0 };
+    const window = voucherCompatibleWindow(voucher.originalTime || "20:00");
+    const issuedDate = voucher.issuedDate || String(voucher.issuedAt || "").split(",")[0];
+    const startsAt = parsePtDateTime(issuedDate, "00:00");
+    const endsAt = parsePtDateTime(voucher.expiresAt, "23:59");
+    const dates = [];
+    let slots = 0;
+    venue.schedule.forEach((day) => {
+      const dayDate = parsePtDateTime(day.date, "00:00");
+      if (dayDate < startsAt || dayDate > endsAt) return;
+      const matching = day.slots.filter((slot) => {
+        const minutes = timeToMinutes(slot.time);
+        const occupied = findReservationForSlot(venue.id, slot.time, day.date, slotEndTime(slot), normalizedSlotSpace(slot));
+        const bookingModeCompatible = voucher.eligibleBookingMode !== "monthly" || slot.monthlyEligible;
+        return !slot.blocked && !occupied && bookingModeCompatible && timePeriod(slot.time) === window.period && minutes >= window.start && minutes <= window.end;
+      });
+      if (matching.length) {
+        dates.push(day.date);
+        slots += matching.length;
+      }
+    });
+    const uniqueDates = [...new Set(dates)];
+    return { dates: uniqueDates, count: uniqueDates.length, slots };
+  }
+
+  function voucherStatusLabel(voucher) {
+    const map = { active: "Disponível", active_extended: "Prorrogado por disponibilidade", reserved: "Reservado", used: "Utilizado", archived: "Arquivado", deleted: "Excluído", expired: "Expirado", reassigned: "Realocado" };
+    return map[voucher.status] || voucher.status;
+  }
+
+  function refreshVoucherAvailability(voucher) {
+    if (!voucher || !["active", "active_extended", "reserved"].includes(voucher.status)) return voucher;
+    if (voucher.status === "reserved") return voucher;
+    const minimum = Number(voucher.minimumCompatibleDates || state.settings.voucherMinimumCompatibleDates || 4);
+    let availability = compatibleAvailabilityForVoucher(voucher);
+    voucher.compatibleDatesCount = availability.count;
+    voucher.compatibleSlotsCount = availability.slots;
+    voucher.compatibleDates = availability.dates;
+    const window = voucherCompatibleWindow(voucher.originalTime || "20:00");
+    voucher.compatibilityWindow = voucher.compatibilityWindow || `${minutesToTime(window.start)}–${minutesToTime(window.end)}`;
+    let expiry = parsePtDateTime(voucher.expiresAt, "23:59");
+    let guard = 0;
+    while (expiry.getTime() < Date.now() && availability.count < minimum && guard < 24) {
+      expiry.setDate(expiry.getDate() + Number(state.settings.voucherExtensionDays || 7));
+      voucher.expiresAt = formatPtDate(expiry);
+      voucher.status = "active_extended";
+      voucher.extensionCount = Number(voucher.extensionCount || 0) + 1;
+      voucher.extensionReason = `Disponibilidade compatível insuficiente: ${availability.count} de ${minimum} datas.`;
+      availability = compatibleAvailabilityForVoucher(voucher);
+      voucher.compatibleDatesCount = availability.count;
+      voucher.compatibleSlotsCount = availability.slots;
+      voucher.compatibleDates = availability.dates;
+      guard += 1;
+    }
+    if (expiry.getTime() < Date.now() && availability.count >= minimum) voucher.status = "expired";
+    return voucher;
+  }
+
+  function voucherIsExpired(voucher) {
+    refreshVoucherAvailability(voucher);
+    return voucher?.status === "expired";
+  }
+
+  function activeCancellationVouchers() {
+    state.cancellationVouchers.filter((voucher) => !voucher.backendOfficial).forEach(refreshVoucherAvailability);
+    return state.cancellationVouchers.filter((voucher) => ["active", "active_extended", "reserved"].includes(voucher.status));
+  }
+
+  function activeVoucherLiability(venueId) {
+    const items = activeCancellationVouchers().filter((voucher) => voucher.venueId === venueId);
+    return { items, count: items.length, value: items.reduce((sum, voucher) => sum + Number(voucher.value || 0), 0) };
+  }
+
+  function promotionByValue(value) {
+    if (!String(value || "").startsWith("PROMO:")) return null;
+    const code = String(value).slice(6);
+    return state.promotions.find((promo) => promo.code === code) || null;
+  }
+
+  function promotionDiscountType(promo) {
+    if (promo?.discountType) return promo.discountType;
+    return /%/.test(String(promo?.benefit || "")) ? "percentage" : "fixed";
+  }
+
+  function promotionDiscountValue(promo) {
+    const explicit = Number(promo?.discountValue);
+    if (Number.isFinite(explicit) && explicit > 0) return explicit;
+    const benefit = String(promo?.benefit || "");
+    if (promotionDiscountType(promo) === "percentage") {
+      const match = benefit.match(/(\d+(?:[,.]\d+)?)\s*%/);
+      return match ? Number(match[1].replace(",", ".")) : 0;
+    }
+    const match = benefit.match(/R\$\s*([\d.]+(?:,\d+)?)/i);
+    return match ? Number(match[1].replace(/\./g, "").replace(",", ".")) : 0;
+  }
+
+  function promotionBenefitLabel(promo) {
+    const type = promotionDiscountType(promo);
+    const value = promotionDiscountValue(promo);
+    return type === "percentage" ? `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(value)}% de desconto` : `${money(value)} de desconto`;
+  }
+
+  function promotionVenueId(promo) {
+    if (promo?.venueId) return promo.venueId;
+    if (promo?.venue === "Todos os parceiros") return "all";
+    return state.venues.find((venue) => venue.name === promo?.venue)?.id || "all";
+  }
+
+  function promotionValid(promo) {
+    if (!promo?.active) return false;
+    const expiry = parsePtDateTime(promo.validUntil || "31/12/2099", "23:59");
+    return Number.isFinite(expiry.getTime()) && expiry.getTime() >= Date.now();
+  }
+
+  function promotionEventLabel(promo) {
+    if(!promo?.eventDate)return "Sem restrição de data e horário do jogo";
+    const date=String(promo.eventDate).split("-").reverse().join("/");
+    return `${date} · ${String(promo.eventStartTime).slice(0,5)} às ${String(promo.eventEndTime).slice(0,5)} · horário do local`;
+  }
+
+  function promotionEventEligible(promo,reservation) {
+    if(!promo?.eventDate)return true;
+    if(!reservation||reservation.monthly||reservation.bookingMode==="monthly")return false;
+    const date=String(reservation.date||"");
+    const iso=/^\d{4}-\d{2}-\d{2}$/.test(date)?date:date.split("/").reverse().join("-");
+    if(iso!==promo.eventDate)return false;
+    const start=timeToMinutes(String(reservation.time||"").slice(0,5));
+    let end=timeToMinutes(String(reservation.endTime||"").slice(0,5));
+    if(end===0&&start>0)end=1440;
+    return Boolean(reservation.time&&reservation.endTime)&&Number.isFinite(start)&&Number.isFinite(end)
+      &&end>start&&start>=timeToMinutes(String(promo.eventStartTime).slice(0,5))&&end<=timeToMinutes(String(promo.eventEndTime).slice(0,5));
+  }
+
+  function promotionEligibleForSelection(promo) {
+    if (!selectedReservation || !promotionValid(promo)) return false;
+    const venueId = promotionVenueId(promo);
+    if (venueId !== "all" && venueId !== selectedReservation.venue.id) return false;
+    const bookingMode = promo.bookingMode || "any";
+    if (bookingMode === "monthly" && !isMonthlySelection()) return false;
+    if (bookingMode === "single" && isMonthlySelection()) return false;
+    if (!promotionEventEligible(promo,{date:selectedReservation.day.date,time:selectedReservation.time,endTime:selectedReservation.endTime,monthly:isMonthlySelection()}))return false;
+    if (currentReservationValue() < Number(promo.minimumReservationValue || 0)) return false;
+    return promotionDiscountValue(promo) > 0;
+  }
+
+  function promotionalDiscountAmount(promo, total = currentReservationValue()) {
+    if (!promo || !promotionEligibleForSelection(promo)) return 0;
+    const value = promotionDiscountValue(promo);
+    const discount = promotionDiscountType(promo) === "percentage" ? Number(total || 0) * (value / 100) : value;
+    return Math.max(0, Math.min(Number(total || 0), Math.round(discount * 100) / 100));
+  }
+
+  function selectedVoucherFinancials() {
+    const total = currentReservationValue();
+    const cancellation = cancellationVoucherByValue(voucherSelect?.value);
+    if (cancellation) return { kind:"cancellation", item:cancellation, code:cancellation.code, amount:Math.min(total, Number(cancellation.value || 0)), label:`${cancellation.code} · crédito ${money(cancellation.value)}` };
+    const promotion = promotionByValue(voucherSelect?.value);
+    if (promotion && promotionEligibleForSelection(promotion)) {
+      const amount = promotionalDiscountAmount(promotion, total);
+      return { kind:"promotion", item:promotion, code:promotion.code, amount, label:`${promotion.code} · ${promotionBenefitLabel(promotion)}` };
+    }
+    return { kind:"none", item:null, code:"", amount:0, label:"" };
+  }
+
+  function dateCompactWeekdayPt(dateText) {
+    const date = parsePtDateTime(dateText, "12:00");
+    if (!Number.isFinite(date.getTime())) return String(dateText || "");
+    const weekday = new Intl.DateTimeFormat("pt-BR", { weekday:"long" }).format(date);
+    const capitalized = weekday.charAt(0).toUpperCase()+weekday.slice(1);
+    return `${capitalized}, ${formatPtDate(date)}`;
+  }
+
+  function cancellationVoucherByValue(value) {
+    if (!String(value || "").startsWith("CANCEL:")) return null;
+    const id = String(value).slice(7);
+    return state.cancellationVouchers.find((voucher) => voucher.id === id) || null;
+  }
+
+  function eligibleCancellationVouchersForReservation() {
+    if (!selectedReservation) return [];
+    activeCancellationVouchers();
+    const monthly = isMonthlySelection();
+    return state.cancellationVouchers.filter((voucher) =>
+      ["active", "active_extended"].includes(voucher.status) &&
+      (voucher.ownerUserId ? voucher.ownerUserId === backendRuntime.identityId : voucher.user === state.userProfile.name) &&
+      voucher.venueId === selectedReservation.venue.id &&
+      currentReservationValue() >= Number(voucher.value) &&
+      (voucher.eligibleBookingMode !== "monthly" || monthly)
+    );
+  }
+
+  function populateVoucherOptions() {
+    const voucherField=voucherSelect?.closest(".reservation-summary-voucher");
+    if (!voucherSelect) return;
+    voucherSelect.innerHTML='<option value="">Não utilizar voucher</option>';
+    voucherSelect.value="";
+    voucherSelect.disabled=true;
+    if(voucherField)voucherField.hidden=true;
+    if(reservationVoucherPreview)reservationVoucherPreview.hidden=true;
+    updateVoucherPaymentPreview();
+  }
+
+  function groupMembers(groupId) {
+    return state.groupMembers.filter((member) => member.groupId === groupId);
+  }
+
+  function pixSplitEnabled() {
+    return selectedPaymentMethod() === "pix_direct_partner" && Boolean(pixSplitToggle?.checked);
+  }
+
+  function equalPixShares(total, members) {
+    const cents = Math.round(Number(total || 0) * 100);
+    const count = Math.max(1, members.length);
+    const base = Math.floor(cents / count);
+    let remainder = cents - base * count;
+    return members.map((member) => ({ member, amount: (base + (remainder-- > 0 ? 1 : 0)) / 100 }));
+  }
+
+  function selectedPixSplitShares() {
+    if (!pixSplitEnabled()) return [];
+    const members = groupMembers(groupSelect.value).filter((member) => pixSplitMembers?.querySelector(`[data-split-member="${member.id}"]`)?.checked);
+    if (pixSplitMode?.value !== "custom") return equalPixShares(currentPaymentDue(), members);
+    return members.map((member) => ({ member, amount: Number(pixSplitMembers?.querySelector(`[data-split-value="${member.id}"]`)?.value || 0) }));
+  }
+
+  function currentPaymentDue() {
+    const total = currentReservationValue();
+    const voucher = selectedVoucherFinancials();
+    return Math.max(0, total - Number(voucher.amount || 0));
+  }
+
+  function selectedSinglePayer() {
+    if (!singlePayerSelect?.value) return null;
+    return groupMembers(groupSelect.value).find((member) => member.id === singlePayerSelect.value) || null;
+  }
+
+  function updateSinglePayerPanel() {
+    if (!singlePayerPanel || !singlePayerSelect || !selectedReservation) return;
+    const visible = selectedPaymentMethod() === "credit_card_asaas" && currentPaymentDue() > 0;
+    singlePayerPanel.hidden = !visible;
+    if (!visible) {
+      singlePayerSelect.innerHTML = "";
+      return;
+    }
+    const members = groupMembers(groupSelect.value);
+    const previous = singlePayerSelect.value;
+    const currentProfileId = backendRuntime.identityId || state.userProfile.id;
+    const creator = members.find((member) => (member.backendProfileId || member.id) === currentProfileId);
+    singlePayerSelect.innerHTML = members.map((member) => `<option value="${esc(member.id)}">${esc(member.name)} · ${esc(member.role)}</option>`).join("");
+    singlePayerSelect.value = members.some((member) => member.id === previous) ? previous : creator?.id || members[0]?.id || "";
+  }
+
+  function validateSinglePayer() {
+    if (selectedPaymentMethod() !== "credit_card_asaas" || currentPaymentDue() <= 0) return { valid:true, payer:null };
+    const payer = selectedSinglePayer();
+    return { valid:Boolean(payer), payer };
+  }
+
+  function updatePixSplitPanel() {
+    if (!pixSplitPanel || !selectedReservation) return;
+    const due = currentPaymentDue();
+    const isPix = selectedPaymentMethod() === "pix_direct_partner" && due > 0;
+    pixSplitPanel.hidden = !isPix;
+    if (!isPix) {
+      pixSplitToggle.checked = false;
+      pixSplitConfig.hidden = true;
+      pixSplitMembers.innerHTML = "";
+      pixSplitSummary.innerHTML = "";
+      return;
+    }
+    pixSplitConfig.hidden = !pixSplitToggle.checked;
+    if (!pixSplitToggle.checked) {
+      pixSplitMembers.innerHTML = "";
+      pixSplitSummary.innerHTML = "";
+      return;
+    }
+    const members = groupMembers(groupSelect.value);
+    const existingSelection = new Map([...pixSplitMembers.querySelectorAll('[data-split-member]')].map((input) => [input.dataset.splitMember, input.checked]));
+    const existingValues = new Map([...pixSplitMembers.querySelectorAll('[data-split-value]')].map((input) => [input.dataset.splitValue, input.value]));
+    const selectedMembers = members.filter((m) => existingSelection.has(m.id) ? existingSelection.get(m.id) : true);
+    const equal = equalPixShares(due, selectedMembers);
+    const equalMap = new Map(equal.map((item) => [item.member.id, item.amount]));
+    pixSplitMembers.innerHTML = members.map((member) => {
+      const checked = existingSelection.has(member.id) ? existingSelection.get(member.id) : true;
+      const amount = pixSplitMode.value === "custom" ? (existingValues.get(member.id) ?? (checked ? (equalMap.get(member.id) || 0).toFixed(2) : "0.00")) : (checked ? (equalMap.get(member.id) || 0).toFixed(2) : "0.00");
+      return `<div class="pix-split-member-row"><label><input type="checkbox" data-split-member="${esc(member.id)}" ${checked ? "checked" : ""}><span><strong>${esc(member.name)}</strong><small>${esc(member.role)}</small></span></label><div class="pix-split-value"><span>R$</span><input type="number" min="0" step="0.01" inputmode="decimal" data-split-value="${esc(member.id)}" value="${esc(amount)}" ${pixSplitMode.value === "equal" ? "readonly" : ""}></div></div>`;
+    }).join("");
+    updatePixSplitSummary();
+  }
+
+  function updatePixSplitSummary() {
+    if (!pixSplitSummary || !pixSplitEnabled()) return;
+    const due = currentPaymentDue();
+    const shares = selectedPixSplitShares();
+    if (pixSplitMode.value === "equal") {
+      const equal = equalPixShares(due, shares.map((share)=>share.member));
+      const byId = new Map(equal.map((share)=>[share.member.id,share.amount]));
+      pixSplitMembers.querySelectorAll('[data-split-value]').forEach((input)=>{ input.value=(byId.get(input.dataset.splitValue)||0).toFixed(2); });
+    }
+    const finalShares = selectedPixSplitShares();
+    const total = finalShares.reduce((sum, share) => sum + Number(share.amount || 0), 0);
+    const diff = Math.round((due - total) * 100) / 100;
+    const valid = finalShares.length >= 2 && Math.abs(diff) < 0.01 && finalShares.every((share)=>share.amount > 0);
+    pixSplitSummary.innerHTML = `<div><span>Valor a arrecadar</span><strong>${money(due)}</strong></div><div><span>Membros selecionados</span><strong>${finalShares.length}</strong></div><div><span>Soma das cotas</span><strong>${money(total)}</strong></div><p class="${valid ? "split-ok" : "split-warning"}">${valid ? "Rateio pronto. Cada membro receberá uma pendência Pix própria." : finalShares.length < 2 ? "Selecione ao menos dois membros para usar o rateio." : `A soma das cotas precisa ser exatamente ${money(due)}. Diferença: ${money(Math.abs(diff))}.`}</p>`;
+    updateReservationSubmitState();
+  }
+
+  function validatePixSplit() {
+    if (!pixSplitEnabled()) return { valid:true, shares:[] };
+    const due = currentPaymentDue();
+    const shares = selectedPixSplitShares();
+    const total = shares.reduce((sum, share)=>sum + Number(share.amount||0),0);
+    const valid = shares.length >= 2 && shares.every((share)=>share.amount > 0) && Math.abs(total-due) < 0.01;
+    return { valid, shares, total, due };
+  }
+
+  function createPixSplitCollection(reservation, shares) {
+    const collectionId = nextId("COL-", state.pixCollections);
+    const collection = { id:collectionId, reservationId:reservation.id, groupId:reservation.groupId, groupName:reservation.groupName, venueId:reservation.venueId, venue:reservation.venue, amount:shares.reduce((sum,share)=>sum+share.amount,0), status:"PENDING", paidAmount:0, paidCount:0, memberCount:shares.length, createdAt:new Date().toLocaleString("pt-BR"), items:[] };
+    const venue = state.venues.find((item)=>item.id===reservation.venueId);
+    const partner = { venueId:reservation.venueId, tradeName:reservation.venue, bank:venue?.bankLabel||"Banco do parceiro", bankProviderId:venue?.bankProviderId||"GENERIC_MANUAL", pixKey:venue?.pixKey||"Chave Pix cadastrada", asaasWalletId:venue?.asaasWalletId||"" };
+    shares.forEach((share,index)=>{
+      const memberReservation = { ...reservation, id:`${reservation.id}-${share.member.id}`, externalReference:`${reservation.id}:${share.member.id}`, memberId:share.member.id, memberName:share.member.name };
+      const intent = window.TamoOnPaymentRouter?.createPreviewIntent({ method:"pix_direct_partner", reservation:memberReservation, partner, amount:share.amount, commissionRate:0 });
+      if (!intent) return;
+      const providerIntentId=intent.id;
+      intent.id=nextId("PAY-",state.paymentIntents);
+      intent.providerIntentId=providerIntentId;
+      intent.reservationId=reservation.id;
+      intent.collectionId=collectionId;
+      intent.memberId=share.member.id;
+      intent.memberName=share.member.name;
+      intent.method="pix_direct_partner";
+      intent.amount=share.amount;
+      intent.externalReference=`${reservation.id}:${share.member.id}`;
+      intent.createdAt=new Date().toLocaleString("pt-BR");
+      state.paymentIntents.unshift(intent);
+      collection.items.push({ memberId:share.member.id, memberName:share.member.name, amount:share.amount, status:"PENDING", paymentIntentId:intent.id, txid:intent.normalized?.txid||"" });
+    });
+    state.pixCollections.unshift(collection);
+    reservation.pixSplit=true;
+    reservation.pixCollectionId=collectionId;
+    reservation.paymentIntentIds=collection.items.map((item)=>item.paymentIntentId);
+    reservation.paymentRoute="pix_direct_partner_split";
+    reservation.paymentProvider=partner.bankProviderId;
+    return collection;
+  }
+
+  function selectedPaymentMethod() {
+    return paymentMethodSelect?.value || window.TamoOnPaymentRouter?.METHODS?.PIX_DIRECT_PARTNER || "pix_direct_partner";
+  }
+
+  function paymentMethodLabel(method = selectedPaymentMethod()) {
+    return method === "manual_external" ? "Pagamento externo ao parceiro" : method === "credit_card_asaas" ? "Cartão de crédito" : method === "voucher" ? "Voucher" : "Pix";
+  }
+
+  function paymentProviderForSelection() {
+    if(backendIsOnline())return "ASAAS";
+    if (selectedPaymentMethod() === "credit_card_asaas") return "ASAAS";
+    return selectedReservation?.venue?.bankProviderId || state.partnerProfile.bankProviderId || "GENERIC_MANUAL";
+  }
+
+  function updatePaymentProviderPreview() {
+    if (!paymentProviderPreview || !paymentMethodNote || !selectedReservation) return;
+    const total = currentReservationValue();
+    const voucher = selectedVoucherFinancials();
+    const due = Math.max(0, total - Number(voucher.amount || 0));
+    if (due <= 0) {
+      paymentMethodSelect.disabled = true;
+      paymentMethodNote.textContent = "Voucher integral: nenhuma cobrança externa.";
+      paymentProviderPreview.innerHTML = `<div class="provider-status-line"><span class="status status-ok">Quitado por voucher</span><strong>${money(total)}</strong></div>`;
+      if (automationPaymentText) automationPaymentText.textContent = "Reserva coberta integralmente por voucher";
+      if (pixSplitPanel) { pixSplitPanel.hidden = true; pixSplitToggle.checked = false; pixSplitConfig.hidden = true; }
+      if (singlePayerPanel) singlePayerPanel.hidden = true;
+      return;
+    }
+    paymentMethodSelect.disabled = false;
+    const method = selectedPaymentMethod();
+    if (method === "credit_card_asaas") {
+      paymentMethodNote.textContent = "Pagamento integral em uma única parcela.";
+      paymentProviderPreview.innerHTML = `<div class="provider-status-line"><span class="status status-warning">Aguardando pagamento</span><strong>${money(due)}</strong></div>`;
+      if (automationPaymentText) automationPaymentText.textContent = "Aguardando confirmação do cartão";
+    } else {
+      paymentMethodNote.textContent = "Pagamento por Pix.";
+      paymentProviderPreview.innerHTML = `<div class="provider-status-line"><span class="status status-warning">Aguardando pagamento</span><strong>${money(due)}</strong></div>`;
+      if (automationPaymentText) automationPaymentText.textContent = "Aguardando confirmação do pagamento";
+    }
+    updateSinglePayerPanel();
+    updatePixSplitPanel();
+  }
+
+  function createPaymentIntentForReservation(reservation, amount) {
+    if (Number(amount || 0) <= 0) return null;
+    const intent = window.TamoOnPaymentRouter?.createPreviewIntent({
+      method: reservation.paymentMethod,
+      reservation,
+      partner: reservation.venueId === state.partnerProfile.venueId ? state.partnerProfile : (() => { const venue = state.venues.find((item)=>item.id===reservation.venueId); return { venueId: reservation.venueId, tradeName: reservation.venue, bank: venue?.bankLabel || "Banco do parceiro", bankProviderId: venue?.bankProviderId || "GENERIC_MANUAL", pixKey: venue?.pixKey || "Chave Pix cadastrada", asaasWalletId: venue?.asaasWalletId || "" }; })(),
+      amount,
+      commissionRate: Number(state.settings.defaultCommission || 0)
+    });
+    if (!intent) return null;
+    const providerIntentId = intent.id;
+    intent.id = nextId("PAY-", state.paymentIntents);
+    intent.providerIntentId = providerIntentId;
+    intent.reservationId = reservation.id;
+    intent.method = reservation.paymentMethod;
+    intent.amount = Number(amount || 0);
+    intent.externalReference = reservation.id;
+    intent.createdAt = new Date().toLocaleString("pt-BR");
+    state.paymentIntents.unshift(intent);
+    reservation.paymentIntentId = intent.id;
+    reservation.paymentProvider = intent.provider || (reservation.paymentMethod === "credit_card_asaas" ? "ASAAS" : state.partnerProfile.bankProviderId || "GENERIC_MANUAL");
+    reservation.paymentRoute = intent.route || reservation.paymentMethod;
+    if (intent.normalized?.txid) reservation.pixTxid = intent.normalized.txid;
+    return intent;
+  }
+
+  function updateReservationPaymentSummary() {
+    if (!selectedReservation) return;
+    const total = currentReservationValue();
+    const voucher = selectedVoucherFinancials();
+    const complement = Math.max(0, total - Number(voucher.amount || 0));
+    const occurrences = isMonthlySelection() ? monthlyOccurrencesForSelection(selectedReservation) : [{ date: selectedReservation.day.date }];
+    const modeLabel = isMonthlySelection() ? `Mensalista · ${occurrences.length} data(s)` : "Reserva avulsa";
+    reservationSummaryHead.innerHTML = `<div class="reservation-summary-venue"><img src="${esc(selectedReservation.venue.facadeImage || "assets/preview-icon.svg")}" alt="${esc(selectedReservation.venue.name)}"><div class="payment-summary-title"><div><strong>${esc(selectedReservation.venue.name)}</strong><small>${esc(normalizedSlotSpace(selectedReservation.slot))} · ${esc(selectedReservation.day.date)} · ${esc(timeRange(selectedReservation.time, slotEndTime(selectedReservation.slot)))}</small></div><span class="status ${isMonthlySelection() ? "status-ok" : "status-neutral"}">${modeLabel}</span></div></div>`;
+    reservationSummaryTotal.innerHTML = `<div class="reservation-total-line"><span>${voucher.amount > 0 ? `Valor ${money(total)} · voucher −${money(voucher.amount)}` : "Valor total"}</span><strong>${money(complement)}</strong></div>`;
+  }
+
+  function updateVoucherPaymentPreview() {
+    if (!reservationVoucherPreview || !selectedReservation) return;
+    updateReservationPaymentSummary();
+    const total = currentReservationValue();
+    const voucher = selectedVoucherFinancials();
+    if (!voucher.amount) {
+      reservationVoucherPreview.innerHTML = "";
+      updatePaymentProviderPreview();
+      return;
+    }
+    const complement = Math.max(0, total - voucher.amount);
+    reservationVoucherPreview.innerHTML = `<div class="voucher-compact-result"><span>${esc(voucher.code)} −${money(voucher.amount)}</span><strong>Restante ${money(complement)}</strong></div>`;
+    updatePaymentProviderPreview();
+  }
+
+  function updateMonthlyReservationPreview() {
+    if (!monthlyReservationPanel || !monthlyReservationPreview || !selectedReservation) return;
+    const advertised = Boolean(selectedReservation.slot.monthlyEligible && Number(selectedReservation.slot.monthlyPrice || 0) > 0);
+    const offer = monthlyOfferContinuity(selectedReservation);
+    const eligible = advertised && offer.eligible;
+    const outcomeText=reservationAutomationPreview?.querySelector("span");
+    monthlyReservationPanel.hidden = !advertised;
+    monthlyReservationToggle.disabled = !eligible;
+    if (!eligible) {
+      monthlyReservationToggle.checked = false;
+      monthlyReservationPreview.innerHTML = advertised
+        ? `<strong>Mensalista indisponível</strong><small>Não há continuidade semanal deste espaço e horário até o fim do mês${offer.missingDates.length ? `: ${offer.missingDates.map(esc).join(", ")}` : ""}. Esta data pode ser reservada como avulsa.</small>` : "";
+      selectedReservation.reviewSignature = reservationReviewSignature(selectedReservation, false);
+      if(outcomeText)outcomeText.textContent="O horário ficará pré-reservado por 30 minutos. Defina e conclua o pagamento em Minhas reservas dentro desse prazo.";
+      if(reservationPolicyText)reservationPolicyText.textContent="Reserva avulsa: a pré-reserva permite pagar em até 30 minutos. Após o pagamento, o usuário pode cancelar em até 24 horas para receber o voucher previsto nas regras. Parceiro ou Tâmo On: reembolso integral. Fora do prazo não há crédito automático." + " " + splitCancellationPolicyText({monthly:false});
+      updateVoucherPaymentPreview();
+      return;
+    }
+    selectedReservation.reviewSignature = reservationReviewSignature(selectedReservation, isMonthlySelection());
+    const occurrences = offer.occurrences;
+    if (!monthlyReservationToggle.checked) {
+      monthlyReservationPreview.innerHTML = `<strong>${money(selectedReservation.slot.monthlyPrice)}</strong><span>${occurrences.length} datas disponíveis · ${timeRange(selectedReservation.time, selectedReservation.endTime)}</span><small>O parceiro já publicou valor e elegibilidade; não é necessário solicitar proposta.</small>`;
+      if(outcomeText)outcomeText.textContent="O horário ficará pré-reservado por 30 minutos. Defina e conclua o pagamento em Minhas reservas dentro desse prazo.";
+      if(reservationPolicyText)reservationPolicyText.textContent="Reserva avulsa: a pré-reserva permite pagar em até 30 minutos. Após o pagamento, o usuário pode cancelar em até 24 horas para receber o voucher previsto nas regras. Parceiro ou Tâmo On: reembolso integral. Fora do prazo não há crédito automático." + " " + splitCancellationPolicyText({monthly:false});
+      updateVoucherPaymentPreview();
+      return;
+    }
+    monthlyReservationPreview.innerHTML = `<div class="monthly-preview-heading"><strong>${money(selectedReservation.slot.monthlyPrice)}</strong><span>${occurrences.length} datas do primeiro ciclo</span></div><p class="monthly-occurrence-text">${occurrences.map((occurrence) => `${esc(dateCompactWeekdayPt(occurrence.date))}, das ${esc(occurrence.time)} às ${esc(occurrence.endTime)}`).join("; ")}.</p><small>A confirmação cria o vínculo protegido diretamente. Após o pagamento, o chat com o parceiro permanece disponível até o fim da última ocorrência do ciclo.</small>`;
+    if(outcomeText)outcomeText.textContent="O vínculo e os eventos serão pré-reservados. O pagamento será definido em Minhas reservas; o chat é liberado após a confirmação.";
+    if(reservationPolicyText)reservationPolicyText.textContent="Mensalista: o pagamento antecipado é opcional. A garantia vence 15 minutos antes da primeira ocorrência aplicável; o saldo vence no quinto dia útil, antecipado para 15 minutos antes do primeiro jogo desse dia quando houver." + " " + splitCancellationPolicyText({monthly:true});
+    updateVoucherPaymentPreview();
+  }
+
+  function initials(name) {
+    return String(name || "?").split(/\s+/).filter(Boolean).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
+  }
+
+  function nextId(prefix, items) {
+    const highest = items.reduce((max, item) => {
+      const number = Number.parseInt(String(item.id).replace(/\D/g, ""), 10);
+      return Number.isFinite(number) ? Math.max(max, number) : max;
+    }, 0);
+    return `${prefix}${String(highest + 1).padStart(4, "0")}`;
+  }
+
+  function showToast(message) {
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => toast.classList.remove("show"), 2600);
+  }
+
+  function statusClass(status) {
+    const value = String(status || "").toLowerCase();
+    if (value.includes("aprov") || value.includes("confirm") || value === "ativo" || value.includes("valid") || value.includes("assinado") || value.includes("aceit")) return "status-ok";
+    if (value.includes("pend") || value.includes("análise") || value.includes("enviado") || value.includes("conferência")) return "status-warning";
+    if (value.includes("expir") || value.includes("cancel") || value.includes("bloque") || value.includes("rejeit") || value.includes("suspens") || value.includes("encerr") || value.includes("exclu") || value.includes("não")) return "status-danger";
+    return "status-neutral";
+  }
+
+  // Presentation only: retain the operational closed-state guards used throughout the app.
+  function reservationIsExpired(reservation) {
+    return reservation?.backendStatus === "expired" || (!reservation?.backendStatus && reservation?.statusKey === "expired");
+  }
+
+  function reservationDisplayKey(reservation) {
+    return reservationIsExpired(reservation) ? "expired" : reservation?.statusKey;
+  }
+
+  function closedReservationPaymentLabel(reservation) {
+    if (reservationIsExpired(reservation)) return "Reserva expirada";
+    return ["cancelled","refund_pending","refunded"].includes(reservation?.backendStatus)
+      || (!reservation?.backendStatus && reservation?.statusKey === "cancelled") ? "Reserva cancelada" : "";
+  }
+
+  function reservationStatus(statusKey) {
+    const map = {
+      pending: { label: "Reserva pendente", status: "status-warning", slot: "reservation-pending" },
+      confirmed: { label: "Confirmada", status: "status-ok", slot: "reservation-confirmed" },
+      expired: { label: "Expirada", status: "status-danger", slot: "reservation-cancelled" },
+      cancelled: { label: "Cancelada", status: "status-danger", slot: "reservation-cancelled" }
+    };
+    return map[statusKey] || map.pending;
+  }
+
+  function reservationDateBadge(date) {
+    const [day = "--", month = "--"] = String(date || "").split("/");
+    const months = { "01":"JAN", "02":"FEV", "03":"MAR", "04":"ABR", "05":"MAI", "06":"JUN", "07":"JUL", "08":"AGO", "09":"SET", "10":"OUT", "11":"NOV", "12":"DEZ" };
+    return { day, month: months[month] || month };
+  }
+
+  function eventPublicationLabel(statusKey) {
+    const map = {
+      standby_payment: { label: "Evento em espera", className: "status-warning" },
+      published: { label: "Evento publicado", className: "status-ok" },
+      linked_existing: { label: "Evento existente", className: "status-neutral" },
+      none: { label: "Nenhum evento vinculado", className: "status-neutral" },
+      cancelled: { label: "Evento cancelado", className: "status-danger" }
+    };
+    return map[statusKey] || map.linked_existing;
+  }
+
+  function currentAccountGroups(bootstrap = backendRuntime.bootstrap) {
+    if (!backendRuntime.enabled) return state.userGroups || [];
+    const profileId = backendRuntime.session?.user?.id;
+    if (!profileId || bootstrap?.profile?.id !== profileId || bootstrap.profile.status !== "active") return [];
+    const memberships = new Map((bootstrap.group_members || [])
+      .filter((member) => member.profile_id === profileId && member.active === true)
+      .map((member) => [member.group_id, member]));
+    return (bootstrap.groups || []).filter((group) => group.active === true && memberships.has(group.id)).map((group) => {
+      const member = memberships.get(group.id);
+      return { id:group.id, backendId:group.id, name:group.name, role:backendGroupRoleLabel(member.role),
+        memberCount:Number(group.member_count || 0), backendOfficial:true,
+        canCreateEvents:Boolean(member.can_create_events === true || ["admin","organizer"].includes(member.role)),
+        canEditEvents:Boolean(member.can_edit_events === true || ["admin","organizer"].includes(member.role)) };
+    }).sort((a,b) => a.name.localeCompare(b.name,"pt-BR"));
+  }
+
+  function reservationGroupsForCurrentAccount(bootstrap = backendRuntime.bootstrap) {
+    return currentAccountGroups(bootstrap).filter(canManageGroupEvents);
+  }
+
+  function userGroup(groupId) {
+    return reservationGroupsForCurrentAccount().find((group) => group.id === groupId);
+  }
+  function canManageGroupEvents(group) {
+    return group?.canCreateEvents === true;
+  }
+
+  function defaultEventTitle(reservation) {
+    return `${reservation.venue.name} · ${reservation.day.shortDate} · ${timeRange(reservation.time,reservation.endTime)}${isMonthlySelection() ? " · Mensalista" : ""}`;
+  }
+
+  function isPersonalReservationSelection() {
+    return groupSelect.value === "__personal__";
+  }
+
+  function populateReservationGroups(preserveSelection = false) {
+    const groups = reservationGroupsForCurrentAccount();
+    const previous = groupSelect.value;
+    groupSelect.innerHTML = `<option value="">Selecione para quem reservar</option><option value="__personal__">Reservar para mim (sem grupo)</option>${groups.map((group) => `<option value="${esc(group.id)}">${esc(group.name)} · ${esc(group.role)}</option>`).join("")}`;
+    groupSelect.value = preserveSelection ? (previous === "__personal__" ? previous : groups.find((group) => group.id === previous)?.id || "") : "__personal__";
+    if (!preserveSelection || !groupSelect.value || groupSelect.value !== previous) updateReservationEventOptions();
+  }
+  function updateReservationEventOptions() {
+    if (isPersonalReservationSelection()) {
+      groupPermissionNote.textContent = "A reserva ficará vinculada à sua conta. Não é necessário criar um grupo.";
+      groupPermissionNote.classList.remove("permission-denied");
+      eventSelect.innerHTML = '<option value="__none__">Reserva pessoal · sem evento de grupo</option>';
+      eventSelect.value = "__none__";
+      eventSelect.disabled = true;
+      document.getElementById("reservationEventField").hidden = true;
+      updateNewEventPanel();
+      updateSinglePayerPanel();
+      updatePixSplitPanel();
+      updateReservationSubmitState();
+      return;
+    }
+    document.getElementById("reservationEventField").hidden = false;
+    const group = userGroup(groupSelect.value);
+    const allowed = canManageGroupEvents(group);
+    groupPermissionNote.textContent = !group ? (reservationGroupsForCurrentAccount().length ? "Selecione um grupo." : "Você pode reservar para si ou escolher um grupo autorizado.") : allowed ? `${group.role} · autorizado` : `${group.role} · sem permissão para eventos`;
+    groupPermissionNote.classList.toggle("permission-denied", Boolean(group && !allowed));
+    eventSelect.disabled = !allowed;
+    if (!allowed) {
+      eventSelect.innerHTML = `<option value="">Grupo sem permissão</option>`;
+      newEventPanel.hidden = true;
+      updateSinglePayerPanel();
+      updatePixSplitPanel();
+      updateReservationSubmitState();
+      return;
+    }
+    if (isMonthlySelection()) {
+      eventSelect.innerHTML = '<option value="__new__">Criar os eventos do ciclo mensalista</option>';
+      eventSelect.value = "__new__";
+      eventSelect.disabled = true;
+      newEventTitle.value = selectedReservation ? defaultEventTitle(selectedReservation) : "";
+      updateNewEventPanel();
+      updateSinglePayerPanel();
+      updatePixSplitPanel();
+      updateReservationSubmitState();
+      return;
+    }
+    const events = state.groupEvents.filter((event) => event.groupId === group.id && event.published && event.statusKey !== "cancelled" && !event.sourceReservationId && !state.reservations.some((reservation)=>reservation.eventId===event.id&&!['cancelled','expired'].includes(reservation.statusKey)) && selectedReservation && event.date === selectedReservation.day.date && event.time === selectedReservation.time && event.endTime === selectedReservation.endTime);
+    eventSelect.innerHTML = `<option value="__none__">Não vincular evento · apenas reservar</option><option value="__new__">Criar novo evento na Comunidade</option>${events.map((event) => `<option value="${esc(event.id)}">Vincular: ${esc(event.title)} · ${esc(event.date)} · ${esc(timeRange(event.time,event.endTime))}</option>`).join("")}`;
+    eventSelect.value = "__none__";
+    newEventTitle.value = "";
+    updateNewEventPanel();
+    updateSinglePayerPanel();
+    updatePixSplitPanel();
+  }
+
+  function updateNewEventPanel() {
+    const createsNew = eventSelect.value === "__new__";
+    const monthly = isMonthlySelection();
+    const linksExisting = !createsNew && eventSelect.value !== "__none__";
+    newEventPanel.hidden = true;
+    if (createsNew && selectedReservation) newEventTitle.value = defaultEventTitle(selectedReservation);
+    reservationAutomationPreview.classList.toggle("existing-event", linksExisting);
+    const outcome = reservationAutomationPreview.querySelector("span");
+    if (outcome) outcome.textContent = createsNew ? monthly ? "O ciclo mensalista cria os eventos correspondentes às ocorrências protegidas." : "O evento ficará em espera e será publicado na Comunidade após a confirmação do pagamento." : linksExisting ? "A pré-reserva será vinculada ao evento publicado do mesmo dia e horário." : "Apenas a pré-reserva será criada; nenhum evento será criado ou vinculado.";
+    updateReservationSubmitState();
+  }
+
+  function updateReservationSubmitState() {
+    const group = userGroup(groupSelect.value);
+    const validGroup = isPersonalReservationSelection() || canManageGroupEvents(group);
+    const validEvent = Boolean(eventSelect.value);
+    const splitValidation = validatePixSplit();
+    const payerValidation = validateSinglePayer();
+    const submit = document.getElementById("confirmReservation");
+    const current = currentReservationSelection(selectedReservation);
+    const validSelection = reservationSelectionAvailable(current)
+      && (!isMonthlySelection() || monthlyOccurrencesForSelection(current).length > 0);
+    if (submit) submit.disabled = !(validSelection && validGroup && validEvent && (isPersonalReservationSelection() || (splitValidation.valid && payerValidation.valid)));
+  }
+
+  function setReservationPolicyInvalid(invalid) {
+    const field=reservationPolicyAcknowledge?.closest(".reservation-terms-compact");
+    const error=document.getElementById("reservationPolicyError");
+    field?.classList.toggle("field-invalid",Boolean(invalid));
+    reservationPolicyAcknowledge?.setAttribute("aria-invalid",invalid?"true":"false");
+    if(error)error.hidden=!invalid;
+  }
+
+  function publishStandbyEventForReservation(reservation, publicationEndpoint = "event.publish_after_payment") {
+    if (reservation.eventMode !== "new" || !reservation.eventId) return false;
+    const linkedEvent = state.groupEvents.find((event) => event.id === reservation.eventId);
+    if (!linkedEvent || linkedEvent.statusKey !== "standby_payment") return false;
+    const group = userGroup(reservation.groupId);
+    linkedEvent.statusKey = "published";
+    linkedEvent.status = "Publicado";
+    linkedEvent.published = true;
+    linkedEvent.publishedAt = new Date().toLocaleString("pt-BR");
+    linkedEvent.publicationEndpoint = publicationEndpoint;
+    linkedEvent.pushStatus = "Enviado";
+    linkedEvent.pushEndpoint = "push.group_members";
+    reservation.eventPublicationStatus = "published";
+    reservation.pushStatus = "Enviado";
+    reservation.automationEndpoint = publicationEndpoint;
+    state.pushLog.unshift({
+      id: nextId("PUSH-", state.pushLog),
+      groupId: reservation.groupId,
+      groupName: reservation.groupName,
+      eventId: reservation.eventId,
+      eventTitle: reservation.event,
+      recipients: Math.max(0, Number(group?.memberCount || 1) - 1),
+      endpoint: "push.group_members",
+      status: "Enviado",
+      createdAt: linkedEvent.publishedAt
+    });
+    return true;
+  }
+
+  function cancellationSourceLabel(source) {
+    return source === "partner" ? "Parceiro" : source === "tamo" ? "Tâmo On" : "Usuário";
+  }
+
+  function cancellationImpacts(source, mode, reservation = null) {
+    const common = [
+      "O horário cancelado será liberado imediatamente para uma nova reserva.",
+      "O evento criado ou vinculado será cancelado e os membros do grupo serão comunicados.",
+      "A operação e o motivo permanecerão registrados no histórico."
+    ];
+    if (mode === "voucher") return [
+      `Será emitido um voucher de uso único no valor integral pago, com prazo nominal de ${state.settings.voucherValidityDays} dias.`,
+      reservation?.monthly ? "Por se originar de um pacote mensalista, o voucher só poderá ser utilizado em uma nova reserva mensalista de valor igual ou superior." : "O voucher poderá ser utilizado em qualquer novo dia ou horário disponível do mesmo parceiro, em reserva de valor igual ou superior.",
+      `Para o prazo expirar normalmente, o parceiro deverá oferecer ao menos ${state.settings.voucherMinimumCompatibleDates} datas distintas em faixa compatível de até ${state.settings.voucherCompatibilityWindowHours} horas antes ou depois do horário original e no mesmo período do dia.`,
+      "Você pode escolher outro período do dia. Para avaliar a obrigação do parceiro, horários apenas pela manhã ou tarde não contam como oferta compatível com um voucher originado à noite.",
+      "Se a disponibilidade compatível for insuficiente, a validade será prorrogada automaticamente.",
+      "Ao utilizar o voucher, todo o crédito será consumido; eventual diferença deverá ser paga no app.",
+      ...common,
+      "O pagamento original permanece contabilizado no mês em que ocorreu; somente eventual complemento futuro gera nova obrigação fiscal e contábil."
+    ];
+    if (mode === "monthly_locked") return [
+      `O prazo de cancelamento do pacote mensalista terminou ${state.settings.cancellationHours} horas antes da primeira ocorrência.`,
+      "Como os múltiplos horários foram adquiridos em uma única operação, não é possível cancelar apenas ocorrências isoladas nem cancelar o pacote após esse marco.",
+      "Não haverá voucher ou reembolso por iniciativa do usuário.",
+      "Cancelamentos provocados pelo parceiro ou pelo Tâmo On continuam sujeitos ao reembolso integral, conforme a responsabilidade de quem cancelar."
+    ];
+    if (mode === "refund") return [
+      "O usuário receberá reembolso integral do valor pago.",
+      `${cancellationSourceLabel(source)} assumirá integralmente taxas, custos de transação, cancelamento e reembolso, sem prejuízo ao usuário ou às demais partes.`,
+      "Nenhum voucher será gerado.",
+      ...common
+    ];
+    return [
+      reservation?.monthly?`O cancelamento ocorre fora do prazo de ${state.settings.cancellationHours} horas antes da primeira ocorrência.`:"O cancelamento ocorre depois de 24 horas da confirmação do pagamento.",
+      "Não haverá reembolso nem geração de voucher.",
+      "Situações excepcionais poderão ser submetidas à análise conjunta do Tâmo On e do parceiro, sem concessão automática.",
+      ...common,
+      "O pagamento original permanece contabilizado conforme a operação já realizada."
+    ];
+  }
+
+  function splitCancellationPolicyText(reservation = {}) {
+    const deadline=reservation.monthly
+      ? `até ${state.settings.cancellationHours} horas antes da primeira ocorrência do mensal`
+      : "em até 24 horas do primeiro pagamento enquanto o rateio estiver parcial; após a quitação, em até 24 horas da confirmação da reserva, sempre antes do início";
+    return `No cancelamento pelo titular dentro do prazo (${deadline}), cada conta com cota paga recebe um voucher individual pelo valor efetivamente pago e ainda não devolvido. Pagamentos da mesma conta são somados. O crédito não fica com o organizador e não há devolução em dinheiro nesse fluxo. Cotas não pagas são encerradas, sem voucher. Fora do prazo, não há crédito automático. O cancelamento pelo parceiro ou pela Administração mantém sua regra própria.`;
+  }
+
+  function cancellationVoucherUseText(rules = {}) {
+    return `Voucher pessoal, de uso único no mesmo parceiro, com validade nominal de ${Number(rules.validity_days ?? state.settings.voucherValidityDays)} dias. ${rules.monthly_only ? "Crédito mensalista aplicável a reserva mensalista. " : ""}Você pode escolher qualquer horário disponível, respeitando a validade, o valor mínimo e a modalidade do crédito.`;
+  }
+
+  function reservationCancellationVoucherMarkup(reservation) {
+    const vouchers=reservation.generatedVouchers || [];
+    if(reservation.individualCancellationVouchers){
+      const visible=vouchers.map(v=>`<div class="detail-line"><span>${esc(v.ownerUserId===backendRuntime.identityId?"Seu voucher":v.ownerName || "Beneficiário")}</span><strong style="overflow-wrap:anywhere">${esc(v.code)} · ${money(v.amount)}</strong></div>`).join("");
+      return `<div class="detail-line"><span>Vouchers individuais</span><strong>${Number(reservation.cancellationVoucherCount||0)} · ${money(reservation.cancellationVoucherTotal||0)}</strong></div>${visible}<small>Os códigos são exibidos conforme as permissões da conta. Cada beneficiário encontra seu crédito em Meus vouchers.</small>`;
+    }
+    return `<div class="detail-line"><span>Voucher</span><strong>${esc(reservation.voucherGeneratedCode || "Não gerado")}</strong></div>`;
+  }
+
+  let cancellationPreviewSequence=0;
+  async function openOfficialReservationCancellation(reservation, actorLabel) {
+    if (!reservation?.backendOfficial || !reservation.backendId || reservation.statusKey === "cancelled") return;
+    const sequence=++cancellationPreviewSequence, identity=backendRuntime.identityId;
+    let plan;
+    try { plan=await window.MarketplaceBackend.reservationCancellationPreview(reservation.backendId); }
+    catch(error){showToast(backendErrorMessage(error));return;}
+    if(sequence!==cancellationPreviewSequence || identity!==backendRuntime.identityId)return;
+    const needsConsent=plan.actor==="user" && plan.split;
+    const individual=plan.individual_vouchers;
+    const financialRule=individual
+      ? `Serão emitidos ${Number(plan.voucher_count)} vouchers individuais, totalizando ${money(plan.voucher_total)}. Os pagamentos originais serão preservados, sem reembolso bancário.`
+      : plan.resolution==="voucher" ? (Number(plan.voucher_total)>0 ? `O cancelamento gerará um voucher de ${money(plan.voucher_total)}. Descontos promocionais não se transformam em crédito.` : "O cancelamento gerará o voucher previsto nas regras desta reserva.")
+      : plan.resolution==="refund_required" ? "O cancelamento registrará o reembolso integral como pendente, sob responsabilidade do cancelador."
+      : "Este cancelamento não gera voucher nem reembolso automático. As cobranças pendentes serão encerradas.";
+    const recipients=individual?`<h3>Créditos por participante</h3><div class="detail-list">${(plan.beneficiaries||[]).map(b=>`<div class="detail-line"><span>${esc(b.name || "Participante")}</span><strong>${money(b.amount)}</strong></div>`).join("")}</div>`:"";
+    const fields=[{name:"summary",type:"custom",full:true,html:`<div class="callout"><strong>${esc(financialRule)}</strong>${plan.deadline?`<p>Prazo para crédito: ${esc(backendDateTimeLabel(plan.deadline))}.${plan.deadline_basis==="first_payment"?" Contado do primeiro pagamento confirmado, pois o rateio ainda está parcial.":""}</p>`:""}${recipients}${individual?`<p>${esc(cancellationVoucherUseText(plan.rules))}</p>`:""}</div>`},
+      {name:"reason",label:"Motivo do cancelamento",type:"textarea",value:"",required:true,full:true}];
+    if(needsConsent)fields.push({name:"cancellationPolicy",label:"Regras do cancelamento",type:"checkbox-group",required:true,full:true,
+      options:[{value:"cancellation_policy_accepted",label:"Li e concordo com o resultado e as regras deste cancelamento.",help:splitCancellationPolicyText(reservation),checked:false}]});
+    openForm({eyebrow:"Reserva oficial",title:`Cancelar ${reservation.id}`,
+      description:"Confira os valores antes de confirmar. O cancelamento libera os horários ativos desta reserva.",fields,submitLabel:"Confirmar cancelamento",
+      onChange:()=>{formSubmit.disabled=needsConsent&&!dynamicForm.querySelector('[name="cancellation_policy_accepted"]')?.checked;},
+      onSubmit:async(data)=>{
+        if(needsConsent&&data.cancellation_policy_accepted!=="true")return markFormFieldInvalid("cancellationPolicy","Aceite as regras para continuar.");
+        const result=await runBackendMutation("",()=>window.MarketplaceBackend.cancelReservation(reservation.backendId,String(data.reason||"").trim(),
+          {policyVersion:plan.policy_version,accepted:needsConsent&&data.cancellation_policy_accepted==="true",previewToken:plan.preview_token}));
+        if(!result)return false;
+        if(result.individual_vouchers&&result.voucher_count>0)showToast(`Reserva ${reservation.id} cancelada. ${result.voucher_count} vouchers individuais, no total de ${money(result.voucher_value)}, disponíveis para os beneficiários em Meus vouchers.`);
+        else if(result.resolution==="voucher")showToast(`Reserva ${reservation.id} cancelada; voucher de ${money(result.voucher_value)} emitido e horário liberado.`);
+        else if(result.resolution==="refund_required")showToast(`Reserva ${reservation.id} cancelada; reembolso integral de ${money(result.refund_value)} registrado como pendente.`);
+        else showToast(`Reserva ${reservation.id} cancelada. Cobranças pendentes encerradas, sem crédito automático.`);
+      }
+    });
+  }
+
+  function occurrenceTransfersForReservation(reservation) {
+    return (state.occurrenceTransfers||[]).filter((request)=>
+      request.reservationBackendId===reservation?.backendId || request.reservationId===reservation?.id
+    );
+  }
+
+  function notificationVisibleForRole(notification,role=state.role) {
+    // Payment assignments concern the account as a payer, even when that
+    // same account also owns/manages the establishment or is an administrator.
+    const personalPaymentTypes=["pix_share_pending","monthly_pix_share_pending",
+      "card_payment_assigned","monthly_card_payment_assigned"];
+    return role==="user" || !personalPaymentTypes.includes(notification?.type);
+  }
+
+  function personalNotificationsForRole(role=state.role) {
+    return (state.personalNotifications||[]).filter(notification=>notificationVisibleForRole(notification,role));
+  }
+
+  function occurrenceTransferNotificationsForReservation(reservation,{unreadOnly=false,role=state.role}={}) {
+    const requestIds=new Set(occurrenceTransfersForReservation(reservation).map((request)=>request.id));
+    return (state.occurrenceTransferNotifications||[]).filter((notification)=>
+      notificationVisibleForRole(notification,role)
+      &&(requestIds.has(notification.requestId)||notification.reservationId===reservation?.backendId)&&(!unreadOnly||notification.status==="unread")
+    );
+  }
+
+  function occurrenceTransferUnreadForReservation(reservation,role=state.role) {
+    return occurrenceTransferNotificationsForReservation(reservation,{unreadOnly:true,role}).length;
+  }
+
+  function occurrenceTransferUnreadForRole(role,{excludePaymentAssignments=false}={}) {
+    if(!["user","partner"].includes(role))return 0;
+    const visibleReservations=(state.reservations||[]).filter((reservation)=>{
+      if(role==="partner")return reservation.venueId===state.partnerProfile?.venueId;
+      return reservationBelongsToCurrentUser(reservation)||currentUserCanManageReservationGroup(reservation);
+    });
+    return visibleReservations.reduce((total,reservation)=>total+occurrenceTransferNotificationsForReservation(reservation,{unreadOnly:true,role})
+      .filter(notification=>!excludePaymentAssignments||notificationVisibleForRole(notification,"partner")).length,0);
+  }
+
+  function latestOccurrenceTransferNotification(reservation) {
+    return occurrenceTransferNotificationsForReservation(reservation)[0]||null;
+  }
+
+  function singlePrebookingDeadlineMarkup(reservation) {
+    if(!reservation || reservation.monthly || !reservation.paymentExpiresAt || !["pending","expired"].includes(reservation.statusKey) && reservation.backendStatus!=="expired")return "";
+    const expired=reservation.backendStatus==="expired" || reservation.statusKey==="expired";
+    return `<div class="prebooking-deadline"><strong>${expired?"Prazo de pagamento encerrado":"Pague até"}: ${esc(backendDateTimeLabel(reservation.paymentExpiresAt))}</strong><small>${expired?"A pré-reserva foi liberada por falta de pagamento dentro desse prazo.":"O horário fica protegido até esse vencimento; depois, a pré-reserva pode ser liberada."}</small></div>`;
+  }
+
+  function reservationNoticeBody(notification, reservation = {}) {
+    if(notification.type==="reservation_confirmed" && notification.title==="Nova reserva confirmada"
+      && officialSinglePaymentConfirmed(reservation)) {
+      return "Reserva e pagamento foram confirmados e o chat com o usuário está disponível.";
+    }
+    if(!reservation.monthly && reservation.paymentExpiresAt && notification.type==="reservation_prebooking_expired") {
+      return `O pagamento não foi confirmado até ${backendDateTimeLabel(reservation.paymentExpiresAt)}. O horário foi liberado. A data abaixo indica quando a liberação foi processada.`;
+    }
+    if(!reservation.monthly && reservation.paymentExpiresAt && notification.type==="reservation_prebooked") {
+      return `O horário foi protegido. Defina e conclua o pagamento até ${backendDateTimeLabel(reservation.paymentExpiresAt)} em Minhas reservas.`;
+    }
+    return notification.body;
+  }
+
+  function reservationContactHistory(reservation) {
+    const notices=occurrenceTransferNotificationsForReservation(reservation);
+    // Some accounts receive no expiry notification. Show the authoritative reservation state
+    // without manufacturing an unread notice or treating the deadline as a processing timestamp.
+    const expiryState = reservationIsExpired(reservation) && !reservation.monthly
+      && !notices.some((n)=>n.type === "reservation_prebooking_expired")
+      ? `<article class="occurrence-transfer-message"><span>Pré-reserva expirada</span><strong>O prazo de pagamento foi encerrado e o horário foi liberado.</strong>${reservation.paymentExpiresAt ? `<small>Prazo de pagamento: ${esc(backendDateTimeLabel(reservation.paymentExpiresAt))}</small>` : ""}</article>` : "";
+    if(!notices.length && !expiryState)return "";
+    return `<section class="detail-group"><h3>Atualizações da reserva</h3><div class="detail-list">${expiryState}${notices.map((n)=>`<article class="occurrence-transfer-message"><span>${esc(n.title)}</span><strong>${esc(reservationNoticeBody(n,reservation))}</strong><small>${esc(backendDateTimeLabel(n.createdAt))}</small></article>`).join("")}</div></section>`;
+  }
+
+  function markOccurrenceTransferNotificationsReadForReservation(reservation) {
+    if(partnerReadonlyActive()||document.hidden)return;
+    const unread=occurrenceTransferNotificationsForReservation(reservation,{unreadOnly:true}).filter(notification=>notification.type!=="occurrence_transfer_message");
+    if(!unread.length)return;
+    if(backendRuntime.enabled){
+      if(reservation?.backendOfficial)return persistNotificationReads(unread.map(notification=>notification.id));
+      return;
+    }
+    unread.forEach(notification=>{notification.status="read";notification.readAt=new Date().toISOString();});
+    renderNotificationReadState();
+  }
+
+  function occurrenceTransferForOriginal(occurrenceId) {
+    return (state.occurrenceTransfers||[]).find((request)=>request.originalOccurrenceId===occurrenceId)||null;
+  }
+
+  function occurrenceIsFuture(occurrence) {
+    const at=parsePtDateTime(occurrence?.date,occurrence?.time);
+    return Number.isFinite(at?.getTime?.())&&at.getTime()>Date.now();
+  }
+
+  function currentUserCanManageReservationGroup(reservation) {
+    const group=userGroup(reservation?.groupId);
+    return Boolean(group&&canManageGroupEvents(group));
+  }
+
+  function occurrenceTransferActionButtons(reservation,occurrence,request,role) {
+    if(!backendIsOnline()||!reservation?.backendOfficial||!reservation.monthly)return "";
+    if(role==="user" && !(reservation.groupId?currentUserCanManageReservationGroup(reservation):reservationBelongsToCurrentUser(reservation)))return "";
+    const canRequest=!request||["cancelled","declined"].includes(request.status);
+    const conversation=request?`<button type="button" class="button secondary small" data-action="open-occurrence-transfer-chat" data-id="${esc(request.id)}">${["requested","awaiting_group_choice","proposed"].includes(request.status)?"Abrir conversa":"Ver conversa"}</button>`:"";
+    if(role==="user" && canRequest && occurrence.status==="active" && occurrenceIsFuture(occurrence)) {
+      return `${conversation}<button type="button" class="button secondary small" data-action="request-occurrence-transfer" data-id="${esc(occurrence.backendId)}" data-reservation="${esc(reservation.id)}">Solicitar outra data</button>`;
+    }
+    if(role==="partner" && !request && occurrence.status==="active" && occurrenceIsFuture(occurrence)) {
+      return `<button type="button" class="button danger small" data-action="partner-cancel-occurrence" data-id="${esc(occurrence.backendId)}" data-reservation="${esc(reservation.id)}">Cancelar esta data</button>`;
+    }
+    return conversation;
+  }
+
+  function reservationOccurrenceTransferPanel(reservation,role="user",onlyOccurrenceId="") {
+    if(!reservation?.monthly)return "";
+    const rows=(reservation.allOccurrences||reservation.occurrences||[])
+      .filter((occurrence)=>!onlyOccurrenceId||occurrence.backendId===onlyOccurrenceId);
+    if(!rows.length)return "";
+    return `<section class="occurrence-transfer-panel"><div class="occurrence-transfer-heading"><div><h3>Datas do mensal</h3><p>Cada troca preserva o histórico e não cria nova cobrança.</p></div></div><div class="occurrence-transfer-list">${rows.map((occurrence)=>{
+      const request=occurrenceTransferForOriginal(occurrence.backendId);
+      const sourceRequest=occurrence.rescheduledFromOccurrenceId
+        ? (state.occurrenceTransfers||[]).find((item)=>item.replacementOccurrenceId===occurrence.backendId)
+        : null;
+      const activeReplacement=request?.replacementOccurrenceId
+        ? (reservation.allOccurrences||[]).find((item)=>item.backendId===request.replacementOccurrenceId)
+        : null;
+      const originalLabel=`${occurrence.date} · ${timeRange(occurrence.time,occurrence.endTime)}`;
+      const targetLabel=request?.targetDate?`${request.targetDate} · ${timeRange(request.targetTime,request.targetEndTime)}`:"";
+      const stateLabel=request?.statusLabel||(occurrence.status==="completed"?"Evento realizado":occurrence.status==="cancelled"?"Data cancelada":"Data reservada");
+      const stateClass=request?occurrenceTransferStatusClass(request.status):(occurrence.status==="cancelled"?"status-neutral":"status-ok");
+      const currentLabel=activeReplacement?`${activeReplacement.date} · ${timeRange(activeReplacement.time,activeReplacement.endTime)}`:targetLabel;
+      const explanation=request?.status==="accepted"
+        ? `Transferida para ${currentLabel}. Evento e valor original preservados.`
+        : request?.status==="refund_selected"
+          ? `Restituição integral de ${money(request.value)} registrada para esta ocorrência.`
+          : request?.requestedByType==="group"&&["requested","proposed"].includes(request.status)
+            ? "O horário original continua protegido até a aprovação da troca."
+            : request?.requestedByType==="partner"&&["awaiting_group_choice","proposed"].includes(request.status)
+              ? "O parceiro liberou o horário original; o grupo decide entre nova data e restituição."
+              : request?.status==="declined"
+                ? "O pedido foi recusado e o horário original continua reservado."
+                : sourceRequest?.status==="accepted"
+                  ? `Esta é a data ativa que substituiu ${sourceRequest.originalDate} · ${timeRange(sourceRequest.originalTime,sourceRequest.originalEndTime)} e poderá ser remarcada novamente, se necessário.`
+                  : request?.reason?request.reason:"";
+      const requesterLabel=request?.requestedByType==="partner"?"Justificativa do parceiro":"Justificativa do cliente";
+      const requestMessage=request?.reason?`<div class="occurrence-transfer-message"><span>${esc(requesterLabel)}${request.requestedByName?` · ${esc(request.requestedByName)}`:""}</span><strong>${esc(request.reason)}</strong></div>`:"";
+      const proposalMessage=request?.targetDate?`<div class="occurrence-transfer-message"><span>Proposta do parceiro</span><strong>${esc(request.targetDate)} · ${esc(timeRange(request.targetTime,request.targetEndTime))}</strong></div>`:"";
+      const resolutionMessage=request?.resolutionNotes?`<div class="occurrence-transfer-message"><span>Devolutiva</span><strong>${esc(request.resolutionNotes)}</strong></div>`:"";
+      return `<article class="occurrence-transfer-row"><div><strong>${esc(originalLabel)}</strong>${currentLabel&&request?.status!=="accepted"?`<small>Proposta atual: ${esc(currentLabel)}</small>`:""}${request?.status==="accepted"?`<small>Novo horário: ${esc(currentLabel)}</small>`:""}${explanation?`<small>${esc(explanation)}</small>`:""}${requestMessage}${proposalMessage}${resolutionMessage}</div><div class="occurrence-transfer-row-actions"><span class="status ${stateClass}">${esc(stateLabel)}</span><div class="item-actions">${occurrenceTransferActionButtons(reservation,occurrence,request,role)}</div></div></article>`;
+    }).join("")}</div></section>`;
+  }
+
+  function openOccurrenceTransferRequest(reservation,occurrence) {
+    openForm({eyebrow:"Mensalista",title:"Solicitar outra data",
+      description:`${occurrence.date} · ${timeRange(occurrence.time,occurrence.endTime)}. Sua justificativa abre uma conversa com o parceiro. Combine uma opção do mesmo mês e confirme a troca ao final. O horário original continua reservado até essa confirmação.`,
+      submitLabel:"Enviar e abrir conversa",fields:[{name:"reason",label:"Justificativa e preferência de data",type:"textarea",required:true,full:true}],
+      onSubmit:async(data)=>{
+        const reason=String(data.reason||"").trim();
+        if(reason.length<3||reason.length>500)return markFormFieldInvalid("reason","Informe uma justificativa de 3 a 500 caracteres.");
+        const result=await runBackendMutation("Pedido enviado. Converse com o parceiro para combinar a nova data.",()=>window.MarketplaceBackend.requestMonthlyOccurrenceTransfer(occurrence.backendId,reason));
+        return result?{afterClose:()=>openOccurrenceTransferConversation(result.request_id)}:false;
+      }
+    });
+  }
+
+  function openPartnerOccurrenceCancellation(reservation,occurrence) {
+    openForm({
+      eyebrow:"Ocorrência mensalista",
+      title:"Cancelar esta data",
+      description:`${occurrence.date} · ${timeRange(occurrence.time,occurrence.endTime)}. O cliente poderá combinar outra data pelo chat ou escolher a restituição integral de ${money(occurrence.value)}. As demais datas permanecem reservadas.`,
+      submitLabel:"Cancelar esta data",
+      fields:[{name:"reason",label:"Justificativa ao grupo",type:"textarea",value:"",required:true,full:true}],
+      onSubmit:async(data)=>{
+        const result=await runBackendMutation("Data cancelada. A conversa está disponível para combinar uma solução.",()=>window.MarketplaceBackend.partnerCancelMonthlyOccurrence(occurrence.backendId,String(data.reason||"").trim()));
+        return result?{afterClose:()=>openOccurrenceTransferConversation(result.request_id)}:false;
+      }
+    });
+  }
+
+  let transferConversationEpoch=0;
+  let transferChatSending=false;
+  let transferChatRetry=null;
+
+  function occurrenceTransferComparison(request) {
+    const originalMinutes=Number(request.originalDurationMinutes)||0;
+    const targetMinutes=Number(request.targetDurationMinutes)||0;
+    const rows=[['Data',request.originalDate,request.targetDate],
+      ['Horário',timeRange(request.originalTime,request.originalEndTime),timeRange(request.targetTime,request.targetEndTime)],
+      ['Duração',`${originalMinutes} minutos`,`${targetMinutes} minutos`]];
+    return `<div class="transfer-comparison-wrap"><table class="transfer-comparison"><thead><tr><th>Confira</th><th>Reserva original</th><th>Troca proposta</th></tr></thead><tbody>${rows.map(([label,before,after])=>`<tr class="${before!==after?'transfer-difference':''}"><th>${esc(label)}</th><td>${esc(before)}</td><td>${esc(after)}${before!==after?'<small>Alteração</small>':''}</td></tr>`).join('')}</tbody></table></div>${originalMinutes!==targetMinutes?`<p class="transfer-duration-warning" role="note">A duração muda de <strong>${esc(originalMinutes)} para ${esc(targetMinutes)} minutos</strong>. Confirme somente se estiver de acordo.</p>`:''}<p class="field-help">Esta troca substitui uma ocorrência do mensalista, sem cobrança adicional.</p>`;
+  }
+
+  async function openOccurrenceTransferConversation(requestId,{refresh=false}={}) {
+    if(!requestId||!backendIsOnline())return;
+    const identity=backendRuntime.identityId;
+    const epoch=++transferConversationEpoch;
+    if(!refresh){
+      detailReturnContext=null;
+      openDetail({eyebrow:'Remarcação mensalista',title:'Conversa sobre a troca',body:'<p role="status">Carregando a conversa…</p>'});
+      detailDialog.dataset.view='occurrence-transfer-chat';detailDialog.dataset.requestId=requestId;
+    }
+    try {
+      const data=await window.MarketplaceBackend.occurrenceTransferConversation(requestId);
+      if(epoch!==transferConversationEpoch||identity!==backendRuntime.identityId||!detailDialog.open||detailDialog.dataset.view!=='occurrence-transfer-chat'||detailDialog.dataset.requestId!==requestId)return;
+      if(!data?.request)throw Error('Solicitação não encontrada.');
+      const request=mapOccurrenceTransferRequest(data.request);
+      const index=state.occurrenceTransfers.findIndex(item=>item.id===requestId);
+      if(index>=0)state.occurrenceTransfers[index]=request;else state.occurrenceTransfers.push(request);
+      const customer=state.role==='user' && request.canManageAsGroup;
+      const partner=state.role!=='user' && request.canManageAsPartner;
+      const closed=!['requested','awaiting_group_choice','proposed'].includes(request.status);
+      const writable=!closed&&!partnerReadonlyActive()&&(customer||partner);
+      const draft=document.getElementById('transferChatMessage')?.value||'';
+      const focused=document.activeElement?.id==='transferChatMessage';
+      const oldLog=document.getElementById('transferChatLog');
+      const followBottom=!refresh||!oldLog||oldLog.scrollHeight-oldLog.scrollTop-oldLog.clientHeight<55;
+      const oldScroll=oldLog?.scrollTop||0;
+      const messages=Array.isArray(data.messages)?data.messages:[];
+      const transcript=messages.map(message=>{
+        const own=message.sender_id===identity&&message.sender_side!=='system';
+        const side=message.sender_side==='partner'?'Parceiro':message.sender_side==='customer'?'Cliente':'Sistema';
+        const proposalTime=message.kind==='proposal'&&message.data?.target_starts_at
+          ?`<small>${esc(backendDateTimeLabel(message.data.target_starts_at))} · ${esc(Math.round((Date.parse(message.data.target_ends_at)-Date.parse(message.data.target_starts_at))/60000))} minutos</small>`:'';
+        return `<article class="transfer-chat-message ${own?'own':''} ${message.sender_side==='system'?'system':''}"><header><strong>${esc(side)}${message.sender_side!=='system'?` · ${esc(message.sender_name)}`:''}</strong><small>${esc(backendDateTimeLabel(message.created_at))}</small></header><p>${esc(message.body)}</p>${proposalTime}</article>`;
+      }).join('');
+      const protection=request.requestedByType==='partner'?'O parceiro cancelou a ocorrência original. Combine outra data ou solicite a restituição.':'O horário original continua reservado até a sua confirmação final.';
+      const proposal=request.status==='proposed'?`<section class="transfer-current-proposal"><h3>Troca combinada para confirmar</h3>${occurrenceTransferComparison(request)}${customer&&!partnerReadonlyActive()?`<button type="button" class="button primary" data-action="accept-occurrence-transfer" data-id="${esc(requestId)}">Revisar e confirmar troca</button>`:'<p class="field-help">Aguardando a confirmação do cliente.</p>'}</section>`:'';
+      const partnerActions=partner&&!closed&&!partnerReadonlyActive()?`<div class="item-actions"><button type="button" class="button secondary" data-action="occurrence-transfer-availability" data-id="${esc(requestId)}">Consultar horários e informar opções</button><button type="button" class="button primary" data-action="propose-occurrence-transfer" data-id="${esc(requestId)}" ${request.hasCustomerReply?'':'disabled'}>Preparar troca combinada</button></div>${!request.hasCustomerReply?'<small class="field-help">Informe as opções no chat e aguarde a resposta do cliente antes de preparar a troca.</small>':''}`:'';
+      const finalActions=!closed&&!partnerReadonlyActive()?customer
+        ?`<button type="button" class="button ghost small" data-action="${request.requestedByType==='partner'?'refund-occurrence-transfer':'cancel-occurrence-transfer'}" data-id="${esc(requestId)}">${request.requestedByType==='partner'?'Solicitar restituição':'Cancelar pedido'}</button>`
+        :partner&&request.requestedByType==='group'?`<button type="button" class="button ghost small" data-action="decline-occurrence-transfer" data-id="${esc(requestId)}">Encerrar sem troca</button>`:'':'';
+      detailTitle.textContent=`Remarcação · ${request.reservationId}`;
+      detailBody.innerHTML=`<div class="transfer-chat-summary"><strong>${esc(request.venueName)} · ${esc(request.spaceName)}</strong><span>${esc(request.originalDate)} · ${esc(timeRange(request.originalTime,request.originalEndTime))} · ${esc(request.originalDurationMinutes)} minutos</span><span class="status ${occurrenceTransferStatusClass(request.status)}">${esc(request.statusLabel)}</span><p>${esc(closed?'Conversa encerrada. O histórico permanece disponível.':protection)}</p></div><section aria-label="Conversa da remarcação"><div id="transferChatLog" class="transfer-chat-log" role="log" aria-label="Mensagens da remarcação" aria-live="polite">${transcript}</div>${writable?`<div class="transfer-chat-composer"><label for="transferChatMessage">Mensagem</label><textarea id="transferChatMessage" rows="3" maxlength="4000" placeholder="Converse sobre as opções e informe a data desejada.">${esc(draft)}</textarea><button type="button" class="button primary" data-action="send-occurrence-transfer-message" data-id="${esc(requestId)}">Enviar mensagem</button></div>`:''}</section>${partnerActions}${proposal}<div class="item-actions transfer-chat-end">${finalActions}</div>`;
+      const log=document.getElementById('transferChatLog');log.scrollTop=followBottom?log.scrollHeight:oldScroll;
+      if(focused){const input=document.getElementById('transferChatMessage');input?.focus({preventScroll:true});input?.setSelectionRange(draft.length,draft.length);}
+      const unread=(state.occurrenceTransferNotifications||[]).some(item=>item.requestId===requestId&&item.status==='unread');
+      if(unread&&messages.length&&!partnerReadonlyActive()&&!document.hidden) {
+        const read=await window.MarketplaceBackend.markOccurrenceTransferConversationRead(requestId,messages.at(-1).message_order);
+        if(identity!==backendRuntime.identityId)return;
+        confirmNotificationReads(read?.notification_ids||[],identity);
+        renderNotificationReadState();
+      }
+    } catch(error) {
+      if(epoch!==transferConversationEpoch||identity!==backendRuntime.identityId)return;
+      if(refresh&&!/Sem acesso|AUTH|bloque|JWT/i.test(error.message||'')){showToast('Não foi possível atualizar a conversa agora. Sua mensagem foi mantida.');return;}
+      // Revoke cached private content if the server no longer permits access.
+      detailBody.innerHTML=`<p role="alert">${esc(backendErrorMessage(error))}</p>`;
+    }
+  }
+
+  async function sendOccurrenceTransferChatMessage(requestId) {
+    if(transferChatSending||partnerReadonlyActive())return;
+    const request=state.occurrenceTransfers.find(item=>item.id===requestId);
+    const input=document.getElementById('transferChatMessage'),body=String(input?.value||'').trim();
+    if(!request||!body){input?.focus();return;}
+    const identity=backendRuntime.identityId,side=state.role==='user'?'customer':'partner';
+    if(!transferChatRetry||transferChatRetry.requestId!==requestId||transferChatRetry.identity!==identity||transferChatRetry.body!==body)transferChatRetry={requestId,identity,body,id:crypto.randomUUID()};
+    transferChatSending=true;
+    const button=detailBody.querySelector('[data-action="send-occurrence-transfer-message"]');if(button)button.disabled=true;
+    try {
+      const result=await runBackendMutation('',()=>window.MarketplaceBackend.sendOccurrenceTransferMessage(requestId,body,side,transferChatRetry.id));
+      if(identity!==backendRuntime.identityId)return;
+      if(result){transferChatRetry=null;if(input?.value.trim()===body)input.value='';}
+    } finally {
+      transferChatSending=false;if(button)button.disabled=false;
+      if(identity===backendRuntime.identityId&&detailDialog.open&&detailDialog.dataset.view==='occurrence-transfer-chat'&&detailDialog.dataset.requestId===requestId)await openOccurrenceTransferConversation(requestId,{refresh:true});
+    }
+  }
+
+  async function transferAvailableOptions(request) {
+    const rows=await window.MarketplaceBackend.occurrenceTransferAvailableSlots(request.id);
+    const reservation=state.reservations.find(item=>item.backendId===request.reservationBackendId);
+    const timezone=state.venues.find(item=>item.id===reservation?.venueId)?.timezone||'America/Sao_Paulo';
+    return (Array.isArray(rows)?rows:[]).map(slot=>{
+      const start=backendZonedDateTime(slot.starts_at,timezone),end=backendZonedDateTime(slot.ends_at,timezone);
+      const minutes=Math.round((Date.parse(slot.ends_at)-Date.parse(slot.starts_at))/60000);
+      return {value:slot.schedule_slot_id,date:start.date,label:`${start.date} · ${timeRange(start.time,backendEndTime(start,end))} · ${minutes} minutos`,minutes};
+    });
+  }
+
+  async function openOccurrenceTransferAvailability(request) {
+    try {
+      const identity=backendRuntime.identityId,options=await transferAvailableOptions(request);
+      if(identity!==backendRuntime.identityId)return;
+      if(!options.length){showToast('Não há horários livres no período permitido. A conversa continua aberta para combinar uma solução.');return;}
+      const selected=new Set(),dates=[...new Set(options.map(item=>item.date))],nonce=crypto.randomUUID();
+      const renderOptions=()=>{
+        const date=dynamicForm.elements.consultDate.value;
+        document.getElementById('transferAvailableOptions').innerHTML=options.filter(item=>item.date===date).map(item=>`<label class="transfer-option"><input type="checkbox" data-transfer-option value="${esc(item.value)}" ${selected.has(item.value)?'checked':''}><span>${esc(item.label)}${item.minutes!==request.originalDurationMinutes?`<small>Duração diferente da original: ${esc(request.originalDurationMinutes)} minutos</small>`:''}</span></label>`).join('');
+        document.getElementById('transferSelectedCount').textContent=`${selected.size} opção(ões) selecionada(s) para informar no chat`;
+      };
+      openForm({eyebrow:'Agenda para remarcação',title:'Informar opções no chat',description:'Selecione horários disponíveis nas datas que deseja informar. O cliente responderá na conversa antes de você preparar a troca.',submitLabel:'Enviar opções no chat',fields:[
+        {name:'consultDate',label:'Data para consultar',type:'select',value:dates[0],options:dates.map(date=>({value:date,label:date})),full:true},
+        {name:'availableOptions',type:'custom',full:true,html:'<div id="transferAvailableOptions"></div><small id="transferSelectedCount" class="field-help"></small>'}
+      ],onChange:event=>{if(event?.target?.matches('[data-transfer-option]')){if(event.target.checked)selected.add(event.target.value);else selected.delete(event.target.value);}renderOptions();},
+      onSubmit:async()=>{
+        if(!selected.size||selected.size>12)return markFormFieldInvalid('availableOptions','Selecione de 1 a 12 opções para informar na conversa.');
+        const body='Opções disponíveis para esta troca:\n'+options.filter(item=>selected.has(item.value)).map(item=>'• '+item.label).join('\n')+'\nQual delas você prefere? A disponibilidade será conferida na confirmação.';
+        return Boolean(await runBackendMutation('Opções enviadas na conversa.',()=>window.MarketplaceBackend.sendOccurrenceTransferMessage(request.id,body,'partner',nonce)));
+      }});
+    } catch(error){showToast(backendErrorMessage(error));}
+  }
+
+  async function openOccurrenceTransferProposal(request) {
+    if(!request?.hasCustomerReply){showToast('Converse no chat e aguarde a resposta do cliente antes de preparar a troca.');return;}
+    try {
+      const identity=backendRuntime.identityId,options=await transferAvailableOptions(request);
+      if(identity!==backendRuntime.identityId)return;
+      if(!options.length){showToast('Não há horários livres no período permitido. Continue a conversa com o cliente.');return;}
+      openForm({eyebrow:'Remarcação mensalista',title:'Preparar a troca combinada',description:'Selecione a data escolhida pelo cliente na conversa. Ele ainda revisará as diferenças e confirmará a troca.',submitLabel:'Enviar para confirmação',fields:[
+        {name:'scheduleSlotId',label:'Data e horário combinados',type:'select',value:options.some(item=>item.value===request.targetScheduleSlotId)?request.targetScheduleSlotId:'',options:[{value:'',label:'Selecione a opção combinada no chat'},...options],required:true,full:true}
+      ],onSubmit:async(data)=>Boolean(await runBackendMutation('Troca enviada para a confirmação do cliente.',()=>window.MarketplaceBackend.proposeMonthlyOccurrenceTransfer(request.id,data.scheduleSlotId)))});
+    } catch(error){showToast(backendErrorMessage(error));}
+  }
+
+  function openOccurrenceTransferConfirmation(request) {
+    const revision=request.proposalRevision,requestId=request.id;
+    openForm({eyebrow:'Confirmação da remarcação',title:'Confira antes de trocar',description:'Ao confirmar, o novo horário entra no vínculo mensalista e o original é liberado.',submitLabel:'Confirmar troca',fields:[
+      {name:'comparison',type:'custom',full:true,html:occurrenceTransferComparison(request)},
+      {name:'transferConsent',label:'Aceite das alterações',type:'checkbox-group',required:true,full:true,options:[{value:'changes_accepted',label:`Li e concordo com a nova data, o horário e a duração de ${request.targetDurationMinutes} minutos (original: ${request.originalDurationMinutes} minutos).`,checked:false}]}
+    ],onChange:()=>{formSubmit.disabled=dynamicForm.elements.changes_accepted?.checked!==true;},onSubmit:async(data)=>{
+      if(data.changes_accepted!=='true')return markFormFieldInvalid('transferConsent','Marque que concorda com a nova data, o horário e a duração.');
+      return Boolean(await runBackendMutation('Troca confirmada. A nova ocorrência está no vínculo mensalista.',()=>window.MarketplaceBackend.acceptMonthlyOccurrenceTransfer(requestId,revision,true)));
+    }});
+  }
+
+  function openPaidCancellation(source, reservationId, partnerReservationId = "") {
+    const reservation = reservationId ? state.reservations.find((item) => item.id === reservationId) : null;
+    const partnerReservation = partnerReservationId ? state.partnerReservations.find((item) => item.id === partnerReservationId) : state.partnerReservations.find((item) => item.userReservationId === reservationId);
+    if (!reservation && !partnerReservation) return;
+    const effectiveReservation = reservation || state.reservations.find((item) => item.id === partnerReservation?.userReservationId);
+    const eligibility = cancellationEligibility(effectiveReservation, source);
+    const mode = eligibility.mode;
+    if (source === "user" && mode === "monthly_locked") {
+      const first = eligibility.firstOccurrence || firstReservationOccurrence(effectiveReservation);
+      openDetail({ eyebrow:"Mensalista", title:"Cancelamento não disponível", body:`<div class="cancellation-warning"><strong>Prazo encerrado</strong><p>Esta reserva mensalista foi adquirida como um único pacote de múltiplos horários. O cancelamento pelo usuário só era permitido até ${esc(state.settings.cancellationHours)} horas antes da primeira ocorrência.</p><ul>${cancellationImpacts(source, mode, effectiveReservation).map((item)=>`<li>${esc(item)}</li>`).join("")}</ul><div class="detail-list" style="margin-top:12px"><div class="detail-line"><span>Primeira ocorrência</span><strong>${esc(first.date)} · ${esc(timeRange(first.time,first.endTime))}</strong></div><div class="detail-line"><span>Situação</span><strong>Pacote sem possibilidade de cancelamento pelo usuário</strong></div></div></div>` });
+      return;
+    }
+    selectedCancellation = { source, mode, reservationId: effectiveReservation?.id || "", partnerReservationId: partnerReservation?.id || partnerReservationId, outsideDeadline: mode === "no_compensation" };
+    cancellationEyebrow.textContent = `Cancelamento pelo ${cancellationSourceLabel(source)}`;
+    cancellationTitle.textContent = mode === "voucher" ? (effectiveReservation?.monthly ? "Cancelar mensalista e gerar voucher mensalista" : "Cancelar e gerar voucher") : mode === "refund" ? "Cancelar com reembolso integral" : "Cancelar fora do prazo";
+    cancellationSummary.innerHTML = `<strong>${esc(effectiveReservation?.venue || partnerReservation?.space || "Reserva")}</strong><div class="meta-row" style="margin-top:7px"><span>${esc(effectiveReservation?.date || partnerReservation?.date || "")}</span><span>${esc(effectiveReservation?.time || partnerReservation?.time || "")}</span><span>${money(effectiveReservation?.value || partnerReservation?.value || 0)}</span></div>`;
+    cancellationWarningText.textContent = mode === "voucher" ? (effectiveReservation?.monthly ? "O pacote mensalista está dentro do prazo. O voucher integral será restrito a uma nova reserva mensalista de valor igual ou superior." : "O usuário está dentro do prazo e receberá voucher conforme a política aceita antes do pagamento.") : mode === "refund" ? "Quem efetua este cancelamento assume o reembolso integral e todos os custos decorrentes." : "O prazo regular foi encerrado. O cancelamento será concluído sem reembolso ou voucher.";
+    cancellationImpactList.innerHTML = cancellationImpacts(source, mode, effectiveReservation).map((item) => `<li>${esc(item)}</li>`).join("");
+    cancellationReasonLabel.textContent = source === "user" ? "Motivo do cancelamento" : "Justificativa obrigatória ao usuário";
+    cancellationReason.placeholder = source === "user" ? "Informe brevemente o motivo do cancelamento." : `Explique por que ${cancellationSourceLabel(source)} precisa cancelar este horário já reservado e pago.`;
+    cancellationReason.value = "";
+    cancellationAcknowledge.checked = false;
+    cancellationAcknowledgeText.textContent = mode === "voucher" ? (effectiveReservation?.monthly ? "Aceito o cancelamento integral do pacote e a emissão de voucher exclusivo para uma nova reserva mensalista de valor igual ou superior." : "Estou ciente de que o horário e o evento serão cancelados e o valor pago será convertido em voucher conforme as regras de disponibilidade compatível.") : mode === "refund" ? "Confirmo o reembolso integral e a responsabilidade do cancelador por todas as taxas e custos, sem desconto para o usuário." : "Estou ciente de que este cancelamento fora do prazo não gera reembolso nem voucher.";
+    cancellationSubmit.textContent = mode === "voucher" ? "Cancelar e gerar voucher" : mode === "refund" ? "Cancelar e reembolsar integralmente" : "Cancelar sem reembolso ou voucher";
+    cancellationDialog.showModal();
+    focusDialog(cancellationDialog);
+  }
+
+  function cancelLinkedEventAndNotify(reservation, source, now) {
+    const linkedEvent = reservation?.eventId ? state.groupEvents.find((event) => event.id === reservation.eventId) : null;
+    if (linkedEvent) Object.assign(linkedEvent, { statusKey: "cancelled", status: "Cancelado", published: false, publicationEndpoint: `${source}.reservation.cancelled`, pushStatus: "Cancelamento comunicado" });
+    const group = reservation ? userGroup(reservation.groupId) : null;
+    if (reservation?.groupId) state.pushLog.unshift({ id: nextId("PUSH-", state.pushLog), groupId: reservation.groupId, groupName: reservation.groupName, eventId: reservation.eventId, eventTitle: reservation.event, recipients: Math.max(0, Number(group?.memberCount || 1) - 1), endpoint: "push.group_cancellation", status: "Enviado", createdAt: now });
+  }
+
+  function completePaidCancellation({ source, mode, reservationId, partnerReservationId, reason, outsideDeadline }) {
+    const reservation = reservationId ? state.reservations.find((item) => item.id === reservationId) : null;
+    const partnerReservation = partnerReservationId ? state.partnerReservations.find((item) => item.id === partnerReservationId) : state.partnerReservations.find((item) => item.userReservationId === reservationId);
+    const nowDate = new Date();
+    const now = nowDate.toLocaleString("pt-BR");
+    const value = Number(reservation?.value || partnerReservation?.value || 0);
+    const venueId = reservation?.venueId || state.partnerProfile.venueId;
+    const venueName = reservation?.venue || state.venues.find((venue) => venue.id === venueId)?.name || state.partnerProfile.tradeName;
+    const cancellationId = nextId("CAN-", state.cancellationLog);
+    let voucher = null;
+    let endpoint = "";
+    let paymentStatus = "";
+    if (mode === "voucher") {
+      const voucherId = nextId("VC-", state.cancellationVouchers);
+      const voucherCode = `CANCELA-${voucherId.replace(/\D/g, "")}`;
+      const expiresAtDate = new Date(nowDate);
+      expiresAtDate.setDate(expiresAtDate.getDate() + Number(state.settings.voucherValidityDays || 30));
+      const originalTime = reservation?.time || partnerReservation?.time || "20:00";
+      const window = voucherCompatibleWindow(originalTime);
+      voucher = { id: voucherId, code: voucherCode, sourceReservationId: reservation?.id || "", partnerReservationId: partnerReservation?.id || "", user: reservation?.user || state.userProfile.name, venueId, venue: venueName, value, originalValue: value, originalTime, originalPeriod: timePeriod(originalTime), compatibilityWindow: `${minutesToTime(window.start)}–${minutesToTime(window.end)}`, minimumCompatibleDates: Number(state.settings.voucherMinimumCompatibleDates || 4), status: "active", issuedAt: now, issuedDate: formatPtDate(nowDate), expiresAt: formatPtDate(expiresAtDate), validityDays: Number(state.settings.voucherValidityDays || 30), useType: "single", eligibleBookingMode: reservation?.monthly ? "monthly" : "any", originBookingMode: reservation?.monthly ? "monthly" : "single", minimumReservationValue: value, partnerLiability: true, accountingOriginMonth: reservation?.accountingOriginMonth || reservation?.accountingMonth || accountingMonth(nowDate), accountingTreatment: "Pagamento original mantido; resgate sem nova obrigação, salvo complemento", cancellationSource: source, cancellationReason: reason, reassignmentStatus: "Vinculado ao parceiro original" };
+      refreshVoucherAvailability(voucher);
+      state.cancellationVouchers.unshift(voucher);
+      endpoint = "user.reservation.cancelled_with_voucher";
+      paymentStatus = "Pago — convertido em voucher";
+      state.accountingLedger.unshift({ id: nextId("LED-", state.accountingLedger), type: "voucher_issued", reservationId: reservation?.id || "", voucherId, venueId, venue: venueName, amount: value, fiscalAmount: 0, accountingMonth: reservation?.accountingOriginMonth || reservation?.accountingMonth || accountingMonth(nowDate), description: reservation?.monthly ? "Voucher mensalista emitido sem reversão do pagamento original" : "Voucher emitido sem reversão do pagamento original" });
+    } else if (mode === "refund") {
+      endpoint = source === "partner" ? "partner.reservation.cancelled_with_full_refund" : "tamo_on.reservation.cancelled_with_full_refund";
+      paymentStatus = "Reembolso integral confirmado — simulado";
+      state.accountingLedger.unshift({ id: nextId("LED-", state.accountingLedger), type: "full_refund", reservationId: reservation?.id || "", venueId, venue: venueName, amount: value, fiscalAmount: 0, accountingMonth: accountingMonth(nowDate), responsible: source, feeResponsibility: source, description: `Reembolso integral; taxas e custos suportados por ${cancellationSourceLabel(source)}` });
+    } else {
+      endpoint = "user.reservation.cancelled_outside_deadline";
+      paymentStatus = "Pago — sem reembolso ou voucher";
+    }
+    if (reservation) Object.assign(reservation, { statusKey: "cancelled", status: mode === "voucher" ? "Cancelada com voucher" : mode === "refund" ? "Cancelada com reembolso integral" : "Cancelada fora do prazo", endpoint, paymentStatus, voucherGeneratedId: voucher?.id || "", voucherGeneratedCode: voucher?.code || "", cancellationSource: source, cancellationMode: mode, cancellationReason: reason, cancelledAt: now, slotReleased: true, refundValue: mode === "refund" ? value : 0, refundStatus: mode === "refund" ? "confirmed" : "not_applicable", refundFeePayer: mode === "refund" ? source : "", outsideDeadline: Boolean(outsideDeadline), pushStatus: "Cancelamento comunicado", eventPublicationStatus: "cancelled" });
+    if (partnerReservation) Object.assign(partnerReservation, { status: "Cancelada", payment: mode === "voucher" ? "Pago — voucher emitido" : mode === "refund" ? "Reembolso integral — simulado" : "Pago — sem compensação", cancellationSource: source, cancellationMode: mode, cancellationReason: reason, voucherGeneratedId: voucher?.id || "", voucherGeneratedCode: voucher?.code || "", voucherStatus: voucher ? voucherStatusLabel(voucher) : "Não emitido", refundValue: mode === "refund" ? value : 0, refundFeePayer: mode === "refund" ? source : "", cancelledAt: now });
+    cancelLinkedEventAndNotify(reservation, source, now);
+    state.cancellationLog.unshift({ id: cancellationId, source, mode, reservationId: reservation?.id || "", partnerReservationId: partnerReservation?.id || "", reason, voucherId: voucher?.id || "", voucherCode: voucher?.code || "", refundValue: mode === "refund" ? value : 0, feeResponsibility: mode === "refund" ? source : "", outsideDeadline: Boolean(outsideDeadline), slotReleased: true, eventId: reservation?.eventId || partnerReservation?.eventId || "", createdAt: now });
+    saveState();
+    render();
+    showToast(mode === "voucher" ? "Reserva cancelada; voucher gerado e horário liberado." : mode === "refund" ? "Reserva cancelada com reembolso integral simulado." : "Reserva cancelada fora do prazo, sem reembolso ou voucher.");
+  }
+
+  function focusDialog(dialog) {
+    if (!allowAutomaticFieldFocus) return;
+    requestAnimationFrame(() => dialog?.focus({ preventScroll: true }));
+  }
+
+  function fieldMarkup(field) {
+    const required = field.required ? "required" : "";
+    const disabled = field.disabled ? "disabled" : "";
+    const readonly = field.readonly ? "readonly" : "";
+    const full = field.full ? " full" : "";
+    const help = field.help ? `<small class="field-help">${esc(field.help)}</small>` : "";
+    let control = "";
+    if (field.type === "date-selection") {
+      return window.ScheduleDateCalendar.markup(field);
+    } else if (field.type === "custom") {
+      return `<section class="field custom-form-field${full}" data-field-name="${esc(field.name)}">${field.html || ""}<small class="field-error" role="alert" hidden></small></section>`;
+    } else if (field.type === "checkbox-group") {
+      const options=field.options || [];
+      return `<fieldset class="field permission-fieldset${full}" data-field-name="${esc(field.name)}" ${field.required?"data-required=true":""}><legend>${esc(field.label)}${field.required?" *":""}</legend><div class="team-permission-grid" data-team-permission-group>${options.map((option)=>`<label class="team-permission-option"><input type="checkbox" name="${esc(option.value)}" value="true" data-team-permission ${option.checked ? "checked" : ""} ${option.disabled ? "disabled" : ""}><span><strong>${esc(option.label)}</strong><small>${esc(option.help || "")}</small></span></label>`).join("")}</div>${field.help ? `<small class="field-help" data-team-permission-help>${esc(field.help)}</small>` : ""}<small class="field-error" role="alert" hidden></small></fieldset>`;
+    } else if (field.type === "select") {
+      control = `<select name="${esc(field.name)}" ${required} ${disabled}>${field.options.map((option) => {
+        const optionValue = typeof option === "object" ? option.value : option;
+        const optionLabel = typeof option === "object" ? option.label : option;
+        return `<option value="${esc(optionValue)}" ${String(optionValue) === String(field.value ?? "") ? "selected" : ""}>${esc(optionLabel)}</option>`;
+      }).join("")}</select>`;
+    } else if (field.type === "currency") {
+      control = `<input type="text" name="${esc(field.name)}" value="${esc(money(field.value ?? 0))}" data-currency inputmode="numeric" autocomplete="off" ${required} ${disabled} ${readonly}>`;
+    } else if (field.type === "file") {
+      control = `<input type="file" name="${esc(field.name)}" accept="${esc(field.accept || "application/pdf")}" ${required} ${disabled}>`;
+    } else if (field.type === "textarea") {
+      control = `<textarea name="${esc(field.name)}" ${required} ${disabled} ${readonly}>${esc(field.value ?? "")}</textarea>`;
+    } else {
+      const maskAttrs = field.name === "cnpj" ? 'inputmode="numeric" maxlength="18" autocomplete="off"' : ["phone","whatsapp"].includes(field.name) ? 'inputmode="tel" maxlength="15" autocomplete="tel"' : "";
+      const input = `<input type="${esc(field.type || "text")}" name="${esc(field.name)}" value="${esc(field.value ?? "")}" ${field.min !== undefined ? `min="${esc(field.min)}"` : ""} ${field.max !== undefined ? `max="${esc(field.max)}"` : ""} ${field.step !== undefined ? `step="${esc(field.step)}"` : ""} ${maskAttrs} ${required} ${disabled} ${readonly}>`;
+      const temporalTypes = ["date", "time", "datetime-local", "month", "week"];
+      control = temporalTypes.includes(field.type) ? `<span class="temporal-control">${input}</span>` : input;
+    }
+    return `<label class="field${full}" data-field-name="${esc(field.name)}"><span>${esc(field.label)}</span>${control}${help}<small class="field-error" role="alert" hidden></small></label>`;
+  }
+
+  function clearFormFieldInvalid(name) {
+    const field=formFields.querySelector(`[data-field-name="${CSS.escape(name)}"]`);
+    if (!field) return;
+    field.classList.remove("field-invalid");
+    const error=field.querySelector(".field-error");
+    if (error) { error.hidden=true; error.textContent=""; }
+  }
+
+  function markFormFieldInvalid(name,message) {
+    const field=formFields.querySelector(`[data-field-name="${CSS.escape(name)}"]`);
+    if (!field) return false;
+    field.classList.add("field-invalid");
+    const error=field.querySelector(".field-error");
+    if (error) { error.textContent=message; error.hidden=false; }
+    field.scrollIntoView({behavior:"smooth",block:"center"});
+    field.querySelector("input,select,textarea")?.focus({preventScroll:true});
+    return false;
+  }
+
+  function setFormFieldVisible(name,visible) {
+    const field=formFields.querySelector(`[data-field-name="${CSS.escape(name)}"]`);
+    if (!field)return;
+    field.hidden=!visible;
+    field.querySelectorAll("input,select,textarea").forEach((control)=>{control.disabled=!visible;});
+  }
+
+  function closeMonthlyWorkflowDialogs() {
+    if(formDialog.open)formDialog.close();
+    formHandler=null;formChangeHandler=null;
+    if(detailDialog.open)detailDialog.close();
+    detailDialog.dataset.view="";
+  }
+
+  function openForm({ eyebrow = "Editar dados", title, description = "", submitLabel = "Salvar", secondarySubmitLabel = "", fields, onSubmit, onChange = null }) {
+    formEyebrow.textContent = eyebrow;
+    formTitle.textContent = title;
+    formDescription.textContent = description;
+    formDescription.hidden = !description;
+    formSubmit.textContent = submitLabel;
+    formSubmit.disabled = false;
+    formSubmit.hidden = false;
+    formSecondarySubmit.textContent = secondarySubmitLabel;
+    formSecondarySubmit.hidden = !secondarySubmitLabel;
+    formSecondarySubmit.disabled = false;
+    formFields.innerHTML = fields.map(fieldMarkup).join("");
+    fields.filter((field)=>field.type==="date-selection").forEach((field)=>window.ScheduleDateCalendar.mount(formFields.querySelector(`[data-field-name="${CSS.escape(field.name)}"]`),field));
+    validateMaskedFields(formFields);
+    formHandler = guardPartnerOperation(onSubmit);
+    formChangeHandler = onChange;
+    formDialog.showModal();
+    onChange?.(null,dynamicForm);
+    if (allowAutomaticFieldFocus) setTimeout(() => formFields.querySelector("input,select,textarea")?.focus({ preventScroll: true }), 30);
+  }
+
+  function openDetail({ eyebrow = "Detalhes", title, body }) {
+    window.MarketplaceInlinePix?.stop();
+    stopAsaasRefundMonitor();
+    detailDialog.dataset.view = "detail";
+    detailEyebrow.textContent = eyebrow;
+    detailTitle.textContent = title;
+    detailBody.innerHTML = body;
+    const technicalLabels=new Set(["Endpoint","Endpoint do pagamento","Endpoint de publicação","Provedor","Intent"]);
+    [...detailBody.querySelectorAll(".detail-line")].forEach((line)=>{
+      const label=line.querySelector("span")?.textContent.trim()||"";
+      const value=line.querySelector("strong")?.textContent.trim()||"";
+      if(technicalLabels.has(label))line.remove();
+      if(label==="Voucher"&&["Não aplicado","Não gerado"].includes(value))line.remove();
+      if(["Valor abatido","Complemento"].includes(label)&&/^R\$\s*0,00$/.test(value))line.remove();
+    });
+    if (state.role === "user") {
+      [...detailBody.querySelectorAll(".detail-line")]
+        .filter((line) => line.querySelector("span")?.textContent.trim() === "Taxas suportadas por")
+        .forEach((line) => line.remove());
+    }
+    if (!detailDialog.open) {
+      detailDialog.showModal();
+      focusDialog(detailDialog);
+    }
+  }
+
+  function askConfirm({ title, message, confirmLabel = "Confirmar", onConfirm }) {
+    confirmTitle.textContent = title;
+    confirmMessage.textContent = message;
+    confirmSubmit.textContent = confirmLabel;
+    confirmHandler = guardPartnerOperation(onConfirm);
+    confirmDialog.showModal();
+    focusDialog(confirmDialog);
+  }
+
+  function exportCsv(filename, rows) {
+    const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(";")).join("\r\n")}`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast("Arquivo CSV gerado com os dados fictícios atuais.");
+  }
+
+  function setRole(role) {
+    if (backendRuntime.enabled && !backendAllowedRoles().has(role)) {
+      showToast("Esta área não está liberada para a conta autenticada.");
+      return;
+    }
+    state.role = role;
+    if(backendIsOnline()&&!partnerReadonlyActive())operationalAlerts.ingest(personalNotificationsForRole(role));
+    saveState();
+    roleButtons.forEach((button) => button.classList.toggle("active", button.dataset.role === role));
+    render();
+    const unread = totalVisibleUnreadForRole(role);
+    if (unread > 0) showToast(`Você tem ${unread} atualização${unread === 1 ? " nova" : "ões novas"}.`);
+  }
+
+  function nav(role, page) {
+    state.activePage[role] = page;
+    saveState();
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function navShell(role, content) {
+    const menu = menus[role];
+    return `
+      <div class="role-layout">
+        <nav class="subnav" aria-label="Menu da área ${role}">
+          <div class="subnav-title">Navegação</div>
+          ${menu.map(([id, icon, label]) => {
+            const unread=navigationUnreadCount(role,id);
+            const restricted=role==="partner"&&!partnerPageAllowed(id);
+            if(restricted)return `<button type="button" class="subnav-button is-restricted" disabled aria-disabled="true"><span class="subnav-icon">${icon}</span><span class="subnav-label">${esc(label)}<small>${partnerAccessPending ? "Atualizando…" : "Acesso Restrito"}</small></span></button>`;
+            const badgeLabel=id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
+            return `<button type="button" class="subnav-button ${state.activePage[role] === id ? "active" : ""} ${unread ? "has-unread" : ""}" data-nav="${id}"><span class="subnav-icon">${icon}</span><span class="subnav-label">${label}</span>${messageBadge(unread,badgeLabel)}</button>`;
+          }).join("")}
+        </nav>
+        <section class="content">${content}</section>
+      </div>`;
+  }
+
+  function pageHeader(eyebrow, title, description, actions = "") {
+    return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
+  }
+
+  function stat(value, label, note = "") {
+    return `<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span>${note ? `<div class="kpi-note">${esc(note)}</div>` : ""}</div>`;
+  }
+
+  function emptyState(icon, text) {
+    return `<div class="empty-state"><div class="empty-icon">${icon}</div>${esc(text)}</div>`;
+  }
+
+  function partnerReservationStatusKey(reservation) {
+    if (!reservation) return "pending";
+    if (reservation.backendStatus) return backendReservationVisual(reservation.backendStatus).key;
+    if (reservation.statusKey) return reservation.statusKey === "expired" ? "cancelled" : reservation.statusKey;
+    if (reservation.status === "Confirmada") return "confirmed";
+    if (["Cancelada","Expirada","Reembolsada","Reembolso pendente"].includes(reservation.status)) return "cancelled";
+    return "pending";
+  }
+
+  function findPartnerReservationForSlot(venueId, time, shortDate, endTime = "", space = "") {
+    if (venueId !== state.partnerProfile.venueId) return null;
+    return state.partnerReservations.find((reservation) => {
+      if (partnerReservationStatusKey(reservation) === "cancelled") return false;
+      const reservationSpace = reservation.space || state.partnerSpaces[0]?.name || "Espaço principal";
+      const directDate = String(reservation.date || "").slice(0,5);
+      const directSpaceMatches = !space || reservationSpace === space;
+      const direct = directSpaceMatches && reservation.time === time && window.MarketplaceAgendaNavigation.dateMatches(reservation.date,shortDate,reservation.shortDate) && (!endTime || !reservation.endTime || reservation.endTime === endTime);
+      const recurring = Array.isArray(reservation.occurrences) && reservation.occurrences.some((item) => {
+        const occurrenceSpace = item.space || reservationSpace;
+        const occurrenceShortDate = item.shortDate || String(item.date || "").slice(0,5);
+        return (!space || occurrenceSpace === space) && item.time === time && window.MarketplaceAgendaNavigation.dateMatches(item.date,shortDate,occurrenceShortDate) && (!endTime || !item.endTime || item.endTime === endTime);
+      });
+      return direct || recurring;
+    }) || null;
+  }
+
+  function findReservationForSlot(venueId, time, shortDate, endTime = "", space = "") {
+    const userReservation = state.reservations.find((reservation) => {
+      if (reservation.venueId !== venueId || partnerReservationStatusKey(reservation) === "cancelled") return false;
+      const reservationSpace = reservation.space || state.partnerSpaces[0]?.name || "Espaço principal";
+      const directSpaceMatches = !space || reservationSpace === space;
+      const direct = directSpaceMatches && reservation.time === time && window.MarketplaceAgendaNavigation.dateMatches(reservation.date,shortDate,reservation.shortDate) && (!endTime || !reservation.endTime || reservation.endTime === endTime);
+      const recurring = Array.isArray(reservation.occurrences) && reservation.occurrences.some((item) => {
+        const occurrenceSpace = item.space || reservationSpace;
+        const occurrenceShortDate = item.shortDate || String(item.date || "").slice(0,5);
+        return (!space || occurrenceSpace === space) && item.time === time && window.MarketplaceAgendaNavigation.dateMatches(item.date,shortDate,occurrenceShortDate) && (!endTime || !item.endTime || item.endTime === endTime);
+      });
+      return direct || recurring;
+    });
+    if (userReservation) return userReservation;
+
+    const partnerReservation = findPartnerReservationForSlot(venueId, time, shortDate, endTime, space);
+    if (!partnerReservation) return null;
+    return {
+      ...partnerReservation,
+      statusKey: partnerReservationStatusKey(partnerReservation),
+      endpoint: partnerReservation.payment === "Externo" ? "partner.manual_reservation" : "partner.reservation",
+      _partnerReservation: true
+    };
+  }
+
+
+  function venueGalleryPhotos(venue) {
+    if (!venue) return [];
+    let photos = [];
+    if (state.partnerProfile?.venueId === venue.id && Array.isArray(state.partnerProfile.photos)) {
+      photos = state.partnerProfile.photos;
+    } else if (Array.isArray(venue.photos)) {
+      photos = venue.photos;
+    }
+    const normalized = photos.filter((photo) => photo?.src).map((photo, index) => ({
+      id: photo.id || `VENUE-PHOTO-${index + 1}`,
+      name: photo.name || `Foto ${index + 1}`,
+      src: photo.src,
+      favorite: Boolean(photo.favorite || (state.partnerProfile?.venueId === venue.id && photo.id === state.partnerProfile.favoritePhotoId)),
+      tone: photo.tone === "light" ? "light" : photo.tone === "dark" ? "dark" : "",
+      luminance: Number.isFinite(Number(photo.luminance)) ? Number(photo.luminance) : null
+    }));
+    if (!normalized.length && venue.facadeImage) {
+      normalized.push({ id:`${venue.id}-facade`, name:"Fachada", src:venue.facadeImage, favorite:true, tone:venue.facadeTone || "dark", luminance:Number.isFinite(Number(venue.facadeLuminance)) ? Number(venue.facadeLuminance) : null });
+    }
+    normalized.sort((a,b) => Number(b.favorite) - Number(a.favorite));
+    return normalized;
+  }
+
+  function venuePublicAddress(venue) {
+    if (!venue) return "Endereço a cadastrar";
+    const profile = state.partnerProfile?.venueId === venue.id ? state.partnerProfile : null;
+    if(!profile)return String(venue.address||[venue.neighborhood,venue.city,venue.zip].filter(Boolean).join(", ")||"Endereço a cadastrar").trim();
+    return [profile.address,profile.neighborhood,profile.city,profile.zip].map((value)=>String(value||"").trim()).filter(Boolean).join(", ");
+  }
+
+  function venueRatingMarkup(venue,compact=false) {
+    return Number(venue?.reviews||0)>0?`★ ${esc(venue.rating)}${compact?"":` <small>${esc(venue.reviews)} avaliações</small>`}`:"Sem avaliações";
+  }
+
+  function venueDetailSummary(venue) {
+    const types=(venue?.types||[]).filter(Boolean);
+    const amenities=(venue?.amenities||[]).filter(Boolean);
+    const blocks=[types.length?`<span><b>Tipos disponíveis</b>${esc(types.join(" · "))}</span>`:"",amenities.length?`<span><b>Estrutura</b>${esc(amenities.join(" · "))}</span>`:""].filter(Boolean);
+    return blocks.length?`<div class="venue-detail-summary">${blocks.join("")}</div>`:"";
+  }
+
+  function publicScheduleDays(venue) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    return (venue?.schedule || [])
+      .filter((day) => {
+        const date = parsePtDateTime(day.date, "00:00");
+        return Number.isFinite(date.getTime()) && date >= today;
+      })
+      .sort((a,b) => parsePtDateTime(a.date,"00:00") - parsePtDateTime(b.date,"00:00"));
+  }
+
+  function publicSlotsForDay(day) {
+    if (!day) return [];
+    const now = new Date();
+    const dayDate = parsePtDateTime(day.date, "00:00");
+    const isToday = dayDate.getFullYear() === now.getFullYear() && dayDate.getMonth() === now.getMonth() && dayDate.getDate() === now.getDate();
+    return (day.slots || []).filter((slot) => !isToday || parsePtDateTime(day.date, slotEndTime(slot)) > now);
+  }
+
+  function openVenueGallery(venueId) {
+    const venue = state.venues.find((item) => item.id === venueId);
+    if (!venue || !galleryDialog || !galleryTitle || !galleryBody) return;
+    const photos = venueGalleryPhotos(venue);
+    galleryTitle.textContent = venue.name;
+    galleryBody.innerHTML = photos.length
+      ? `<div class="venue-gallery-grid">${photos.map((photo) => `<figure class="venue-gallery-item ${photo.favorite ? "is-favorite" : ""}"><div class="venue-gallery-image-wrap"><img src="${esc(photo.src)}" alt="${esc(photo.favorite ? `Foto principal de ${venue.name}` : `Foto do estabelecimento ${venue.name}`)}" loading="lazy">${photo.favorite ? `<span class="venue-gallery-favorite">Foto principal</span>` : ""}</div></figure>`).join("")}</div>`
+      : emptyState("▧", "Este parceiro ainda não publicou fotos do estabelecimento.");
+    if (!galleryDialog.open) {
+      galleryDialog.showModal();
+      focusDialog(galleryDialog);
+    }
+  }
+
+  function venuePhotoTone(venue) {
+    if (!venue) return "dark";
+    const photos = venueGalleryPhotos(venue);
+    const favoritePhoto = photos.find((photo) => photo.favorite) || photos[0];
+    const tone = favoritePhoto?.tone || venue.facadeTone;
+    return tone === "light" ? "light" : "dark";
+  }
+
+  function venueCard(venue) {
+    const favorite = state.favorites.includes(venue.id);
+    const photoTone = venuePhotoTone(venue);
+    return `<article class="venue-card compact-venue-card photo-tone-${esc(photoTone)}">
+      <div class="venue-card-media">
+        <img class="venue-card-photo" src="${esc(venue.facadeImage)}" alt="Fachada de ${esc(venue.name)}" loading="lazy">
+        <div class="venue-card-shade"></div>
+        <div class="venue-card-top">
+          <div class="venue-card-top-text">
+            <div class="venue-title-row"><h2>${esc(venue.name)}</h2><span class="rating-inline">${venueRatingMarkup(venue,true)}</span></div>
+            <div class="venue-location"><span>${esc(venue.city)}</span><span>${esc(venue.neighborhood)}</span><strong>${esc(venue.distance)}</strong></div>
+          </div>
+          <button type="button" class="favorite-button ${favorite ? "active" : ""}" data-action="toggle-favorite" data-id="${esc(venue.id)}" aria-label="${favorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}">${favorite ? "♥" : "♡"}</button>
+        </div>
+      </div>
+      <div class="venue-card-base">
+        <span class="venue-types-note">${esc(venue.types.join(" · "))}</span>
+        <button type="button" class="button primary small" data-action="venue-details" data-id="${esc(venue.id)}">Ver espaço</button>
+      </div>
+    </article>`;
+  }
+
+  function userDiscover() {
+    const filtered = marketplaceVenuesFromActiveSource().filter((venue) => partnerVisibleInMarketplace(venue) && `${venue.name} ${venue.city}`.toLowerCase().includes(state.search.venue.toLowerCase()));
+    const activePromotions = state.promotions.filter((item) => item.active).length;
+    const activeUserVouchers = state.cancellationVouchers.filter((item) => item.user === state.userProfile.name && ["active","active_extended","reserved"].includes(item.status)).length;
+    return `<div class="discover-toolbar"><label class="search discover-search"><span>⌕</span><input id="venueSearch" value="${esc(state.search.venue)}" placeholder="Buscar por quadra ou cidade" aria-label="Buscar por quadra ou cidade"></label><button class="promo-menu-button" data-nav="promotions"><span class="promo-menu-icon">V</span><span><strong>Voucher</strong><small>${activeUserVouchers} crédito(s) · ${activePromotions} promocional(is)</small></span><b>›</b></button></div>
+      ${pageHeader("Área do usuário", "Buscar quadras", "Selecione um local para consultar a agenda, os horários e os valores cadastrados pelo parceiro.")}
+      <section class="grid venue-grid">${filtered.map(venueCard).join("") || emptyState("⌕", "Nenhuma quadra encontrada para essa busca.")}</section>`;
+  }
+
+  function userCancellationAction(reservation) {
+    if (reservation.statusKey !== "confirmed" || (backendIsOnline() && !reservationBelongsToCurrentUser(reservation))) return "";
+    const eligibility = cancellationEligibility(reservation, "user");
+    if (reservation.monthly && eligibility.mode === "monthly_locked") return `<button class="button ghost small" type="button" disabled title="O prazo terminou 24 horas antes da primeira ocorrência">Cancelamento encerrado</button>`;
+    return `<button class="button danger small" data-action="cancel-paid-user-reservation" data-id="${esc(reservation.id)}">Cancelar reserva</button>`;
+  }
+
+  function pixCollectionForReservation(reservationId) {
+    return state.pixCollections.find((collection) => collection.reservationId === reservationId) || null;
+  }
+
+  function communitySplitNotificationForReservation(reservation) {
+    if (!reservation) return null;
+    return (state.communityMarketplaceNotifications || []).find((notification) =>
+      notification.reservationId === (reservation.backendId || reservation.id)
+      && notification.type === "pix_share_pending"
+      && notification.action === "open_marketplace_pix_share"
+    ) || null;
+  }
+
+  function canViewCompletePixSplit(reservation) {
+    if (state.role !== "user") return true;
+    return Boolean(
+      reservation?.userId
+      && backendRuntime.identityId
+      && reservation.userId === backendRuntime.identityId
+    );
+  }
+
+  function visiblePixSplitItems(collection,reservation) {
+    const items=Array.isArray(collection?.items)?collection.items:[];
+    return canViewCompletePixSplit(reservation)?items:items.filter((item)=>item.own);
+  }
+
+  function pixSplitDetailsBody(reservation) {
+    const collection = pixCollectionForReservation(reservation.id);
+    if (!collection) return `<p class="dialog-description">Nenhum rateio Pix foi encontrado para esta reserva.</p>`;
+    const paid = collection.items.filter((item)=>item.status === "PAID").length;
+    const paidAmount=Number(collection.paidAmount||0);
+    const singleMonthly=reservation.monthlyCollectionMode==="single_monthly_pool";
+    const guaranteeRequired=Number(reservation.monthlyGuaranteeRequired||0);
+    const monthlyView=singleMonthly?monthlyPaymentPresentation(reservation):null;
+    const collectionClosed=reservation.statusKey==="cancelled" || collection.status==="CLOSED" || Boolean(monthlyView?.closed);
+    const closedNotice=collectionClosed?`<div class="callout"><strong>Arrecadação encerrada</strong><p>As cotas não pagas foram encerradas. ${reservation.individualCancellationVouchers&&reservation.cancellationMode==="voucher"?"Os créditos de cancelamento estão disponíveis individualmente em Meus vouchers, conforme os pagamentos e as regras aplicáveis.":"Consulte os detalhes do cancelamento para conferir seu resultado financeiro."}</p></div>`:"";
+    const guaranteeReached=singleMonthly&&monthlyView.minimumReached;
+    const ownItem=collection.items.find((item)=>item.own)||null;
+    const communityNotification = communitySplitNotificationForReservation(reservation);
+    const communityStatus = collection.backendOfficial
+      ? communityNotification
+        ? `<div class="callout"><strong>Notificação na Comunidade</strong><p>Sua cota de ${money(communityNotification.amount)} foi enviada ao grupo ${esc(collection.groupName || reservation.groupName || "selecionado")} e está sincronizada por Realtime.</p></div>`
+        : `<div class="callout"><strong>Notificação na Comunidade</strong><p>Cada participante recebe individualmente sua cota na área do grupo. O conteúdo de outros membros permanece protegido.</p></div>`
+      : "";
+    const overview=singleMonthly
+      ? `<div class="pix-collection-overview monthly-collection-overview"><div><span>Valor mensal</span><strong>${money(collection.amount)}</strong></div><div><span>Valor pago</span><strong>${money(paidAmount)}</strong></div><div><span>Mínimo para os primeiros eventos</span><strong>${money(guaranteeRequired)}</strong></div><div><span>Situação</span><strong>${esc(monthlyView.label)}</strong></div></div>`
+      : `<div class="pix-collection-overview"><div><span>Valor total</span><strong>${money(collection.amount)}</strong></div><div><span>Pagamentos concluídos</span><strong>${paid} de ${collection.memberCount}</strong></div></div>`;
+    if(canViewCompletePixSplit(reservation)){
+      const canSettle=state.role==="partner"&&canManageBackendFinance()&&singleMonthly&&!collectionClosed&&!monthlyView.full;
+      const rows=visiblePixSplitItems(collection,reservation).map((item)=>{
+        const method=item.manualSettlementMethod?"Recebimento externo":item.status==="PAID"?"Pagamento confirmado":collectionClosed?"Cota encerrada sem cobrança":"Pagamento pendente";
+        const manualAction=canSettle&&["pix_share","card_payer"].includes(item.paymentRole)&&item.status!=="PAID"&&item.participantId
+          ? `<button type="button" class="button secondary small" data-action="settle-monthly-share" data-id="${esc(item.participantId)}" data-reservation="${esc(reservation.id)}">Registrar recebimento</button>`:"";
+        const early=Boolean(reservation.monthlyStageId&&reservation.monthlyStageAvailableAt&&Date.now()<new Date(reservation.monthlyStageAvailableAt).getTime());
+        const canPayOwn=!collectionClosed&&state.role==="user"&&item.own&&item.status!=="PAID"&&stagingPaymentSimulationAvailable(reservation);
+        const ownPaymentAction=canPayOwn
+          ? collection.backendOfficial
+            ? `<button type="button" class="button secondary small" data-action="confirm-staging-payment" data-id="${esc(reservation.id)}">${early?"Pagar antecipadamente":"Pagar minha cota"}</button>`
+            : `<button type="button" class="button secondary small" data-action="simulate-pix-share-paid" data-id="${esc(item.paymentIntentId)}">Simular baixa</button>`
+          : "";
+        const memberLabel=state.role==="user"&&item.own?`${item.memberName} · Você`:item.memberName;
+        return `<div class="list-item compact partner-split-row"><div class="avatar">${initials(item.memberName)}</div><div class="list-item-main"><strong>${esc(memberLabel)}</strong><small>Cota única de ${money(item.amount)}</small><small>${esc(method)}${item.manualSettledAt?` · ${esc(backendDateTimeLabel(item.manualSettledAt))}`:""}</small>${item.manualSettlementReference?`<small>Referência: ${esc(item.manualSettlementReference)}</small>`:""}</div><span class="status ${item.status==="PAID"?"status-ok":"status-warning"}">${item.status==="PAID"?"Pago":collectionClosed?"Encerrada":"Pendente"}</span>${manualAction}${ownPaymentAction}</div>`;
+      }).join("");
+      const ownerVisibility=state.role==="user"&&collection.backendOfficial
+        ? `<div class="callout"><strong>Pagadores do rateio</strong><p>Como responsável pela reserva, você acompanha todos os membros, os valores atribuídos e quem já pagou ou ainda está pendente. Cada participante continua recebendo somente a própria cobrança.</p></div>`
+        : "";
+      const manualSettlementHelp=canSettle
+        ? `<div class="callout"><strong>Recebimento externo</strong><p>Somente o financeiro autorizado pode registrar uma cota recebida fora do app. A baixa cancela a cobrança pendente da mesma cota e fica auditada, sem expor a modalidade usada.</p></div>`
+        : "";
+      return `${overview}${closedNotice}${ownerVisibility}${singleMonthly?monthlyCollectionNotice(reservation):""}<div class="list pix-collection-list partner-split-list">${rows}</div>${manualSettlementHelp}`;
+    }
+    const ownRow=ownItem?(()=>{ const canPayOfficial=!collectionClosed&&collection.backendOfficial&&ownItem.status!=="PAID"&&stagingPaymentSimulationAvailable(reservation); const early=Boolean(reservation.monthlyStageId&&reservation.monthlyStageAvailableAt&&Date.now()<new Date(reservation.monthlyStageAvailableAt).getTime()); const localAction=!collectionClosed&&!collection.backendOfficial&&ownItem.status!=="PAID"?`<button type="button" class="button secondary small" data-action="simulate-pix-share-paid" data-id="${esc(ownItem.paymentIntentId)}">Simular baixa</button>`:""; const paidMethod=ownItem.manualSettlementMethod?"Recebimento externo registrado pelo parceiro":"Pagamento confirmado"; return `<div class="list pix-collection-list"><div class="list-item compact"><div class="avatar">${initials(ownItem.memberName)}</div><div class="list-item-main"><strong>Sua cota${singleMonthly?" única do mês":""}</strong><small>${money(ownItem.amount)}</small>${ownItem.status==="PAID"?`<small>${esc(paidMethod)}</small>`:""}${early?`<small>Pagamento antecipado opcional · prazo ${esc(backendDateTimeLabel(reservation.monthlyStageDueAt))}</small>`:""}${communityNotification?`<small>Notificação disponível na Comunidade</small>`:""}</div><span class="status ${ownItem.status==="PAID"?"status-ok":"status-warning"}">${ownItem.status==="PAID"?"Pago":collectionClosed?"Encerrada":"Pendente"}</span>${canPayOfficial?`<button type="button" class="button secondary small" data-action="confirm-staging-payment" data-id="${esc(reservation.id)}">${early?"Pagar antecipadamente":"Pagar minha cota"}</button>`:localAction}</div></div>`;})():`<div class="callout"><strong>Cota individual protegida</strong><p>Esta conta não possui uma cota atribuída nesta arrecadação.</p></div>`;
+    const flow=collectionClosed?closedNotice:singleMonthly
+      ? monthlyCollectionNotice(reservation)
+      : `<div class="callout"><strong>Fluxo do rateio</strong><p>Você visualiza somente a própria cota. ${reservation.statusKey==="confirmed"?"A reserva está confirmada.":"A reserva é confirmada quando o total de pagamentos atingir "+collection.memberCount+" de "+collection.memberCount+"."}</p></div>`;
+    return `${overview}${ownRow}${communityStatus}${flow}`;
+  }
+
+  function openPixSplitDetails(reservationId) {
+    const reservation = state.reservations.find((item)=>item.id===reservationId);
+    if (!reservation) return;
+    openDetail({ eyebrow:reservation.monthlyCollectionMode==="single_monthly_pool"?"Arrecadação mensal":"Rateio Pix", title:`${reservation.id} · ${reservation.groupName || "Grupo"}`, body:pixSplitDetailsBody(reservation) });
+  }
+
+  function openPartnerExternalReceipt(reservationId){
+    const reservation=state.reservations.find((item)=>item.id===reservationId);
+    if(!reservation?.backendOfficial||!canManageBackendFinance())return;
+    if(reservation.monthly){
+      const pending=(pixCollectionForReservation(reservationId)?.items||[]).filter((item)=>item.status!=="PAID"&&item.participantId);
+      if(pending.length===1){openMonthlyShareSettlement(pending[0].participantId,reservationId);return;}
+      openPixSplitDetails(reservationId);return;
+    }
+    const due=Number(reservation.financialSummary?.balance_pending??reservation.paymentDue??0);
+    openForm({eyebrow:"Financeiro do parceiro",title:"Registrar recebimento externo",description:`Saldo da reserva: ${money(due)}. Confirme somente o valor recebido diretamente pelo parceiro.`,submitLabel:"Confirmar recebimento",
+      fields:[{name:"reference",label:"Referência ou comprovante",value:"",full:true},{name:"notes",label:"Observação interna",type:"textarea",value:"",full:true},
+      {name:"confirmation",label:"Confirmação",type:"checkbox-group",required:true,full:true,options:[{value:"settlement_confirmed",label:`Confirmo o recebimento de ${money(due)} diretamente pelo parceiro.`,checked:false}]}],
+      onSubmit:async(data)=>{
+        if(data.settlement_confirmed!=="true")return markFormFieldInvalid("confirmation","Confirme o recebimento antes de continuar.");
+        const result=await runBackendMutation("Recebimento externo registrado.",()=>window.MarketplaceBackend.partnerSettleSingleReservation({reservationId:reservation.backendId,reference:data.reference,notes:data.notes}));
+        if(result){closeCompletedManualSettlement();if(detailDialog.open)detailDialog.close();return true;}return false;
+      }});
+  }
+
+  function closeCompletedManualSettlement() {
+    if(formDialog.open)formDialog.close();
+    formHandler=null;
+    formChangeHandler=null;
+  }
+
+  function openMonthlyShareSettlement(participantId,reservationId) {
+    const reservation=state.reservations.find((item)=>item.id===reservationId);
+    const collection=reservation?pixCollectionForReservation(reservation.id):null;
+    const share=collection?.items.find((item)=>item.participantId===participantId);
+    if(!reservation||!share||!["pix_share","card_payer"].includes(share.paymentRole)||share.status==="PAID"||!canManageBackendFinance()){
+      showToast("Esta cota não permite baixa manual por esta conta.");
+      return;
+    }
+    openForm({
+      eyebrow:"Financeiro do parceiro",
+      title:`Registrar recebimento de ${share.memberName}`,
+      description:`Cota mensal única de ${money(share.amount)}. A confirmação registrará um recebimento externo e cancelará somente a cobrança pendente desta cota.`,
+      submitLabel:"Confirmar recebimento",
+      fields:[
+        {name:"reference",label:"Referência ou comprovante",value:"",full:true,help:"Opcional. Use somente um identificador interno ou número do comprovante."},
+        {name:"notes",label:"Observação interna",type:"textarea",value:"",full:true},
+        {name:"confirmation",label:"Confirmação",type:"checkbox-group",required:true,full:true,options:[{value:"settlement_confirmed",label:`Confirmo que o parceiro recebeu ${money(share.amount)} desta cota.`,help:"A ação fica registrada na auditoria e não cria uma nova cobrança.",checked:false}]}
+      ],
+      onSubmit:async(data)=>{
+        if(data.settlement_confirmed!=="true")return markFormFieldInvalid("confirmation","Confirme o recebimento antes de continuar.");
+        if(!backendIsOnline()||backendRuntime.mutating)return false;
+        backendRuntime.mutating=true;
+        app.classList.add("backend-mutating");
+        try{
+          await window.MarketplaceBackend.partnerSettleMonthlyShare({participantId,method:"partner_external",reference:String(data.reference||"").trim(),notes:String(data.notes||"").trim()});
+          closeCompletedManualSettlement();
+          showToast("Cota recebida e conciliada pelo parceiro.");
+          try{
+            await refreshBackendBootstrap(true);
+            const updatedReservation=state.reservations.find((item)=>item.id===reservationId);
+            if(detailDialog.open&&updatedReservation)detailBody.innerHTML=pixSplitDetailsBody(updatedReservation);
+          }catch(_refreshError){
+            if(detailDialog.open)detailDialog.close();
+            showToast("Cota recebida. Reabra o rateio para consultar o estado atualizado.");
+          }
+          return true;
+        }catch(error){
+          showToast(backendErrorMessage(error));
+          return false;
+        }finally{
+          backendRuntime.mutating=false;
+          app.classList.remove("backend-mutating");
+        }
+      }
+    });
+  }
+
+  function simulatePixSharePaid(paymentIntentId) {
+    const intent = state.paymentIntents.find((item)=>item.id===paymentIntentId);
+    if (!intent || !intent.collectionId || intent.status === "CONFIRMED") return;
+    const collection = state.pixCollections.find((item)=>item.id===intent.collectionId);
+    const reservation = state.reservations.find((item)=>item.id===intent.reservationId);
+    if (!collection || !reservation) return;
+    const share = collection.items.find((item)=>item.paymentIntentId===intent.id);
+    if (!share) return;
+    intent.status="CONFIRMED";
+    intent.confirmedAt=new Date().toLocaleString("pt-BR");
+    share.status="PAID";
+    share.paidAt=intent.confirmedAt;
+    collection.paidCount=collection.items.filter((item)=>item.status==="PAID").length;
+    collection.paidAmount=collection.items.filter((item)=>item.status==="PAID").reduce((sum,item)=>sum+Number(item.amount||0),0);
+    state.paymentWebhookLog.unshift({ id:nextId("WH-",state.paymentWebhookLog), provider:intent.provider||reservation.paymentProvider, event:"PIX_RECEIVED", reservationId:reservation.id, paymentIntentId:intent.id, memberId:intent.memberId, status:"Processado", createdAt:intent.confirmedAt });
+    if (collection.paidCount >= collection.memberCount && Math.abs(collection.paidAmount-collection.amount)<0.01) {
+      collection.status="SETTLED";
+      collection.settledAt=intent.confirmedAt;
+      Object.assign(reservation,{ statusKey:"confirmed", status:"Confirmada — rateio quitado", endpoint:"bank_pix.split.settled", paymentStatus:`Rateio Pix quitado · ${collection.paidCount} de ${collection.memberCount} cotas`, accountingRecognizedValue:collection.amount, fiscalObligationValue:collection.amount, accountingMonth:accountingMonth() });
+      state.accountingLedger.unshift({ id:nextId("LED-",state.accountingLedger), type:"service_payment", reservationId:reservation.id, venueId:reservation.venueId, venue:reservation.venue, amount:collection.amount, fiscalAmount:collection.amount, accountingMonth:reservation.accountingMonth, description:"Reserva quitada por rateio Pix" });
+      publishStandbyEventForReservation(reservation,"event.publish_after_pix_split");
+      syncPartnerReservationFromUser(reservation);
+      ensureChatThread(reservation);
+      showToast(`Rateio quitado: ${collection.paidCount} de ${collection.memberCount} cotas confirmadas.`);
+    } else {
+      reservation.paymentStatus=`Rateio Pix · ${collection.paidCount} de ${collection.memberCount} cotas pagas`;
+      showToast(`${share.memberName}: Pix confirmado. Faltam ${collection.memberCount-collection.paidCount} cota(s).`);
+    }
+    saveState(); render();
+    if (detailDialog.open) {
+      detailBody.innerHTML=pixSplitDetailsBody(reservation);
+    }
+  }
+
+  function syncPartnerReservationFromUser(reservation) {
+    if (!reservation || reservation.venueId !== state.partnerProfile.venueId) return null;
+    let item = state.partnerReservations.find((entry) => entry.userReservationId === reservation.id);
+    const normalized = {
+      client: reservationSubjectLabel(reservation),
+      date: reservation.date,
+      time: reservation.time,
+      endTime: reservation.endTime || "",
+      space: reservation.space || state.partnerSpaces[0]?.name || "Espaço principal",
+      value: Number(reservation.value || 0),
+      monthly: Boolean(reservation.monthly),
+      occurrenceCount: Number(reservation.occurrenceCount || 0),
+      occurrences: Array.isArray(reservation.occurrences) ? reservation.occurrences : [],
+      allOccurrences: Array.isArray(reservation.allOccurrences) ? reservation.allOccurrences : [],
+      status: reservationIsExpired(reservation) ? "Expirada" : reservation.statusKey === "confirmed" ? "Confirmada" : reservation.statusKey === "cancelled" ? "Cancelada" : "Pendente",
+      payment: reservation.paymentStatus || "Não iniciado",
+      userReservationId: reservation.id,
+      createdAtIso: reservation.createdAtIso || "",
+      backendOfficial: Boolean(reservation.backendOfficial),
+      backendId: reservation.backendId || "",
+      backendStatus: reservation.backendStatus || "",
+      statusKey: reservation.statusKey || "",
+      groupName: reservation.groupName || "",
+      eventId: reservation.eventId || "",
+      voucher: reservation.voucher || "",
+      voucherAppliedValue: Number(reservation.voucherAppliedValue || 0),
+      paymentDue: Number(reservation.paymentDue || 0),
+      paymentMethod: reservation.paymentMethod || "",
+      paymentMethodLabel: reservation.paymentMethodLabel || "",
+      paymentConfirmedAt: reservation.paymentConfirmedAt || "",
+      paymentResponsibleId: reservation.paymentResponsibleId || "",
+      paymentResponsibleName: reservation.paymentResponsibleName || reservation.user || "",
+      paymentResponsibilityMode: reservation.paymentResponsibilityMode || "creator",
+      paymentParticipants: Array.isArray(reservation.paymentParticipants) ? reservation.paymentParticipants : [],
+      pixSplit: Boolean(reservation.pixSplit),
+      pixSplitMemberCount: Number(reservation.pixSplitMemberCount || 0),
+      monthlyCycleId:reservation.monthlyCycleId||"",
+      monthlyCollectionMode:reservation.monthlyCollectionMode||"legacy_staged",
+      monthlyGuaranteeRequired:Number(reservation.monthlyGuaranteeRequired||0),
+      monthlyGuaranteePaid:Number(reservation.monthlyGuaranteePaid||0),
+      monthlyTotalPaid:Number(reservation.monthlyTotalPaid||0),
+      monthlyGuaranteeReached:Boolean(reservation.monthlyGuaranteeReached),
+      monthlyStageId:reservation.monthlyStageId||"",
+      monthlyStage:reservation.monthlyStage||"",
+      monthlyStageDueAt:reservation.monthlyStageDueAt||"",
+      voucherGeneratedCode: reservation.voucherGeneratedCode || "",
+      generatedVouchers:reservation.generatedVouchers || [],individualCancellationVouchers:reservation.individualCancellationVouchers || false,
+      cancellationVoucherCount:reservation.cancellationVoucherCount || 0,cancellationVoucherTotal:reservation.cancellationVoucherTotal || 0,
+      cancellationSource: reservation.cancellationSource || "",
+      cancellationMode: reservation.cancellationMode || "",
+      cancellationReason: reservation.cancellationReason || "",
+      refundValue: Number(reservation.refundValue || 0),
+      refundFeePayer: reservation.refundFeePayer || "",
+      accountingRecognizedValue: Number(reservation.accountingRecognizedValue || 0),
+      accountingMonth: reservation.accountingMonth || ""
+    };
+    if (item) Object.assign(item, normalized);
+    else {
+      item = { id: nextId("RP-", state.partnerReservations), ...normalized };
+      state.partnerReservations.unshift(item);
+    }
+    const thread = chatThreadForReservation(reservation.id);
+    if (thread && !thread.partnerReservationId) thread.partnerReservationId = item.id;
+    return item;
+  }
+
+  function reservationPaymentConfirmed(reservation) {
+    if (!reservation || reservation.statusKey !== "confirmed") return false;
+    if (String(reservation.paymentStatus || "").toLowerCase().includes("pendente")) return false;
+    return Number(reservation.accountingRecognizedValue || 0) > 0 || ["voucher.redeemed","bank_pix.split.settled","asaas.webhook.payment_confirmed","bank_pix.webhook.received"].includes(reservation.endpoint);
+  }
+
+  function chatThreadForReservation(reservationId) {
+    return state.chatThreads.find((thread) => thread.reservationId === reservationId) || null;
+  }
+
+  function partnerReservationForUserReservation(reservationId) {
+    return state.partnerReservations.find((item) => item.userReservationId === reservationId) || null;
+  }
+
+  function ensureChatThread(reservation) {
+    if (!reservation) return null;
+    let thread = chatThreadForReservation(reservation.id);
+    if (thread) return thread;
+    if (!reservationPaymentConfirmed(reservation)) return null;
+    if (!chatWindowState(reservation).active) return null;
+    const partnerReservation = partnerReservationForUserReservation(reservation.id);
+    thread = {
+      id: `CHAT-${reservation.id}`,
+      reservationId: reservation.id,
+      partnerReservationId: partnerReservation?.id || "",
+      venueId: reservation.venueId,
+      venue: reservation.venue,
+      user: reservation.user,
+      createdAt: new Date().toLocaleString("pt-BR"),
+      unlockedAt: new Date().toLocaleString("pt-BR"),
+      status: "active",
+      unread: { user:0, partner:0 },
+      lastReadAt: { user:"", partner:"" },
+      messages: []
+    };
+    state.chatThreads.unshift(thread);
+    return thread;
+  }
+
+  function finalReservationOccurrence(reservation) {
+    const occurrences = Array.isArray(reservation?.occurrences) && reservation.occurrences.length
+      ? [...reservation.occurrences]
+      : [{ date:reservation?.date, time:reservation?.time, endTime:reservation?.endTime }];
+    occurrences.sort((a,b) => parsePtDateTime(a.date, a.endTime || minutesToTime(timeToMinutes(a.time) + 60)).getTime() - parsePtDateTime(b.date, b.endTime || minutesToTime(timeToMinutes(b.time) + 60)).getTime());
+    return occurrences[occurrences.length - 1] || null;
+  }
+
+  function reservationChatEndsAt(reservation) {
+    const occurrence = finalReservationOccurrence(reservation);
+    if (!occurrence?.date) return null;
+    let endTime = occurrence.endTime;
+    if (!endTime) {
+      const venue = state.venues.find((item) => item.id === reservation.venueId);
+      const day = venue?.schedule?.find((item) => item.date === occurrence.date || item.shortDate === occurrence.shortDate);
+      const slot = day?.slots?.find((item) => item.time === occurrence.time);
+      endTime = slot ? slotEndTime(slot) : minutesToTime(timeToMinutes(occurrence.time) + 60);
+    }
+    return parsePtDateTime(occurrence.date, endTime);
+  }
+
+  function chatWindowState(reservation) {
+    const officialThread = chatThreadForReservation(reservation?.id);
+    if (backendIsOnline() && reservation?.backendOfficial) {
+      const effectiveStatus = officialThread?.effectiveStatus || officialThread?.status || "locked";
+      const endsAt = officialThread?.readOnlyAtIso ? new Date(officialThread.readOnlyAtIso) : reservationChatEndsAt(reservation);
+      const paid = Boolean(officialThread?.unlockedAtIso || ["active", "read_only"].includes(effectiveStatus));
+      const ended = effectiveStatus === "read_only" || Boolean(endsAt && Date.now() >= endsAt.getTime());
+      const active = Boolean(paid && reservation.statusKey === "confirmed" && effectiveStatus === "active" && !ended);
+      return { paid, endsAt, ended, active, effectiveStatus };
+    }
+    const paid = reservationPaymentConfirmed(reservation);
+    const endsAt = reservationChatEndsAt(reservation);
+    const ended = Boolean(endsAt && Date.now() >= endsAt.getTime());
+    const active = Boolean(paid && reservation?.statusKey === "confirmed" && !ended);
+    return { paid, endsAt, ended, active, effectiveStatus:active ? "active" : ended ? "read_only" : "locked" };
+  }
+
+  function chatAvailableForReservation(reservation) {
+    const thread = chatThreadForReservation(reservation?.id);
+    const windowState = chatWindowState(reservation);
+    return Boolean(thread || (windowState.paid && !windowState.ended));
+  }
+
+  function chatCanSendForReservation(reservation) {
+    if(state.role==="partner"&&!hasPartnerPermission("manage_schedule"))return false;
+    return chatWindowState(reservation).active;
+  }
+
+  function chatButtonForUser(reservation) {
+    if (!chatAvailableForReservation(reservation)) return "";
+    const unread = unreadForReservation(reservation.id, "user");
+    const label = chatCanSendForReservation(reservation) ? "Falar com parceiro" : "Ver conversa";
+    return `<button class="button secondary small chat-entry-button ${unread ? "has-unread" : ""}" data-action="open-reservation-chat" data-id="${esc(reservation.id)}"><span>${label}</span>${messageBadge(unread)}</button>`;
+  }
+
+  function chatButtonForPartner(item) {
+    const reservation = state.reservations.find((entry) => entry.id === item.userReservationId);
+    if (!reservation || !chatAvailableForReservation(reservation)) return "";
+    const unread = unreadForReservation(reservation.id, "partner");
+    const label = chatCanSendForReservation(reservation) ? "Chat com usuário" : "Ver conversa";
+    return `<button class="button secondary small chat-entry-button ${unread ? "has-unread" : ""}" data-action="open-reservation-chat" data-id="${esc(reservation.id)}"><span>${label}</span>${messageBadge(unread)}</button>`;
+  }
+
+  function chatUnreadCount(thread, role) {
+    if (!thread || !["user","partner"].includes(role)) return 0;
+    thread.unread = thread.unread || { user:0, partner:0 };
+    return Number(thread.unread[role] || 0);
+  }
+
+  function unreadForReservation(reservationId, role) {
+    return chatUnreadCount(chatThreadForReservation(reservationId), role);
+  }
+
+  function totalUnreadForRole(role) {
+    return state.chatThreads.reduce((total, thread) => total + chatUnreadCount(thread, role), 0);
+  }
+
+  function monthlyRequestUnread(requestId) {
+    return (state.monthlyLinkNotifications||[]).filter((notification)=>notification.requestId===requestId&&notification.status==="unread").length;
+  }
+
+  function monthlyRequestUnreadForRole(role) {
+    return (state.monthlyLinkNotifications||[]).filter((notification)=>{
+      if(notification.status!=="unread")return false;
+      const request=(state.monthlyLinkRequests||[]).find((item)=>item.id===notification.requestId);
+      if(!request)return false;
+      if(role==="partner")return request.canManageAsPartner;
+      if(role==="user")return canManageMonthlyRequest(request);
+      return role==="admin";
+    }).length;
+  }
+
+  function totalVisibleUnreadForRole(role) {
+    // Personal payment notices and their pending share represent one obligation.
+    // Keep its badge until payment/closure, even after the notice was read.
+    return totalUnreadForRole(role)+monthlyRequestUnreadForRole(role)
+      +occurrenceTransferUnreadForRole(role,{excludePaymentAssignments:role==="user"})
+      +partnerApplicationUnreadForRole(role)+(role==="user"?userPendingSharesCount():0);
+  }
+
+  function markChatRead(thread, role) {
+    if(partnerReadonlyActive()||document.hidden||!thread||!["user","partner"].includes(role))return;
+    if(!backendRuntime.enabled){
+      thread.unread[role]=0;thread.lastReadAt[role]=new Date().toLocaleString("pt-BR");renderNotificationReadState();return;
+    }
+    const identity=backendRuntime.identityId,key=thread.backendId;
+    if(!thread.backendOfficial||!thread.backendReservationId||!notificationReadContext(identity))return;
+    const messageIds=new Set((thread.messages||[]).map(message=>message.backendId||message.id));
+    const notices=(state.personalNotifications||[]).filter(row=>row.profile_id===identity&&row.status==="unread"&&row.entity_type==="reservation"
+      &&row.entity_id===thread.backendReservationId&&row.type==="chat_message"&&(!row.data?.message_id||messageIds.has(row.data.message_id)));
+    if(!chatUnreadCount(thread,role)&&!notices.length)return;
+    if(chatReadRequests.has(key))return chatReadRequests.get(key);
+    let completed=false;
+    const task=(async()=>{
+      try{
+        await window.MarketplaceBackend.markChatRead(thread.backendReservationId);
+        if(!notificationReadContext(identity))return;
+        const seen=confirmedChatMessages.get(key)||new Set();for(const id of messageIds)seen.add(id);confirmedChatMessages.set(key,seen);
+        const current=(state.chatThreads||[]).find(item=>item.backendId===key)||thread;
+        current.unread[role]=unreadChatAfterConfirmedReads(key,current.messages,chatUnreadCount(current,role),identity);
+        confirmNotificationReads(notices.map(row=>row.id),identity);renderNotificationReadState();completed=true;
+      }catch(error){if(identity===backendRuntime.identityId)showToast(backendErrorMessage(error));}
+      finally{
+        if(chatReadRequests.get(key)===task)chatReadRequests.delete(key);
+        if(completed&&identity===backendRuntime.identityId&&chatDialog.open&&selectedChatReservationId===thread.reservationId)renderOpenChat();
+      }
+    })();
+    chatReadRequests.set(key,task);return task;
+  }
+
+  function messageBadge(count, label="mensagem(ns) nova(s)") {
+    return count > 0 ? `<span class="message-badge" aria-label="${esc(count)} ${esc(label)}">${esc(count)}</span>` : "";
+  }
+
+  function navigationUnreadCount(role, page) {
+    if(page==="reservations"&&role==="user")return userReservationsUnreadCount();
+    if(page==="shares"&&role==="user")return userPendingSharesCount();
+    if(page==="reservations"&&role==="partner")return totalUnreadForRole("partner")+occurrenceTransferUnreadForRole("partner");
+    if(page==="agenda"&&role==="partner")return monthlyRequestUnreadForRole("partner");
+    if(page==="partners"&&role==="admin")return partnerApplicationUnreadForRole("admin");
+    return 0;
+  }
+
+  function updateRoleUnreadIndicators() {
+    for(const button of app.querySelectorAll("[data-nav]")){
+      const count=navigationUnreadCount(state.role,button.dataset.nav);
+      button.querySelector(".message-badge")?.remove();
+      if(count)button.insertAdjacentHTML("beforeend",messageBadge(count,"atualização(ões) pendente(s)"));
+      button.classList.toggle("has-unread",count>0);
+    }
+    renderNotificationControls();
+    const allowed = backendAllowedRoles();
+    roleButtons.forEach((button) => {
+      const role = button.dataset.role;
+      const count = allowed.has(role) && ["user","partner","admin","candidate"].includes(role) ? totalVisibleUnreadForRole(role) : 0;
+      let badge = button.querySelector(".role-unread-badge");
+      if (count > 0) {
+        if (!badge) {
+          badge = document.createElement("span");
+          badge.className = "role-unread-badge";
+          button.appendChild(badge);
+        }
+        badge.textContent = count > 99 ? "99+" : String(count);
+        badge.setAttribute("aria-label", `${count} atualização(ões) ou pagamento(s) pendente(s)`);
+        button.classList.add("has-unread");
+      } else {
+        badge?.remove();
+        button.classList.remove("has-unread");
+      }
+    });
+  }
+
+  function chatMessagesMarkup(thread, viewerRole) {
+    if (!thread.messages.length) return `<div class="chat-empty"><strong>Conversa liberada</strong><p>A reserva foi paga. Usuário e parceiro já podem trocar mensagens sobre acesso, estrutura, horário e demais detalhes da reserva.</p></div>`;
+    return thread.messages.map((message) => {
+      const mine = (viewerRole === "user" && message.senderType === "user") || (viewerRole === "partner" && message.senderType === "partner");
+      return `<div class="chat-message ${mine ? "mine" : "theirs"}"><div class="chat-bubble"><strong>${esc(message.senderName)}</strong><p>${esc(message.text)}</p><small>${esc(message.createdAt)}</small></div></div>`;
+    }).join("");
+  }
+
+  function renderOpenChat() {
+    if (!selectedChatReservationId || !chatDialog?.open) return;
+    const reservation = state.reservations.find((item) => item.id === selectedChatReservationId);
+    const thread = reservation ? chatThreadForReservation(reservation.id) : null;
+    if (!reservation || !thread) return;
+    const canSend = !partnerReadonlyActive() && chatCanSendForReservation(reservation);
+    const windowState = chatWindowState(reservation);
+    const finalOccurrence = finalReservationOccurrence(reservation);
+    if (!thread.backendOfficial && !canSend && windowState.ended && thread.status !== "history") { thread.status = "history"; thread.closedAt = new Date().toLocaleString("pt-BR"); saveState(); }
+    chatTitle.textContent = state.role === "partner" ? thread.user : thread.venue;
+    chatSubtitle.textContent = `${reservation.id} · ${reservation.date} · ${timeRange(reservation.time,reservation.endTime)}`;
+    chatMessages.innerHTML = chatMessagesMarkup(thread, state.role);
+    chatStatus.textContent = partnerReadonlyActive() ? "Somente leitura · mensagens do parceiro preservadas" : canSend
+      ? `Conversa ativa até ${finalOccurrence?.date || reservation.date} às ${finalOccurrence?.endTime || reservation.endTime || minutesToTime(timeToMinutes(reservation.time) + 60)}`
+      : windowState.effectiveStatus === "read_only"
+        ? "Horário encerrado · conversa somente para consulta"
+        : "Conversa encerrada · histórico disponível para consulta";
+    chatStatus.className = `status ${canSend ? "status-ok" : "status-neutral"}`;
+    chatInput.disabled = !canSend;
+    chatSend.disabled = !canSend;
+    chatInput.placeholder = partnerReadonlyActive() ? "Somente leitura" : canSend ? "Digite uma mensagem..." : "Conversa encerrada";
+    const identity=backendRuntime.identityId,role=state.role;
+    requestAnimationFrame(() => {
+      if(!chatDialog.open||selectedChatReservationId!==reservation.id||identity!==backendRuntime.identityId||state.role!==role)return;
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      if(!formDialog.open&&!document.hidden)markChatRead(thread,role);
+    });
+  }
+
+  function openReservationChat(reservationId) {
+    const reservation = state.reservations.find((item) => item.id === reservationId);
+    if (!reservation || !chatAvailableForReservation(reservation)) {
+      showToast("O chat é liberado somente após a confirmação do pagamento da reserva.");
+      return;
+    }
+    const thread = ensureChatThread(reservation) || chatThreadForReservation(reservation.id);
+    if (!thread) return;
+    selectedChatReservationId = reservation.id;
+    saveState();
+    render();
+    if (!chatDialog.open) chatDialog.showModal();
+    renderOpenChat();
+    if (chatCanSendForReservation(reservation) && allowAutomaticFieldFocus) setTimeout(() => chatInput.focus({ preventScroll:true }), 40);
+  }
+
+  async function sendChatMessage(text) {
+    const reservation = state.reservations.find((item) => item.id === selectedChatReservationId);
+    if (!reservation || !chatCanSendForReservation(reservation)) return;
+    const thread = ensureChatThread(reservation);
+    const clean = String(text || "").trim();
+    if (!thread || !clean) return;
+    if (backendIsOnline() && thread.backendOfficial) {
+      if (!reservation.backendId) {
+        showToast("A reserva não possui identificação oficial para o chat.");
+        return;
+      }
+      const result = await runBackendMutation("", () => window.MarketplaceBackend.sendChatMessage(reservation.backendId, clean.slice(0,1000)));
+      if (result) {
+        chatInput.value = "";
+        renderOpenChat();
+        showToast("Mensagem enviada pelo chat oficial da reserva.");
+      }
+      return;
+    }
+    const senderType = state.role === "partner" ? "partner" : "user";
+    const receiverType = senderType === "partner" ? "user" : "partner";
+    const senderName = senderType === "partner" ? state.partnerProfile.tradeName : state.userProfile.name;
+    thread.messages.push({ id: nextId("MSG-", thread.messages), senderType, senderName, text: clean.slice(0,1000), createdAt: new Date().toLocaleString("pt-BR") });
+    thread.updatedAt = new Date().toLocaleString("pt-BR");
+    thread.unread = thread.unread || { user:0, partner:0 };
+    thread.unread[senderType] = 0;
+    thread.unread[receiverType] = Number(thread.unread[receiverType] || 0) + 1;
+    saveState();
+    chatInput.value = "";
+    renderOpenChat();
+    updateRoleUnreadIndicators();
+  }
+
+  function reservationBelongsToCurrentUser(reservation) {
+    return reservation?.userId === backendRuntime.identityId;
+  }
+
+  function paymentResponsibilitySummary(reservation) {
+    if (!reservation || Number(reservation.paymentDue || 0) <= 0) return "Quitação integral por voucher";
+    if (reservation.paymentResponsibilityMode === "group_split" || reservation.pixSplit) {
+      const collection = pixCollectionForReservation(reservation.id);
+      const paid = Number(collection?.paidCount || 0);
+      const total = Number(collection?.memberCount || reservation.pixSplitMemberCount || reservation.paymentParticipants?.length || 0);
+      if(reservation.monthlyCollectionMode==="single_monthly_pool"){
+        const paidAmount=Number(collection?.paidAmount??reservation.monthlyTotalPaid??0);
+        const totalAmount=Number(collection?.amount??reservation.value??0);
+        return `Arrecadação mensal · ${money(paidAmount)} de ${money(totalAmount)} · ${paid}/${total} cota(s)`;
+      }
+      return `Rateio Pix · ${paid} de ${total} cota(s) pagas`;
+    }
+    const payer = reservation.paymentResponsibleName || reservation.user || "Usuário da reserva";
+    return reservation.paymentMethod === "credit_card_asaas"
+      ? `Cartão integral · responsável: ${payer} · 1 parcela`
+      : `${payer} · pagamento integral`;
+  }
+
+  function hasSingleCardPaymentResponsible(reservation) {
+    return Boolean(reservation && !reservation.pixSplit && (
+      reservation.paymentResponsibilityMode === "single_member"
+      || (reservation.paymentMethod === "credit_card_asaas" && Number(reservation.paymentDue || 0) > 0)
+    ));
+  }
+
+  function paymentResponsibleDisplayName(reservation) {
+    const name = reservation?.paymentResponsibleName || reservation?.user || "Usuário da reserva";
+    const isCurrentUser = state.role === "user" && reservation?.paymentResponsibleId === backendRuntime.identityId;
+    return `${name}${isCurrentUser ? " (você)" : ""}`;
+  }
+
+  function paymentResponsibleStatusLabel(reservation) {
+    if (reservation?.statusKey === "cancelled" || reservation?.status === "Cancelada") {
+      return reservation.paymentConfirmedAt ? "Pagamento realizado antes do cancelamento" : "Pagamento não realizado";
+    }
+    if (reservation?.paymentConfirmedAt || reservation?.statusKey === "confirmed" || reservation?.status === "Confirmada") return "Pagamento realizado";
+    return "Aguardando pagamento";
+  }
+
+  function singleCardPaymentResponsibleDetail(reservation) {
+    const cardDetail=hasSingleCardPaymentResponsible(reservation)
+      ? `<div class="detail-line"><span>Responsável pelo pagamento</span><strong>${esc(paymentResponsibleDisplayName(reservation))}</strong></div><div class="detail-line"><span>Situação do responsável</span><strong>${esc(paymentResponsibleStatusLabel(reservation))}</strong></div>`
+      : "";
+    return `${cardDetail}${monthlyFinancialDetail(reservation)}`;
+  }
+
+  function singleCardPaymentResponsibleCard(reservation) {
+    if (!hasSingleCardPaymentResponsible(reservation)) return "";
+    return `<div class="inline-payment-assignment"><strong>Responsável pelo cartão: ${esc(paymentResponsibleDisplayName(reservation))}</strong><span>${esc(paymentResponsibleStatusLabel(reservation))} · pagamento integral em uma parcela.</span></div>`;
+  }
+
+  function monthlyFinancialDetail(reservation) {
+    if (!reservation?.monthlyCycleId) return "";
+    const cycle=(state.monthlyCycles||[]).find(item=>item.id===reservation.monthlyCycleId);
+    const view=monthlyPaymentPresentation(reservation,cycle);
+    const openStage=!view.closed&&(cycle?.stages||[]).find(stage=>!["paid","expired","cancelled"].includes(stage.status));
+    const stageDetail=cycle?.collectionMode!=="single_monthly_pool"&&openStage?`<div class="detail-line"><span>Etapa financeira atual</span><strong>${esc(monthlyStageLabel(openStage.stage))} · ${money(openStage.amount_required)}</strong></div><div class="detail-line"><span>Prazo desta etapa</span><strong>${esc(backendDateTimeLabel(openStage.due_at))}</strong></div>`:"";
+    return `<div class="detail-line"><span>Ciclo mensalista</span><strong>${esc(view.label)}</strong></div>
+      <div class="detail-line"><span>Valor mensal contratado</span><strong>${money(view.total)}</strong></div>
+      <div class="detail-line"><span>Valor pago</span><strong>${money(view.paid)}</strong></div>
+      ${view.closed&&view.finalDue!==null?`<div class="detail-line"><span>Valor final devido</span><strong>${money(view.finalDue)}</strong></div>`:""}
+      <div class="detail-line"><span>Mínimo para os primeiros eventos</span><strong>${money(view.minimum)} · ${view.minimumReached?"atingido":"não atingido"}</strong></div>
+      ${!view.closed&&!view.full?`<div class="detail-line"><span>Prazo do mínimo</span><strong>${esc(backendDateTimeLabel(cycle?.initialDueAt||view.dueAt))}</strong></div>`:""}
+      <div class="detail-line"><span>Saldo a pagar</span><strong>${money(view.balance)}${view.closed?" · obrigação restante encerrada":view.balance>0?` · até ${esc(backendDateTimeLabel(view.dueAt))}`:""}</strong></div>
+      ${stageDetail}<div class="detail-line"><span>Modelo de cobrança</span><strong>${cycle?.collectionMode==="single_monthly_pool"?"Uma única cota por pagador no mês":"Cobrança por etapas"}</strong></div>`;
+  }
+
+  function reservationPaymentAssignedToCurrentUser(reservation) {
+    if (!reservation) return false;
+    if (reservation.pixSplit) return Boolean(currentUserPixShareState(reservation));
+    if ((reservation.paymentResponsibleId || reservation.userId) === backendRuntime.identityId) return true;
+    return Boolean(reservation.paymentParticipants?.some((participant) => participant.profileId === backendRuntime.identityId));
+  }
+
+  function userPaymentAction(reservation) {
+    if(reservation?.monthlyCycleId&&monthlyPaymentPresentation(reservation).closed)return "";
+    if (reservation?.statusKey === "pending" && !reservation.paymentConfigured && reservationBelongsToCurrentUser(reservation)) {
+      return `${reservationPrebookingEditAction(reservation)}<button class="button primary small" data-action="configure-reservation-payment" data-id="${esc(reservation.id)}">Definir pagamento</button>`;
+    }
+    if (!stagingPaymentSimulationAvailable(reservation)) return "";
+    const stage=reservation.monthlyStageId?` da ${monthlyStageLabel(reservation.monthlyStage)}`:"";
+    const early=Boolean(reservation.monthlyStageId&&reservation.monthlyStageAvailableAt&&Date.now()<new Date(reservation.monthlyStageAvailableAt).getTime());
+    const sandbox=window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG?.asaasSandboxCheckout===true&&window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG?.simulationPayments!==true;
+    const label = sandbox ? (reservation.pixSplit?"Pagar minha cota":"Pagar agora") : reservation.monthlyCollectionMode==="single_monthly_pool"&&reservation.pixSplit
+      ? `${early?"Pagar antecipadamente":"Pagar"} minha cota mensal`
+      : reservation.pixSplit ? `${early?"Pagar antecipadamente":"Confirmar"} minha cota${stage}` : reservation.monthlyStageId ? `${early?"Pagar antecipadamente":"Confirmar"} ${monthlyStageLabel(reservation.monthlyStage)}` : "Confirmar pagamento de teste";
+    return `<button class="button secondary small" data-action="confirm-staging-payment" data-id="${esc(reservation.id)}">${label}</button>`;
+  }
+
+  function reservationPaymentVouchers(reservation) {
+    if (reservation?.monthly) return [];
+    const currentUserId=backendRuntime.identityId;
+    const cancellations=(state.cancellationVouchers||[]).filter((voucher)=>
+      ["active","active_extended"].includes(voucher.status)
+      && (!voucher.ownerUserId||voucher.ownerUserId===currentUserId)
+      && voucher.venueId===reservation.venueId
+      && Number(voucher.minimumReservationValue||voucher.value||0)<=Number(reservation.value||0)
+    ).map((voucher)=>({code:voucher.code,label:`${voucher.code} · crédito ${money(voucher.value)}`,amount:Number(voucher.value||0)}));
+    const promotions=(state.promotions||[]).filter((voucher)=>promotionValid(voucher)&&!voucher.deleted
+      && (!voucher.venueId||voucher.venueId==="all"||voucher.venueId===reservation.venueId)
+      && voucher.bookingMode!=="monthly" && promotionEventEligible(voucher,reservation)
+      && Number(voucher.minimumReservationValue||0)<=Number(reservation.value||0)
+    ).map((voucher)=>({code:voucher.code,label:`${voucher.code} · ${promotionBenefitLabel(voucher)}${voucher.eventDate?` · ${promotionEventLabel(voucher)}`:""}`,amount:Math.min(Number(reservation.value||0),voucher.discountType==="percentage"?Number(reservation.value||0)*Number(voucher.discountValue||0)/100:Number(voucher.discountValue||0))}));
+    return [...cancellations,...promotions];
+  }
+
+  function reservationPaymentMembers(reservation) {
+    if (reservation.groupId) return groupMembers(reservation.groupId);
+    const ownerId = reservation.userId || backendRuntime.identityId;
+    return ownerId ? [{id:ownerId,backendProfileId:ownerId,name:reservation.user||state.userProfile.name,role:"Titular da reserva"}] : [];
+  }
+
+  function paymentConfigurationAction({method,amount,useSplit,split,payerId,ownerId,currentProfileId}) {
+    if(Number(amount)<=0)return {canPayNow:false,amount:0,label:"Confirmar reserva"};
+    const ownAmount=method==="credit_card_asaas"
+      ? (payerId===currentProfileId?Number(amount):0)
+      : useSplit ? Number(split.find(item=>item.profile_id===currentProfileId)?.amount||0)
+      : ownerId===currentProfileId?Number(amount):0;
+    return {canPayNow:Boolean(currentProfileId&&ownAmount>0),amount:ownAmount,
+      label:useSplit?"Pagar minha cota agora":"Pagar agora"};
+  }
+
+  async function saveReservationPaymentConfiguration(reservation,payload,{intent,amount,currentProfileId}) {
+    const configureAndContinue=async(communicationScope=null)=>{
+      communicationScope?.assertActive();
+      if(backendRuntime.identityId!==currentProfileId)return false;
+      const result=await runBackendMutation("",()=>window.MarketplaceBackend.configureReservationPayment(payload));
+      communicationScope?.assertActive();
+      if(!result||backendRuntime.identityId!==currentProfileId)return false;
+      if(amount<=0||result.confirmed===true){
+        const updated=state.reservations.find(item=>item.backendId===reservation.backendId);
+        showToast(updated?.statusKey==="confirmed"?"Reserva confirmada. Nenhum pagamento adicional necessário.":"Configuração salva. Confira a situação atual da reserva em Minhas reservas.");
+        return true;
+      }
+      if(intent!=="now"){
+        showToast("Forma de pagamento salva. O pagamento ainda precisa ser realizado dentro do prazo da reserva.");
+        return true;
+      }
+      const continuePayment=()=>{
+        communicationScope?.assertActive();
+        if(backendRuntime.identityId!==currentProfileId)return;
+        const updated=state.reservations.find(item=>item.backendId===reservation.backendId);
+        if(!updated||!stagingPaymentSimulationAvailable(updated)){
+          showToast("Forma de pagamento salva; pagamento ainda não iniciado. Confira Minhas reservas para continuar dentro do prazo.");return;
+        }
+        return communicationScope?openOfficialAsaasPayment(updated,null,communicationScope):requestOfficialStagingPaymentConfirmation(updated);
+      };
+      if(!communicationScope)return {afterClose:continuePayment};
+      // Keep one modal across configuration, refresh, form handoff and checkout.
+      if(formDialog.open)formDialog.close();formHandler=null;formChangeHandler=null;
+      await continuePayment();
+      return true;
+    };
+    const cfg=window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG||{};
+    return intent==="now"&&amount>0&&cfg.asaasSandboxCheckout===true&&cfg.simulationPayments!==true
+      ?runAsaasPaymentFlow(reservation,configureAndContinue):configureAndContinue();
+  }
+
+  function canEditReservationPrebooking(reservation) {
+    return Boolean(backendIsOnline() && state.role==="user" && reservation?.backendId
+      && reservation.userId===backendRuntime.identityId && !reservation.monthly && !reservation.monthlyCycleId
+      && reservation.statusKey==="pending" && !reservation.paymentConfigured && !reservation.paymentMethod
+      && !reservation.paymentIntentId && !reservation.pixSplit && !reservation.paymentParticipants?.length
+      && new Date(reservation.paymentExpiresAt).getTime()>Date.now());
+  }
+
+  function reservationPrebookingEditAction(reservation) {
+    return canEditReservationPrebooking(reservation)
+      ? `<button type="button" class="button ghost small" data-action="edit-reservation-prebooking" data-id="${esc(reservation.id)}">Alterar dados da reserva</button>` : "";
+  }
+
+  function reservationPrebookingEventOptions(reservation,groupId) {
+    if(!groupId || groupId==="__personal__")return [{value:"__none__",label:"Reserva pessoal · sem evento de grupo"}];
+    const available=(state.groupEvents||[]).filter(event=>event.groupId===groupId && event.published
+      && event.statusKey!=="cancelled" && !event.sourceReservationId
+      && event.date===reservation.date && event.time===reservation.time && event.endTime===reservation.endTime
+      && !state.reservations.some(other=>other.backendId!==reservation.backendId && other.eventId===event.id
+        && !["cancelled","expired"].includes(other.statusKey)));
+    return [{value:"__none__",label:"Não vincular evento · apenas reservar"},
+      {value:"__new__",label:"Criar novo evento na Comunidade"},
+      ...available.map(event=>({value:event.id,label:`Vincular: ${event.title} · ${timeRange(event.time,event.endTime)}`}))];
+  }
+
+  function openReservationPrebookingEdit(reservation) {
+    if(!canEditReservationPrebooking(reservation)){
+      showToast("A edição está disponível ao titular da pré-reserva avulsa antes de definir o pagamento e dentro do prazo.");return;
+    }
+    const editorIdentity=backendRuntime.identityId;
+    const groups=reservationGroupsForCurrentAccount();
+    const options=[{value:"__personal__",label:"Reservar para mim (sem grupo)"},
+      ...groups.map(group=>({value:group.id,label:`${group.name} · ${group.role}`}))];
+    // Keep a revoked group visible as a placeholder, never silently switch to personal.
+    if(reservation.groupId&&!groups.some(group=>group.id===reservation.groupId))options.push({value:reservation.groupId,label:`${reservation.groupName} · escolha um grupo autorizado ou reserva pessoal`});
+    const initialGroup=reservation.groupId||"__personal__";
+    const initialEvent=reservation.eventMode==="new"?"__new__":reservation.eventMode==="existing"?reservation.eventId:"__none__";
+    const eventOptions=reservationPrebookingEventOptions(reservation,initialGroup);
+    if(initialEvent && !eventOptions.some(option=>option.value===initialEvent))eventOptions.push({value:initialEvent,label:`${reservation.event||"Evento atual"} · confira a disponibilidade`});
+    const updateFields=(event)=>{
+      const groupValue=dynamicForm.elements.reservationGroup.value;
+      const eventInput=dynamicForm.elements.reservationEvent;
+      const personal=groupValue==="__personal__";
+      if(event?.target?.name==="reservationGroup"){
+        eventInput.innerHTML=reservationPrebookingEventOptions(reservation,groupValue)
+          .map(option=>`<option value="${esc(option.value)}">${esc(option.label)}</option>`).join("");
+        eventInput.value="__none__";
+      }
+      eventInput.disabled=personal;
+      setFormFieldVisible("reservationEvent",!personal);
+      const note=formFields.querySelector("[data-prebooking-edit-note]");
+      if(note)note.textContent=personal?"A reserva ficará vinculada à sua conta.":eventInput.value==="__new__"
+        ? "O evento será publicado após a confirmação do pagamento."
+        : "Você poderá dividir o Pix entre os membros do grupo ao definir o pagamento, mesmo sem vincular um evento.";
+    };
+    if(formDialog.open)formDialog.close();
+    if(detailDialog.open)detailDialog.close();
+    openForm({eyebrow:"Minhas reservas",title:"Alterar dados da reserva",submitLabel:"Salvar alterações",
+      description:`${reservation.id} · ${reservation.venue} · ${reservation.date} · ${timeRange(reservation.time,reservation.endTime)} · ${money(reservation.value)}. Prazo de pagamento: ${backendDateTimeLabel(reservation.paymentExpiresAt)}.`,
+      fields:[
+        {name:"reservationGroup",label:"Reservar para",type:"select",required:true,full:true,value:initialGroup,options},
+        {name:"reservationEvent",label:"Evento",type:"select",required:true,full:true,value:initialEvent,options:eventOptions},
+        {name:"reservationEditNote",type:"custom",full:true,html:'<p class="field-help" data-prebooking-edit-note aria-live="polite"></p>'}
+      ],onChange:updateFields,onSubmit:async data=>{
+        if(editorIdentity!==backendRuntime.identityId){showToast("A conta mudou. Abra novamente a reserva.");return false;}
+        const personal=data.reservationGroup==="__personal__";
+        if(!personal&&!reservationGroupsForCurrentAccount().some(group=>group.id===data.reservationGroup))
+          return markFormFieldInvalid("reservationGroup","Selecione um grupo autorizado ou reserve para você.");
+        const eventValue=personal?"__none__":data.reservationEvent;
+        if(!reservationPrebookingEventOptions(reservation,data.reservationGroup).some(option=>option.value===eventValue))
+          return markFormFieldInvalid("reservationEvent","Escolha um evento disponível para o horário desta reserva.");
+        const result=await runBackendMutation("Dados da reserva atualizados.",()=>window.MarketplaceBackend.updateReservationPrebooking({
+          reservationId:reservation.backendId,groupId:personal?null:data.reservationGroup,
+          eventId:["__none__","__new__"].includes(eventValue)?null:eventValue,createEvent:eventValue==="__new__",
+          expectedRevision:reservation.prebookingRevision??0
+        }));
+        if(!result)return false;
+        return {afterClose:()=>{
+          if(editorIdentity!==backendRuntime.identityId)return;
+          const updated=state.reservations.find(item=>item.backendId===reservation.backendId);
+          if(updated?.statusKey==="pending"&&!updated.paymentConfigured)openReservationPaymentConfiguration(updated);
+        }};
+      }
+    });
+  }
+
+  function openReservationPaymentConfiguration(reservation) {
+    if (!reservation?.backendId || reservation.statusKey!=="pending" || !reservationManagedByCurrentUser(reservation)) {
+      showToast("Esta reserva não permite definir o pagamento agora.");
+      return;
+    }
+    const members=reservationPaymentMembers(reservation);
+    const currentProfileId=backendRuntime.identityId||state.userProfile.id;
+    const defaultPayer=members.find((member)=>(member.backendProfileId||member.id)===currentProfileId)||members[0];
+    const vouchers=reservationPaymentVouchers(reservation);
+    const cycle=(state.monthlyCycles||[]).find((item)=>item.id===reservation.monthlyCycleId);
+    const deadline=reservation.monthly
+      ? `O mínimo para liberar os primeiros horários é ${money(cycle?.guaranteeRequired??cycle?.initialRequired??0)}; o saldo vence em ${backendDateTimeLabel(cycle?.balanceDueAt)}.`
+      : `Conclua o pagamento até ${backendDateTimeLabel(reservation.paymentExpiresAt)}.`;
+    const memberAmountFields=members.map((member,index)=>({member,name:`pix_amount_${index}`,row:`pix_amount_row_${index}`}));
+    const selectedVoucherAmount=()=>{
+      const voucher=vouchers.find((item)=>item.code===dynamicForm.elements.voucherCode?.value);
+      return Number(voucher?.amount||0);
+    };
+    const splitTargetAmount=()=>{
+      if(!reservation.monthly)return Math.max(0,Number(reservation.value||0)-selectedVoucherAmount());
+      return Number(cycle?.monthlyTotal||reservation.value||0);
+    };
+    const monthlySplitForBackend=(shares,targetAmount)=>{
+      return shares;
+    };
+    const selectedPaymentMembers=()=>memberAmountFields.filter(({member})=>dynamicForm.elements[`payment_share_${member.backendProfileId||member.id}`]?.checked);
+    const setPaymentSplitValues=(selected)=>{
+      const targetCents=Math.round(splitTargetAmount()*100);
+      const custom=dynamicForm.elements.pixSplitMode?.value==="custom";
+      const selectedNames=new Set(selected.map((item)=>item.name));
+      memberAmountFields.forEach(({name})=>{
+        const input=dynamicForm.elements[name];
+        if(!input)return;
+        if(!selectedNames.has(name))input.value="0.00";
+        input.readOnly=!custom;
+      });
+      if(!selected.length)return;
+      if(custom)return;
+      const equal=equalPixShares(targetCents/100,selected.map((item)=>item.member));
+      const byId=new Map(equal.map((share)=>[share.member.backendProfileId||share.member.id,share.amount]));
+      selected.forEach(({member,name})=>{
+        dynamicForm.elements[name].value=Number(byId.get(member.backendProfileId||member.id)||0).toFixed(2);
+      });
+    };
+    const updatePaymentSplitSummary=()=>{
+      const summary=formFields.querySelector("[data-payment-split-summary]");
+      if(!summary)return;
+      const selected=selectedPaymentMembers();
+      const targetCents=Math.round(splitTargetAmount()*100);
+      const allocatedCents=selected.reduce((total,{name})=>total+Math.round(Number(dynamicForm.elements[name]?.value||0)*100),0);
+      const remainingCents=targetCents-allocatedCents;
+      const valid=selected.length>=2&&remainingCents===0&&selected.every(({name})=>Number(dynamicForm.elements[name]?.value||0)>0);
+      const differenceLabel=remainingCents>=0?"Restante":"Excedente";
+      const guidance=remainingCents<0
+        ? `Reduza ${money(Math.abs(remainingCents)/100)} nas cotas para fechar o total.`
+        : `Distribua mais ${money(remainingCents/100)} para fechar o total.`;
+      summary.innerHTML=`<div><span>Valor total</span><strong>${money(targetCents/100)}</strong></div><div><span>Cotas definidas</span><strong>${money(allocatedCents/100)}</strong></div><div><span>${differenceLabel}</span><strong>${money(Math.abs(remainingCents)/100)}</strong></div><p class="${valid?"split-ok":"split-warning"}">${valid?"Rateio pronto. Os valores personalizados serão preservados.":selected.length<2?"Selecione ao menos dois membros.":guidance}</p>`;
+    };
+    const updateMonthlyPaymentPlanSummary=()=>{
+      const summary=formFields.querySelector("[data-monthly-payment-plan-summary]");
+      if(!summary||!reservation.monthly)return;
+      const monthlyTotal=Number(cycle?.monthlyTotal||reservation.value||0);
+      const guarantee=Number(cycle?.guaranteeRequired??cycle?.initialRequired??0);
+      summary.innerHTML=`<div><span>Arrecadação única do mês</span><strong>${money(monthlyTotal)}</strong></div><div><span>Mínimo para os primeiros eventos</span><strong>${money(guarantee)}</strong></div><p>Cada pagador recebe uma única cota do mês. Quando os pagamentos acumulados atingirem ${money(guarantee)}, os primeiros eventos cobertos são liberados; as cotas restantes continuam abertas até ${esc(backendDateTimeLabel(cycle?.balanceDueAt))}. Cotas recebidas em dinheiro ou cartão no estabelecimento podem ser baixadas pelo parceiro.</p>`;
+    };
+    const configuredAction=()=>{
+      const method=dynamicForm.elements.paymentMethod?.value;
+      const useSplit=method==="pix_direct_partner"&&members.length>1&&dynamicForm.elements.use_pix_split?.checked&&splitTargetAmount()>0;
+      const split=useSplit?selectedPaymentMembers().map(({member,name})=>({profile_id:member.backendProfileId||member.id,amount:Number(dynamicForm.elements[name]?.value||0)})):[];
+      const payerId=dynamicForm.elements.choose_other_card_payer?.checked?dynamicForm.elements.cardPayerId?.value:currentProfileId;
+      return paymentConfigurationAction({method,amount:splitTargetAmount(),useSplit,split,payerId,ownerId:reservation.userId,currentProfileId});
+    };
+    const updatePaymentConfigurationActions=()=>{
+      const action=configuredAction();
+      const covered=splitTargetAmount()<=0;
+      formSubmit.textContent=action.label;
+      formSubmit.hidden=!covered&&!action.canPayNow;
+      formSecondarySubmit.hidden=covered;
+      const note=formFields.querySelector("[data-payment-responsibility]");
+      if(note)note.textContent=covered?"O voucher cobre o valor integral. Confirme para concluir a reserva.":action.canPayNow
+        ? `Seu pagamento: ${money(action.amount)}. Você pode pagar agora ou confirmar a forma e pagar depois, dentro do prazo da reserva.`
+        : "O pagamento ficou atribuído a outros membros. Você pode confirmar a configuração; cada responsável paga sua própria cota.";
+    };
+    const updatePaymentConfigurationFields=(event=null)=>{
+      const method=dynamicForm.elements.paymentMethod?.value;
+      const useSplit=method==="pix_direct_partner"&&dynamicForm.elements.use_pix_split?.checked&&splitTargetAmount()>0;
+      const custom=dynamicForm.elements.pixSplitMode?.value==="custom";
+      const selected=selectedPaymentMembers();
+      setFormFieldVisible("cardPayerChoice",method==="credit_card_asaas"&&members.length>1&&splitTargetAmount()>0);
+      setFormFieldVisible("cardPayerId",method==="credit_card_asaas"&&members.length>1&&Boolean(dynamicForm.elements.choose_other_card_payer?.checked)&&splitTargetAmount()>0);
+      setFormFieldVisible("pixSplitChoice",method==="pix_direct_partner"&&members.length>1&&splitTargetAmount()>0);
+      setFormFieldVisible("pixSplitMode",useSplit);
+      setFormFieldVisible("pixMembers",useSplit);
+      setFormFieldVisible("pixSplitAmounts",useSplit);
+      setFormFieldVisible("pixSplitSummary",useSplit);
+      const selectedNames=new Set(selected.map((item)=>item.name));
+      memberAmountFields.forEach(({name,row})=>{
+        const rowElement=formFields.querySelector(`[data-payment-split-row="${row}"]`);
+        const input=dynamicForm.elements[name];
+        const visible=useSplit&&selectedNames.has(name);
+        if(rowElement)rowElement.hidden=!visible;
+        if(input){input.disabled=!visible;input.readOnly=!custom;}
+      });
+      if(useSplit){
+        setPaymentSplitValues(selected);
+        updatePaymentSplitSummary();
+      }
+      updateMonthlyPaymentPlanSummary();
+      updatePaymentConfigurationActions();
+    };
+    openForm({
+      eyebrow:"Minhas reservas",
+      title:`Definir pagamento de ${reservation.id}`,
+      description:`${reservation.venue} · ${reservation.date} · ${timeRange(reservation.time,reservation.endTime)} · ${money(reservation.value)} · ${reservation.groupName||"Reserva pessoal"}. ${deadline}`,
+      submitLabel:"Pagar agora",
+      secondarySubmitLabel:"Confirmar e pagar depois",
+      fields:[
+        ...(canEditReservationPrebooking(reservation)?[{name:"editPrebooking",type:"custom",full:true,html:reservationPrebookingEditAction(reservation)}]:[]),
+        ...(!reservation.monthly?[{name:"voucherCode",label:"Voucher",type:"select",value:"",full:true,help:"Crédito de cancelamento: você pode escolher qualquer horário disponível do parceiro, dentro da validade e das condições do crédito. Vouchers promocionais mantêm suas próprias datas e horários.",options:[{value:"",label:"Não utilizar voucher"},...vouchers.map((voucher)=>({value:voucher.code,label:voucher.label}))]}]:[]),
+        {name:"paymentMethod",label:"Forma de pagamento",type:"select",value:"pix_direct_partner",required:true,options:[{value:"pix_direct_partner",label:"Pix / recebimento no parceiro"},{value:"credit_card_asaas",label:"Cartão de crédito online"}]},
+        ...(reservation.monthly?[{name:"monthlyPaymentPlanSummary",type:"custom",full:true,html:'<div class="monthly-payment-plan-summary" data-monthly-payment-plan-summary></div>'}]:[]),
+        {name:"paymentResponsibility",type:"custom",full:true,html:'<p class="field-help payment-responsibility" data-payment-responsibility aria-live="polite"></p>'},
+        {name:"cardPayerChoice",label:"Responsável pelo cartão",type:"checkbox-group",full:true,options:[{value:"choose_other_card_payer",label:"Atribuir a outro membro do grupo",checked:false}]},
+        {name:"cardPayerId",label:"Responsável pelo cartão",type:"select",value:defaultPayer?.backendProfileId||defaultPayer?.id||"",help:"O responsável escolhido realiza o pagamento integral em uma parcela.",options:members.map((member)=>({value:member.backendProfileId||member.id,label:`${member.name} · ${member.role}`}))},
+        {name:"pixSplitChoice",label:"Rateio Pix",type:"checkbox-group",full:true,options:[{value:"use_pix_split",label:"Dividir entre membros",help:"Escolha divisão igual ou ajuste os valores de cada participante.",checked:false}]},
+        {name:"pixSplitMode",label:"Como dividir",type:"select",value:"equal",full:true,options:[{value:"equal",label:"Dividir igualmente"},{value:"custom",label:"Definir valores individualmente"}]},
+        {name:"pixMembers",label:"Pagadores do mês",type:"checkbox-group",full:true,help:"Selecione ao menos dois pagadores. Uma pessoa que arrecada por vários membros pode receber uma cota maior. Cada pagador será cobrado apenas uma vez.",options:members.map((member)=>({value:`payment_share_${member.backendProfileId||member.id}`,label:member.name,help:member.role,checked:true}))},
+        {name:"pixSplitAmounts",type:"custom",full:true,html:`<div class="dynamic-pix-split-members">${memberAmountFields.map(({member,name,row})=>`<label class="pix-split-member-row" data-payment-split-row="${esc(row)}"><span><strong>${esc(member.name)}</strong><small>${esc(member.role)}</small></span><span class="pix-split-value"><span>R$</span><input type="number" min="0.01" step="0.01" inputmode="decimal" name="${esc(name)}" data-payment-split-amount value="0.00"></span></label>`).join("")}</div>`},
+        {name:"pixSplitSummary",type:"custom",full:true,html:'<div class="pix-split-summary dynamic-pix-split-summary" data-payment-split-summary></div>'},
+        {name:"financialPolicy",label:"Termos financeiros",type:"checkbox-group",required:true,full:true,options:[{value:"financial_policy_accepted",label:"Aceito os prazos e as regras desta reserva",help:(reservation.monthly?"O rateio cobre o mês inteiro em uma única rodada. O mínimo acumulado libera os primeiros horários cobertos e o saldo permanece nas cotas não pagas até o quinto dia útil.":"O pagamento mantém o prazo atual da pré-reserva. Após a confirmação, o cancelamento com voucher pode ser solicitado em até 24 horas.")+" "+splitCancellationPolicyText(reservation),checked:false}]}
+      ],
+      onChange:updatePaymentConfigurationFields,
+      onSubmit:async(data,{intent="later"}={})=>{
+        if(backendRuntime.identityId!==currentProfileId){showToast("A conta mudou. Abra novamente a configuração do pagamento.");return false;}
+        if(data.financial_policy_accepted!=="true")return markFormFieldInvalid("financialPolicy","Campo obrigatório: aceite as regras para continuar.");
+        const method=data.paymentMethod;
+        const useSplit=method==="pix_direct_partner"&&members.length>1&&data.use_pix_split==="true"&&splitTargetAmount()>0;
+        const selectedMembers=useSplit?members.filter((member)=>data[`payment_share_${member.backendProfileId||member.id}`]==="true"):[];
+        if(useSplit&&selectedMembers.length<2)return markFormFieldInvalid("pixMembers","Selecione ao menos dois membros para o rateio.");
+        const selectedVoucher=vouchers.find((voucher)=>voucher.code===data.voucherCode);
+        const amount=reservation.monthly?splitTargetAmount():Math.max(0,Number(reservation.value||0)-Number(selectedVoucher?.amount||0));
+        const displayedSplit=useSplit?selectedMembers.map((member)=>{
+          const field=memberAmountFields.find((item)=>item.member===member);
+          return {profile_id:member.backendProfileId||member.id,amount:Number(dynamicForm.elements[field.name]?.value||0)};
+        }):[];
+        const splitCents=displayedSplit.reduce((total,item)=>total+Math.round(Number(item.amount||0)*100),0);
+        if(useSplit&&(displayedSplit.some((item)=>item.amount<=0)||splitCents!==Math.round(amount*100)))return markFormFieldInvalid("pixSplitSummary",`As cotas precisam ser positivas e somar exatamente ${money(amount)}.`);
+        const split=monthlySplitForBackend(displayedSplit,amount);
+        const payerId=method==="credit_card_asaas"?(data.choose_other_card_payer==="true"?data.cardPayerId:currentProfileId):null;
+        const action=paymentConfigurationAction({method,amount,useSplit,split,payerId,ownerId:reservation.userId,currentProfileId});
+        if(intent==="now"&&amount>0&&!action.canPayNow)return markFormFieldInvalid("paymentResponsibility","Não há pagamento atribuído à sua conta nesta configuração.");
+        return saveReservationPaymentConfiguration(reservation,{reservationId:reservation.backendId,expectedPrebookingRevision:reservation.prebookingRevision??0,monthly:reservation.monthly,paymentMethod:method,voucherCode:data.voucherCode||null,split,cardPayerId:payerId,prepaymentMode:reservation.monthly?"single_collection":"staged",policyVersion:"marketplace-0.2.0-part-22ar",policyAccepted:true},{intent,amount,currentProfileId});
+      }
+    });
+    updatePaymentConfigurationFields();
+  }
+
+  function userPendingCancellationAction(reservation) {
+    if (!reservationBelongsToCurrentUser(reservation)) return "";
+    return `<button class="button danger small" data-action="reservation-status" data-id="${esc(reservation.id)}" data-status="cancelled">Cancelar</button>`;
+  }
+
+  function canManageMonthlyGroup(groupId) {
+    // Same membership permissions accepted by private.can_manage_group_events.
+    // In the user area, the platform admin role does not add unrelated groups.
+    return Boolean(groupId && currentAccountGroups().some((group) =>
+      group.id === groupId && (group.canCreateEvents === true || group.canEditEvents === true)));
+  }
+
+  function canManageMonthlySubject(subject) {
+    if (!subject) return false;
+    return subject.groupId ? canManageMonthlyGroup(subject.groupId) : Boolean(backendRuntime.identityId && subject.customerProfileId === backendRuntime.identityId);
+  }
+
+  function canManageMonthlyRequest(request) {
+    return Boolean(request?.canManageAsGroup && canManageMonthlyGroup(request.groupId));
+  }
+
+  function userMonthlyActionAllowed(action, id) {
+    if (["open-monthly-request","message-monthly-request","close-monthly-request"].includes(action)) {
+      return canManageMonthlyRequest((state.monthlyLinkRequests || []).find((request) => request.id === id));
+    }
+    if (action === "accept-monthly-link") {
+      return canManageMonthlySubject((state.monthlyCustomerLinks || []).find((link) => link.id === id));
+    }
+    if (["confirm-monthly-renewal","activate-monthly-cycle"].includes(action)) {
+      return canManageMonthlySubject((state.monthlyCycles || []).find((cycle) => cycle.id === id));
+    }
+    return true;
+  }
+
+  function monthlyCycleReservationSummary(cycle) {
+    const reservation=(state.reservations||[]).find(item=>(cycle.reservationId && item.backendId===cycle.reservationId) || (cycle.id && item.monthlyCycleId===cycle.id));
+    let occurrences=[];
+    if(reservation) {
+      occurrences=(reservation.allOccurrences||reservation.occurrences||[]).filter(item=>item.status!=="cancelled");
+    } else {
+      const slotIds=new Set((backendRuntime.bootstrap?.monthly_pre_reservation_slots||[])
+        .filter(item=>item.monthly_cycle_id===cycle.id && ["pre_reserved","claimed"].includes(item.status)).map(item=>item.schedule_slot_id));
+      occurrences=(state.venues||[]).flatMap(venue=>(venue.schedule||[]).flatMap(day=>(day.slots||[])
+        .filter(slot=>slotIds.has(slot.backendId)).map(slot=>({date:day.date,time:slot.time,endTime:slotEndTime(slot)}))));
+    }
+    const dates=[...new Set(occurrences.map(item=>item.date).filter(Boolean))]
+      .sort((a,b)=>a.split("/").reverse().join("-").localeCompare(b.split("/").reverse().join("-")));
+    return {reservation,dates};
+  }
+
+  function monthlyPeriodTitle(value) {
+    const months=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    const text=String(value||""),month=months[Number(text.slice(5,7))-1];
+    return month?`${month} de ${text.slice(0,4)}`:monthlyPeriodLabel(value);
+  }
+
+  function monthlyPendingStep(cycle) {
+    const link=cycle.link||{};
+    if(["suspended","cancelled","completed"].includes(cycle.status)||["suspended","cancelled"].includes(link.status))return {label:"Horário suspenso",help:link.suspensionReason||"Consulte o parceiro para verificar a continuidade deste horário.",action:"",button:"",tone:"status-neutral"};
+    if(/^\d{4}-\d{2}-\d{2}/.test(String(cycle.balanceDueAt||""))&&Date.parse(cycle.balanceDueAt)<=Date.now())return {label:"Prazo encerrado",help:"O prazo deste mês terminou. Consulte as datas e condições no histórico abaixo.",action:"",button:"",tone:"status-neutral"};
+    if(link.status==="pending_acceptance")return {label:"Proposta para revisar",help:"Confira a proposta do parceiro e aceite para continuar.",action:"accept-monthly-link",id:link.id,button:"Revisar proposta",tone:"status-warning"};
+    if(link.status!=="active")return {label:"Aguardando vínculo",help:"O vínculo precisa estar ativo para criar a pré-reserva.",action:"",button:"",tone:"status-neutral"};
+    if(link.requireRenewalConfirmation&&!cycle.renewalConfirmedAt)return {label:"Confirme a continuidade",help:"Confirme que o grupo vai manter este horário no mês. Depois, revise o valor e crie a pré-reserva.",action:"confirm-monthly-renewal",id:cycle.id,button:"Confirmar renovação",tone:"status-warning"};
+    return {label:"Pronto para reservar",help:"O horário está protegido. Confira o valor deste mês e crie a pré-reserva para definir o pagamento.",action:"activate-monthly-cycle",id:cycle.id,button:"Criar pré-reserva",tone:"status-ok"};
+  }
+
+  function monthlyFirstGameDate(dates) {
+    return `<div class="monthly-period-first-date"><span>Primeiro jogo do mês</span><strong>${esc(dates[0]||"Data ainda não disponível")}</strong></div>`;
+  }
+
+  function monthlyPendingConditions(cycle,dates) {
+    const minimum=Number(cycle.guaranteeRequired??cycle.initialRequired??0);
+    return `<details class="monthly-period-conditions"><summary>Demais datas e condições do mês</summary><div class="monthly-period-dates">${dates.length>1?dates.slice(1).map(date=>`<span>${esc(date)}</span>`).join(""):dates.length?"<span>Não há outras datas neste mês.</span>":"<span>Datas ainda não disponíveis.</span>"}</div><div class="detail-list">${cycle.initialDueAt?`<div class="detail-line"><span>Mínimo para os primeiros jogos</span><strong>${money(minimum)} · até ${esc(backendDateTimeLabel(cycle.initialDueAt))}</strong></div>`:""}<div class="detail-line"><span>Prazo para quitar o mês</span><strong>${esc(backendDateTimeLabel(cycle.balanceDueAt))}</strong></div></div><p>O mínimo faz parte da mensalidade. Os valores e prazos serão apresentados novamente antes do aceite da pré-reserva.</p></details>`;
+  }
+
+  function monthlyPendingCard(cycle,allRequests) {
+    const link=cycle.link||{},summary=monthlyCycleReservationSummary(cycle),step=monthlyPendingStep(cycle);
+    const request=allRequests.find(item=>item.monthlyLinkId===link.id),unread=request?monthlyRequestUnread(request.id):0;
+    const weekday=["","Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"][link.weekday]||"Horário mensalista";
+    return `<article class="monthly-period-card ${unread?"has-unread":""}"><div class="monthly-period-heading"><div><span class="status ${step.tone}">${esc(step.label)}</span><h3>${esc(weekday)} · ${esc(timeRange(link.startTime,link.endTime))}</h3>${monthlyFirstGameDate(summary.dates)}<p>${esc(cycle.venueName)} · ${esc(cycle.spaceName)}</p><small>${esc(cycle.groupName)}</small></div><div class="monthly-period-price"><span>Mensalidade do mês</span><strong>${money(cycle.monthlyTotal)}</strong><small>${esc(cycle.occurrenceCount)} jogo${cycle.occurrenceCount===1?"":"s"}</small></div></div><div class="monthly-period-next"><p>${esc(step.help)}</p><div class="item-actions">${request?`<button class="button ghost small" data-action="open-monthly-request" data-id="${esc(request.id)}">Ver conversa ${messageBadge(unread)}</button>`:""}${step.action?`<button class="button primary small" data-action="${step.action}" data-id="${esc(step.id)}">${esc(step.button)}</button>`:""}</div></div>${unread?`<div class="inline-message-notice"><span class="message-badge">${esc(unread)}</span><strong>${unread===1?"Nova atualização":"Novas atualizações"}</strong></div>`:""}${monthlyPendingConditions(cycle,summary.dates)}</article>`;
+  }
+
+  function monthlyCustomerUserPanel() {
+    if (!backendIsOnline()) return "";
+    const allCycles=(state.monthlyCycles||[]).filter((cycle)=>canManageMonthlySubject(cycle));
+    const allRequests=(state.monthlyLinkRequests||[]).filter(canManageMonthlyRequest);
+    if (!allCycles.length&&!allRequests.length) return "";
+    const activeCycles=allCycles.filter((cycle)=>!["cancelled","completed"].includes(cycle.status));
+    const cycles=activeCycles.filter(cycle=>!cycle.reservationId&&!monthlyCycleReservationSummary(cycle).reservation)
+      .sort((a,b)=>String(b.serviceMonth).localeCompare(String(a.serviceMonth))||(a.link?.weekday||0)-(b.link?.weekday||0)||String(a.link?.startTime||"").localeCompare(String(b.link?.startTime||"")));
+    const visibleLinkIds=new Set(activeCycles.map((cycle)=>cycle.link?.id).filter(Boolean));
+    const requests=allRequests.filter((request)=>["pending_partner","in_conversation"].includes(request.status)||(request.status==="proposal_sent"&&!visibleLinkIds.has(request.monthlyLinkId))||monthlyRequestUnread(request.id)>0);
+    const closedRequestCount=allRequests.filter((request)=>["converted","rejected","cancelled","expired"].includes(request.status)).length;
+    const closedCycleCount=allCycles.filter((cycle)=>["cancelled","completed"].includes(cycle.status)).length;
+    const requestUnreadTotal=monthlyRequestUnreadForRole("user");
+    const unreadBanner=requestUnreadTotal?`<div class="message-alert-banner" role="status"><span class="message-alert-icon">●</span><div><strong>${esc(requestUnreadTotal)} atualização${requestUnreadTotal===1?" nova":"ões novas"}</strong><small>Abra a conversa destacada para visualizar a resposta do parceiro.</small></div></div>`:"";
+    const requestSection=requests.length?`<div class="monthly-request-section"><div class="section-heading"><div><h3>Conversas e atualizações</h3><p>Pedidos em andamento ou avisos que ainda precisam ser visualizados.</p></div></div><div class="monthly-customer-grid monthly-user-list">${requests.map((request)=>{const unread=monthlyRequestUnread(request.id);const closed=["converted","rejected","cancelled","expired"].includes(request.status);return `<article class="monthly-customer-card monthly-user-card ${unread?"has-unread":""}"><div class="monthly-user-card-main"><span class="status ${closed?"status-neutral":"status-warning"}">${esc(monthlyLinkRequestStatusLabel(request.status))}</span><h3>${esc(["","Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"][request.weekday])} · ${esc(timeRange(request.startTime,request.endTime))}</h3><p>${esc(request.venueName)} · ${esc(request.spaceName)}</p><small>${esc(request.groupName)}${request.status==="proposal_sent"?` · proposta de ${money(request.proposedMonthlyPrice)}/mês`:""}</small>${unread?`<div class="inline-message-notice"><span class="message-badge">${esc(unread)}</span><strong>${unread===1?"Nova atualização":"Novas atualizações"}</strong></div>`:""}</div><div class="item-actions"><button class="button ghost small" data-action="open-monthly-request" data-id="${esc(request.id)}">${closed?"Ver atualização":"Abrir conversa"} ${messageBadge(unread)}</button>${["pending_partner","in_conversation"].includes(request.status)?`<button class="button danger small" data-action="close-monthly-request" data-id="${esc(request.id)}" data-decision="cancelled">Cancelar</button>`:""}</div></article>`;}).join("")}</div></div>`:"";
+    const months=[...new Set(cycles.map(cycle=>cycle.serviceMonth))];
+    const cycleSection=cycles.length?`<div class="section-heading"><div><h2>Horários protegidos</h2><p>Confira o mês e conclua a ação indicada. O pagamento será definido depois da criação da pré-reserva.</p></div></div>${months.map(month=>`<section class="monthly-period-section"><h3 class="monthly-period-title">${esc(monthlyPeriodTitle(month))}</h3><div class="monthly-period-list">${cycles.filter(cycle=>cycle.serviceMonth===month).map(cycle=>monthlyPendingCard(cycle,allRequests)).join("")}</div></section>`).join("")}`:"";
+    const historySection=closedRequestCount||closedCycleCount?`<div class="monthly-history-summary"><strong>Histórico preservado</strong><span>${esc(closedRequestCount)} solicitação${closedRequestCount===1?"":"ões"} encerrada${closedRequestCount===1?"":"s"} · ${esc(closedCycleCount)} ciclo${closedCycleCount===1?"":"s"} concluído${closedCycleCount===1?"":"s"} ou cancelado${closedCycleCount===1?"":"s"}</span></div>`:"";
+    if(!unreadBanner&&!requestSection&&!cycleSection&&!historySection)return "";
+    return `<section class="card monthly-customer-panel">${unreadBanner}${requestSection}${cycleSection}${historySection}</section>`;
+  }
+
+  function reservationManagedByCurrentUser(reservation) {
+    if (!reservation) return false;
+    if (reservationBelongsToCurrentUser(reservation)) return true;
+    if (!backendIsOnline() && reservation.user === state.userProfile.name) return true;
+    return currentUserCanManageReservationGroup(reservation);
+  }
+
+  function managedUserReservations(monthly) {
+    return (state.reservations || []).filter((reservation) => Boolean(reservation.monthly) === Boolean(monthly) && reservationManagedByCurrentUser(reservation));
+  }
+
+  function currentUserShare(reservation) {
+    if (!reservation) return null;
+    if (reservation.pixSplit) {
+      const split = currentUserPixShareState(reservation);
+      if (!split) return null;
+      const row = split.currentParticipant || split.currentCollectionItem || {};
+      return { amount:Number(row.amountDue ?? row.amount ?? 0), paid:Boolean(split.paid), mode:"split" };
+    }
+    const configured=Boolean(reservation.paymentConfigured || reservation.paymentMethod || reservation.paymentIntentId || reservation.statusKey === "confirmed");
+    if (!configured || Number(reservation.paymentDue || reservation.value || 0) <= 0) return null;
+    const currentId=backendRuntime.identityId;
+    const assignedId=reservation.paymentResponsibleId || reservation.userId;
+    const assignedOnline=Boolean(currentId && assignedId === currentId);
+    const assignedFallback=!backendIsOnline() && (reservation.paymentResponsibleName === state.userProfile.name || (!reservation.paymentResponsibleName && reservation.user === state.userProfile.name));
+    if (!assignedOnline && !assignedFallback) return null;
+    const paid=Boolean(reservation.paymentConfirmedAt || reservation.statusKey === "confirmed");
+    return { amount:Number(reservation.paymentDue || reservation.value || 0), paid, mode:"single" };
+  }
+
+  function userShareReservations() {
+    return (state.reservations || []).filter((reservation) => currentUserShare(reservation));
+  }
+
+  function userPendingSharesCount() {
+    return userShareReservations().filter((reservation) => {
+      if (reservation.monthlyCycleId && monthlyPaymentPresentation(reservation).closed) return false;
+      const share=currentUserShare(reservation);
+      return reservation.statusKey === "pending" && share && !share.paid;
+    }).length;
+  }
+
+  function reservationUnreadCount(reservations) {
+    return reservations.reduce((total,reservation)=>total+unreadForReservation(reservation.id,"user")+occurrenceTransferUnreadForReservation(reservation),0);
+  }
+
+  function userReservationTabUnread(tab) {
+    return tab === "monthly"
+      ? reservationUnreadCount(managedUserReservations(true)) + monthlyRequestUnreadForRole("user")
+      : reservationUnreadCount(managedUserReservations(false));
+  }
+
+  function userReservationsUnreadCount() {
+    return userReservationTabUnread("single") + userReservationTabUnread("monthly");
+  }
+
+  function userReservationCard(reservation,{shareView=false}={}) {
+    let visual = reservationStatus(reservationDisplayKey(reservation));
+    if(reservation.monthlyCycleId && !reservationIsExpired(reservation)){
+      const view=monthlyPaymentPresentation(reservation);
+      visual={status:view.closed?"status-neutral":view.full?"status-ok":"status-warning",label:view.label};
+    }
+    const badge = reservationDateBadge(reservation.date);
+    const eventVisual = eventPublicationLabel(reservation.eventPublicationStatus);
+    const unread = unreadForReservation(reservation.id,"user");
+    const transferUnread=occurrenceTransferUnreadForReservation(reservation);
+    const latestTransferNotification=latestOccurrenceTransferNotification(reservation);
+    const ownShare=currentUserShare(reservation);
+    const assignedPayment = shareView && ownShare
+      ? `<div class="inline-payment-assignment"><strong>${reservation.monthly?"Sua cota mensal":"Pagamento atribuído a você"}</strong><span>${money(ownShare.amount)} · ${ownShare.paid?"Pagamento confirmado":"Pagamento pendente"}</span></div>`
+      : hasSingleCardPaymentResponsible(reservation)
+        ? singleCardPaymentResponsibleCard(reservation)
+        : !reservationBelongsToCurrentUser(reservation) && reservationPaymentAssignedToCurrentUser(reservation)
+          ? `<div class="inline-payment-assignment"><strong>Pagamento atribuído a você</strong><span>Sua cota Pix deve ser paga individualmente.</span></div>`
+          : "";
+    const pendingActions = reservation.statusKey === "pending"
+      ? `${userPaymentAction(reservation)}${!reservation.backendOfficial && !reservation.pixSplit ? `<button class="button secondary small" data-action="reservation-status" data-id="${esc(reservation.id)}" data-status="confirmed">Simular pagamento</button>` : ""}${shareView?"":userPendingCancellationAction(reservation)}`
+      : shareView
+        ? ""
+        : reservation.statusKey === "confirmed"
+          ? userCancellationAction(reservation)
+          : reservation.statusKey === "cancelled" && reservation.outsideDeadline && !reservation.exceptionReviewId && reservationBelongsToCurrentUser(reservation)
+            ? `<button class="button ghost small" data-action="request-cancellation-exception" data-id="${esc(reservation.id)}">Solicitar análise excepcional</button>`
+            : "";
+    const collection=reservation.pixSplit?pixCollectionForReservation(reservation.id):null;
+    const splitProgress=reservation.pixSplit?(reservation.monthlyCollectionMode==="single_monthly_pool"?` · Pago ${money(collection?.paidAmount||0)} de ${money(collection?.amount||reservation.value)}`:` · Rateio ${esc(collection?.paidCount || 0)}/${esc(reservation.pixSplitMemberCount || 0)}`):"";
+    const pendingTransfer=occurrenceTransfersForReservation(reservation).find((request)=>["requested","awaiting_group_choice","proposed"].includes(request.status));
+    const transferNotice=transferUnread&&latestTransferNotification
+      ? `<div class="inline-message-notice occurrence-transfer-notice has-unread"><span class="message-badge">${esc(transferUnread)}</span><div><strong>${esc(latestTransferNotification.title)}</strong><span>${esc(latestTransferNotification.body||"Abra os detalhes para visualizar a atualização.")}</span></div></div>`
+      : pendingTransfer?`<div class="inline-message-notice occurrence-transfer-notice"><div><strong>${esc(pendingTransfer.statusLabel)}</strong><span>${pendingTransfer.targetDate?`Proposta: ${esc(pendingTransfer.targetDate)} · ${esc(timeRange(pendingTransfer.targetTime,pendingTransfer.targetEndTime))}`:"Abra os detalhes para acompanhar ou decidir."}</span></div></div>`:"";
+    return `<article data-ui-key="reservation-${esc(reservation.id)}" class="reservation-card ${unread||transferUnread ? "has-unread" : ""}"><div class="reservation-date"><strong>${esc(badge.day)}</strong><span>${esc(badge.month)}</span></div><div class="reservation-card-main"><div class="reservation-card-heading"><div><h2>${esc(reservation.venue)}</h2><small class="reservation-public-code">Reserva ${esc(reservation.id)}</small><p>${esc(timeRange(reservation.time,reservation.endTime))} · ${money(reservation.value)}${reservation.monthly ? ` · Mensalista (${esc(reservation.occurrenceCount)} datas)` : ""}${!closedReservationPaymentLabel(reservation)&&!reservation.monthly&&Number(reservation.paymentDue||0)>0 ? ` · Diferença ${money(reservation.paymentDue)}` : ""}${reservation.paymentMethodLabel ? ` · ${esc(reservation.paymentMethodLabel)}` : ""}${splitProgress}</p></div><span class="status ${visual.status}">${visual.label}</span></div><div class="reservation-group-line"><strong>${esc(reservationSubjectLabel(reservation))}</strong><span>${esc(reservation.groupId ? (reservation.groupRole || "") : "Reserva pessoal")}</span></div><div class="reservation-card-meta"><span>${esc(reservation.event || "Evento não informado")}</span><span class="status ${eventVisual.className}">${eventVisual.label}</span></div>${singlePrebookingDeadlineMarkup(reservation)}${assignedPayment}${shareView?"":transferNotice}${!shareView&&unread && reservationBelongsToCurrentUser(reservation) ? `<div class="inline-message-notice"><span class="message-badge">${esc(unread)}</span><strong>${unread === 1 ? "Nova mensagem do parceiro" : `${unread} novas mensagens do parceiro`}</strong></div>` : ""}<div class="reservation-card-actions"><button class="button ghost small" data-action="reservation-details" data-id="${esc(reservation.id)}">${!shareView&&transferUnread?"Ver atualização":"Detalhes"}${!shareView?messageBadge(transferUnread):""}</button>${!shareView&&reservationBelongsToCurrentUser(reservation) ? chatButtonForUser(reservation) : ""}${reservation.pixSplit ? `<button class="button secondary small" data-action="pix-split-details" data-id="${esc(reservation.id)}">${shareView?"Ver minha cota":"Acompanhar rateio"}</button>` : ""}${pendingActions}</div></div></article>`;
+  }
+
+  function userReservationList(reservations,filterId="userReservationFilter",emptyText="Nenhuma reserva encontrada neste filtro.") {
+    const pending = reservations.filter((item) => item.statusKey === "pending").length;
+    const confirmed = reservations.filter((item) => item.statusKey === "confirmed").length;
+    const cancelled = reservations.filter((item) => reservationDisplayKey(item) === "cancelled").length;
+    const expired = reservations.filter(reservationIsExpired).length;
+    const filterKey=filterId==="userShareFilter"?"userShareStatus":"userReservationStatus";
+    const filter = state.filters[filterKey] || "Todas";
+    const filterMap = { Pendentes: "pending", Confirmadas: "confirmed", Canceladas: "cancelled", Expiradas: "expired" };
+    const visibleReservations = filter === "Todas" ? reservations : reservations.filter((item) => reservationDisplayKey(item) === filterMap[filter]);
+    return `<section class="reservation-overview" aria-label="Resumo"><span><strong>${reservations.length}</strong> total</span><span class="pending"><strong>${pending}</strong> pendentes</span><span class="confirmed"><strong>${confirmed}</strong> confirmadas</span><span class="cancelled"><strong>${cancelled}</strong> canceladas</span><span class="cancelled"><strong>${expired}</strong> expiradas</span></section>
+      <div class="reservation-toolbar"><label class="compact-filter"><span>Mostrar</span><select id="${filterId}"><option>Todas</option><option>Pendentes</option><option>Confirmadas</option><option>Canceladas</option><option>Expiradas</option></select></label></div>
+      <section class="reservation-list">${visibleReservations.map((reservation)=>userReservationCard(reservation,{shareView:filterId==="userShareFilter"})).join("") || emptyState("▣", emptyText)}</section>`;
+  }
+
+  function userReservations() {
+    const tab=state.userReservationTab==="monthly"?"monthly":"single";
+    const singleUnread=userReservationTabUnread("single");
+    const monthlyUnread=userReservationTabUnread("monthly");
+    const tabs=`<div class="partner-validation-tabs reservation-management-tabs" role="tablist" aria-label="Tipos de reserva"><button class="button ${tab==="single"?"primary":"secondary"}" role="tab" aria-selected="${tab==="single"}" data-action="user-reservation-tab" data-tab="single">Avulsas${messageBadge(singleUnread,"atualização(ões) nova(s)")}</button><button class="button ${tab==="monthly"?"primary":"secondary"}" role="tab" aria-selected="${tab==="monthly"}" data-action="user-reservation-tab" data-tab="monthly">Mensalistas${messageBadge(monthlyUnread,"atualização(ões) nova(s)")}</button></div>`;
+    const reservations=managedUserReservations(tab==="monthly");
+    const transferUnreadTotal=reservations.reduce((total,reservation)=>total+occurrenceTransferUnreadForReservation(reservation),0);
+    const content=tab==="monthly"
+      ? `${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Seus horários mensalistas</strong><small>Acompanhe os horários que você administra e as reservas de cada mês. Suas cotas individuais ficam em Minhas cotas.</small></div>`:""}${backendIsOnline()?`<div class="toolbar"><button class="button secondary" data-action="user-initial-agenda">Vincular horário importado</button></div>`:""}${monthlyCustomerUserPanel()||(reservations.length?"":emptyState("↻","Você não possui vínculos mensalistas sob sua gestão."))}<div class="section-heading"><div><h2>Pré-reservas e pagamentos</h2><p>Depois de criar a pré-reserva, defina o pagamento e acompanhe a arrecadação aqui.</p></div></div>${userReservationList(reservations,"userReservationFilter","Nenhuma reserva mensalista encontrada neste filtro.")}`
+      : `${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Reservas avulsas sob sua responsabilidade</strong><small>Esta lista considera a autoria da reserva e as permissões atuais de administrador ou organizador do grupo.</small></div>`:""}${transferUnreadTotal?`<div class="message-alert-banner" role="status"><span class="message-alert-icon">●</span><div><strong>${esc(transferUnreadTotal)} atualização${transferUnreadTotal===1?" de remarcação":"ões de remarcação"}</strong><small>As reservas destacadas possuem pedido, proposta ou devolutiva ainda não visualizada.</small></div></div>`:""}${userReservationList(reservations,"userReservationFilter")}`;
+    return `${pageHeader("Área do usuário", "Minhas reservas", "Administre reservas avulsas e mensalistas sem misturar as cotas atribuídas à sua conta.", `<button class="button primary small" data-nav="discover">Nova reserva</button>`)}${tabs}${content}`;
+  }
+
+  function userShares() {
+    const reservations=userShareReservations();
+    const pending=userPendingSharesCount();
+    return `${pageHeader("Área do usuário", "Minhas cotas", "Consulte e pague somente os valores atribuídos à sua conta, mesmo quando outra pessoa administra a reserva.", `<button class="button secondary small" data-nav="reservations">Ver minhas reservas</button>`)}
+      ${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>${esc(pending)} pagamento${pending===1?" pendente":"s pendentes"}</strong><small>Cotas avulsas e mensalistas aparecem uma única vez por pagador. A reserva pode também constar em Minhas reservas quando você for responsável pela gestão, sem gerar cobrança duplicada.</small></div>`:""}
+      ${userReservationList(reservations,"userShareFilter","Nenhuma cota foi atribuída a esta conta.")}`;
+  }
+
+  function userFavorites() {
+    const favoriteVenues = marketplaceVenuesFromActiveSource().filter((venue) => partnerVisibleInMarketplace(venue) && state.favorites.includes(venue.id));
+    return `${pageHeader("Área do usuário", "Favoritos", "Acesse rapidamente os locais que você marcou.", `<button class="button ghost" data-nav="discover">Buscar mais quadras</button>`)}<section class="grid">${favoriteVenues.map(venueCard).join("") || emptyState("♡", "Nenhuma quadra foi adicionada aos favoritos.")}</section>`;
+  }
+
+  function userPromotions() {
+    activeCancellationVouchers();
+    const vouchers = state.cancellationVouchers.filter((voucher) => voucher.ownerUserId ? voucher.ownerUserId === backendRuntime.identityId : voucher.user === state.userProfile.name);
+    return `${pageHeader("Área do usuário", "Meus vouchers", "Consulte créditos de cancelamento e vouchers promocionais disponíveis.")}
+      ${backendIsOnline() ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>Créditos, promoções e pagamentos individuais ou rateados usam os registros oficiais protegidos.</small></div>` : ""}
+      <section class="section"><div class="section-heading"><div><h2>Vouchers de cancelamento</h2><p>Uso único, no mesmo parceiro, em nova reserva de valor igual ou superior, dentro da validade. Você pode escolher qualquer dia e horário disponível.</p></div></div><div class="grid two">${vouchers.map((voucher) => `<article class="card voucher-card"><div class="section-heading"><div><span class="status ${["active", "active_extended"].includes(voucher.status) ? "status-ok" : voucher.status === "reserved" ? "status-warning" : "status-neutral"}">${esc(voucherStatusLabel(voucher))}</span><h3>${esc(voucher.code)}</h3></div><strong class="voucher-value">${money(voucher.value)}</strong></div><div class="detail-list"><div class="detail-line"><span>Parceiro</span><strong>${esc(voucher.venue)}</strong></div><div class="detail-line"><span>Reserva de origem</span><strong>${esc(voucher.sourceReservationId || "Não informada")}</strong></div><div class="detail-line"><span>Validade atual</span><strong>${esc(voucher.expiresAt)}</strong></div><div class="detail-line"><span>Regra de uso</span><strong>Reserva de ${money(voucher.minimumReservationValue)} ou mais</strong></div><div class="detail-line"><span>Uso</span><strong>Integral e único</strong></div><div class="detail-line"><span>Horário original</span><strong>${esc(voucher.originalTime || "—")} · ${esc(voucher.originalPeriod || "—")}</strong></div>${voucher.extensionReason ? `<div class="detail-line"><span>Prorrogação</span><strong>Validade prorrogada por disponibilidade insuficiente do parceiro.</strong></div>` : ""}${voucher.reassignedFrom ? `<div class="detail-line"><span>Realocação</span><strong>${esc(voucher.reassignmentStatus)}</strong></div>` : ""}</div></article>`).join("") || emptyState("V", "Nenhum voucher de cancelamento foi gerado para este usuário.")}</div></section>
+      <section class="section"><div class="section-heading"><div><h2>Vouchers promocionais</h2><p>Ofertas oficiais independentes dos créditos gerados por cancelamento.</p></div></div><div class="grid">${state.promotions.filter((promo)=>!promo.deleted).map((promo) => `<article class="card"><span class="status ${promo.active ? "status-ok" : "status-neutral"}">${promo.active ? "Disponível" : "Encerrada"}</span><h3>${esc(promo.title)}</h3><p class="meta-row"><span>${esc(promo.venue)}</span><span>Código válido até ${esc(promo.validUntil)}</span></p><p class="field-help">${esc(promotionEventLabel(promo))}</p><div class="promo-code"><div><strong>${esc(promo.code)}</strong><div class="meta-row">${esc(promotionBenefitLabel(promo))}</div></div><button class="button ${state.appliedVouchers.includes(promo.code) ? "ghost" : "secondary"} small" data-action="apply-voucher" data-code="${esc(promo.code)}" ${promo.active ? "" : "disabled"}>${state.appliedVouchers.includes(promo.code) ? "Aplicado" : "Aplicar"}</button></div></article>`).join("") || emptyState("%", "Nenhum voucher promocional disponível.")}</div></section>`;
+  }
+
+  function userProfile() {
+    const profile = state.userProfile;
+    const permittedGroups = reservationGroupsForCurrentAccount();
+    return `${pageHeader("Área do usuário", "Conta Tâmo On", "O marketplace reutiliza o perfil principal do aplicativo. Nenhum dado pessoal precisa ser preenchido novamente nesta área.", `<button class="button secondary" data-action="sync-main-profile">Sincronizar agora</button><button class="button ghost" data-action="manage-main-profile">Gerenciar no Tâmo On</button>`)}
+      <section class="profile-sync-banner" role="status">
+        <div class="profile-avatar" aria-hidden="true">${initials(profile.name)}</div>
+        <div><span class="eyebrow">Perfil único</span><h2>${esc(profile.name)}</h2><p>Dados centrais compartilhados entre Grupos, Marketplace e demais áreas autorizadas.</p></div>
+        <span class="status status-ok">${esc(profile.centralProfileStatus)}</span>
+      </section>
+      <section class="details-grid">
+        <article class="detail-group"><div class="section-heading"><div><h3>Conta Google</h3><p>Identidade fornecida pelo login vinculado.</p></div><span class="source-badge">Google</span></div><div class="detail-list"><div class="detail-line"><span>Nome</span><strong>${esc(profile.name)}</strong></div><div class="detail-line"><span>E-mail</span><strong>${esc(profile.email)}</strong></div><div class="detail-line"><span>Origem</span><strong>${esc(profile.accountSource)}</strong></div></div></article>
+        <article class="detail-group"><div class="section-heading"><div><h3>Dados complementares</h3><p>Preenchidos uma única vez no perfil principal.</p></div><span class="source-badge">Tâmo On</span></div><div class="detail-list"><div class="detail-line"><span>Telefone</span><strong>${esc(profile.phone)}</strong></div><div class="detail-line"><span>Cidade</span><strong>${esc(profile.city)}</strong></div><div class="detail-line"><span>Notificações</span><strong>${esc(profile.notification)}</strong></div><div class="detail-line"><span>Horário preferido</span><strong>${esc(profile.preferredTime)}</strong></div></div></article>
+      </section>
+      <section class="card profile-permissions"><div class="section-heading"><div><h2>Permissões utilizadas pelo marketplace</h2><p>Reservas com eventos usam as permissões já existentes em cada grupo.</p></div></div><div class="list">${permittedGroups.map((group) => `<div class="list-item compact"><div class="avatar">${initials(group.name)}</div><div class="list-item-main"><strong>${esc(group.name)}</strong><small>${esc(group.role)} · ${esc(group.memberCount)} membros</small></div><span class="status ${canManageGroupEvents(group) ? "status-ok" : "status-neutral"}">${canManageGroupEvents(group) ? "Pode criar eventos" : "Sem permissão"}</span></div>`).join("")}</div><div class="profile-sync-footer"><span>Última sincronização: <strong>${esc(profile.lastSync)}</strong></span><span>${permittedGroups.length} grupo(s) habilitado(s) para reservas com eventos</span></div></section>`;
+  }
+
+  function userView() {
+    const page = state.activePage.user;
+    const views = { discover: userDiscover, reservations: userReservations, shares: userShares, favorites: userFavorites, promotions: userPromotions, profile: userProfile };
+    return navShell("user", (views[page] || userDiscover)());
+  }
+
+  function partnerRegistrationOverviewCard() {
+    const profile = state.partnerProfile || {};
+    const record = (state.adminPartners || []).find(partner => profile.backendPartnerId
+      ? (partner.backendPartnerId || partner.id) === profile.backendPartnerId
+      : !backendRuntime.enabled && partner.venueId === profile.venueId);
+    const item = partnerOnboardingForPartner(profile.backendPartnerId);
+    const steps = Array.isArray(item?.steps) ? item.steps : [];
+    const score = steps.length ? Math.round(100 * steps.filter(step => step.done === true).length / steps.length)
+      : Math.max(0, Math.min(100, Number(record?.score) || 0));
+    const complete = steps.length ? steps.every(step => step.done === true) : score === 100;
+    const approved = item?.status === "approved" || record?.status === "Aprovado";
+    const bank = typeof item?.bank_validated === "boolean"
+      ? item.bank_validated ? "Dados bancários conferidos" : "Dados bancários em conferência"
+      : `Dados bancários: ${record?.banking || "Não informado"}`;
+    const pending = steps.find(step => step.done !== true)?.label;
+    return `<article class="card partner-registration-overview"><div class="section-heading"><div><h2>Cadastro do parceiro</h2><p>${complete && approved ? "Cadastro aprovado e concluído" : complete ? "Conferência concluída" : "Completude dos dados"}</p></div><button type="button" class="button ghost small" data-nav="registration">Ver cadastro</button></div>
+      <div class="progress" role="progressbar" aria-label="Completude do cadastro" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${score}"><span style="width:${score}%"></span></div>
+      <div class="meta-row" style="margin-top:10px"><span>${score}% concluído</span><span>${esc(bank)}</span></div>
+      ${complete ? `<p class="field-help">${approved ? "Tudo pronto para organizar sua agenda e receber reservas." : "Aguardando a decisão final da Administração."}</p>` : `<div class="callout" style="margin-top:14px"><strong>Próxima pendência</strong><p>${esc(pending || "Abra o cadastro para acompanhar os dados e documentos pendentes.")}</p></div>`}
+    </article>`;
+  }
+
+  function partnerOverview() {
+    const confirmed = state.partnerReservations.filter((item) => item.status === "Confirmada").length;
+    const pending = state.partnerReservations.filter((item) => item.status === "Pendente").length;
+    const activeSpaces = state.partnerSpaces.filter((item) => item.status === "Ativo").length;
+    const gross = state.partnerReservations.filter((item) => item.status === "Confirmada").reduce((sum, item) => sum + item.value, 0);
+    const venue = state.venues.find((item) => item.id === state.partnerProfile.venueId);
+    const upcoming = publicAvailabilityEntries(venue).sort((a,b) => parsePtDateTime(a.day.date,a.slot.time) - parsePtDateTime(b.day.date,b.slot.time)).slice(0,3);
+    return `${pageHeader("Portal do parceiro", "Visão geral", `Resumo objetivo da operação diária de ${state.partnerProfile.tradeName}.`)}
+      <section class="stats-grid compact-kpi-grid">${hasPartnerPermission("manage_schedule") ? stat(confirmed,"confirmadas")+stat(pending,"pendentes") : ""}${hasPartnerPermission("manage_spaces") ? stat(activeSpaces,"espaços ativos") : ""}${hasPartnerPermission("manage_finance") ? stat(money(gross),"reservas confirmadas") : ""}</section>
+      <section class="grid two">
+        ${hasPartnerPermission("manage_schedule") ? `<article class="card"><div class="section-heading"><div><h2>Próximos horários</h2><p>Mesma grade publicada no marketplace</p></div><button class="button ghost small" data-nav="agenda">Ver agenda</button></div><div class="list">${upcoming.map(({day,slot}) => { const info=operationalSlotInfo(venue,day,slot); return `<div class="list-item"><div class="avatar">${esc(slot.time.slice(0,2))}</div><div class="list-item-main"><strong>${esc(info.title)}</strong><small>${esc(day.date)} · ${esc(timeRange(slot.time,slotEndTime(slot)))} · ${esc(normalizedSlotSpace(slot))}</small></div><span class="status ${info.type === "confirmed" ? "status-ok" : info.type === "pending" ? "status-warning" : "status-neutral"}">${esc(info.statusLabel)}</span></div>`; }).join("") || emptyState("▦","Nenhum horário publicado.")}</div></article>` : partnerRestrictedSection("Agenda e reservas")}
+        ${hasPartnerPermission("manage_profile") ? partnerRegistrationOverviewCard() : partnerRestrictedSection("Cadastro do parceiro")}
+      </section>`;
+  }
+
+  function partnerAgenda() {
+    const venue = state.venues.find((item) => item.id === state.partnerProfile.venueId);
+    if (!venue) return `${pageHeader("Portal do parceiro", "Agenda", "Agenda indisponível.")}${emptyState("▦","Parceiro sem espaço vinculado.")}`;
+    const backendMode = backendScheduleIsOfficial(venue);
+    state.reservations.filter((reservation) => reservation.venueId === venue.id).forEach((reservation) => syncPartnerReservationFromUser(reservation));
+    const selectedDate = selectedPartnerAgendaDate(venue);
+    const publicEntries = publicAvailabilityEntries(venue)
+      .filter(({day}) => window.MarketplaceAgendaNavigation.dayIso(day) === selectedDate)
+      .sort((a,b) => a.slot.time.localeCompare(b.slot.time) || normalizedSlotSpace(a.slot).localeCompare(normalizedSlotSpace(b.slot)));
+    const selectableEntries = selectableAvailabilityEntries(venue,selectedDate);
+    const selected = selectedAvailabilityKeys().filter(key => selectableEntries.some(entry => entry.key === key));
+    state.ui.selectedAvailabilityKeys = selected;
+    const selectedCount = selected.filter((key) => selectableEntries.some((entry) => entry.key === key)).length;
+    const allSelectableSelected = selectableEntries.length > 0 && selectableEntries.every((entry) => selected.includes(entry.key));
+    const dateStrip = partnerAgendaDateStrip(venue, selectedDate);
+    return `${pageHeader("Portal do parceiro", "Agenda", "Uma única grade controla publicação, reservas e bloqueios do marketplace.", `<button class="button primary" data-action="new-availability">Criar agenda</button>${backendMode ? "" : `<button class="button ghost" data-action="new-partner-reservation">Reserva manual</button>`}`)}
+      ${backendMode ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>Horários com vínculo mensalista ficam destacados na própria grade; todas as informações do vínculo estão no botão Detalhes.</small></div>` : ""}
+      ${partnerInitialImportCard(venue)}
+      <section class="agenda-batch-guide"><strong>Grade única</strong><span>Todas as ações abaixo alteram imediatamente a mesma agenda consultada pelo usuário no marketplace.</span></section>
+      <section class="card"><div class="section-heading agenda-published-heading"><div><h2>Agenda publicada e operacional</h2><p>Escolha o mês, o ano e o dia para consultar os horários publicados.</p></div><div class="agenda-bulk-actions"><label class="agenda-select-all"><input type="checkbox" data-action="toggle-all-availability" ${allSelectableSelected ? "checked" : ""} ${!selectableEntries.length ? "disabled" : ""}><span>Selecionar horários livres deste dia</span></label><button type="button" class="button danger small" data-action="delete-selected-availability" ${selectedCount ? "" : "disabled"}>Excluir selecionados${selectedCount ? ` (${selectedCount})` : ""}</button></div></div>
+        ${dateStrip}
+        <p class="agenda-selected-date" aria-live="polite">${selectedDate?`Horários de ${esc(selectedDate.split("-").reverse().join("/"))}`:`Sem dias publicados em ${esc(window.MarketplaceAgendaNavigation.label(state.ui.partnerAgendaMonth))}`}</p>
+        <div class="public-agenda-list">${publicEntries.map(({day,slot,key}) => {
+          const info = operationalSlotInfo(venue,day,slot);
+          const monthlyLinked=partnerSlotHasMonthlyLink(slot,info.reservation);
+          const occupied = availabilitySelectionProtected(venue,day,slot)||monthlyLinked;
+          const checked = selected.includes(key);
+          const statusText = info.type === "available" ? `${info.statusLabel} · ${money(slot.price)}${slot.monthlyEligible ? ` · Mensalista ${money(slot.monthlyPrice)}` : ""}` : info.type === "blocked" ? `${info.statusLabel} · ${info.title}` : `${info.statusLabel} · ${info.title}`;
+          const compactStatusLabel = slot.backendInitialEntryId ? "Mensalista importado" : monthlyLinked
+            ? `Mensalista · ${info.type==="confirmed"?"confirmado":info.type==="pending"?"pendente":info.type==="blocked"?"bloqueado":"protegido"}`
+            : info.type === "confirmed" ? "Confirmado" : info.type === "pending" ? "Pendente" : info.type === "blocked" ? "Bloqueado" : "Disponível";
+          const detailsButton=`<button class="button ghost small" data-action="schedule-slot-details" data-slot-id="${esc(slot.backendId || "")}" data-full-date="${esc(day.date)}" data-end="${esc(slotEndTime(slot))}" data-date="${esc(day.date)}" data-time="${esc(slot.time)}" data-space="${esc(normalizedSlotSpace(slot))}">${occupied||monthlyLinked?"Detalhes":"Abrir"}</button>`;
+          const operationalActions=occupied
+            ? ""
+            : slot.blocked
+              ? `<button class="button ghost small" data-action="unblock-availability" data-slot-id="${esc(slot.backendId || "")}" data-full-date="${esc(day.date)}" data-end="${esc(slotEndTime(slot))}" data-date="${esc(day.date)}" data-time="${esc(slot.time)}" data-space="${esc(normalizedSlotSpace(slot))}">Desbloquear</button>`
+              : `<button class="button ghost small" data-action="edit-availability" data-slot-id="${esc(slot.backendId || "")}" data-full-date="${esc(day.date)}" data-end="${esc(slotEndTime(slot))}" data-date="${esc(day.date)}" data-time="${esc(slot.time)}" data-space="${esc(normalizedSlotSpace(slot))}">Editar</button><button class="button ghost small" data-action="block-availability" data-slot-id="${esc(slot.backendId || "")}" data-full-date="${esc(day.date)}" data-end="${esc(slotEndTime(slot))}" data-date="${esc(day.date)}" data-time="${esc(slot.time)}" data-space="${esc(normalizedSlotSpace(slot))}">Bloquear</button><button class="button danger small" data-action="delete-availability" data-slot-id="${esc(slot.backendId || "")}" data-full-date="${esc(day.date)}" data-end="${esc(slotEndTime(slot))}" data-date="${esc(day.date)}" data-time="${esc(slot.time)}" data-space="${esc(normalizedSlotSpace(slot))}">Excluir</button>`;
+          const rowClasses=[checked?"selected":"",info.type!=="available"?`agenda-row-${info.type}`:"",monthlyLinked?"agenda-row-monthly":""].filter(Boolean).join(" ");
+          return `<div class="public-agenda-row ${rowClasses}" data-slot-status="${esc(monthlyLinked?"monthly":info.type)}"><label class="agenda-row-check" title="${occupied ? "Horário protegido por reserva ou vínculo mensalista" : "Selecionar horário"}"><input type="checkbox" data-action="toggle-availability-selection" data-key="${esc(key)}" ${checked ? "checked" : ""} ${occupied ? "disabled" : ""}><span></span></label><div><strong>${esc(day.weekday)} · ${esc(day.dayLabel)}</strong><small>${esc(normalizedSlotSpace(slot))}${slot.backendInitialEntryId?" · importação inicial":monthlyLinked?" · vínculo mensalista":occupied?" · reserva ativa":""}</small></div><div><strong>${esc(timeRange(slot.time,slotEndTime(slot)))}</strong>${info.type !== "available"||monthlyLinked ? `<span class="agenda-slot-status agenda-slot-status-${esc(monthlyLinked?"monthly":info.type)}" role="status">${esc(compactStatusLabel)}</span>` : ""}<small>${esc(statusText)}</small></div><div class="item-actions">${detailsButton}${operationalActions}</div></div>`;
+        }).join("") || emptyState("▦", "Nenhum horário criado neste dia.")}</div></section>`;
+  }
+
+  function partnerReservationActions(item, reservation) {
+    const splitAction=reservation?.pixSplit?`<button class="button secondary small" data-action="pix-split-details" data-id="${esc(reservation.id)}">Ver rateio e baixas</button>`:"";
+    const transferUnread=reservation?occurrenceTransferUnreadForReservation(reservation):0;
+    const base = `${chatButtonForPartner(item)}<button class="button ghost small ${transferUnread?"has-unread":""}" data-action="partner-reservation-details" data-id="${esc(item.id)}">${transferUnread?"Ver atualização":"Detalhes"}${messageBadge(transferUnread)}</button>${splitAction}`;
+    if (reservation?.backendOfficial) {
+      const external=canManageBackendFinance()&&reservation.statusKey==="pending"&&reservation.paymentConfigured
+        ?`<button class="button secondary small" data-action="register-external-receipt" data-id="${esc(reservation.id)}">Registrar recebimento externo</button>`:"";
+      if(reservation.monthly)return `${base}${external}`;
+      return `${base}${external}${reservation.statusKey !== "cancelled" ? `<button class="button danger small" data-action="cancel-backend-partner-reservation" data-id="${esc(item.id)}">Cancelar reserva</button>` : ""}`;
+    }
+    if (item.status === "Pendente") return `${base}<button class="button secondary small" data-action="partner-reservation-status" data-id="${esc(item.id)}" data-status="Confirmada">Aceitar</button><button class="button danger small" data-action="partner-reservation-status" data-id="${esc(item.id)}" data-status="Cancelada">Recusar</button>`;
+    if (item.status === "Confirmada" && item.payment === "Pago no cartão") return `${base}<button class="button danger small" data-action="cancel-paid-partner-reservation" data-id="${esc(item.id)}">Cancelar e reembolsar</button>`;
+    return base;
+  }
+
+  function partnerReservationsNewestFirst(items) {
+    const createdAt = (item) => {
+      const timestamp = Date.parse(item.createdAtIso || "");
+      return Number.isFinite(timestamp) ? timestamp : -Infinity;
+    };
+    return [...items].sort((a, b) => createdAt(b) - createdAt(a)
+      || String(b.userReservationId || b.id || "").localeCompare(String(a.userReservationId || a.id || ""), "pt-BR", { numeric:true }));
+  }
+
+  function partnerReservations() {
+    state.reservations.filter((reservation) => reservation.venueId === state.partnerProfile.venueId).forEach((reservation) => syncPartnerReservationFromUser(reservation));
+    const filter = state.filters.partnerReservationStatus;
+    const items = partnerReservationsNewestFirst(state.partnerReservations.filter((item) => filter === "Todos" || item.status === filter));
+    const chatUnreadTotal = totalUnreadForRole("partner");
+    const transferUnreadTotal=occurrenceTransferUnreadForRole("partner");
+    const unreadTotal = chatUnreadTotal+transferUnreadTotal;
+    return `${pageHeader("Portal do parceiro", "Reservas", "Aceite solicitações, acompanhe pagamentos e converse com o usuário após a confirmação financeira.", backendIsOnline() ? "" : `<button class="button primary" data-action="new-partner-reservation">Nova reserva manual</button>`)}
+      ${backendIsOnline() ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>Reservas, rateios e ciclos mensalistas protegidos usam a fonte oficial e notificações individuais na Comunidade.</small></div>` : ""}
+      ${unreadTotal ? `<div class="message-alert-banner" role="status"><span class="message-alert-icon">●</span><div><strong>${esc(unreadTotal)} atualização${unreadTotal === 1 ? " nova" : "ões novas"}</strong><small>${transferUnreadTotal?"Há pedidos, propostas ou devolutivas de remarcação nas reservas destacadas.":"As reservas com conversa pendente estão destacadas abaixo."}</small></div></div>` : ""}
+      <div class="toolbar"><select class="filter-select" id="partnerReservationFilter"><option>Todos</option><option>Pendente</option><option>Confirmada</option><option>Cancelada</option><option>Expirada</option></select><button class="button ghost" data-action="export-partner-reservations">Exportar CSV</button></div>
+      <section class="partner-reservation-list">${items.map((item) => {
+        const reservation = item.userReservationId ? state.reservations.find((entry) => entry.id === item.userReservationId) : null;
+        const unread = reservation ? unreadForReservation(reservation.id,"partner") : 0;
+        const transferUnread=reservation?occurrenceTransferUnreadForReservation(reservation):0;
+        const latestTransferNotification=reservation?latestOccurrenceTransferNotification(reservation):null;
+        const badge = reservationDateBadge(item.date);
+        return `<article data-ui-key="partner-reservation-${esc(item.id)}" class="partner-reservation-card ${unread||transferUnread ? "has-unread" : ""}">
+          <div class="reservation-date"><strong>${esc(badge.day)}</strong><span>${esc(badge.month)}</span></div>
+          <div class="partner-reservation-main">
+            <div class="partner-reservation-heading"><div><h2>${esc(item.client)}</h2><p>${esc(item.space)} · ${esc(timeRange(item.time,item.endTime))}${item.monthly ? ` · Mensalista (${esc(item.occurrenceCount || 0)} datas)` : ""}</p></div><span class="status ${statusClass(item.status)}">${esc(item.status)}</span></div>
+            <div class="partner-reservation-meta"><strong>${esc(item.userReservationId || item.id)}</strong><span>${esc(item.date)}</span><strong>${money(item.value)}</strong><span>${esc(item.payment || "Pagamento não informado")}</span><span>${esc(paymentResponsibilitySummary(reservation || item))}</span></div>
+            ${transferUnread&&latestTransferNotification?`<div class="inline-message-notice occurrence-transfer-notice has-unread"><span class="message-badge">${esc(transferUnread)}</span><div><strong>${esc(latestTransferNotification.title)}</strong><span>${esc(latestTransferNotification.body||"Abra os detalhes para visualizar a solicitação.")}</span></div></div>`:""}
+            ${unread ? `<div class="inline-message-notice"><span class="message-badge">${esc(unread)}</span><strong>${unread === 1 ? "Nova mensagem do usuário" : `${unread} novas mensagens do usuário`}</strong></div>` : ""}
+            <div class="reservation-card-actions">${partnerReservationActions(item, reservation)}</div>
+          </div>
+        </article>`;
+      }).join("") || emptyState("▣", "Nenhuma reserva encontrada neste filtro.")}</section>`;
+  }
+
+  function partnerSpaces() {
+    return `${pageHeader("Portal do parceiro", "Espaços", "Cadastre o tipo de cada quadra ou local, estrutura, capacidade, preço e disponibilidade.", `<button class="button primary" data-action="new-space">Cadastrar espaço</button>`)}
+      ${backendIsOnline() ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Dados sincronizados com o Supabase staging</strong><small>Inclusões e alterações respeitam RLS e aparecem nos demais aparelhos.</small></div>` : ""}
+      <section class="grid two">${state.partnerSpaces.map((space) => `<article class="card"><div class="section-heading"><div><span class="status ${statusClass(space.status)}">${esc(space.status)}</span><h2 style="margin-top:9px">${esc(space.name)}</h2><p>${esc(space.type)} · ${esc(space.floor)}</p></div></div><div class="details-grid"><div class="detail-line"><span>Capacidade</span><strong>${esc(space.capacity || "—")} pessoas</strong></div><div class="detail-line"><span>Preço-base</span><strong>${money(space.price)}</strong></div><div class="detail-line"><span>Mensalista padrão</span><strong>${money(space.monthlyPrice || 0)}</strong></div><div class="detail-line"><span>Iluminação</span><strong>${esc(space.lights)}</strong></div><div class="detail-line"><span>Coberta</span><strong>${esc(space.covered)}</strong></div></div><div class="price-row"><div class="item-actions"><button class="button ghost small" data-action="edit-space" data-id="${esc(space.id)}">Editar</button><button class="button ${space.status === "Ativo" ? "danger" : "secondary"} small" data-action="toggle-space" data-id="${esc(space.id)}">${space.status === "Ativo" ? "Desativar" : "Ativar"}</button></div></div></article>`).join("") || emptyState("◇","Nenhum espaço cadastrado para este estabelecimento.")}</section>`;
+  }
+
+  function partnerClients() {
+    const cards=state.partnerClients.map(client=>`<article class="card partner-client-card"><div class="list-item"><div class="avatar">${initials(client.name)}</div><div class="list-item-main"><strong>${esc(client.name)}</strong><small>${esc(client.contact || "Responsável não informado")}${client.phone ? ` · ${esc(client.phone)}` : ""} · ${esc(client.frequency)}<br>Última reserva: ${esc(client.lastBooking || "—")}</small><span class="status status-neutral">${client.source==="reservation" ? "Cadastro por reserva confirmada" : "Cadastro manual"}</span></div><div class="item-actions"><button class="button ghost small" data-action="client-details" data-id="${esc(client.id)}">Detalhes</button><button class="button ghost small" data-action="edit-client" data-id="${esc(client.id)}">Editar</button></div></div>${client.groupId ? `<details class="partner-client-users"><summary>Usuários que reservaram por este grupo (${client.users.length})</summary><div class="detail-list">${client.users.map(user=>`<div class="detail-line"><span>${esc(user.name)}${user.phone ? `<small>${esc(user.phone)}</small>` : ""}</span><strong>${Number(user.reservation_count || 0)} reserva(s)</strong></div>`).join("") || "<p>Nenhum responsável registrado.</p>"}</div></details>` : ""}</article>`).join("");
+    return `${pageHeader("Portal do parceiro", "Clientes", "Reservas confirmadas cadastram automaticamente o grupo ou a conta. Você também pode cadastrar clientes e complementar as informações.", `<button class="button primary" data-action="new-client">Cadastrar cliente</button>`)}<section class="list partner-client-list">${cards || emptyState("♙","Nenhum cliente cadastrado neste parceiro.")}</section>`;
+  }
+
+  function partnerTeam() {
+    const official=backendIsOnline();
+    const canManage=!official || canManageBackendTeam();
+    const addButton=canManage ? `<button class="button primary" data-action="new-team-member">Adicionar pessoa</button>` : "";
+    return `${pageHeader("Portal do parceiro", "Equipe", "Defina funções e permissões operacionais para cada colaborador.", addButton)}
+      ${official ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>Funções, permissões personalizadas e status usam a equipe oficial, com segurança, auditoria e atualização em tempo real.</small></div>` : ""}
+      <section class="card"><div class="list">${state.partnerTeam.map((member) => `<div class="list-item"><div class="avatar">${initials(member.name)}</div><div class="list-item-main"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${esc(member.email)}<br>Permissões: ${esc(member.permission)}${member.updatedAt ? ` · atualizado em ${esc(member.updatedAt)}` : ""}</small></div><span class="status ${statusClass(member.accessPending && member.active ? "Pendente" : member.status)}">${esc(member.accessPending && member.active ? "Aguardando primeiro acesso" : member.status)}</span>${canManage ? `<div class="item-actions"><button class="button ghost small" data-action="edit-team-member" data-id="${esc(member.id)}">Editar</button><button class="button ${member.status === "Ativo" ? "danger" : "secondary"} small" data-action="toggle-team-member" data-id="${esc(member.id)}">${member.status === "Ativo" ? "Desativar" : "Ativar"}</button></div>` : ""}</div>`).join("") || emptyState("♙", "Nenhuma pessoa encontrada na equipe oficial.")}</div></section>`;
+  }
+
+  function promotionIssuerType(promo) {
+    if (promo?.issuerType) return promo.issuerType;
+    return promotionVenueId(promo) === "all" ? "admin" : "partner";
+  }
+
+  function promotionStatusClass(promo) {
+    return promotionValid(promo) ? "status-ok" : "status-neutral";
+  }
+
+  function promotionBookingLabel(promo) {
+    return promo.bookingMode === "monthly" ? "Mensalista" : promo.bookingMode === "single" ? "Avulsa" : "Avulsa ou mensalista";
+  }
+
+  function promotionCurrentlyInUse(promo) {
+    if (!promo) return false;
+    const selectedNow = Boolean(reservationDialog?.open && voucherSelect?.value === `PROMO:${promo.code}`);
+    const pendingReservation = state.reservations.some((reservation) => reservation.promotionalVoucherId === promo.id && reservation.statusKey === "pending");
+    return selectedNow || pendingReservation;
+  }
+
+  function promotionHasHistory(promo) {
+    return Number(promo?.usedCount || 0) > 0 || state.reservations.some((reservation) => reservation.promotionalVoucherId === promo?.id);
+  }
+
+  function promotionCanBeManagedByCurrentRole(promo) {
+    if (!promo) return false;
+    if (state.role === "admin") return true;
+    return state.role === "partner" && promotionIssuerType(promo) === "partner" && promotionVenueId(promo) === state.partnerProfile.venueId;
+  }
+
+  function promotionCard(promo, management = false) {
+    const valid = promotionValid(promo);
+    const inUse = promotionCurrentlyInUse(promo);
+    return `<article class="card voucher-management-card"><div class="voucher-management-head"><div><span class="status ${promotionStatusClass(promo)}">${valid ? "Ativo" : promo.active ? "Expirado" : "Inativo"}</span><h3>${esc(promo.title)}</h3></div><strong class="voucher-code-large">${esc(promo.code)}</strong></div><div class="detail-list"><div class="detail-line"><span>Desconto</span><strong>${esc(promotionBenefitLabel(promo))}</strong></div><div class="detail-line"><span>Parceiro</span><strong>${esc(promo.venue || "Todos os parceiros")}</strong></div><div class="detail-line"><span>Modalidade</span><strong>${esc(promotionBookingLabel(promo))}</strong></div><div class="detail-line"><span>Reserva mínima</span><strong>${money(promo.minimumReservationValue || 0)}</strong></div><div class="detail-line"><span>Data e horário do jogo</span><strong>${esc(promotionEventLabel(promo))}</strong></div><div class="detail-line"><span>Código válido até</span><strong>${esc(promo.validUntil)}</strong></div><div class="detail-line"><span>Utilizações</span><strong>${Number(promo.usedCount || 0)}</strong></div><div class="detail-line"><span>Criado por</span><strong>${esc(promo.issuerName || (promotionIssuerType(promo) === "partner" ? promo.venue : "Tâmo On"))}</strong></div></div>${management ? `<div class="reservation-card-actions"><button class="button ghost small" data-action="toggle-promotion" data-id="${esc(promo.id)}">${promo.active ? "Desativar" : "Ativar"}</button><button class="button danger small" data-action="delete-promotion" data-id="${esc(promo.id)}" ${inUse ? "disabled" : ""}>${inUse ? "Em uso" : "Excluir"}</button></div>` : ""}</article>`;
+  }
+
+  function partnerCancellationVouchers() {
+    const vouchers=state.cancellationVouchers.filter(voucher=>voucher.venueId===state.partnerProfile.venueId);
+    const used=vouchers.filter(window.MarketplacePartnerOperations.voucherUsed),available=vouchers.filter(v=>!window.MarketplacePartnerOperations.voucherUsed(v));
+    const card=(voucher)=>`<article class="card voucher-card"><div class="section-heading"><div><span class="status ${["active", "active_extended"].includes(voucher.status) ? "status-ok" : "status-neutral"}">${esc(voucherStatusLabel(voucher))}</span><h3>${esc(voucher.code)}</h3></div><strong class="voucher-value">${money(voucher.value)}</strong></div><div class="detail-list"><div class="detail-line"><span>Reserva de origem</span><strong>${esc(voucher.sourceReservationId || "—")}</strong></div><div class="detail-line"><span>Validade atual</span><strong>${esc(voucher.expiresAt)}</strong></div><div class="detail-line"><span>Faixa de referência da oferta do parceiro</span><strong>${esc(voucher.compatibilityWindow || "—")} · ${esc(voucher.originalPeriod || "—")}</strong></div><div class="detail-line"><span>Datas ofertadas nessa faixa</span><strong>${esc(voucher.compatibleDatesCount || 0)} de ${esc(voucher.minimumCompatibleDates || state.settings.voucherMinimumCompatibleDates)}</strong></div>${voucher.extensionReason ? `<div class="detail-line"><span>Prorrogação</span><strong>${esc(voucher.extensionReason)}</strong></div>` : ""}</div></article>`;
+    return `<section class="section"><div class="section-heading"><div><h2>Créditos de cancelamento</h2><p>A faixa de referência avalia sua oferta de datas e a prorrogação da validade. O usuário pode escolher qualquer horário disponível. Esses créditos são uma obrigação de atendimento futuro; não retêm novamente o pagamento original.</p></div></div><div class="grid two">${available.map(card).join("") || emptyState("V","Nenhum crédito pendente de utilização.")}</div>${used.length ? `<details class="card section voucher-history"><summary>Vouchers utilizados (${used.length})</summary><div class="grid two">${used.map(card).join("")}</div></details>` : ""}</section>`;
+  }
+
+  function partnerVouchers() {
+    const venueId = state.partnerProfile.venueId;
+    const items = state.promotions.filter((promo) => promotionVenueId(promo) === venueId && promotionIssuerType(promo) === "partner" && !promo.deleted);
+    const history = state.promotions.filter((promo) => promotionVenueId(promo) === venueId && promotionIssuerType(promo) === "partner" && promo.deleted && promotionHasHistory(promo));
+    const used=items.filter(window.MarketplacePartnerOperations.promotionUsed),available=items.filter(p=>!window.MarketplacePartnerOperations.promotionUsed(p));
+    return `${pageHeader("Portal do parceiro", "Vouchers", "Crie descontos promocionais válidos apenas para reservas do seu espaço.", `<button class="button primary" data-action="create-partner-promotion">Criar voucher</button>`)}${backendIsOnline() ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>Criação, ativação, exclusão, utilização e histórico respeitam as permissões financeiras do parceiro.</small></div>` : ""}<section class="grid two">${available.map((promo) => promotionCard(promo, true)).join("") || emptyState("%", "Nenhum voucher promocional criado pelo parceiro.")}</section>${used.length ? `<details class="card section voucher-history"><summary>Vouchers promocionais utilizados (${used.length})</summary><div class="grid two">${used.map(p=>promotionCard(p,false)).join("")}</div></details>` : ""}${history.length ? `<details class="card section voucher-history"><summary>Histórico de vouchers excluídos (${history.length})</summary><p>Vouchers excluídos que já possuem utilização permanecem para auditoria.</p><div class="detail-list">${history.map((promo)=>`<div class="detail-line"><span>${esc(promo.code)} · ${esc(promo.title)}</span><strong>${Number(promo.usedCount||0)} utilização(ões) · excluído em ${esc(promo.deletedAt||"—")}</strong></div>`).join("")}</div></details>` : ""}<div class="callout section"><strong>Aplicação no checkout</strong><p>O desconto é calculado automaticamente quando o usuário seleciona o voucher em uma reserva elegível. O valor a pagar, o rateio Pix e o cartão Asaas passam a considerar o valor já descontado.</p></div>${partnerCancellationVouchers()}`;
+  }
+
+  function adminVouchers() {
+    const activeItems = state.promotions.filter((promo) => !promo.deleted);
+    const history = state.promotions.filter((promo) => promo.deleted && promotionHasHistory(promo));
+    return `${pageHeader("Administração", "Vouchers", "Crie vouchers globais ou vinculados a um parceiro e acompanhe as regras promocionais.", `<button class="button primary" data-action="create-admin-promotion">Criar voucher</button>`)}${backendIsOnline() ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>Promoções, créditos, responsáveis de pagamento e histórico financeiro usam a fonte oficial.</small></div>` : ""}<section class="grid two">${activeItems.map((promo) => promotionCard(promo, true)).join("") || emptyState("%", "Nenhum voucher promocional cadastrado.")}</section>${history.length ? `<section class="card section"><div class="section-heading"><div><h2>Histórico de vouchers excluídos</h2><p>Registros com utilização são preservados para reservas, financeiro e auditoria.</p></div></div><div class="table-wrap" style="border:0"><table><thead><tr><th>Código</th><th>Parceiro</th><th>Utilizações</th><th>Última utilização</th><th>Excluído em</th></tr></thead><tbody>${history.map((promo)=>`<tr><td>${esc(promo.code)}</td><td>${esc(promo.venue||"Todos")}</td><td>${Number(promo.usedCount||0)}</td><td>${esc(promo.lastUsedAt||"—")}</td><td>${esc(promo.deletedAt||"—")}</td></tr>`).join("")}</tbody></table></div></section>` : ""}`;
+  }
+
+  function roundFinancial(value) {
+    return Math.round((Number(value||0)+Number.EPSILON)*100)/100;
+  }
+
+  function localFinancialReconciliation() {
+    const venues=new Map(state.venues.map((venue)=>[venue.id,venue]));
+    const groups=new Map();
+    state.reservations.filter((reservation)=>Number(reservation.accountingRecognizedValue||0)>0).forEach((reservation)=>{
+      const venue=venues.get(reservation.venueId);
+      const adminPartner=state.adminPartners.find((partner)=>partner.venueId===reservation.venueId);
+      const partnerId=venue?.backendPartnerId||adminPartner?.backendPartnerId||adminPartner?.id||reservation.venueId;
+      if(!groups.has(partnerId))groups.set(partnerId,{partnerId,venueId:reservation.venueId,partnerName:reservation.venue||venue?.name||"Parceiro",recognizedReservations:0,grossValue:0,voucherDiscount:0,commissionBase:0,commissionRate:Number(adminPartner?.commission||state.settings.defaultCommission||0),asaasProcessed:0,externalReceived:0,asaasPixCount:0,asaasCardCount:0,asaasFeeEstimated:0});
+      const row=groups.get(partnerId);
+      const net=Number(reservation.accountingRecognizedValue||0);
+      const provider=String(reservation.paymentProvider||"").toUpperCase();
+      const throughAsaas=provider==="ASAAS"||reservation.paymentMethod==="credit_card_asaas";
+      const card=throughAsaas&&reservation.paymentMethod==="credit_card_asaas";
+      row.recognizedReservations+=1;
+      row.grossValue+=Number(reservation.value||net);
+      row.voucherDiscount+=Number(reservation.voucherAppliedValue||0);
+      row.commissionBase+=net;
+      if(throughAsaas){
+        row.asaasProcessed+=net;
+        if(card){
+          row.asaasCardCount+=1;
+          row.asaasFeeEstimated+=Number(state.settings.asaasCardFixedFee||0)+net*Number(state.settings.asaasCardPercentageFee||0)/100;
+        }else{
+          row.asaasPixCount+=1;
+          row.asaasFeeEstimated+=Number(state.settings.asaasPixFixedFee||0);
+        }
+      }else row.externalReceived+=net;
+    });
+    return [...groups.values()].map((row)=>{
+      const commissionTotal=roundFinancial(row.commissionBase*row.commissionRate/100);
+      const available=Math.max(0,roundFinancial(row.asaasProcessed-row.asaasFeeEstimated));
+      const commissionRetained=Math.min(commissionTotal,available);
+      return {...row,grossValue:roundFinancial(row.grossValue),voucherDiscount:roundFinancial(row.voucherDiscount),commissionBase:roundFinancial(row.commissionBase),asaasProcessed:roundFinancial(row.asaasProcessed),externalReceived:roundFinancial(row.externalReceived),asaasFeeEstimated:roundFinancial(row.asaasFeeEstimated),commissionTotal,commissionRetained:roundFinancial(commissionRetained),commissionPending:roundFinancial(Math.max(0,commissionTotal-commissionRetained)),asaasPartnerPayout:roundFinancial(Math.max(0,available-commissionTotal)),backendOfficial:false};
+    });
+  }
+
+  function financialReconciliationRows() {
+    if(typeof backendIsOnline==="function"&&backendIsOnline()) return state.financialReconciliation||[];
+    return Array.isArray(state.financialReconciliation)&&state.financialReconciliation.length
+      ? state.financialReconciliation
+      : localFinancialReconciliation();
+  }
+
+  function combinedFinancialSummary(rows=financialReconciliationRows()) {
+    const fields=["recognizedReservations", "grossValue", "voucherDiscount", "commissionBase", "asaasProcessed", "externalReceived", "asaasPixCount", "asaasCardCount", "asaasFeeEstimated", "commissionTotal", "commissionRetained", "commissionPending", "asaasPartnerPayout", "contractedValue", "finalDueValue", "cancelledValue", "receivedTotal", "receivedNet", "refundCompleted", "refundPending", "balancePending", "liquidatedValue", "unliquidatedValue", "asaasPixValue", "asaasCardValue", "asaasBlocked", "blockedRefund", "asaasBlockedRefund", "blockedResolution", "asaasBlockedResolution", "blockedExcess", "asaasBlockedExcess", "blockedPartial", "asaasBlockedPartial", "blockedReview", "asaasBlockedReview", "asaasAwaitingCredit", "asaasFeeTotal", "commissionProvisional", "partnerPaid", "commissionSettled"];
+    const total=Object.fromEntries(fields.map((key)=>[key,0]));
+    for(const row of rows)for(const key of fields)total[key]=roundFinancial(total[key]+Number(row[key]||0));
+    return total;
+  }
+
+  function currentPartnerFinancialSummary() {
+    const rows=financialReconciliationRows();
+    const partnerId=state.partnerProfile.backendPartnerId;
+    const exact=rows.find((row)=>partnerId&&row.partnerId===partnerId)
+      ||(state.partnerProfile.venueId?rows.find((row)=>row.venueId===state.partnerProfile.venueId):null);
+    return exact||{partnerId:partnerId||state.partnerProfile.venueId,partnerName:state.partnerProfile.tradeName,recognizedReservations:0,grossValue:0,voucherDiscount:0,commissionBase:0,commissionRate:Number(state.partnerProfile.commissionRate||state.settings.defaultCommission||0),asaasProcessed:0,externalReceived:0,asaasPixCount:0,asaasCardCount:0,asaasFeeEstimated:0,commissionTotal:0,commissionRetained:0,commissionPending:0,asaasPartnerPayout:0};
+  }
+
+  function financialStatusLabel(status, summary = null, reservation = null) {
+    // A confirmed voucher settlement has no new cash receipt. Keep server amounts
+    // and exceptional financial states intact; only clarify this display label.
+    if (status === "awaiting_payment" && summary?.reservation_id && summary.financial_closed === false) {
+      const official = reservation || state.reservations.find(item => item.backendId === summary.reservation_id);
+      // The financial directory omits these two fields; reconciliation snapshots
+      // include them. Use the same official reservation for the directory case.
+      const gross = Object.hasOwn(summary, "gross_value") ? summary.gross_value : official?.value;
+      const voucher = Object.hasOwn(summary, "voucher_discount") ? summary.voucher_discount : official?.voucherAppliedValue;
+      const values = [gross, voucher, summary.contracted_value,
+        summary.final_due_value, summary.balance_pending, summary.received_total, summary.received_net];
+      const complete = values.every(value => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)));
+      if (complete && official?.backendOfficial === true && official.backendId === summary.reservation_id
+        && official.backendStatus === "confirmed" && Number(gross) > 0
+        && Number(voucher) >= Number(gross)
+        && values.slice(2).every(value => Number(value) === 0)) return "Quitada por voucher";
+    }
+    return ({refunded:"Restituído",awaiting_payment:"Aguardando pagamento",blocked:"Recebido e bloqueado",partial_liquidated:"Parcial liquidado",liquidated:"Liquidado",closed:"Encerrado",refund_pending:"Restituição pendente",resolution_pending:"Aguardando resolução",excess_received:"Recebimento excedente a conferir",payment_review:"Recebimento em conferência"})[status]||"Em conciliação";
+  }
+
+  function financeDisclosure(id,title,description,body) {
+    return `<details class="finance-disclosure" data-finance-detail="${esc(id)}"><summary><span><strong>${esc(title)}</strong>${description?`<small>${esc(description)}</small>`:""}</span><span class="finance-chevron" aria-hidden="true">⌄</span></summary><div class="finance-disclosure-body">${body}</div></details>`;
+  }
+
+  function financeScreenIdentity() {
+    return JSON.stringify([backendRuntime.identityId||null,state.role,backendRuntime.bootstrap?.preview?.partner_id||null]);
+  }
+
+  function financeStableMarkup(markup) {
+    // Movement content has its own renderer and must not invalidate the rest of the page.
+    return markup.replace('<div id="financeMovementsHost">'+financialPeriodPanel()+'</div>','<div id="financeMovementsHost"></div>');
+  }
+
+  function captureFinanceScreen(root) {
+    if(!root)return null;
+    const active=document.activeElement;
+    return {identity:root.dataset.financeIdentity,x:window.scrollX,y:window.scrollY,height:root.getBoundingClientRect().height,
+      open:[...root.querySelectorAll('details[data-finance-detail][open]')].map(item=>item.dataset.financeDetail),
+      focus:root.contains(active)?{id:active.id,action:active.dataset.action,reservationId:active.dataset.reservationId,tab:active.dataset.tab,detail:active.closest('details')?.dataset.financeDetail}:null};
+  }
+
+  function restoreFinanceScreen(root,previous) {
+    if(!root||!previous||root.dataset.financeIdentity!==previous.identity)return;
+    root.querySelectorAll('details[data-finance-detail]').forEach(item=>{item.open=previous.open.includes(item.dataset.financeDetail);});
+    const focus=previous.focus;
+    const target=focus?.id?root.querySelector('#'+CSS.escape(focus.id)):focus?.action?[...root.querySelectorAll('[data-action]')].find(item=>item.dataset.action===focus.action&&item.dataset.reservationId===focus.reservationId&&item.dataset.tab===focus.tab):focus?.detail?[...root.querySelectorAll('details')].find(item=>item.dataset.financeDetail===focus.detail)?.querySelector('summary'):null;
+    target?.focus({preventScroll:true});
+    window.scrollTo({left:previous.x,top:previous.y,behavior:"instant"});
+  }
+
+  function refreshFinancialPeriodPanel() {
+    const host=document.getElementById("financeMovementsHost");
+    if(!host||state.activePage?.[state.role]!=="finance")return;
+    const markup=financialPeriodPanel();
+    if(host.financeMarkup===markup)return;
+    const root=host.closest('.finance-page'),previous=captureFinanceScreen(root);
+    const height=root.getBoundingClientRect().height;
+    root.style.minHeight=height+'px';
+    host.innerHTML=markup;host.financeMarkup=markup;
+    restoreFinanceScreen(root,previous);
+    root.style.minHeight='';
+  }
+
+  function financePeriodSelection() {
+    const stored=state.filters[state.role==="admin"?"adminFinanceMonth":"partnerFinanceMonth"];
+    return stored==="all"||window.MarketplaceFinancePeriod.validMonth(stored)?stored:window.MarketplaceFinancePeriod.currentMonth();
+  }
+  function financePeriodPartner() {
+    return state.role==="partner"?state.partnerProfile.backendPartnerId:(state.filters.adminFinancePartner&&state.filters.adminFinancePartner!=="Todos"?state.filters.adminFinancePartner:null);
+  }
+  function financePeriodKey() {
+    return JSON.stringify([window.MarketplaceBackend?.session?.user?.id||null,state.role,backendRuntime.bootstrap?.preview?.partner_id||null,financePeriodPartner(),financePeriodSelection()]);
+  }
+  async function loadFinancialPeriod(revalidate = false) {
+    const key=financePeriodKey();
+    if((financialPeriodRuntime.key===key&&!revalidate)||financialPeriodRuntime.loadingKey===key)return;
+    const sequence=++financialPeriodRuntime.sequence;
+    financialPeriodRuntime.loadingKey=key;
+    if(financialPeriodRuntime.key!==key)financialPeriodRuntime.data=null;
+    financialPeriodRuntime.error="";
+    try {
+      if(!backendIsOnline())throw Error("Conecte-se ao ambiente oficial para consultar movimentos por mês.");
+      if(state.role==="partner"&&!financePeriodPartner())throw Error("Parceiro não identificado.");
+      const period=financePeriodSelection();
+      const data=await window.MarketplaceBackend.rpc("marketplace_financial_receipts",{p_month:period==="all"?null:period,p_partner_id:financePeriodPartner()});
+      if(sequence!==financialPeriodRuntime.sequence||key!==financePeriodKey())return;
+      if(!data||data.basis!=="payment_date"||!Array.isArray(data.receipts)||!Array.isArray(data.rows)||!Array.isArray(data.entries))throw Error("Resposta financeira incompleta.");
+      financialPeriodRuntime.data=data;financialPeriodRuntime.key=key;
+    } catch(error) {
+      if(sequence!==financialPeriodRuntime.sequence||key!==financePeriodKey())return;
+      financialPeriodRuntime.key=key;financialPeriodRuntime.data=null;financialPeriodRuntime.error=backendErrorMessage(error);
+    } finally {
+      if(sequence===financialPeriodRuntime.sequence){financialPeriodRuntime.loadingKey="";refreshFinancialPeriodPanel();}
+    }
+  }
+  function changeFinancePeriod(value) {
+    if(value!=="all"&&!window.MarketplaceFinancePeriod.validMonth(value)){showToast("Selecione um mês válido.");return;}
+    if(value===financePeriodSelection()&&!financialPeriodRuntime.error)return;
+    state.filters[state.role==="admin"?"adminFinanceMonth":"partnerFinanceMonth"]=value;
+    financialPeriodRuntime={key:"",loadingKey:"",data:null,error:"",sequence:financialPeriodRuntime.sequence+1};
+    saveState();render();
+  }
+  function financePeriodToolbar() {
+    const period=financePeriodSelection(),monthly=period!=="all";
+    return `<div class="toolbar finance-period-toolbar" aria-label="Período financeiro"><label class="field"><span>Período</span><select id="financePeriodMode"><option value="month" ${monthly?"selected":""}>Por mês</option><option value="all" ${monthly?"":"selected"}>Todo o período</option></select></label><label class="field"><span>Mês e ano</span><input id="financeMonth" type="month" min="2000-01" max="2199-12" value="${monthly?period:window.MarketplaceFinancePeriod.currentMonth()}" ${monthly?"":"disabled"}></label><div class="item-actions"><button class="button ghost small" data-action="finance-period-prev" ${monthly?"":"disabled"} aria-label="Mês anterior">‹</button><button class="button secondary small" data-action="finance-period-today">Mês atual</button><button class="button ghost small" data-action="finance-period-next" ${monthly?"":"disabled"} aria-label="Próximo mês">›</button><button class="button ghost small" data-action="export-finance-movements">Exportar pagamentos</button></div></div>`;
+  }
+  function adminCommissionHighlight(amount,period=false) {
+    if(state.role!=="admin")return "";
+    return `<section class="finance-commission-result ${Number(amount)<0?"is-negative":""}" aria-label="Comissão Tâmo On"><span>Comissão Tâmo On</span><strong>${money(amount)}</strong><small>${period?"Reconhecida no período selecionado, incluindo ajustes.":"Reconhecida sobre os valores liquidados dos parceiros selecionados."}</small><small>Comissão provisória fica nos detalhes. O valor reconhecido não significa transferência já recebida.</small></section>`;
+  }
+
+  function financialCurrentPosition(finance) {
+    return financeDisclosure("current-position","Posição atual · todos os meses","Estes valores não representam o fechamento do mês selecionado.",financialTotalsPanel(finance));
+  }
+
+  function financialPaymentPayerName(receipt) {
+    const bootstrap=backendRuntime.bootstrap;
+    const payment=(bootstrap?.payments||[]).find(row=>row.id===receipt.payment_id&&row.reservation_id===receipt.reservation_id);
+    const participantId=payment?.participant_id||payment?.metadata?.participant_id;
+    if(!participantId)return "";
+    const participant=(bootstrap?.reservation_participants||[]).find(row=>row.id===participantId&&row.reservation_id===receipt.reservation_id);
+    if(!participant)return "";
+    const reservation=state.reservations.find(row=>row.backendId===receipt.reservation_id);
+    return reservation?.paymentParticipants?.find(row=>row.id===participant.id)?.name
+      ||(bootstrap?.monthly_reservation_split_directory||[]).find(row=>row.reservation_id===receipt.reservation_id&&row.profile_id===participant.profile_id)?.display_name
+      ||(bootstrap?.group_member_directory||[]).find(row=>row.profile_id===participant.profile_id)?.display_name
+      ||(participant.profile_id===backendRuntime.identityId?bootstrap?.profile?.display_name:"")||"";
+  }
+
+  function financialPeriodPanel() {
+    const all=financePeriodSelection()==="all";
+    if(financialPeriodRuntime.key!==financePeriodKey()){
+      queueMicrotask(()=>loadFinancialPeriod());
+      return `<section class="finance-loading ${all?"":"is-monthly"}" role="status" aria-live="polite"><span>Carregando pagamentos do período…</span></section>`;
+    }
+    if(financialPeriodRuntime.error)return `<section class="card section finance-loading ${all?"":"is-monthly"}" role="alert"><strong>Consulta mensal indisponível</strong><p>${esc(financialPeriodRuntime.error)}</p><button class="button ghost small" data-action="finance-period-retry">Tentar novamente</button></section>`;
+    const data=financialPeriodRuntime.data,helper=window.MarketplaceFinancePeriod,t=helper.total(data.rows);
+    if(state.role==="partner"||state.role==="admin") {
+      const admin=state.role==="admin",rows=admin?adminFinancialRows():[];
+      const finance=admin?{...combinedFinancialSummary(rows),partnerId:financePeriodPartner(),
+        reservationBreakdown:rows.flatMap(row=>(row.reservationBreakdown||[]).map(item=>({...item,partner_id:row.partnerId,partner_name:row.partnerName})))}:currentPartnerFinancialSummary();
+      const tab=state.ui?.[admin?"adminFinanceTab":"partnerFinanceTab"]||"reservations";
+      return window.PartnerFinanceView.render({finance,data,period:financePeriodSelection(),position:helper.position(finance),
+        tab,reservations:state.reservations,admin,
+        adminHistory:admin&&tab==="returns"?adminFinancialHistory():"",
+        adminPartners:admin&&tab==="payouts"?adminFinancialPartnerTable(rows):"",
+        helpers:{esc,money,periodLabel:helper.label,dateLabel:helper.dateLabel,evidenceLabel:helper.evidenceLabel,
+          kindLabel:helper.kindLabel,channelLabel:helper.channelLabel,holds:helper.holds,statusLabel:financialStatusLabel,payerName:financialPaymentPayerName,
+          refundAction:asaasRefundButton,feeReference:`Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%`}});
+    }
+    const columns=[['received_total','Recebido bruto'],['refund_completed','Devolvido'],['asaas_pix_value','Pix'],['asaas_card_value','Cartão'],['external_received','Externo'],['asaas_fee_total','Tarifas'],['liquidated_value','Liquidado'],['commission_total','Comissão'],['partner_paid','Créditos ao parceiro após devoluções'],['commission_settled','Comissão transferida']];
+    const groups=helper.reservationGroups(data.entries);
+    const snapshots=new Map((state.financialReconciliation||[]).flatMap(row=>(row.reservationBreakdown||[]).map(item=>[
+      JSON.stringify([row.partnerId,item.reservation_id]),item
+    ])));
+    const transactionTable=`<section class="card section"><h2>Reservas com movimentos no período</h2><p>${groups.length} reserva(s) · ${data.entries.length} movimento(s). Abra uma reserva para consultar seus lançamentos.${groups.length>100?' Exibindo as 100 reservas com movimentos mais recentes; a exportação contém todos os movimentos.':''}</p><p class="field-help">O valor contratado após vouchers e a situação são atuais. Os lançamentos abaixo respeitam o período selecionado.</p>${groups.slice(0,100).map(group=>{
+      const snapshot=snapshots.get(JSON.stringify([group.partnerId,group.reservationId]));
+      const value=snapshot?.contracted_value;
+      const summary=[group.partnerName,`${group.entries.length} movimento(s)`,value!=null?`Contratado após vouchers: ${money(value)}`:'Valor da reserva não disponível',snapshot?`Situação atual: ${financialStatusLabel(snapshot.financial_status,snapshot)}`:'Situação atual não disponível'].filter(Boolean).join(' · ');
+      const table=`<div class="table-wrap"><table class="finance-transaction-table"><thead><tr><th>Data</th><th>Movimento</th><th>Canal</th><th>Valor</th></tr></thead><tbody>${group.entries.map(e=>`<tr><td>${esc(helper.dateLabel(e))}<small class="field-help">${esc(helper.evidenceLabel(e))}</small></td><td>${esc(helper.kindLabel(e.kind))}<small class="field-help">${esc(e.description)}</small></td><td>${esc(helper.channelLabel(e.channel))}</td><td>${money(e.amount)}</td></tr>`).join('')}</tbody></table></div>`;
+      return financeDisclosure(`transaction-reservation:${group.key}`,group.reservationCode||'Reserva sem código',summary,table);
+    }).join('')||'<p>Nenhum movimento neste período.</p>'}</section>`;
+    const partnerTable=`<div class="table-wrap"><table><thead><tr><th>Parceiro</th>${columns.map(([,label])=>`<th>${label}</th>`).join('')}</tr></thead><tbody>${data.rows.map(row=>`<tr><td>${esc(row.partner_name)}</td>${columns.map(([key])=>`<td>${money(row[key])}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="11">Nenhum parceiro disponível.</td></tr>'}</tbody></table></div>`;
+    const history=`<p>Pagamentos e devoluções pela data registrada; liquidação e comissão pelo reconhecimento financeiro. Horário de Brasília. Ajustes podem aparecer negativos.</p>${data.legacy_recognition_count?`<p>Histórico importado: ${money(t.liquidated_legacy)} em liquidação e ${money(t.commission_legacy)} em comissão. Essas datas representam registros contábeis antigos e não comprovam a data real da liquidação. Os valores importados já estão incluídos nos totais.</p>`:''}${data.legacy_count?'<p>Há registros anteriores à organização mensal agrupados pela data disponível.</p>':''}`;
+    const details=financeDisclosure("transactions","Transações do período",`${data.entries.length} movimento(s) · exportação completa disponível`,transactionTable+history)
+      +(state.role==="admin"&&data.rows.length>1?financeDisclosure("period-partners","Movimentos por parceiro","Valores do período selecionado",partnerTable):"");
+    if(all)return details;
+    return `${adminCommissionHighlight(t.commission_total,true)}<section class="finance-monthly"><h2>Movimentos · ${esc(helper.label(financePeriodSelection()))}</h2><div class="finance-kpis">${stat(money(t.received_total),"Recebido bruto","no período selecionado")}${stat(money(t.refund_completed),"Devolvido","restituições realizadas no período")}${stat(money(t.received_net),"Recebido menos devoluções","antes dos descontos e bloqueios")}</div><div class="finance-channels">${stat(money(t.asaas_pix_value+t.asaas_card_value),"Instituição financeira",`Pix ${money(t.asaas_pix_value)} · Cartão ${money(t.asaas_card_value)}`)}${stat(money(t.external_received),"Direto ao parceiro","recebimentos externos do período")}</div><div class="card finance-month-details"><h2>Liquidação e repasses do período</h2><dl class="finance-line-list"><div><dt>Valor liquidado</dt><dd>${money(t.liquidated_value)}</dd></div><div><dt>Comissão Tâmo On</dt><dd>${money(t.commission_total)}</dd></div><div><dt>Tarifas e ajustes</dt><dd>${money(t.asaas_fee_total)}</dd></div><div><dt>Créditos ao parceiro após devoluções</dt><dd>${money(t.partner_paid)}</dd></div></dl><p class="field-help">Recebimentos, liquidação e repasses podem ocorrer em meses diferentes. O líquido acumulado está em “Posição atual”, abaixo.</p></div>${details}</section>`;
+  }
+
+  function exportFinancialPeriod(movements=false) {
+    if(financialPeriodRuntime.key!==financePeriodKey()||!financialPeriodRuntime.data||financialPeriodRuntime.error){showToast("Aguarde a consulta financeira do período.");return;}
+    const period=financePeriodSelection(),data=financialPeriodRuntime.data;
+    const rows=window.PartnerFinanceView.receiptCsv(data);
+    exportCsv(`pagamentos-${period}-${financePeriodPartner()||'consolidado'}.csv`,rows);
+  }
+
+  async function exportReservationPaymentConference(button) {
+    if(!["partner","admin"].includes(state.role)||button.disabled)return;
+    const reservationId=button.dataset.reservationId,partnerId=financePeriodPartner();
+    if(!reservationId||(state.role==="partner"&&!partnerId))return;
+    const context=financePeriodKey(),identity=financeScreenIdentity();
+    const current=()=>context===financePeriodKey()&&identity===financeScreenIdentity()&&state.activePage?.[state.role]==="finance";
+    button.disabled=true;button.setAttribute?.("aria-busy","true");
+    try{
+      // All months of this reservation, using the same official values as the
+      // finance screen. Audit records supply identifiers, never extra revenue.
+      const [data,audit]=await Promise.all([
+        window.MarketplaceBackend.rpc("marketplace_financial_receipts",{p_month:null,p_partner_id:partnerId}),
+        window.MarketplaceBackend.rpc("reservation_payment_audit",{p_reservation_id:reservationId})
+      ]);
+      if(!current())return;
+      const rows=window.PartnerFinanceView.reservationCsv(data,audit,reservationId,financialPaymentPayerName,partnerId);
+      exportCsv(`conferencia-${audit.reservation.reservation_code}.csv`,rows);
+    }catch(error){if(current())showToast(backendErrorMessage(error));}
+    finally{button.disabled=false;button.removeAttribute?.("aria-busy");}
+  }
+
+  function financialHoldComposition(finance) {
+    const raw={};for(const [key] of window.MarketplaceFinancePeriod.holdTypes){const tail=key[0].toUpperCase()+key.slice(1);raw['blocked_'+key]=finance['blocked'+tail];raw['asaas_blocked_'+key]=finance['asaasBlocked'+tail];}
+    const items=window.MarketplaceFinancePeriod.holds(raw);if(!items.length)return '';
+    return `<section class="card section"><h2>Composição dos valores bloqueados</h2><p>Valores já incluídos nos recebimentos. Excedentes aguardam conferência e não geram comissão nem repasse automático.</p><div class="table-wrap"><table><thead><tr><th>Motivo</th><th>Total</th><th>Retido no Asaas</th><th>Com o parceiro</th></tr></thead><tbody>${items.map(h=>`<tr><td>${esc(h.label)}</td><td>${money(h.amount)}</td><td>${money(raw['asaas_blocked_'+h.key]||0)}</td><td>${money(Math.max(0,h.amount-Number(raw['asaas_blocked_'+h.key]||0)))}</td></tr>`).join('')}</tbody></table></div></section>`;
+  }
+
+  function financialTotalsPanel(finance) {
+    const view=window.MarketplaceFinancePeriod.position(finance);
+    const line=(label,value,kind="")=>`<div class="${kind}"><dt>${esc(label)}</dt><dd>${money(value)}</dd></div>`;
+    const outside=view.outsideContract!==0?`<span>${view.outsideContract>0?"−":"+"} ${money(Math.abs(view.outsideContract))} ${view.outsideContract>0?"fora do contrato vigente":"ajuste do contratado"}</span>`:"";
+    const history=`<dl class="finance-line-list">${line("Contratado original",finance.contractedValue||0)}${line("Encerrado ou cancelado",finance.cancelledValue||0)}${line("Valor contratado vigente",view.contracted)}${line("Devoluções concluídas",view.returned)}${line("Restituições pendentes",finance.refundPending||0)}</dl><p class="field-help">O contratado vigente já considera os descontos aplicados e exclui obrigações encerradas ou canceladas. Recebimentos para restituição ou excedentes permanecem no histórico, sem aumentar esse contrato.</p>`;
+    const feeNote=Number(finance.asaasFeeEstimated||0)!==0?`Inclui ${money(finance.asaasFeeEstimated)} em tarifas estimadas.`:"Tarifas registradas na conciliação.";
+    const rules=`<p>A comissão incide uma única vez sobre o valor liquidado após vouchers. Recebimento externo não gera novo repasse.</p><dl class="finance-line-list">${line("Liquidado",view.liquidated)}${line("Comissão provisória — ainda não descontada",finance.commissionProvisional||0)}${line("Comissão com saldo elegível para retenção",finance.commissionRetained||0)}${line("Comissão transferida",finance.commissionSettled||0)}${line("Comissão a quitar pelo parceiro",finance.commissionPending||0)}${line("Crédito da instituição ainda não disponível ou comprovado",finance.asaasAwaitingCredit||0)}</dl><p class="field-help">${esc(feeNote)} Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%.</p>`;
+    return `${adminCommissionHighlight(view.commission)}<section class="finance-kpis" aria-label="Resumo financeiro">
+      ${stat(money(view.contracted),"Valor contratado","obrigações vigentes")}
+      ${stat(money(view.received),"Recebido bruto","antes de devoluções e descontos")}
+      ${stat(money(view.pending),"Pendente de pagamento","Parte do valor contratado ainda não paga")}
+    </section><p class="finance-contract-check"><span>${money(view.receivedNet)} recebido após devoluções</span>${outside}<span>+ ${money(view.pending)} pendente de pagamento</span><strong>= ${money(view.contracted)} contratado</strong></p>
+    <section class="finance-channels" aria-label="Origem do recebido bruto">
+      ${stat(money(finance.asaasProcessed||0),"Instituição financeira",`Pix ${money(finance.asaasPixValue||0)} · Cartão ${money(finance.asaasCardValue||0)}`)}
+      ${stat(money(finance.externalReceived||0),"Direto ao parceiro","recebido externamente")}
+    </section>${view.channelDifference!==0?`<p class="finance-alert" role="status">${money(view.channelDifference)} de diferença entre recebimentos e canais. Consulte as transações.</p>`:""}
+    <section class="card finance-net-card"><div class="section-heading"><h2>Do recebido ao líquido</h2></div><div class="finance-net-layout"><dl class="finance-line-list">
+      ${line("Recebido bruto",view.received)}${view.returned!==0?line("− Devoluções concluídas",view.returned):""}
+      ${line("− Valores bloqueados",view.blocked)}${line("− Comissão Tâmo On",view.commission)}${line("− Tarifas bancárias",view.fee)}
+    </dl><div class="finance-net-result ${view.partnerNet<0?"is-negative":""}"><span>${view.partnerNet<0?"Saldo líquido do parceiro":"Líquido do parceiro"}</span><strong>${money(view.partnerNet)}</strong><small>Sobre os recebimentos liquidados, após os descontos.</small>${Number(finance.asaasFeeEstimated||0)!==0?'<small>Inclui tarifas estimadas.</small>':''}</div></div>
+    ${view.liquidationDifference!==0?'<p class="finance-alert" role="status">Há diferença entre recebimentos, bloqueios e liquidação. Confira as reservas antes de considerar o líquido definitivo.</p>':''}
+    <div class="finance-payout-row"><div><span>Apuração financeira a conciliar</span><strong>${money(finance.asaasPartnerPayout||0)}</strong><small>Consulte os créditos por pagamento e o saldo no Asaas.</small></div><div><span>Crédito confirmado ao parceiro</span><strong>${money(finance.partnerPaid||0)}</strong><small>Inclui crédito na subconta; não é saldo para saque.</small></div></div>
+    <p class="field-help">O líquido reúne os canais. O recebido diretamente já está com o parceiro; o repasse considera somente o saldo da instituição.${view.partnerNet<0?' Os descontos superam o valor liquidado; há saldo a regularizar.':''}</p></section>
+    ${financeDisclosure("holds","Valores bloqueados",`${money(view.blocked)} aguardando liberação ou resolução`,financialHoldComposition(finance)||'<p>Nenhum valor bloqueado.</p>')}
+    ${financeDisclosure("cancelled","Cancelamentos e devoluções",`${money(finance.cancelledValue||0)} fora do contratado vigente`,history)}
+    ${financeDisclosure("rules","Comissão, tarifas e repasses",Number(finance.commissionPending||0)>0?`${money(finance.commissionPending)} de comissão a quitar pelo parceiro`:"Conferir composição e critérios",rules)}`;
+  }
+
+  function asaasRefundButton(id,summary,reservation) {
+    if(!backendIsOnline() || partnerReadonlyActive() || !(state.role==="admin" || (state.role==="partner" && canManageBackendFinance())))return "";
+    const r=reservation || (state.reservations||[]).find(item=>item.backendId===id);
+    if(!id || !["refund_pending","refunded"].includes(r?.backendStatus||summary?.financial_status) || r?.monthly)return "";
+    return `<button class="button secondary small" data-action="asaas-refund-open" data-reservation-id="${esc(id)}">Devolução do pagamento</button>`;
+  }
+
+  let asaasRefundMonitor=null;
+  function stopAsaasRefundMonitor() {
+    if(asaasRefundMonitor)clearTimeout(asaasRefundMonitor.timer);
+    asaasRefundMonitor=null;
+  }
+  function asaasRefundNeedsMonitoring(c) {
+    return (c.payments||[]).some(p=>p.split_review_required||p.denial_review_required||p.transfer_lookup||(p.status==='partial'&&!p.can_submit&&Number(p.amount)>0)||['requesting','submitted','unknown','transfer_authorization','transfer_blocked','transfer_done'].includes(p.status));
+  }
+  function asaasRefundFailure(p) {
+    if(p.denial_reason&&p.status!=='completed')return p.denial_reason;
+    if(/INSUFFICIENT_BALANCE$/.test(p.error_code||''))return 'O Asaas recusou a devolução por saldo insuficiente. Regularize o saldo antes de solicitar novamente.';
+    if(p.transfer_fail_reason)return p.transfer_fail_reason;
+    if(p.status==='rejected')return 'O Asaas não aceitou a solicitação, ou a conferência anterior ao envio falhou. Nenhuma devolução foi confirmada. Verifique a cobrança e o saldo antes de solicitar novamente.';
+    return '';
+  }
+  function asaasRefundPresentation(c,{checking=false,unavailable=false}={}) {
+    const labels={denial_review:'Recusa recebida · em conferência',not_requested:'Aguardando solicitação',requesting:'Solicitação em andamento',submitted:'Aguardando confirmação do Asaas',unknown:'Resultado ainda não confirmado',rejected:'Solicitação não aceita',partial:'Devolução parcial confirmada',completed:'Devolução concluída',transfer_authorization:'Aguardando autorização no Asaas',transfer_failed:'Devolução falhou no Asaas',transfer_cancelled:'Devolução cancelada no Asaas',transfer_blocked:'Devolução bloqueada no Asaas',transfer_done:'Conciliando devolução'};
+    const feedback=unavailable?'Não foi possível confirmar o status agora. A consulta será repetida automaticamente; novos envios permanecem bloqueados.':checking?'Verificando automaticamente o resultado no Asaas…':asaasRefundNeedsMonitoring(c)?'Acompanhando automaticamente a resposta do Asaas. Você pode continuar usando o aplicativo.':'Situação atualizada. A devolução retorna ao pagador pelo meio original.';
+    return `<p>Reserva <strong>${esc(c.reservation_code)}</strong> · Pago: ${money(c.payment_amount)} · Devolução prevista: ${money(c.refund_target)} · Já devolvido: ${money(c.refunded_amount)}</p><p>Cada pagador recebe integralmente o valor pago, descontando apenas o que já foi devolvido. Cotas não pagas não geram devolução.</p><p class="asaas-refund-feedback" role="status">${feedback}</p>${(c.payments||[]).map(p=>{
+      const retry=p.can_retry===true,enabled=!checking&&!unavailable&&!p.transfer_lookup&&!p.split_review_required&&!p.denial_review_required&&(p.can_submit===true||retry);
+      const action=retry?'asaas-refund-retry':'asaas-refund-submit';
+      const note=p.split_review_required?'O Asaas informou a reversão da comissão, mas a devolução ao pagador ainda não foi conciliada. Uma nova solicitação fica bloqueada até a conferência.':p.denial_review_required?'A recusa desta tentativa foi recebida. A confirmação atual no Asaas ainda está em conferência; novos envios permanecem bloqueados.':p.status==='unknown'?'O resultado é incerto. Uma nova solicitação permanece bloqueada.':p.status==='partial'?'A próxima solicitação devolverá todo o saldo restante deste pagamento.':p.status==='transfer_authorization'?'Autorize a devolução no painel do Asaas. O aplicativo acompanhará a confirmação automaticamente.':p.status==='completed'?'O Asaas confirmou a devolução deste pagamento.':retry?'A falha será confirmada novamente no Asaas antes de um novo envio.':'';
+      const failure=asaasRefundFailure(p);
+      const denialHistory=p.unmatched_denial?`<details class="asaas-refund-history"><summary>Recusa registrada no histórico</summary><p>${esc(p.unmatched_denial.reason||'O Asaas informou uma recusa de estorno.')}</p>${p.unmatched_denial.event_created_at?`<p>Data informada pelo Asaas: ${esc(p.unmatched_denial.event_created_at)}</p>`:''}<p>Esse evento não identifica a tentativa de devolução. Ele não altera o resultado da solicitação atual.</p></details>`:'';
+      return `<article class="asaas-refund-item pf-payment"><h3>${esc(p.payer_name)} · ${p.billing_type==='CREDIT_CARD'?'Cartão':'Pix'}</h3><p><strong>${esc(labels[p.status]||'Em conferência')}</strong></p><dl class="pf-lines"><div><dt>Pagamento original</dt><dd>${money(p.payment_amount)}</dd></div><div><dt>Já devolvido</dt><dd>${money(p.refunded_amount)}</dd></div><div><dt>Valor a devolver</dt><dd><strong>${money(p.amount)}</strong></dd></div></dl>${failure?`<p class="asaas-refund-feedback asaas-refund-error" role="status">${esc(failure)}</p>`:''}${note?`<p>${esc(note)}</p>`:''}${p.transfer_lookup?'<p>A confirmação ainda está em andamento. Uma nova solicitação permanece bloqueada.</p>':''}${denialHistory}${p.split_enabled?(p.split_already_reversed?'<p class="field-help">A comissão já foi devolvida ao estabelecimento. Uma nova solicitação não descontará essa comissão novamente. As tarifas do Asaas ficam com o estabelecimento.</p>':'<p class="field-help">A devolução inclui a reversão da comissão pelo split. As tarifas do Asaas ficam com o estabelecimento.</p>'):'<p class="field-help">As tarifas do Asaas ficam com o estabelecimento.</p>'}${enabled?`<div class="dialog-actions"><button class="button primary" data-action="${action}" data-reservation-id="${esc(c.reservation_id)}" data-payment-id="${esc(p.payment_id)}" data-request-id="${esc(p.request_id||'')}">${retry||p.status==='rejected'?'Solicitar novamente':'Solicitar devolução integral'}</button></div>`:''}</article>`;
+    }).join('')}`;
+  }
+  function asaasRefundMonitorValid(m) {
+    return m===asaasRefundMonitor&&m.identity===backendRuntime.identityId&&m.role===state.role
+      &&backendIsOnline()&&!partnerReadonlyActive()&&(state.role==='admin'||(state.role==='partner'&&canManageBackendFinance()))
+      &&detailDialog.open&&detailDialog.dataset.view==='asaas-refund'&&detailDialog.dataset.refundReservationId===m.reservationId;
+  }
+  function scheduleAsaasRefundMonitor(m,delay=12000) {
+    clearTimeout(m.timer);
+    m.timer=setTimeout(async()=>{
+      if(!asaasRefundMonitorValid(m))return;
+      if(document.hidden||confirmDialog.open||formDialog.open||backendRuntime.mutating||window.MarketplaceAsaasCommunication?.isBusy()){
+        scheduleAsaasRefundMonitor(m,3000);return;
+      }
+      try{
+        const c=await window.MarketplaceBackend.asaasRefund(m.reservationId,'reconcile',null,{background:true});
+        if(!asaasRefundMonitorValid(m))return;
+        m.context=c;
+        detailBody.innerHTML=asaasRefundPresentation(c);
+        // Webhooks also update the bootstrap. This read covers a missed realtime event.
+        refreshBackendAfterMutation().catch(()=>{});
+        if(asaasRefundNeedsMonitoring(c))scheduleAsaasRefundMonitor(m);
+      }catch(error){
+        if(!asaasRefundMonitorValid(m))return;
+        if(/REFUND_FORBIDDEN|UNAUTHORIZED|PARTNER_PREVIEW_READ_ONLY/.test(String(error?.message||''))){
+          stopAsaasRefundMonitor();detailDialog.close();showToast('Sua permissão para consultar esta devolução não está mais disponível.');return;
+        }
+        detailBody.innerHTML=asaasRefundPresentation(m.context,{unavailable:true});
+        scheduleAsaasRefundMonitor(m,30000);
+      }
+    },delay);
+  }
+  async function openAsaasRefund(reservationId,action="preview",expectedRequestId=null,paymentId=null,amount=null) {
+    if(partnerReadonlyActive() || !backendIsOnline() || !(state.role==="admin" || (state.role==="partner" && canManageBackendFinance())))return;
+    const identity=backendRuntime.identityId,role=state.role;
+    stopAsaasRefundMonitor();
+    let c,uncertain=false;
+    try {
+      c=await window.MarketplaceBackend.asaasRefund(reservationId,action,expectedRequestId,{paymentId,amount});
+    } catch(error) {
+      const code=String(error?.message||'');
+      if(/REFUND_FORBIDDEN|UNAUTHORIZED|PARTNER_PREVIEW_READ_ONLY/.test(code)){showToast('Você não tem permissão financeira para esta reserva.');return;}
+      if(/REFUND_SCOPE_UNSUPPORTED|REFUND_PAYMENT_REVIEW_REQUIRED/.test(code)){showToast('Esta reserva exige conferência dos pagamentos e do cancelamento antes da devolução.');return;}
+      if(code==='ASAAS_COMMUNICATION_BUSY'){showToast('Aguarde a comunicação que está em andamento.');return;}
+      uncertain=true;
+      try{c=await window.MarketplaceBackend.asaasRefund(reservationId,'preview',null,{background:true});}
+      catch{showToast('Não foi possível confirmar o resultado. A solicitação não foi reenviada. Abra a devolução novamente quando a conexão voltar.');return;}
+    }
+    if(!c||identity!==backendRuntime.identityId||role!==state.role)return;
+    const checking=uncertain||(c.payments||[]).some(p=>p.request_id&&p.status!=='completed');
+    openDetail({eyebrow:'Devolução · Asaas Sandbox',title:c.reservation_code,body:asaasRefundPresentation(c,{checking})});
+    detailDialog.dataset.view='asaas-refund';detailDialog.dataset.refundReservationId=reservationId;
+    const m={identity,role,reservationId,context:c,timer:null};asaasRefundMonitor=m;
+    if(checking)scheduleAsaasRefundMonitor(m,500);
+    if(['submit','retry','reconcile'].includes(action))refreshBackendAfterMutation().catch(()=>{});
+  }
+
+  function financialReservationTable(rows) {
+    const reservations=rows.flatMap((row)=>(row.reservationBreakdown||[]).map((item)=>({...item,partner_name:row.partnerName})));
+    return `<section class="card"><h2>Valores por reserva</h2><div class="table-wrap"><table><thead><tr><th>Reserva</th><th>Contratado vigente</th><th>Recebido</th><th>Bloqueado Asaas</th><th>Liquidado</th><th>Saldo aberto</th><th>Situação</th></tr></thead><tbody>${reservations.map((item)=>`<tr><td>${esc(item.reservation_code)}<small class="field-help">${esc(item.partner_name)}</small></td><td>${money(item.final_due_value??item.contracted_value)}<small class="field-help">Original: ${money(item.contracted_value)}</small></td><td>${money(item.received_net)}</td><td>${money(item.asaas_blocked)}${window.MarketplaceFinancePeriod.holds(item,true).map(h=>`<small class="field-help">${esc(h.label)}: ${money(h.amount)}</small>`).join("")}</td><td>${money(item.liquidated_value)}</td><td>${money(item.balance_pending)}</td><td>${esc(financialStatusLabel(item.financial_status,item))}<button class="button ghost small" data-action="export-reservation-payment-audit" data-reservation-id="${esc(item.reservation_id)}">Conferir pagamentos</button>${asaasRefundButton(item.reservation_id,item)}</td></tr>`).join("")||'<tr><td colspan="7">Nenhum registro financeiro disponível.</td></tr>'}</tbody></table></div></section>`;
+  }
+
+  function reservationRemainingBalance(reservation = {}) {
+    if (reservation.monthlyCycleId) return monthlyPaymentPresentation(reservation).balance;
+    const f = reservation.financialSummary || {};
+    // Zero is an authoritative balance, not a reason to fall back to the contract value.
+    if (f.balance_pending != null && f.balance_pending !== "" && Number.isFinite(Number(f.balance_pending))) {
+      return Math.max(0, Number(f.balance_pending));
+    }
+    const due = Number(f.final_due_value ?? reservation.finalDueValue ?? reservation.paymentDue
+      ?? Math.max(0, Number(reservation.value || 0) - Number(reservation.voucherAppliedValue || 0)));
+    const paid = Number(f.received_net ?? reservation.amountPaid ?? reservation.complementPaid ?? 0);
+    return Math.max(0, Math.round(due * 100) - Math.round(paid * 100)) / 100;
+  }
+
+  function reservationFinancialDetails(reservation) {
+    const f=reservation?.financialSummary;if(!f)return "";
+    const closedPaymentLabel = closedReservationPaymentLabel(reservation);
+    return `<div class="detail-group"><h3>Valores da reserva</h3><div class="detail-list">${(f.payment_channels||[]).length?`<div class="detail-line"><span>Recebimentos por</span><strong>${esc(f.payment_channels.join(" · "))}</strong></div>`:""}${[
+      ["Contratado após vouchers",f.contracted_value],["Valor atual devido",f.final_due_value],["Recebido",f.received_net],...(Number(f.refund_completed)>0?[["Devoluções concluídas",f.refund_completed]]:[]),
+      ["Liquidado",f.liquidated_value],["Saldo a pagar",f.balance_pending],...window.MarketplaceFinancePeriod.holds(f).map(h=>[h.label,h.amount])
+    ].map(([label,value])=>`<div class="detail-line"><span>${esc(label)}</span>${closedPaymentLabel && ["Valor atual devido","Saldo a pagar"].includes(label) ? `<strong class="reservation-cancelled-value">${esc(closedPaymentLabel)}</strong>` : `<strong>${money(value)}</strong>`}</div>`).join("")}
+    <div class="detail-line"><span>Situação financeira</span><strong>${esc(financialStatusLabel(f.financial_status,f,reservation))}</strong></div></div>${asaasRefundButton(reservation.backendId,f,reservation)}</div>`;
+  }
+
+  function partnerFinance() {
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>')}
+      ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
+  }
+
+  function partnerUploadDocumentTypes(registration) {
+    const types = registration?.flow === "22x"
+      ? ["Cartão CNPJ", "Contrato social", "Dados bancários", ...(registration.requested_documents || [])]
+      : ["Cartão CNPJ", "Contrato social", "Comprovante de endereço", "Dados bancários", "Licença ou alvará", "Outro documento"];
+    return [...new Set(types)].filter(type => !["Contrato de parceria", "Termos de uso", "Política de privacidade"].includes(type));
+  }
+
+  function partnerDocumentManager() {
+    if(!hasPartnerPermission("manage_documents"))return partnerRestrictedSection("Documentos");
+    const documents=state.partnerProfile.documents || [];
+    const registration=partnerOnboardingForPartner(state.partnerProfile.backendPartnerId);
+    const typeOptions=partnerUploadDocumentTypes(registration);
+    const items=documents.filter(document=>!(registration?.flow === "22x" && ["Termos de uso","Política de privacidade"].includes(document.name) && document.status === "Pendente")).map((document)=>`<div class="toggle-row partner-document-row"><div class="toggle-copy"><strong>${esc(document.name)}</strong><small>${esc(document.originalName || "Arquivo protegido")} · ${esc(document.status)}${document.updatedAt ? ` · atualizado em ${esc(document.updatedAt)}` : ""}${document.reviewNotes ? ` · parecer: ${esc(document.reviewNotes)}` : ""}</small></div><span class="status ${statusClass(document.status)}">${esc(document.status)}</span><div class="item-actions"><button type="button" class="button ghost small" data-action="open-partner-document" data-id="${esc(document.id)}">Visualizar</button><button class="button danger small" data-action="remove-partner-document" data-id="${esc(document.id)}" ${documentCanBeRemovedByPartner(document) ? "" : "disabled"}>${documentCanBeRemovedByPartner(document) ? "Excluir" : "Preservado"}</button></div></div>`).join("");
+    return `<article class="detail-group partner-documents-manager"><div class="section-heading"><div><h2>Documentos</h2><p>Arquivos privados do cadastro e da homologação.</p></div><span class="status status-ok">Supabase protegido</span></div><div class="partner-document-upload"><label class="field"><span>Tipo de documento</span><select id="partnerDocumentType">${typeOptions.map((type)=>`<option value="${esc(type)}">${esc(type === "Contrato social" ? "Contrato social, CCMEI ou equivalente" : type)}</option>`).join("")}</select></label><input id="partnerDocumentUpload" type="file" accept="application/pdf,image/jpeg,image/png" hidden><button class="button primary small" data-action="upload-partner-document">Enviar arquivo</button></div><small class="field-help">PDF, JPEG ou PNG de até 15 MB. O contrato é fornecido pela Administração e devolvido na etapa Contrato de parceria.</small><div class="detail-list partner-document-list">${items || emptyState("▤","Nenhum documento enviado ao staging.")}</div></article>`;
+  }
+
+  function partnerRegistration() {
+    const p = state.partnerProfile;
+    const profileAllowed=hasPartnerPermission("manage_profile"),documentsAllowed=hasPartnerPermission("manage_documents");
+    const bankProvider = window.TamoOnBankPix?.provider(p.bankProviderId || "GENERIC_MANUAL") || { label:p.bank, mode:"manual" };
+    const adminRecord = adminPartnerForVenue(p.venueId);
+    const group = (title, lines, action = "") => `<article class="detail-group"><div class="section-heading"><div><h2>${esc(title)}</h2></div>${action ? `<button class="button ghost small" data-action="${action}">Editar</button>` : `<span class="status status-neutral">Somente leitura</span>`}</div><div class="detail-list">${lines.map(([label,value]) => `<div class="detail-line"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("")}</div></article>`;
+    const backendMode = backendIsOnline();
+    return `${pageHeader("Portal do parceiro", "Cadastro", "Dados cadastrais, operacionais, contratuais, fiscais e financeiros definidos para a homologação do parceiro.")}
+      <div class="callout"><strong>Status administrativo: ${esc(adminRecord?.status || "Não localizado")}</strong><p>Alterações realizadas pela Administração neste cadastro são sincronizadas com este Portal e com os dados públicos aplicáveis.</p></div>
+      ${backendMode ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>Empresa, responsável, endereço, espaços, fotos e documentos usam a fonte oficial protegida.</small></div>` : ""}
+      ${profileAllowed ? `<section class="card partner-photo-manager">
+        <div class="section-heading"><div><h2>Fotos do estabelecimento</h2><p>A foto favorita é usada no card do marketplace e no resumo da reserva.</p></div><div class="item-actions"><input id="partnerPhotoUpload" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><button class="button primary small" data-action="upload-partner-photos">Carregar fotos</button></div></div>
+        <div class="partner-photo-grid">${(p.photos || []).map((photo) => `<article class="partner-photo-item ${photo.id === p.favoritePhotoId ? "is-favorite" : ""}"><img src="${esc(photo.src || "assets/preview-icon.svg")}" alt="${esc(photo.name || "Foto do estabelecimento")}"><div class="partner-photo-copy"><strong>${esc(photo.name || "Foto do estabelecimento")}</strong><small>${photo.id === p.favoritePhotoId ? "Favorita · visível no marketplace" : esc(photo.uploadedAt || "")}${photo.tone ? ` · fundo ${photo.tone === "light" ? "claro" : "escuro"}` : ""}</small></div><div class="partner-photo-actions">${photo.id === p.favoritePhotoId ? `<span class="status status-ok">Favorita</span>` : `<button class="button secondary small" data-action="set-partner-favorite-photo" data-id="${esc(photo.id)}">Usar no card</button>`}<button class="button ghost small" data-action="remove-partner-photo" data-id="${esc(photo.id)}" ${photo.id === p.favoritePhotoId && (p.photos || []).length === 1 ? "disabled" : ""}>Remover</button></div></article>`).join("") || emptyState("▧", "Nenhuma foto carregada.")}</div>
+        <small class="field-help">Até 6 fotos JPEG, PNG ou WebP. ${backendMode ? "As imagens são reduzidas no navegador e enviadas ao Storage protegido do staging." : "No fallback local, as imagens permanecem somente neste navegador."}</small>
+      </section>
+      <section class="details-grid">
+        ${group("Empresa", [["Nome fantasia",p.tradeName],["Razão social",p.legalName],["CNPJ",p.cnpj],...(backendMode ? [] : [["Natureza jurídica",p.legalNature]]),...(backendMode ? [] : [["Regime tributário",p.taxRegime],["Atividade declarada",p.declaredActivity],["Inscrição municipal",p.municipalRegistration]])], "edit-company-data")}
+        ${group("Responsável", backendMode ? [["Nome",p.responsibleName],["E-mail da conta",p.email],["E-mail secundário",p.secondaryEmail || "Não informado"],["Telefone",p.phone]] : [["Nome",p.responsibleName],["CPF",p.responsibleCpf],["Função",p.responsibleRole],["E-mail",p.email],["Telefone",p.phone],["WhatsApp",p.whatsapp]], "edit-responsible-data")}
+        ${group("Endereço", [["Logradouro",p.address],["Bairro",p.neighborhood],["Cidade/UF",`${p.city}/${p.state}`],["CEP",p.zip]], "edit-address-data")}
+        ${group("Contratos e regras", [["Contrato",p.contractStatus],["Termos",p.termsStatus],["LGPD",p.privacyStatus],...(backendMode ? [] : [["Cancelamento",p.cancellationPolicy]])], backendMode ? "" : "edit-contract-data")}
+        ${group(backendMode ? "Condições comerciais" : "Fiscal e financeiro", backendMode ? [["Comissão",`${p.commissionRate}%`]] : [["Documento ao usuário",p.fiscalIssuer],["NFS-e da comissão",p.commissionInvoice],["Pagamento",p.paymentModel],["Comissão",`${p.commissionRate}%`]], backendMode ? "" : "edit-fiscal-data")}
+        ${group("Integrações de pagamento", backendMode ? [["Situação","Prevista para etapa específica"],["Dados locais","Não utilizados com o backend ativo"]] : [["Banco Pix",`${bankProvider.label} · ${bankProvider.mode === "api" ? "API" : "manual"}`],["Status API Pix",p.pixApiStatus],["Baixa automática",p.pixAutoReconciliation ? "Preparada" : "Desativada"],["Webhook Pix",p.pixWebhookStatus],["Cartão",p.asaasCardStatus],["Subconta Asaas",p.asaasSubaccount]], backendMode ? "" : "edit-payment-integrations")}
+      </section>` : partnerRestrictedSection("Dados do cadastro")}
+      <section class="details-grid">
+        ${documentsAllowed ? (backendMode ? partnerDocumentManager() : `<article class="detail-group"><div class="section-heading"><div><h2>Documentos</h2></div><button class="button ghost small" data-action="add-document">Adicionar</button></div><div class="detail-list">${p.documents.map((doc,index) => `<div class="toggle-row"><div class="toggle-copy"><strong>${esc(doc.name)}</strong><small>${esc(doc.status)}</small></div><button class="button ghost small" data-action="edit-document" data-index="${index}">Alterar</button></div>`).join("")}</div></article>`) : partnerRestrictedSection("Documentos")}
+        ${!profileAllowed || p.onboardingVersion > 0 && p.adminStatus === "Em análise" ? "" : `<article class="detail-group"><div class="section-heading"><div><h2>Vouchers e encerramento</h2></div><button class="button danger small" data-action="request-partner-closure">Solicitar encerramento</button></div><div class="detail-list"><div class="detail-line"><span>Vouchers ativos</span><strong>${activeVoucherLiability(p.venueId).count}</strong></div><div class="detail-line"><span>Valor a honrar</span><strong>${money(activeVoucherLiability(p.venueId).value)}</strong></div><div class="detail-line"><span>Regra</span><strong>Encerramento bloqueado com créditos pendentes</strong></div></div></article>`}
+      </section>`;
+  }
+
+  function partnerRestrictedView(access) {
+    const status = access?.status || "Cadastro indisponível";
+    return `${pageHeader("Portal do parceiro", "Acesso ao parceiro", "O acesso operacional acompanha o status definido pela Administração.")}
+      <section class="card partner-access-card"><span class="status ${statusClass(status)}">${esc(status)}</span><h2 style="margin-top:12px">${status === "Suspenso" ? "Operação temporariamente suspensa" : status === "Encerrado" ? "Parceria encerrada" : "Cadastro indisponível"}</h2><p>${status === "Suspenso" ? "O estabelecimento deixa de aparecer no marketplace e o portal fica somente indisponível até a reativação administrativa." : "Este cadastro não está liberado para operar no Marketplace Tâmo On."}</p></section>`;
+  }
+
+  function partnerView() {
+    const access = currentPartnerAccessStatus();
+    if (!access.allowed && access.partner?.onboardingVersion > 0 && access.status === "Em análise") {
+      if(hasPartnerPermission("manage_profile") && hasPartnerPermission("manage_documents"))return partnerValidationView(access.partner);
+      const partial={registration:partnerRegistration,spaces:partnerSpaces};
+      return navShell("partner",partial[state.activePage.partner] && partnerPageAllowed(state.activePage.partner) ? partial[state.activePage.partner]() : partnerRestrictedSection("Cadastro em validação"));
+    }
+    if (!access.allowed) return partnerRestrictedView(access);
+    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, registration: partnerRegistration };
+    const page=state.activePage.partner;
+    if(partnerAccessPending)return navShell("partner",partnerRestrictedSection("Atualizando permissões"));
+    if(!partnerPageAllowed(page))return navShell("partner",partnerRestrictedSection((menus.partner.find(item=>item[0]===page)||[])[2]||"Esta área"));
+    return navShell("partner", (views[page] || partnerOverview)());
+  }
+
+  function partnerInterestIdentity() {
+    return backendRuntime.enabled ? (backendRuntime.session?.user?.id || "") : "local-preview";
+  }
+
+  function partnerLoginEmail() {
+    return backendRuntime.session?.user?.email || backendRuntime.bootstrap?.profile?.email || state.userProfile?.email || "";
+  }
+
+  function currentPartnerInterestDraft() {
+    const identity = partnerInterestIdentity();
+    if (!partnerInterestDraft || partnerInterestDraft.identity !== identity) partnerInterestDraft = {identity,values:{spaces:"1"}};
+    return partnerInterestDraft;
+  }
+
+  function capturePartnerInterestDraft(form = document.getElementById("partnerInterestForm")) {
+    if (!form || form.dataset.identity !== partnerInterestIdentity()) return;
+    const draft = currentPartnerInterestDraft();
+    const data = Object.fromEntries(new FormData(form).entries());
+    draft.values = Object.fromEntries(["tradeName","legalName","cnpj","city","spaces","types","responsible","secondaryEmail","phone","notes","contactConsent"].map((key) => [key,String(data[key] || "")]));
+  }
+
+  function clearPartnerInterestDraft(identity = partnerInterestIdentity()) {
+    if (partnerInterestDraft?.identity === identity) partnerInterestDraft = null;
+  }
+
+  async function submitPartnerInterest(data) {
+    if (partnerInterestSubmitting || !backendIsOnline()) return false;
+    const identity = partnerInterestIdentity();
+    partnerInterestSubmitting = true;
+    render();
+    try {
+      const result = await runBackendMutation("Solicitação enviada à Administração.", () => window.MarketplaceBackend.submitPartnerApplication({
+        tradeName:String(data.tradeName || "").trim(),legalName:String(data.legalName || "").trim(),cnpj:String(data.cnpj || "").trim(),
+        city:String(data.city || "").trim(),spacesCount:Number(data.spaces || 1),spaceTypes:splitPartnerTypes(data.types),
+        responsibleName:String(data.responsible || "").trim(),email:partnerLoginEmail(),secondaryEmail:String(data.secondaryEmail || "").trim(),
+        phone:String(data.phone || "").trim(),notes:String(data.notes || "").trim() || null,contactConsent:data.contactConsent === "yes"
+      }));
+      if (result) {
+        const form = document.getElementById("partnerInterestForm");
+        if (form?.dataset.identity === identity) form.remove();
+        clearPartnerInterestDraft(identity);
+      }
+      return Boolean(result);
+    } finally { partnerInterestSubmitting = false; render(); }
+  }
+
+  function registrationCurrency(value) {
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    const text = String(value ?? "").trim();
+    if (!text) return 0;
+    const normalized = /R\$|,/.test(text) ? text.replace(/R\$|\s|\./g, "").replace(",", ".") : text;
+    const amount = Number(normalized);
+    if (!Number.isFinite(amount) || amount < 0) throw new Error("Informe um valor monetário válido.");
+    return Math.round(amount * 100) / 100;
+  }
+
+  function registrationCheck(name, label) {
+    return {name, type:"custom", full:true, html:`<label class="check-line"><input type="checkbox" name="${esc(name)}" value="yes" required><span>${esc(label)}</span></label>`};
+  }
+
+  function registrationBankPanel(item, isAdmin = false) {
+    if (!item || item.flow !== "22x" || !item.bank) return "";
+    const b = item.bank;
+    return `<article class="detail-group"><div class="section-heading"><h3>Dados bancários</h3><span class="status ${item.bank_validated ? "status-ok" : "status-neutral"}">${item.bank_validated ? "Conferidos" : "A conferir"}</span></div>
+      <div class="detail-list">${[["Banco",b.bank],["Agência",b.branch],["Conta",b.account],["Tipo",b.account_type],["Titular",b.holder_name],["CPF/CNPJ do titular",b.holder_document],["Chave Pix (opcional)",b.pix_key]].map(([k,v])=>`<div class="detail-line"><span>${esc(k)}</span><strong>${esc(v || "Não informado")}</strong></div>`).join("")}</div>
+      ${item.bank_review?.notes ? `<p>${esc(item.bank_review.notes)}</p>` : ""}
+      ${item.status === "under_review" ? `<button class="button secondary" data-action="registration-${isAdmin ? "verify-bank" : "bank"}" data-id="${esc(item.partner_id)}">${isAdmin ? "Conferir dados e comprovante" : "Preencher dados bancários"}</button>` : ""}
+      <p class="field-help">O comprovante serve para conferir a conta informada. Alterações exigem nova conferência.</p></article>`;
+  }
+
+  function registrationPanel(item, isAdmin = false) {
+    const docs = item.legal_documents || {}, contract = item.contract_delivery || {};
+    const editable = item.status === "under_review";
+    const owner = (state.partnerApplications || []).some(a=>a.id===item.application_id && a.requesterUserId===backendRuntime.identityId);
+    const button = (action,label,disabled=false) => `<button class="button secondary" data-action="registration-${action}" data-id="${esc(item.partner_id)}" ${disabled ? "disabled" : ""}>${label}</button>`;
+    const read = (doc,label) => doc ? `<button type="button" class="button ghost small" data-action="open-partner-document" data-id="${esc(doc.id)}">${label}</button>` : "";
+    return `<section class="partner-onboarding-panel"><div class="section-heading"><h2>Validação da parceria</h2><strong>${item.status === "approved" ? "Parceria aprovada" : item.ready ? "Pronto para aprovação final" : "Etapas pendentes"}</strong></div>
+      <ul class="partner-onboarding-steps">${(item.steps || []).map(step=>`<li><span class="${step.done ? "step-complete" : ""}">${step.done ? "✓" : "○"}</span><span>${esc(step.label)} · <strong>${step.done ? "Concluído" : "Pendente"}</strong></span></li>`).join("")}</ul>
+      <article class="detail-group"><h3>Termos de uso e privacidade</h3><div class="dialog-actions">${read(docs.terms,"Ler Termos de Uso")}${read(docs.privacy,"Ler Política de Privacidade")}</div>
+       ${item.accepted_at ? `<p>Aceite registrado em ${esc(backendDateTimeLabel(item.accepted_at))}.</p>` : `<p>Leia os dois documentos e registre o aceite. Não é necessário imprimir, assinar ou devolver esses arquivos.</p>`}
+       ${editable && isAdmin ? button("terms","Disponibilizar termos de uso e privacidade") : editable && owner && !item.accepted_at ? button("accept","Ler e registrar aceite",!item.legal_documents_ready) : ""}</article>
+      <article class="detail-group"><h3>Contrato de parceria</h3><p>A Administração fornece o contrato. O responsável devolve o arquivo assinado para conferência e arquivo.</p><div class="dialog-actions">${read(docs.proposal,"Baixar contrato para assinatura")}${read(docs.contract,"Abrir contrato devolvido")}</div>
+       <p>${esc(({proposed:"Aguardando assinatura",submitted:"Assinado e aguardando conferência",validated:"Contrato validado",rejected:"Devolvido para correção"})[contract.status] || "Aguardando disponibilização pela Administração")}</p>${contract.review_notes ? `<p class="notification-full-text">Parecer: ${esc(contract.review_notes)}</p>` : ""}
+       <div class="dialog-actions">${editable && isAdmin ? button("contract","Disponibilizar contrato")+(contract.status==="submitted" ? button("review-contract","Conferir contrato assinado") : "") : editable && owner && contract.status==="proposed" ? button("return-contract","Devolver contrato assinado") : ""}</div>
+       <p class="field-help">Assinatura gov.br/ICP-Brasil: devolva o PDF original. Assinatura manuscrita: envie a cópia digitalizada. O arquivo será conferido pela Administração.</p></article>
+      ${registrationBankPanel(item,isAdmin)}
+      ${item.review?.notes ? `<p class="notification-full-text"><strong>Conferência cadastral:</strong> ${esc(item.review.notes)}</p>` : ""}
+      ${isAdmin ? `<div class="dialog-actions"><button type="button" class="button secondary" data-action="onboarding-open-dossier" data-id="${esc(item.partner_id)}">Ver cadastro e documentos enviados</button></div>` : ""}
+      ${editable && isAdmin ? `<div class="dialog-actions">${button("request","Solicitar documento complementar")}<button type="button" class="button primary" data-action="onboarding-admin-check" data-id="${esc(item.partner_id)}">Concluir conferência cadastral</button></div>` : editable && owner ? `<button class="button secondary" data-action="onboarding-send-update" data-id="${esc(item.partner_id)}">Enviar atualização à Administração</button>` : ""}</section>`;
+  }
+
+  async function handleRegistrationAction(button) {
+    const action = button.dataset.action;
+    if (!action.startsWith("registration-")) return false;
+    if (!backendIsOnline()) return true;
+    const id = button.dataset.id, item = partnerOnboardingForPartner(id);
+    if (!item || item.flow !== "22x" || item.status !== "under_review") return true;
+    const admin = Boolean(backendRuntime.bootstrap?.is_admin);
+    const adminActions = ["registration-terms","registration-contract","registration-review-contract","registration-verify-bank","registration-request"];
+    if (adminActions.includes(action) && !admin) return true;
+    if (!adminActions.includes(action) && !(state.partnerApplications || []).some(a=>a.id===item.application_id && a.requesterUserId===backendRuntime.identityId)) return true;
+    const send = async (operation,data,message) => Boolean(await runBackendMutation(message,()=>window.MarketplaceBackend.registrationAction(id,operation,data)));
+    const pdf = (name,label) => ({name,label,type:"file",required:true,full:true,accept:"application/pdf"});
+    const upload = (type,file) => window.MarketplaceBackend.uploadPartnerDocument({partnerId:id,documentType:type,file});
+    if (action === "registration-terms") {
+      openForm({title:"Disponibilizar termos de uso e privacidade",description:"Selecione os dois PDFs oficiais. Eles serão disponibilizados juntos para leitura e aceite.",submitLabel:"Disponibilizar os dois documentos",fields:[pdf("terms","Termos de Uso"),pdf("privacy","Política de Privacidade")],onSubmit:async data=>Boolean(await runBackendMutation("Termos e privacidade disponibilizados. O parceiro foi notificado.",()=>window.MarketplaceBackend.publishPartnerTerms(id,data.terms,data.privacy)))});
+    } else if (action === "registration-accept") {
+      if (!item.legal_documents_ready) return true;
+      openForm({title:"Aceite dos termos",description:"O registro identifica sua conta e as versões dos dois documentos. Esta etapa é independente da assinatura do contrato.",submitLabel:"Registrar aceite",fields:[{name:"documents",type:"custom",full:true,html:Object.values(item.legal_documents).filter(d=>d && ["Termos de uso","Política de privacidade"].includes(d.name)).map(d=>`<button type="button" class="button secondary" data-action="open-partner-document" data-id="${esc(d.id)}">Ler ${esc(d.name)}</button>`).join("")},registrationCheck("accept","Aceito os Termos de Uso e declaro ciência da Política de Privacidade.")],onSubmit:data=>data.accept!=="yes" ? false : send("accept_terms",{release_id:item.terms_release_id,confirmed:true},"Aceite registrado. A Administração foi notificada.")});
+    } else if (action === "registration-contract") {
+      openForm({title:"Disponibilizar contrato de parceria",description:"Envie o contrato preenchido e revisado pela Administração. Uma nova disponibilização preserva as versões anteriores e exige nova assinatura.",submitLabel:"Disponibilizar contrato",fields:[pdf("contract","Contrato para assinatura")],onSubmit:async data=>Boolean(await runBackendMutation("Contrato disponibilizado ao parceiro.",async()=>{const row=await upload("Contrato de parceria",data.contract);return window.MarketplaceBackend.registrationAction(id,"propose_contract",{document_id:row.id});}))});
+    } else if (action === "registration-return-contract") {
+      const c=item.contract_delivery;
+      if (c?.status!=="proposed") return true;
+      openForm({title:"Devolver contrato assinado",description:"Para gov.br ou ICP-Brasil, envie o PDF original e preserve as assinaturas eletrônicas. Confira se o arquivo corresponde ao contrato disponibilizado.",submitLabel:"Enviar para conferência",fields:[{name:"method",label:"Modalidade de assinatura",type:"select",options:[{value:"handwritten",label:"Manuscrita — cópia digitalizada"},{value:"govbr",label:"gov.br — PDF original"},{value:"icp_brasil",label:"ICP-Brasil — PDF original"}],required:true},{name:"contract",label:"Arquivo assinado",type:"file",accept:"application/pdf,image/jpeg,image/png",required:true,full:true}],onSubmit:async data=>Boolean(await runBackendMutation("Contrato enviado. A Administração foi notificada.",async()=>{if(data.method!=="handwritten" && data.contract.type!=="application/pdf")throw Error("Envie o PDF original assinado eletronicamente.");const row=await upload("Contrato de parceria",data.contract);return window.MarketplaceBackend.registrationAction(id,"return_contract",{delivery_id:c.id,document_id:row.id,method:data.method});}))});
+    } else if (action === "registration-review-contract") {
+      const c=item.contract_delivery, digital=c?.signature_method!=="handwritten";
+      openForm({title:"Conferir contrato assinado",description:"Confira a correspondência com o contrato disponibilizado, as assinaturas das partes e os poderes dos representantes. Em caso de rejeição, disponibilize uma nova versão para reenvio.",submitLabel:"Registrar conferência",fields:[{name:"decision",label:"Decisão",type:"select",options:[{value:"validated",label:"Validar contrato"},{value:"rejected",label:"Devolver para correção"}],required:true},{name:"checks",type:"custom",full:true,html:`<label class="check-line"><input type="checkbox" name="signatures" value="yes">Conferi as assinaturas das partes e os poderes dos representantes.</label>${digital ? `<p><a href="https://validar.iti.gov.br/" target="_blank" rel="noopener">Abrir VALIDAR do ITI</a></p><label class="check-line"><input type="checkbox" name="digital" value="yes">Verifiquei as assinaturas eletrônicas do PDF original e registrei o resultado no parecer.</label>` : ""}`},{name:"notes",label:"Parecer da conferência",type:"textarea",required:true,full:true}],onSubmit:data=>send("review_contract",{delivery_id:c.id,document_id:c.signed_document_id,status:data.decision,notes:data.notes,signatures_confirmed:data.signatures==="yes",digital_verified:data.digital==="yes"},"Conferência registrada e enviada ao parceiro.")});
+    } else if (action === "registration-bank") {
+      const b=item.bank || {};
+      openForm({title:"Dados bancários do parceiro",description:"Informe a conta do titular indicado no comprovante. Os dados são privados e sujeitos à conferência administrativa.",fields:[...[['bank','Banco'],['branch','Agência'],['account','Conta com dígito'],['holder_name','Nome do titular'],['holder_document','CPF/CNPJ do titular']].map(([name,label])=>({name,label,value:b[name] || "",required:true})),{name:"account_type",label:"Tipo de conta",type:"select",value:b.account_type || "Corrente",options:["Corrente","Poupança","Pagamento"],required:true},{name:"pix_key",label:"Chave Pix (opcional)",value:b.pix_key || ""}],onSubmit:data=>send("save_bank",data,"Dados bancários enviados para conferência.")});
+    } else if (action === "registration-verify-bank") {
+      const proof=(backendRuntime.bootstrap?.partner_documents || []).filter(d=>d.partner_id===id && d.document_type==="Dados bancários").sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)) || b.id.localeCompare(a.id))[0];
+      if (!proof || !item.bank?.bank) {showToast("O parceiro deve preencher a conta e enviar o comprovante bancário.");return true;}
+      openForm({title:"Conferir dados bancários",description:"Compare a conta preenchida com o comprovante. Valide a titularidade antes de confirmar.",fields:[{name:"summary",type:"custom",full:true,html:`${registrationBankPanel({...item,status:"view"},true)}<button type="button" class="button secondary" data-action="open-partner-document" data-id="${esc(proof.id)}">Abrir comprovante bancário</button>`},registrationCheck("confirmed","Conferi titularidade, banco, agência e conta com o comprovante."),{name:"notes",label:"Parecer",type:"textarea",full:true}],onSubmit:data=>send("verify_bank",{confirmed:data.confirmed==="yes",bank:item.bank,document_id:proof.id,notes:data.notes},"Conta e comprovante conferidos. O parceiro foi notificado.")});
+    } else if (action === "registration-request") {
+      openForm({title:"Solicitar documento complementar",description:"Solicite somente o necessário para este estabelecimento. Para alvará, aceite a comprovação de dispensa quando aplicável.",fields:[{name:"type",label:"Documento",type:"select",options:["Comprovante de endereço","Licença ou alvará","Outro documento"],required:true},{name:"notes",label:"Justificativa e orientação",type:"textarea",required:true,full:true}],onSubmit:data=>send("request_document",data,"Solicitação enviada ao parceiro.")});
+    }
+    return true;
+  }
+
+  function partnerOnboardingForPartner(partnerId) {
+    return (backendRuntime.bootstrap?.partner_onboarding || []).find((item) => item.partner_id === partnerId) || null;
+  }
+
+  function partnerOnboardingForApplication(applicationId) {
+    return (backendRuntime.bootstrap?.partner_onboarding || []).find((item) => item.application_id === applicationId) || null;
+  }
+
+  function partnerOnboardingPanel(item, isAdmin = false) {
+    if (!item) return "";
+    if (item.flow === "22x") return registrationPanel(item,isAdmin);
+    const documents = item.legal_documents || {};
+    const application = (state.partnerApplications || []).find((a) => a.id === item.application_id);
+    const canAccept = !isAdmin && application?.requesterUserId === backendRuntime.identityId && item.status === "under_review";
+    const editable = isAdmin && backendRuntime.bootstrap?.is_admin && item.status === "under_review";
+    return `<section class="partner-onboarding-panel"><div class="section-heading"><div><h2>Validação da parceria</h2><p>${item.status === "approved" ? "Parceria aprovada para operar." : item.ready ? "Etapas concluídas. Aguardando aprovação final da Administração." : "Complete as etapas pendentes para a aprovação final."}</p></div></div>
+      <ul class="partner-onboarding-steps">${(item.steps || []).map((step) => `<li><span class="${step.done ? "step-complete" : ""}">${step.done ? "✓" : "○"}</span><span>${esc(step.label)} · <strong>${step.done ? "Concluído" : "Pendente"}</strong></span></li>`).join("")}</ul>
+      <div class="dialog-actions">${Object.values(documents).filter(Boolean).map((doc) => `<button type="button" class="button secondary small" data-action="open-partner-document" data-id="${esc(doc.id)}">Ler ${esc(doc.name)}</button>`).join("")}</div>
+      ${item.accepted_at ? `<p class="field-help">Aceites registrados pelo responsável em ${esc(backendDateTimeLabel(item.accepted_at))}.</p>` : ""}
+      ${item.review?.notes ? `<p class="notification-full-text"><strong>Parecer da conferência:</strong> ${esc(item.review.notes)}</p>` : ""}
+      ${canAccept ? `<div class="dialog-actions"><button class="button secondary" data-action="onboarding-send-update" data-id="${esc(item.partner_id)}">Enviar atualização à Administração</button></div>` : ""}
+      ${canAccept && !item.accepted_at ? `<p class="field-help">Envie o contrato já assinado em Documentos. Após a conferência das assinaturas pela Administração, leia os três arquivos acima e registre seus aceites.</p><button class="button primary" data-action="accept-partner-onboarding" data-id="${esc(item.partner_id)}" ${item.legal_documents_ready ? "" : "disabled"}>Confirmar contrato e registrar aceites</button>` : ""}
+      ${editable ? `<div class="dialog-actions"><button class="button secondary" data-action="onboarding-open-dossier" data-id="${esc(item.partner_id)}">Conferir cadastro e documentos</button><button class="button secondary" data-action="onboarding-admin-terms" data-id="${esc(item.partner_id)}">Disponibilizar termos oficiais</button><button class="button primary" data-action="onboarding-admin-check" data-id="${esc(item.partner_id)}">Registrar conferência administrativa</button></div>` : ""}
+    </section>`;
+  }
+
+  function partnerValidationView(partner) {
+    const step = state.activePage.partner === "spaces" ? "spaces" : "registration";
+    const item = partnerOnboardingForPartner(partner.id);
+    return `${pageHeader("Cadastro do parceiro","Concluir validação","Preencha o cadastro e os espaços, envie os documentos e acompanhe a análise. O estabelecimento será publicado após a aprovação final.")}
+      ${partnerOnboardingPanel(item)}
+      <div class="partner-validation-tabs"><button class="button ${step === "registration" ? "primary" : "secondary"}" data-nav="registration">Cadastro e documentos</button>${hasPartnerPermission("manage_spaces") ? `<button class="button ${step === "spaces" ? "primary" : "secondary"}" data-nav="spaces">Espaços</button>` : `<span class="status status-neutral">Espaços · Acesso Restrito</span>`}<button class="button ghost" data-action="partner-application-details" data-id="${esc(partner.applicationId)}">Solicitação e pareceres</button></div>
+      ${step === "spaces" ? (hasPartnerPermission("manage_spaces") ? partnerSpaces() : partnerRestrictedSection("Espaços")) : partnerRegistration()}`;
+  }
+
+  function refreshOpenPartnerReview() {
+    if (!backendIsOnline() || !backendRuntime.bootstrap?.is_admin || !detailDialog.open) return;
+    if (detailDialog.dataset.view === "partner-dossier") {
+      const partner = state.adminPartners.find(row => String(row.id) === detailDialog.dataset.partnerId);
+      if (partner) detailBody.innerHTML = partnerDetailsBody(partner);
+    } else if (detailDialog.dataset.view === "partner-application") {
+      const application = state.partnerApplications.find(row => row.id === detailDialog.dataset.applicationId);
+      if (application) detailBody.innerHTML = partnerApplicationDetailsBody(application);
+    }
+  }
+
+  function openPartnerDossier(id) {
+    if (!backendRuntime.bootstrap?.is_admin && backendRuntime.enabled) return;
+    const partner = state.adminPartners.find((p) => String(p.id) === String(id));
+    if (!partner) return;
+    openDetail({eyebrow:"Dossiê do parceiro",title:partner.tradeName,body:partnerDetailsBody(partner)});
+    detailDialog.dataset.view = "partner-dossier";
+    detailDialog.dataset.partnerId = String(partner.id);
+  }
+
+  async function handlePartnerOnboardingAction(button) {
+    const action = button.dataset.action, id = button.dataset.id;
+    if (action === "clear-partner-interest") {
+      if (partnerInterestSubmitting) return true;
+      document.getElementById("partnerInterestForm")?.reset();
+      clearPartnerInterestDraft();
+      // Retira o formulario antigo antes do render para nao recapturar o rascunho.
+      document.getElementById("partnerInterestForm")?.remove();
+      render(); return true;
+    }
+    if (!["onboarding-open-dossier","onboarding-admin-check","onboarding-admin-terms","onboarding-send-update","accept-partner-onboarding"].includes(action)) return false;
+    if (!backendIsOnline()) return true;
+    const item = partnerOnboardingForPartner(id);
+    if (!item) return true;
+    if (action === "onboarding-send-update") {
+      const application = state.partnerApplications.find((a) => a.id === item.application_id);
+      if (application?.requesterUserId !== backendRuntime.identityId || item.status !== "under_review") return true;
+      openForm({eyebrow:"Validação da parceria",title:"Enviar atualização à Administração",description:"A mensagem ficará na solicitação e a Administração receberá uma notificação.",submitLabel:"Enviar atualização",fields:[{name:"message",label:"Mensagem",type:"textarea",required:true,full:true}],onSubmit:async (data) => {
+        const message = String(data.message || "").trim(); if (!message) return false;
+        return Boolean(await runBackendMutation("Atualização enviada à Administração.", () => window.MarketplaceBackend.sendPartnerValidationUpdate(id,message)));
+      }});
+      return true;
+    }
+    if (action === "accept-partner-onboarding") {
+      const application = state.partnerApplications.find((a) => a.id === item.application_id);
+      if (application?.requesterUserId !== backendRuntime.identityId || !item.legal_documents_ready || item.status !== "under_review") return true;
+      askConfirm({title:"Contrato e aceites",message:"Confirmo a assinatura no contrato de parceria anexado, aceito os Termos de uso e declaro ciência da Política de privacidade apresentados. Este registro ficará vinculado à minha conta e às versões desses arquivos.",confirmLabel:"Confirmar e registrar",onConfirm:async () => {
+        await runBackendMutation("Aceites registrados. A Administração foi notificada.", () => window.MarketplaceBackend.acceptPartnerOnboarding(id,item.legal_documents));
+      }});
+      return true;
+    }
+    if (!backendRuntime.bootstrap?.is_admin) return true;
+    if (action === "onboarding-open-dossier") { openPartnerDossier(id); return true; }
+    if (item.status !== "under_review") return true;
+    if (action === "onboarding-admin-check") {
+      openForm({eyebrow:"Validação do cadastro",title:"Concluir conferência cadastral",description:"Confira a empresa, o responsável, o endereço, os espaços e a comissão. A conferência bancária, o contrato e os aceites têm etapas próprias. Alterações cadastrais posteriores exigem nova conferência.",submitLabel:"Concluir conferência",fields:[{name:"notes",label:"Resultado da conferência",type:"textarea",required:true,full:true}],onSubmit:async (data) => {
+        const notes = String(data.notes || "").trim();
+        if (!notes) return false;
+        return Boolean(await runBackendMutation("Conferência registrada e parecer enviado ao responsável.", () => window.MarketplaceBackend.validatePartnerRegistration(id,notes)));
+      }});
+      return true;
+    }
+    openForm({eyebrow:"Documentos oficiais",title:"Disponibilizar termos para o parceiro",description:"Selecione o documento oficial e envie seu arquivo. Depois, confira o arquivo e marque como Validado no dossiê para disponibilizar o aceite ao responsável.",submitLabel:"Selecionar arquivo",fields:[{name:"documentType",label:"Documento",type:"select",options:["Termos de uso","Política de privacidade"],required:true}],onSubmit:(data) => {
+      const input = document.createElement("input");
+      input.type = "file"; input.accept = "application/pdf,image/jpeg,image/png"; input.hidden = true;
+      input.addEventListener("cancel", () => input.remove(), {once:true});
+      input.addEventListener("change", async () => {
+        const file = input.files?.[0]; input.remove(); if (!file) return;
+        const result = await runBackendMutation("Documento enviado. Confira e valide o arquivo no dossiê.", () => window.MarketplaceBackend.uploadPartnerDocument({partnerId:id,documentType:data.documentType,file}));
+        if (result) openPartnerDossier(id);
+      }, {once:true});
+      document.body.append(input); input.click(); return true;
+    }});
+    return true;
+  }
+
+  function candidateApplicationStatus(application) {
+    if (!application) return "";
+    const notes = application.validationStartedAt && application.status === "Em análise"
+      ? "Validação iniciada. Abra seu cadastro para completar os dados, enviar documentos e acompanhar as pendências antes da aprovação final."
+      : application.status === "Aprovado"
+      ? "Validação concluída e parceria aprovada. Sua conta está habilitada para configurar a agenda e iniciar a operação."
+      : application.status === "Rejeitado"
+        ? "A solicitação foi encerrada. É possível enviar uma nova solicitação com dados atualizados."
+        : application.status === "Excluído pela administração"
+          ? "O cadastro foi removido pela Administração. Uma nova solicitação pode ser enviada."
+          : "A equipe do Tâmo On recebeu os dados. O estabelecimento ainda não aparece no marketplace enquanto a análise não for concluída.";
+    return `<section class="card partner-application-status"><div class="section-heading"><div><span class="eyebrow">Solicitação ${esc(application.id)}</span><h2>${esc(application.tradeName)}</h2><p>${esc(application.requestedAt || "")}</p></div><span class="status ${statusClass(application.status)}">${esc(application.status)}</span></div><p>${esc(notes)}</p>${application.reviewNotes ? `<div class="callout"><strong>Mensagem da Administração</strong><p class="notification-full-text">${esc(application.reviewNotes)}</p></div>` : ""}<div class="dialog-actions"><button class="button secondary" data-action="partner-application-details" data-id="${esc(application.id)}">Ver solicitação${partnerApplicationUnreadForRole("candidate",application.id) ? " e atualização" : ""}</button>${["Aprovado","Em análise"].includes(application.status) && backendAllowedRoles().has("partner") && (application.status === "Aprovado" || application.validationStartedAt) ? `<button class="button primary" data-action="open-approved-partner">${application.status === "Aprovado" ? "Abrir Portal do parceiro" : "Completar cadastro"}</button>` : ""}</div></section>`;
+  }
+
+  function ownPartnerApplications() {
+    return (state.partnerApplications || []).filter((item) => !backendRuntime.enabled || item.requesterUserId === backendRuntime.identityId);
+  }
+
+  function pendingPartnerApplications() {
+    return (state.partnerApplications || []).filter((item) => ["Pendente","Em análise"].includes(item.status));
+  }
+
+  function partnerApplicationUnreadForRole(role, applicationId = null) {
+    if (!["admin","candidate"].includes(role)) return 0;
+    return (state.personalNotifications || []).filter((item) => item.profile_id === backendRuntime.identityId && item.status === "unread"
+      && item.entity_type === "partner_application" && (!applicationId || item.entity_id === applicationId)
+      && (role === "admin" ? item.type === "partner_application_received" : item.type === "partner_application_reviewed")).length;
+  }
+
+  function partnerApplicationRows(applications) {
+    return applications.map((item) => `<article class="list-item partner-application-row ${partnerApplicationUnreadForRole("admin",item.id) ? "has-unread" : ""}"><div class="list-item-main"><strong>${esc(item.tradeName)}</strong><small>${esc(item.city)} · ${esc(item.cnpj)} · ${esc(item.requestedAt)}</small>${item.notes ? `<p class="partner-application-preview">${esc(item.notes)}</p>` : ""}</div><span class="status ${statusClass(item.status)}">${esc(item.status)}</span><button class="button secondary small" data-action="partner-application-details" data-id="${esc(item.id)}">${partnerApplicationUnreadForRole("admin",item.id) ? "Ver atualização" : "Abrir solicitação"}</button></article>`).join("") || emptyState("◇", "Nenhuma solicitação nesta seleção.");
+  }
+
+  function partnerApplicationDecisionActions(item, validation) {
+    if (!item || !backendIsOnline() || !backendRuntime.bootstrap?.is_admin || !["Pendente","Em análise"].includes(item.status)) return "";
+    return `<div class="dialog-actions"><button class="button ghost" data-action="partner-application-review" data-id="${esc(item.id)}" data-decision="under_review">Enviar mensagem ou solicitar ajustes</button>${!item.validationStartedAt ? `<button class="button primary" data-action="partner-application-review" data-id="${esc(item.id)}" data-decision="start_validation">Iniciar processo de validação</button>` : `<button class="button primary" data-action="partner-application-review" data-id="${esc(item.id)}" data-decision="approved" ${validation?.ready ? "" : "disabled"}>Aprovar e liberar operação</button>`}<button class="button danger" data-action="partner-application-review" data-id="${esc(item.id)}" data-decision="rejected">Rejeitar solicitação</button></div>`;
+  }
+
+  function partnerApplicationDetailsBody(item) {
+    const fields = [["Nome fantasia",item.tradeName],["Razão social",item.legalName],["CNPJ",item.cnpj],["Cidade",item.city],
+      ["Responsável",item.responsible],["E-mail da conta",item.email],["E-mail secundário",item.secondaryEmail || "Não informado"],["Telefone",item.phone],["Espaços informados",item.spaces],
+      ["Tipos de espaço",item.types],["Recebida em",item.requestedAt],["Autorização de contato",item.contactConsent ? "Autorizada" : "Não informada"]];
+    const canReview = backendIsOnline() && backendRuntime.bootstrap?.is_admin && ["Pendente","Em análise"].includes(item.status);
+    const validation = partnerOnboardingForApplication(item.id);
+    return `<span class="status ${statusClass(item.status)}">${esc(item.status)}</span><div class="detail-list">${fields.map(([label,value]) => `<div class="detail-line"><span>${esc(label)}</span><strong>${esc(value ?? "—")}</strong></div>`).join("")}</div><div class="callout"><strong>Mensagem do solicitante</strong><p class="notification-full-text">${esc(item.notes || "Nenhuma observação informada.")}</p></div>${item.reviewNotes ? `<div class="callout"><strong>Mensagem da Administração</strong><p class="notification-full-text">${esc(item.reviewNotes)}</p><small>${esc(item.reviewedAt || "")}</small></div>` : ""}${validation ? partnerOnboardingPanel(validation,canReview) : ""}${partnerApplicationDecisionActions(item,validation)}`;
+  }
+
+  async function openPartnerApplicationDetails(id) {
+    const item = (state.partnerApplications || []).find((application) => application.id === id);
+    if (!item || (backendRuntime.enabled && !backendRuntime.bootstrap?.is_admin && item.requesterUserId !== backendRuntime.identityId)) {
+      showToast("Solicitação indisponível para esta conta."); return;
+    }
+    if (state.role === "admin") {
+      state.ui ||= {};
+      state.activePage ||= {};
+      state.ui.adminPartnersTab = "applications";
+      state.activePage.admin = "partners";
+      saveState(); render();
+    }
+    openDetail({eyebrow:"Solicitação de parceria",title:item.tradeName,body:partnerApplicationDetailsBody(item)});
+    detailDialog.dataset.view = "partner-application";
+    detailDialog.dataset.applicationId = item.id;
+    const ids = (state.personalNotifications || []).filter((row) => row.profile_id === backendRuntime.identityId && row.status === "unread" && row.entity_type === "partner_application" && row.entity_id === item.id).map((row) => row.id);
+    if (partnerReadonlyActive() || !backendIsOnline() || !ids.length) return;
+    try {
+      await window.MarketplaceBackend.markReservationNotificationsRead(ids);
+      (state.personalNotifications || []).filter((row) => ids.includes(row.id)).forEach((row) => { row.status="read"; });
+      render(); renderNotificationControls(); updateRoleUnreadIndicators();
+    } catch (error) { showToast(backendErrorMessage(error)); }
+  }
+
+  function openPartnerApplicationReview(id, decision) {
+    const item = (state.partnerApplications || []).find((application) => application.id === id);
+    if (!backendIsOnline() || !backendRuntime.bootstrap?.is_admin || !item || !["Pendente","Em análise"].includes(item.status) || !["under_review","start_validation","approved","rejected"].includes(decision)) return;
+    if (decision === "approved" && (!item.validationStartedAt || !partnerOnboardingForApplication(id)?.ready)) { showToast("Conclua todas as etapas de validação antes de aprovar."); return; }
+    const label = {under_review:"Enviar mensagem ou solicitar ajustes",start_validation:"Iniciar processo de validação",approved:"Aprovar e liberar operação",rejected:"Rejeitar solicitação"}[decision];
+    openForm({eyebrow:"Análise da parceria",title:`${label}: ${item.tradeName}`,submitLabel:label,
+      description:decision === "approved" ? "A validação está concluída. A aprovação final publica o estabelecimento e libera a operação." : decision === "start_validation" ? "O responsável receberá acesso ao cadastro, aos espaços e aos documentos. A operação aguarda a aprovação final." : decision === "under_review" ? "Envie orientações ou solicite correções. Esta mensagem não conclui a conferência cadastral nem aprova a parceria." : "O solicitante receberá uma atualização com seu parecer.",
+      fields:[{name:"notes",label:"Mensagem ao solicitante",type:"textarea",full:true,required:true,value:""}],
+      onSubmit:async (data) => {
+        const notes = String(data.notes || "").trim();
+        if (!notes) { showToast("Informe o parecer para o solicitante."); return false; }
+        const result = await runBackendMutation("Parecer registrado e atualização enviada ao solicitante.", () => window.MarketplaceBackend.reviewPartnerApplication(id,decision,notes));
+        if (!result) return false;
+        formDialog.close(); await openPartnerApplicationDetails(id); return true;
+      }});
+  }
+
+  function candidateView() {
+    const application = ownPartnerApplications()[0] || null;
+    const approvedPartner = application?.status === "Aprovado" && (backendRuntime.bootstrap?.partners || []).find(partner =>
+      partner.application_id === application.id && partner.status === "approved"
+      && (backendRuntime.bootstrap?.partner_memberships || []).some(member => member.partner_id === partner.id && member.active !== false));
+    if (approvedPartner && backendAllowedRoles().has("partner")) {
+      clearPartnerInterestDraft();
+      return `<div class="candidate-area"><section class="card partner-welcome">
+        <span class="eyebrow">Parceria Tâmo On</span><h1>Você já faz parte do time Tâmo On!</h1>
+        <p>O cadastro de <strong>${esc(approvedPartner.trade_name || application.tradeName)}</strong> foi aprovado. Acesse seu portal para organizar a agenda, acompanhar reservas e controlar sua operação.</p>
+        <div class="dialog-actions"><button type="button" class="button primary" data-action="open-approved-partner">Acessar Portal do parceiro</button></div>
+      </section></div>`;
+    }
+    const canSubmit = state.settings.newPartners && (!application || ["Rejeitado","Excluído pela administração","Encerrado"].includes(application.status));
+    if (application && !canSubmit) clearPartnerInterestDraft();
+    const draft = currentPartnerInterestDraft();
+    const field = (name) => esc(draft.values[name] ?? "");
+    return `<div class="candidate-area">
+      ${pageHeader("Parceria Tâmo On", "Quero ser parceiro", "Envie os dados iniciais para a Administração iniciar a análise da parceria.")}
+      ${application ? candidateApplicationStatus(application) : ""}
+      ${canSubmit ? `<section class="card section partner-interest-card"><div class="section-heading"><div><h2>Solicitar inclusão</h2><p>Após a análise inicial, você poderá completar o cadastro e enviar os documentos para validação.</p></div></div>
+        <form id="partnerInterestForm" class="form-grid partner-interest-form" data-identity="${esc(draft.identity)}">
+          <label class="field"><span>Nome fantasia</span><input name="tradeName" value="${field("tradeName")}" required></label>
+          <label class="field"><span>Razão social</span><input name="legalName" value="${field("legalName")}" required></label>
+          <label class="field"><span>CNPJ</span><input name="cnpj" value="${field("cnpj")}" inputmode="numeric" maxlength="18" placeholder="00.000.000/0000-00" required></label>
+          <label class="field"><span>Cidade</span><input name="city" value="${field("city")}" required></label>
+          <label class="field"><span>Número de espaços</span><input type="number" min="1" name="spaces" value="${field("spaces")}" required></label>
+          <label class="field"><span>Tipos de espaço</span><input name="types" value="${field("types")}" placeholder="Ex.: Society, Futsal" required></label>
+          <label class="field"><span>Responsável</span><input name="responsible" value="${field("responsible")}" required></label>
+          <label class="field"><span>E-mail da conta de login</span><input type="email" name="email" value="${esc(partnerLoginEmail())}" ${backendRuntime.enabled ? "readonly" : ""} required><small>Vinculado à conta utilizada para entrar no aplicativo.</small></label>
+          <label class="field"><span>E-mail secundário (opcional)</span><input type="email" name="secondaryEmail" value="${field("secondaryEmail")}" autocomplete="email"></label>
+          <label class="field"><span>Telefone / WhatsApp</span><input name="phone" value="${field("phone")}" inputmode="tel" maxlength="15" placeholder="(00) 00000-0000" required></label>
+          <label class="field full"><span>Observação</span><textarea name="notes" placeholder="Conte brevemente sobre o espaço ou deixe uma informação para a equipe.">${field("notes")}</textarea></label>
+          <label class="cancellation-acknowledge full partner-interest-consent"><input type="checkbox" name="contactConsent" value="yes" ${draft.values.contactConsent === "yes" ? "checked" : ""} required><span><strong>Autorizo o Tâmo On a entrar em contato sobre esta solicitação de parceria.</strong></span></label>
+          <small class="field-help full">O preenchimento é mantido ao navegar pelo app. Atualizar a página, sair da conta ou limpar o formulário descarta o rascunho.</small>
+          <div class="dialog-actions full"><button class="button ghost" type="button" data-action="clear-partner-interest" ${partnerInterestSubmitting ? "disabled" : ""}>Limpar formulário</button><button class="button primary" type="submit" ${partnerInterestSubmitting ? "disabled" : ""}>${partnerInterestSubmitting ? "Enviando…" : "Enviar solicitação"}</button></div>
+        </form>
+      </section>` : ""}
+      ${!state.settings.newPartners ? `<div class="callout section"><strong>Novas solicitações temporariamente desativadas</strong></div>` : ""}
+      <div class="callout section"><strong>Etapas da parceria</strong><p>Solicitação → validação do cadastro e documentos → contrato assinado e termos aceitos → aprovação final e início da operação.</p></div>
+    </div>`;
+  }
+  function adminOverview() {
+    const pendingPartners = state.adminPartners.filter((item) => ["Pendente","Em análise"].includes(item.status) && !state.partnerApplications.some((application) => application.adminPartnerId === item.id)).length;
+    const appRequests = state.partnerApplications.filter((item) => ["Pendente","Em análise"].includes(item.status)).length;
+    const activeUsers = state.adminUsers.filter((item) => item.status === "Ativo").length;
+    const pendingReservations = state.reservations.filter((item) => item.statusKey === "pending").length;
+    return `${pageHeader("Administração", "Visão geral", "Acompanhe pendências e acesse os cadastros sem excesso de informações na tela.", `<button class="button primary" data-action="review-next-partner">Analisar parceiro</button><button class="button ghost" data-action="export-admin-overview">Exportar resumo</button>`)}
+      <section class="stats-grid">${stat(state.adminPartners.length, "parceiros")}${stat(pendingPartners + appRequests, "em homologação", `${appRequests} solicitações pelo app`)}${stat(activeUsers, "usuários ativos")}${stat(pendingReservations, "reservas pendentes")}</section>
+      <section class="card section"><div class="section-heading"><div><h2>Solicitações recebidas</h2><p>Formulários enviados pelo aplicativo, aguardando parecer.</p></div><button class="button ghost small" data-nav="partners">Ver histórico</button></div><div class="list">${partnerApplicationRows(pendingPartnerApplications())}</div></section>
+      <section class="grid two"><article class="card"><div class="section-heading"><div><h2>Fila de parceiros</h2><p>Solicitações pelo app e cadastros em homologação</p></div><button class="button ghost small" data-nav="partners">Ver todos</button></div><div class="list">${state.adminPartners.filter((item) => ["Pendente","Em análise"].includes(item.status)).map((partner) => `<div class="list-item"><div class="avatar">${initials(partner.tradeName)}</div><div class="list-item-main"><strong>${esc(partner.tradeName)}</strong><small>${esc(partner.city)} · ${esc(partner.source || "Administração")} · completude ${esc(partner.score)}%</small></div><span class="status ${statusClass(partner.status)}">${esc(partner.status)}</span><button class="button ghost small" data-action="admin-partner-details" data-id="${partner.id}">Abrir</button></div>`).join("") || emptyState("◇", "Nenhum parceiro aguardando análise.")}</div></article><article class="card"><div class="section-heading"><div><h2>Segurança do staging</h2><p>Integrações críticas isoladas</p></div><button class="button ghost small" data-nav="settings">Configurar</button></div><div class="toggle-row"><div class="toggle-copy"><strong>Pagamentos reais</strong><small>Bloqueado no código</small></div><span class="status status-danger">Desativado</span></div><div class="toggle-row"><div class="toggle-copy"><strong>Banco de produção</strong><small>Nenhuma conexão configurada</small></div><span class="status status-danger">Isolado</span></div><div class="toggle-row"><div class="toggle-copy"><strong>Uso sem conexão</strong><small>O piloto exige autenticação e conexão com o ambiente de testes</small></div><span class="status status-danger">Desativado</span></div></article></section>`;
+  }
+
+  function adminPartnerActions(partner) {
+    const previewButton=typeof window!=="undefined" && window.MarketplaceBackend?.readonlyStatus?.available && partner.backendPartnerId
+      ? `<button type="button" class="button secondary small" data-action="admin-view-partner" data-id="${esc(partner.id)}">Visualizar como parceiro</button>` : "";
+    if (partner.onboardingVersion > 0 && ["Pendente","Em análise","Rejeitado"].includes(partner.status)) return `${previewButton}<button class="button secondary small" data-action="partner-application-details" data-id="${esc(partner.applicationId)}">Acompanhar validação</button><button class="button ghost small" data-action="admin-partner-details" data-id="${esc(partner.id)}">Dossiê</button><button class="button ghost small" data-action="edit-admin-partner" data-id="${esc(partner.id)}">Editar cadastro</button>`;
+    const importButton = partner.status === "Aprovado" && partner.backendPartnerId && backendIsOnline() ? `<button type="button" class="button secondary small" data-action="admin-import-agenda" data-id="${esc(partner.id)}">Importar agenda</button>` : "";
+    const base = `${previewButton}${importButton}<button class="button ghost small" data-action="admin-partner-details" data-id="${partner.id}">Dossiê</button><button class="button ghost small" data-action="edit-admin-partner" data-id="${partner.id}">Editar</button>`;
+    if (partner.status === "Aprovado") return `${base}<button class="button danger small" data-action="admin-partner-status" data-id="${partner.id}" data-status="Suspenso">Suspender</button><button class="button ghost small" data-action="request-admin-partner-closure" data-id="${partner.id}">Encerramento</button><button class="button danger small" data-action="delete-admin-partner" data-id="${partner.id}">Excluir</button>`;
+    if (partner.status === "Suspenso") return `${base}<button class="button secondary small" data-action="admin-partner-status" data-id="${partner.id}" data-status="Aprovado">Reativar</button><button class="button ghost small" data-action="request-admin-partner-closure" data-id="${partner.id}">Encerramento</button><button class="button danger small" data-action="delete-admin-partner" data-id="${partner.id}">Excluir</button>`;
+    if (partner.status === "Encerrado") return `${base}<button class="button danger small" data-action="delete-admin-partner" data-id="${partner.id}">Excluir</button>`;
+    return `${base}<button class="button secondary small" data-action="admin-partner-status" data-id="${partner.id}" data-status="Aprovado">Aprovar</button><button class="button ghost small" data-action="admin-partner-status" data-id="${partner.id}" data-status="Em análise">Em análise</button><button class="button danger small" data-action="admin-partner-status" data-id="${partner.id}" data-status="Rejeitado">Rejeitar</button><button class="button danger small" data-action="delete-admin-partner" data-id="${partner.id}">Excluir</button>`;
+  }
+
+  function adminPartnerCard(partner) {
+    return `<article class="admin-partner-card"><div class="admin-partner-card-heading"><div class="avatar" aria-hidden="true">${initials(partner.tradeName)}</div><div class="admin-partner-identity"><h3>${esc(partner.tradeName)}</h3><p>${esc(partner.legalName)}</p></div><span class="status ${statusClass(partner.status)}">${esc(partner.status)}</span></div><div class="admin-partner-meta"><span><strong>CNPJ</strong> ${esc(partner.cnpj || "Não informado")}</span><span>${esc(partner.city)} · ${esc(partner.spaces)} espaço(s)</span><span>${esc(partner.source || "Administração")} · cadastro ${esc(partner.score)}%</span></div><div class="admin-partner-card-actions" role="group" aria-label="Ações de ${esc(partner.tradeName)}">${adminPartnerActions(partner)}</div></article>`;
+  }
+
+  function adminPartnerPatch(data) {
+    const names={tradeName:"trade_name",legalName:"legal_name",city:"city",responsible:"responsible_name",email:"email",phone:"phone",
+      contract:"contract_status",terms:"terms_status",privacy:"privacy_status",fiscal:"fiscal_status",banking:"banking_status"};
+    const patch={};
+    for(const [key,target] of Object.entries(names))if(Object.hasOwn(data,key))patch[target]=String(data[key]).trim();
+    if(Object.hasOwn(data,"spaces"))patch.spaces_count=Number(data.spaces);
+    if(Object.hasOwn(data,"types"))patch.space_types=splitPartnerTypes(data.types);
+    if(Object.hasOwn(data,"commission"))patch.commission_rate=Number(data.commission);
+    if(Object.hasOwn(data,"status"))patch.status=({"Pendente":"pending","Em análise":"under_review","Aprovado":"approved","Suspenso":"suspended","Rejeitado":"rejected","Encerrado":"closed"})[data.status];
+    return patch;
+  }
+
+  function adminFinancialRows() {
+    const rows=[...financialReconciliationRows()];
+    for(const partner of state.adminPartners || []){
+      const partnerId=partner.backendPartnerId || partner.id;
+      if(!rows.some((row)=>String(row.partnerId)===String(partnerId)))rows.push({...combinedFinancialSummary([]),partnerId,partnerName:partner.tradeName,venueId:partner.venueId,reservationBreakdown:[]});
+    }
+    const selected=state.filters.adminFinancePartner || "Todos";
+    return selected==="Todos" ? rows : rows.filter((row)=>String(row.partnerId)===selected);
+  }
+
+  function adminFinancialPartnerTable(rows) {
+    return `<section class="card section"><div class="section-heading"><div><h2>Conciliação por parceiro</h2><p>Cada parceiro tem seu próprio saldo. O consolidado soma os resultados sem compensar pendências entre parceiros.</p></div></div><div class="table-wrap"><table><thead><tr><th>Parceiro</th><th>Contratado vigente</th><th>Recebido bruto</th><th>Pendente de pagamento</th><th>Líquido do parceiro</th><th>Apuração financeira a conciliar</th></tr></thead><tbody>${rows.map(row=>{const view=window.MarketplaceFinancePeriod.position(row);return `<tr><td>${esc(row.partnerName)}</td>${[view.contracted,view.received,view.pending,view.partnerNet,row.asaasPartnerPayout].map(value=>`<td>${money(value||0)}</td>`).join("")}</tr>`;}).join("")||'<tr><td colspan="6">Nenhum parceiro nesta seleção.</td></tr>'}</tbody></table></div></section>`;
+  }
+
+  function adminPartners() {
+    const requestsTab = state.ui?.adminPartnersTab === "applications";
+    const queryValue = requestsTab ? state.search.adminApplication || "" : state.search.adminPartner || "";
+    const query = queryValue.toLowerCase();
+    const filter = (requestsTab ? state.filters.adminApplicationStatus : state.filters.adminPartnerStatus) || "Todos";
+    const list = requestsTab ? state.partnerApplications || [] : state.adminPartners;
+    const items = list.filter((item) => `${item.tradeName} ${item.legalName} ${item.city} ${item.cnpj}`.toLowerCase().includes(query) && (filter === "Todos" || item.status === filter));
+    const unread = partnerApplicationUnreadForRole("admin");
+    const searchId = requestsTab ? "adminApplicationSearch" : "adminPartnerSearch";
+    const filterId = requestsTab ? "adminApplicationFilter" : "adminPartnerFilter";
+    const statuses = requestsTab ? ["Todos","Pendente","Em análise","Aprovado","Rejeitado","Encerrado"] : ["Todos","Aprovado","Em análise","Pendente","Suspenso","Rejeitado","Encerrado"];
+    return `${pageHeader("Administração", "Parceiros", "Consulte os parceiros cadastrados ou acompanhe solicitações, mensagens e alterações cadastrais.", `<button class="button primary" data-action="new-admin-partner">${backendIsOnline() ? "Como cadastrar novo parceiro" : "Cadastrar parceiro"}</button>`)}
+      <div class="partner-validation-tabs" role="group" aria-label="Áreas de parceiros">
+        <button class="button ${requestsTab ? "primary" : "secondary"}" data-action="admin-partners-tab" data-tab="applications" aria-pressed="${requestsTab}">Solicitações e pareceres${unread ? ` <span class="admin-requests-count" aria-label="${unread} atualizações não lidas">${unread}</span>` : ""}</button>
+        <button class="button ${requestsTab ? "secondary" : "primary"}" data-action="admin-partners-tab" data-tab="registered" aria-pressed="${!requestsTab}">Parceiros cadastrados</button>
+      </div>
+      <div class="toolbar"><label class="search"><span>⌕</span><input id="${searchId}" value="${esc(queryValue)}" placeholder="Buscar nome, CNPJ ou cidade"></label><select class="filter-select" id="${filterId}">${statuses.map((status) => `<option ${status === filter ? "selected" : ""}>${status}</option>`).join("")}</select>${requestsTab ? "" : '<button class="button ghost" data-action="export-admin-partners">Exportar CSV</button>'}</div>
+      ${requestsTab ? `<section class="card section"><div class="section-heading"><div><h2>Solicitações e pareceres</h2><p>Pedidos de parceria, mensagens e acompanhamento cadastral, com o histórico dos já analisados.</p></div></div><div class="list">${partnerApplicationRows(items)}</div></section>` : `<section class="card"><h2>Parceiros cadastrados</h2><div class="list">${items.map(adminPartnerCard).join("") || emptyState("◇", "Nenhum parceiro corresponde aos filtros.")}</div></section>`}`;
+  }
+  function adminReservationActions(item) {
+    const splitAction=item.pixSplit
+      ? `<button class="button secondary small" data-action="pix-split-details" data-id="${esc(item.id)}">Ver rateio</button>`:"";
+    if (item.backendOfficial) {
+      return `<button class="button ghost small" data-action="reservation-details" data-id="${esc(item.id)}">Detalhes</button>${splitAction}${item.statusKey !== "cancelled" ? `<button class="button danger small" data-action="cancel-backend-admin-reservation" data-id="${esc(item.id)}">Cancelar reserva</button>` : ""}`;
+    }
+    return `<button class="button ghost small" data-action="admin-reservation-edit" data-id="${esc(item.id)}">Alterar status</button>${splitAction}${item.statusKey === "confirmed" ? `<button class="button danger small" data-action="cancel-paid-tamo-reservation" data-id="${esc(item.id)}">Cancelar pelo Tâmo On</button>` : ""}`;
+  }
+
+  function adminReservations() {
+    const filter = state.filters.adminReservationStatus;
+    const partnerFilter = state.filters.adminReservationPartner || "Todos";
+    const userFilter = state.filters.adminReservationUser || "Todos";
+    const dateFilter = state.filters.adminReservationDate || "";
+    const partners = [...new Set(state.reservations.map((item) => item.venue).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+    const users = [...new Set(state.reservations.flatMap((item) => [item.user,item.paymentResponsibleName,...(item.paymentParticipants || []).map((participant) => participant.name)]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+    const items = state.reservations.filter((item) =>
+      (filter === "Todos" || reservationStatus(reservationDisplayKey(item)).label === filter) &&
+      (partnerFilter === "Todos" || item.venue === partnerFilter) &&
+      (userFilter === "Todos" || item.user === userFilter || item.paymentResponsibleName === userFilter || (item.paymentParticipants || []).some((participant) => participant.name === userFilter)) &&
+      (!dateFilter || ptDateToIso(item.date) === dateFilter)
+    );
+    return `${pageHeader("Administração", "Reservas", "Acompanhe o status operacional e filtre por parceiro, usuário ou data.")}
+      ${backendIsOnline() ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>A Administração acompanha reservas, rateios, ciclos mensalistas, suspensão financeira e notificações protegidas.</small></div>` : ""}
+      <div class="toolbar admin-reservation-filters"><select class="filter-select" id="adminReservationPartner"><option value="Todos">Todos os parceiros</option>${partners.map((name)=>`<option ${name===partnerFilter?"selected":""}>${esc(name)}</option>`).join("")}</select><select class="filter-select" id="adminReservationUser"><option value="Todos">Todos os usuários</option>${users.map((name)=>`<option ${name===userFilter?"selected":""}>${esc(name)}</option>`).join("")}</select><label class="admin-date-filter"><span>Data</span><input id="adminReservationDate" type="date" value="${esc(dateFilter)}"></label><select class="filter-select" id="adminReservationFilter"><option value="Todos">Todos os status</option><option>Reserva pendente</option><option>Confirmada</option><option>Cancelada</option><option>Expirada</option></select><button class="button ghost" data-action="clear-admin-reservation-filters">Limpar filtros</button><button class="button ghost" data-action="export-admin-reservations">Exportar CSV</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Reserva</th><th>Parceiro</th><th>Usuário</th><th>Data</th><th>Valor</th><th>Pagamento</th><th>Status</th><th>Ações</th></tr></thead><tbody>${items.map((item) => { const visual = reservationStatus(reservationDisplayKey(item)); return `<tr><td>${esc(item.id)}</td><td>${esc(item.venue)}</td><td>${esc(item.user)}</td><td>${esc(item.date)} · ${esc(item.time)}</td><td>${money(item.value)}</td><td>${esc(paymentResponsibilitySummary(item))}</td><td><span class="status ${visual.status}">${visual.label}</span></td><td><div class="item-actions">${adminReservationActions(item)}</div></td></tr>`; }).join("")}</tbody></table></div>`;
+  }
+
+  function adminUserDetails(user) {
+    const history=(user.statusHistory||[]).map(item=>`<article class="card section"><strong>${item.new_status==="blocked"?"Bloqueio":"Reativação"} · ${esc(backendDateTimeLabel(item.created_at))}</strong><p class="notification-full-text">${esc(item.reason)}</p><small>Responsável: ${esc(item.actor_name)}</small></article>`).join("");
+    return `<div class="detail-group"><p>${esc(user.email)} · ${esc(user.city)}</p><p>Status: <strong>${esc(user.status)}</strong></p><p>${esc(user.groups)} grupos · ${esc(user.reservations)} reservas</p></div><h3>Histórico de bloqueios e reativações</h3>${history||'<p>Nenhuma alteração de status registrada.</p>'}`;
+  }
+
+  function openUserStatusForm(user) {
+    if(user.protected){showToast("Conta administradora protegida.");return;}
+    const blocking=user.status!=="Bloqueado";
+    openForm({eyebrow:"Administração · Usuários",title:`${blocking?"Bloquear":"Reativar"} ${user.name}`,description:"O motivo ficará no histórico administrativo, com data e responsável.",submitLabel:blocking?"Confirmar bloqueio":"Reativar conta",
+      fields:[{name:"reason",label:blocking?"Motivo do bloqueio":"Motivo da reativação",type:"textarea",required:true,full:true}],
+      onSubmit:async(data)=>{
+        const reason=String(data.reason||"").trim();
+        if(reason.length<3||reason.length>2000)return markFormFieldInvalid("reason","Descreva o motivo com 3 a 2000 caracteres.");
+        if(backendRuntime.enabled){
+          if(!backendIsOnline()||!user.backendId){showToast("Conecte-se ao cadastro oficial para alterar este usuário.");return false;}
+          return Boolean(await runBackendMutation(blocking?"Usuário bloqueado. Motivo registrado no histórico.":"Usuário reativado. Histórico preservado.",()=>window.MarketplaceBackend.setMarketplaceUserStatus(user.backendId,blocking?"blocked":"active",reason)));
+        }
+        user.statusHistory=[{new_status:blocking?"blocked":"active",reason,created_at:new Date().toISOString(),actor_name:"Administração local"},...(user.statusHistory||[])];
+        user.status=blocking?"Bloqueado":"Ativo";saveState();render();return true;
+      }});
+  }
+
+  function adminUsers() {
+    const query = state.search.adminUser.toLowerCase();
+    const items = state.adminUsers.filter((user) => `${user.name} ${user.email} ${user.city}`.toLowerCase().includes(query));
+    return `${pageHeader("Administração", "Usuários", "Consulte usuários e acompanhe o histórico de bloqueios e reativações.")}
+      <div class="toolbar"><label class="search"><span>⌕</span><input id="adminUserSearch" value="${esc(state.search.adminUser)}" placeholder="Buscar usuário, e-mail ou cidade"></label><button class="button ghost" data-action="export-admin-users">Exportar CSV</button></div>
+      <section class="card"><div class="list">${items.map((user) => `<div class="list-item"><div class="avatar">${initials(user.name)}</div><div class="list-item-main"><strong>${esc(user.name)}</strong><small>${esc(user.email)} · ${esc(user.city)}<br>${esc(user.groups)} grupos · ${esc(user.reservations)} reservas · desde ${esc(user.createdAt)}</small></div><span class="status ${statusClass(user.status)}">${esc(user.status)}</span><div class="item-actions"><button class="button ghost small" data-action="admin-user-details" data-id="${esc(user.id)}">Detalhes</button><button class="button ${user.status === "Ativo" ? "danger" : "secondary"} small" data-action="toggle-admin-user" data-id="${esc(user.id)}" ${user.protected?"disabled":""}>${user.status === "Bloqueado" ? "Reativar" : "Bloquear"}</button></div></div>`).join("")}</div></section>`;
+  }
+
+  function adminFinancialHistory() {
+    const selected=state.filters.adminFinancePartner || "Todos";
+    const venueIds=new Set([...state.venues.filter((venue)=>String(venue.backendPartnerId)===selected).map((venue)=>venue.id),
+      ...state.adminPartners.filter((partner)=>String(partner.backendPartnerId || partner.id)===selected).map((partner)=>partner.venueId)].filter(Boolean));
+    const matches=(item)=>selected==="Todos" || venueIds.has(item.venueId);
+    const reservations=state.reservations.filter(matches);
+    const reservationIds=new Set(reservations.flatMap((item)=>[item.id,item.backendId]));
+    const cancellations=state.cancellationLog.filter((item)=>selected==="Todos" || reservationIds.has(item.reservationId));
+    const vouchers=state.cancellationVouchers.filter(matches);
+    const history=`<section class="card"><div class="section-heading"><div><h2>Vouchers de cancelamento</h2><p>Prazo condicionado à oferta de horários compatíveis e responsabilidade do parceiro.</p></div></div><div class="table-wrap" style="border:0"><table><thead><tr><th>Voucher</th><th>Parceiro</th><th>Valor</th><th>Uso</th><th>Faixa de oferta do parceiro</th><th>Datas ofertadas</th><th>Validade</th><th>Status</th><th>Ação</th></tr></thead><tbody>${vouchers.map((voucher) => `<tr><td>${esc(voucher.code)}</td><td>${esc(voucher.venue)}</td><td>${money(voucher.value)}</td><td>${voucher.eligibleBookingMode === "monthly" ? "Somente mensalista" : "Avulsa ou mensalista"}</td><td>${esc(voucher.originalTime || "—")} · ${esc(voucher.compatibilityWindow || "—")}</td><td>${esc(voucher.compatibleDatesCount || 0)}/${esc(voucher.minimumCompatibleDates || state.settings.voucherMinimumCompatibleDates)}</td><td>${esc(voucher.expiresAt)}</td><td><span class="status ${["active", "active_extended"].includes(voucher.status) ? "status-ok" : voucher.status === "reserved" ? "status-warning" : "status-neutral"}">${esc(voucherStatusLabel(voucher))}</span></td><td>${["active", "active_extended"].includes(voucher.status) ? (voucher.backendOfficial ? "Responsabilidade ativa" : `<button class="button ghost small" data-action="reassign-cancellation-voucher" data-id="${esc(voucher.id)}">Ressarcir e realocar</button>`) : "—"}</td></tr>`).join("") || `<tr><td colspan="9">Nenhum voucher gerado.</td></tr>`}</tbody></table></div></section>
+      <section class="card section"><div class="section-heading"><div><h2>Cancelamentos e reembolsos</h2><p>O responsável pelo cancelamento suporta a consequência financeira aplicável.</p></div></div><div class="table-wrap" style="border:0"><table><thead><tr><th>Registro</th><th>Reserva</th><th>Responsável</th><th>Modalidade</th><th>Reembolso</th><th>Taxas</th></tr></thead><tbody>${cancellations.map((item) => `<tr><td>${esc(item.id)}</td><td>${esc(item.reservationId || item.partnerReservationId)}</td><td>${esc(cancellationSourceLabel(item.source))}</td><td>${item.mode === "voucher" ? (item.voucherCount>0?`${item.voucherCount} vouchers individuais · ${money(item.voucherTotal)}`:"Voucher") : item.mode === "refund" ? "Reembolso integral" : "Sem compensação"}</td><td>${money(item.refundValue || 0)}</td><td>${item.feeResponsibility ? esc(cancellationSourceLabel(item.feeResponsibility)) : "Não aplicável"}</td></tr>`).join("") || `<tr><td colspan="6">Nenhum cancelamento processado.</td></tr>`}</tbody></table></div></section>
+      <section class="card section"><div class="section-heading"><div><h2>Análises excepcionais</h2><p>Cancelamentos fora do prazo submetidos conjuntamente ao Tâmo On e ao parceiro.</p></div></div><div class="table-wrap" style="border:0"><table><thead><tr><th>Solicitação</th><th>Reserva</th><th>Parceiro</th><th>Status</th><th>Decisões</th></tr></thead><tbody>${(state.cancellationExceptionReviews || []).filter((review)=>selected==="Todos" || reservationIds.has(review.reservationId)).map((review) => `<tr><td>${esc(review.id)}</td><td>${esc(review.reservationId)}</td><td>${esc(review.venue)}</td><td><span class="status status-warning">${esc(review.status)}</span></td><td>Tâmo On: ${esc(review.tamoDecision)} · Parceiro: ${esc(review.partnerDecision)}</td></tr>`).join("") || `<tr><td colspan="5">Nenhuma análise excepcional pendente.</td></tr>`}</tbody></table></div></section>
+      <div class="callout section"><strong>Regra contábil simulada</strong><p>O pagamento que originou o voucher permanece no exercício original. Cancelamentos do parceiro ou do Tâmo On geram reembolso integral e os custos ficam com o responsável. Fora do prazo, não há crédito automático.</p></div>`;
+    return history;
+  }
+
+  function adminFinance() {
+    const selected=state.filters.adminFinancePartner || "Todos";
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>')}
+      <div class="toolbar"><label class="field"><span>Parceiro</span><select class="filter-select" id="adminFinancePartner"><option value="Todos">Todos os parceiros — consolidado</option>${state.adminPartners.map(partner=>`<option value="${esc(partner.backendPartnerId||partner.id)}" ${String(partner.backendPartnerId||partner.id)===selected?'selected':''}>${esc(partner.tradeName)}</option>`).join('')}</select></label></div>
+      ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
+  }
+
+  function adminSettings() {
+    const settings = state.settings;
+    const toggle = (key,title,help,locked=false) => `<div class="toggle-row"><div class="toggle-copy"><strong>${esc(title)}</strong><small>${esc(help)}</small></div><button class="switch ${settings[key] ? "on" : ""}" data-action="toggle-setting" data-key="${esc(key)}" aria-pressed="${settings[key]}" ${locked ? "disabled" : ""}></button></div>`;
+    return `${pageHeader("Administração", "Configurações", "Controles do ambiente de homologação. Pagamentos reais permanecem bloqueados.", `<button class="button ghost" data-action="edit-commercial-settings">Editar regras comerciais</button>`)}
+      <section class="grid two"><article class="card"><h2>Operação</h2>${toggle("marketplaceEnabled","Área de parceiros","Exibe as áreas demonstrativas.")}${toggle("newPartners","Novos cadastros","Permite incluir parceiros fictícios.")}${toggle("vouchersEnabled","Vouchers","Exibe créditos de cancelamento e vouchers promocionais.")}${toggle("notificationEmails","Avisos por e-mail","Simulação de comunicações operacionais.")}</article><article class="card"><h2>Regras comerciais</h2><div class="detail-list" style="margin-top:14px"><div class="detail-line"><span>Comissão Tâmo On</span><strong>${esc(settings.defaultCommission)}%</strong></div><div class="detail-line"><span>Tarifa Pix Asaas</span><strong>${money(settings.asaasPixFixedFee)} por transação</strong></div><div class="detail-line"><span>Tarifa cartão Asaas</span><strong>${money(settings.asaasCardFixedFee)} + ${String(settings.asaasCardPercentageFee).replace(".",",")}%</strong></div><div class="detail-line"><span>Prazo do usuário</span><strong>${esc(settings.cancellationHours)} horas</strong></div><div class="detail-line"><span>Validade nominal</span><strong>${esc(settings.voucherValidityDays)} dias</strong></div><div class="detail-line"><span>Faixa compatível</span><strong>± ${esc(settings.voucherCompatibilityWindowHours)} horas</strong></div><div class="detail-line"><span>Mínimo de datas</span><strong>${esc(settings.voucherMinimumCompatibleDates)}</strong></div><div class="detail-line"><span>Prorrogação</span><strong>${esc(settings.voucherExtensionDays)} dias</strong></div><div class="detail-line"><span>Persistência</span><strong>LocalStorage do navegador</strong></div></div></article></section>
+      <section class="card section"><h2>Canais de recebimento</h2><p>Pix e cartão de crédito pelo Asaas, ou pagamento externo diretamente ao parceiro. O valor repassável é uma apuração financeira; transferências realizadas aparecem separadamente como repasse comprovado.</p></section>
+      <section class="section"><button class="button danger" data-action="reset-local-data">Restaurar dados iniciais</button></section>`;
+  }
+
+
+  function adminView() {
+    const views = { overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, vouchers: adminVouchers, settings: adminSettings };
+    return navShell("admin", (views[state.activePage.admin] || adminOverview)());
+  }
+
+  function render() {
+    capturePartnerInterestDraft();
+    const financeScreen=state.activePage?.[state.role]==="finance"?captureFinanceScreen(app.querySelector(".finance-page")):null;
+    const preserveFinance=financeScreen&&state.activePage?.[state.role]==="finance"&&financeScreen.identity===financeScreenIdentity();
+    renderNotificationControls();
+    if(backendRuntime.enabled&&backendRuntime.bootstrap?.profile?.status==="blocked"){
+      [reservationDialog,detailDialog,chatDialog,formDialog].forEach(dialog=>{if(dialog?.open)dialog.close();});
+      updateBackendRoleAccess();app.financeMarkup="";app.marketplaceScreenKey="";
+      app.innerHTML='<section class="backend-auth-gate"><div class="backend-auth-card"><h1>Conta bloqueada</h1><p>O acesso ao Marketplace foi bloqueado pela Administração. Entre em contato com o suporte.</p><p><a href="mailto:suporte@tamoon.app.br" style="color:inherit;overflow-wrap:anywhere">suporte@tamoon.app.br</a></p></div></section>';
+      app.style.minHeight="";return;
+    }
+    if (backendRuntime.enabled && !backendIsOnline()) {
+      updateBackendRoleAccess();
+      app.financeMarkup="";
+      app.marketplaceScreenKey="";
+      app.innerHTML = partnerReadonlyBanner() + backendAuthView();
+      applyPartnerReadonlyControls();
+      if(preserveFinance)app.style.minHeight="";
+      return;
+    }
+    if (backendRuntime.enabled && !backendAllowedRoles().has(state.role)) chooseBackendRole(backendRuntime.bootstrap || {});
+    const partnerAccessKey=state.role==="partner"
+      ? JSON.stringify([state.partnerProfile.backendPartnerId,menus.partner.map(([page])=>partnerPageAllowed(page))]) : null;
+    const canKeepFinance=preserveFinance&&financeScreen.identity===financeScreenIdentity()
+      &&(state.role==="admin"||(state.role==="partner"&&currentPartnerAccessStatus().allowed
+        && hasPartnerPermission("manage_finance") && app.partnerAccessKey===partnerAccessKey));
+    let changedFinance=false;
+    if(canKeepFinance){
+      const markup=state.role==="partner"?partnerFinance():adminFinance();
+      const stableMarkup=financeStableMarkup(markup);
+      if(app.financeMarkup!==stableMarkup){
+        app.style.minHeight=app.getBoundingClientRect().height+"px";
+        app.querySelector(".finance-page").outerHTML=markup;
+        app.financeMarkup=stableMarkup;changedFinance=true;
+      }
+    }else{
+      const markup=partnerReadonlyBanner() + (state.role === "user" ? userView() : state.role === "partner" ? partnerView() : state.role === "candidate" ? candidateView() : adminView());
+      const screenKey=JSON.stringify([backendRuntime.identityId,state.role,state.activePage?.[state.role],partnerAccessKey,partnerAccessPending,partnerReadonlyActive()]);
+      if(window.MarketplaceUI && app.marketplaceScreenKey===screenKey)window.MarketplaceUI.update(app,markup);
+      else app.innerHTML=markup;
+      app.marketplaceScreenKey=screenKey;
+      app.financeMarkup=state.activePage?.[state.role]==="finance"&&app.querySelector(".finance-page")
+         ?financeStableMarkup(state.role==="partner"?partnerFinance():adminFinance()):"";
+    }
+    if(!canKeepFinance||changedFinance){
+      const host=document.getElementById("financeMovementsHost");
+      if(host)host.financeMarkup=financialPeriodPanel();
+    }
+    applyPartnerReadonlyControls();
+    window.MarketplaceAgendaNavigation.showSelected(app);
+    updateBackendRoleAccess();
+    roleButtons.forEach((button) => button.classList.toggle("active", button.dataset.role === state.role));
+    const userReservationFilter = document.getElementById("userReservationFilter");
+    if (userReservationFilter) userReservationFilter.value = state.filters.userReservationStatus || "Todas";
+    const userShareFilter = document.getElementById("userShareFilter");
+    if (userShareFilter) userShareFilter.value = state.filters.userShareStatus || "Todas";
+    const partnerFilter = document.getElementById("partnerReservationFilter");
+    if (partnerFilter) partnerFilter.value = state.filters.partnerReservationStatus;
+    const adminPartnerFilter = document.getElementById("adminPartnerFilter");
+    if (adminPartnerFilter) adminPartnerFilter.value = state.filters.adminPartnerStatus;
+    const adminReservationFilter = document.getElementById("adminReservationFilter");
+    if (adminReservationFilter) adminReservationFilter.value = state.filters.adminReservationStatus;
+    app.partnerAccessKey=partnerAccessKey;
+    updateRoleUnreadIndicators();
+    if(changedFinance)restoreFinanceScreen(app.querySelector(".finance-page"),financeScreen);
+    if(preserveFinance)app.style.minHeight="";
+  }
+
+  function publicScheduleSlotState(slot, reservation = null) {
+    const official=Boolean(backendIsOnline() && slot.backendId);
+    const occupied=official ? slot.backendMarketplaceStatus==="reserved" : Boolean(reservation);
+    const monthly=Boolean(slot.backendMonthlyProtected);
+    const owned=official ? (occupied ? slot.backendReservationOwned===true : monthly && slot.backendMonthlyOwned===true)
+      : Boolean(reservation && (reservation.userId ? reservation.userId===(backendRuntime.identityId||state.userProfile.id) : reservation.user===state.userProfile.name));
+    if(slot.blocked || (occupied || monthly || ["unavailable","monthly_pre_reserved"].includes(slot.backendMarketplaceStatus)) && !owned) {
+      return {className:"unavailable",label:"Indisponível",disabled:true,owned:false,showOffer:false};
+    }
+    if(owned && (occupied || monthly)) {
+      const status=monthly ? monthlyCycleStatusLabel(slot.backendMonthlyCycleStatus)
+        : (slot.backendReservationStatus==="confirmed" || reservation?.statusKey==="confirmed" ? "Confirmada" : "Pagamento pendente");
+      return {className:monthly?"monthly-protected":"reservation-confirmed",label:`${monthly?"Seu horário mensalista":"Sua reserva"} · ${status}`,
+        disabled:occupied || !slot.backendMonthlyAuthorized,owned:true,showOffer:false};
+    }
+    return {className:"available",label:"Disponível",disabled:false,owned:false,showOffer:true};
+  }
+
+  function venueScheduleBody(venue, selectedDate) {
+    venue.schedule = Array.isArray(venue.schedule) ? venue.schedule : [];
+    const publicDays = publicScheduleDays(venue).filter((day) => publicSlotsForDay(day).length > 0);
+    const photos = venueGalleryPhotos(venue);
+    const galleryButton = `<button type="button" class="venue-gallery-button" data-action="venue-gallery" data-id="${esc(venue.id)}" aria-label="Abrir galeria de fotos">Galeria${photos.length > 1 ? ` · ${photos.length}` : ""}</button>`;
+    const address = venuePublicAddress(venue);
+    const photoTone = venuePhotoTone(venue);
+    if (!publicDays.length) {
+      selectedVenueSchedule = { venueId: venue.id, shortDate: "" };
+      return `<div class="venue-detail-cover photo-tone-${esc(photoTone)}"><img class="venue-detail-image" src="${esc(venue.facadeImage)}" alt="Fachada de ${esc(venue.name)}">${galleryButton}<div class="venue-detail-overlay"><span class="rating-badge">${venueRatingMarkup(venue)}</span><div><strong>${esc(address)}</strong></div></div></div>
+        ${venueDetailSummary(venue)}
+        <section class="schedule-section">${emptyState("▦", "Não há horários atuais ou futuros publicados para reserva.")}</section>`;
+    }
+    const day = publicDays.find((item) => item.shortDate === selectedDate) || publicDays[0];
+    const publicSlots = publicSlotsForDay(day);
+    selectedVenueSchedule = { venueId: venue.id, shortDate: day.shortDate };
+    return `<div class="venue-detail-cover photo-tone-${esc(photoTone)}"><img class="venue-detail-image" src="${esc(venue.facadeImage)}" alt="Fachada de ${esc(venue.name)}">${galleryButton}<div class="venue-detail-overlay"><span class="rating-badge">${venueRatingMarkup(venue)}</span><div><strong>${esc(address)}</strong></div></div></div>
+      ${venueDetailSummary(venue)}
+      <section class="schedule-section"><div class="section-heading"><div><h2>Agenda do parceiro</h2><p>Somente o dia atual e as próximas datas ficam disponíveis para novas reservas.</p></div></div>
+      <div class="schedule-days" aria-label="Dias atuais e futuros com agenda">${publicDays.map((item) => `<button type="button" class="schedule-day ${item.shortDate === day.shortDate ? "active" : ""}" data-action="venue-schedule-day" data-id="${esc(venue.id)}" data-date="${esc(item.shortDate)}"><small>${esc(item.weekday)}</small><strong>${esc(item.dayLabel)}</strong></button>`).join("")}</div>
+      <div class="schedule-slots">${publicSlots.map((slot) => {
+        const reservation=backendIsOnline() && slot.backendId
+          ? state.reservations.find(item=>item.backendId===slot.backendReservationId)
+          : findReservationForSlot(venue.id,slot.time,day.date,slotEndTime(slot),normalizedSlotSpace(slot));
+        const display=publicScheduleSlotState(slot,reservation);
+        const cls=display.className,label=display.label,unavailable=display.disabled;
+        const monthlyProtected=Boolean(slot.backendMonthlyProtected);
+        const monthlyVisible=display.owned && monthlyProtected
+          ? Number(slot.backendMonthlyTotal||slot.monthlyPrice)>0
+          : display.showOffer && monthlyOfferContinuity({venue,day,slot,time:slot.time,endTime:slotEndTime(slot)}).eligible;
+        const priceMarkup=cls==="unavailable"?"":monthlyVisible
+          ? `<span class="schedule-slot-prices"><span><small>Avulso</small><b>${money(slot.price)}</b></span><span><small>Mensal</small><b>${money(slot.backendMonthlyTotal||slot.monthlyPrice)}</b></span></span>`
+          : `<b>${money(slot.price)}</b>`;
+        const openHint=display.owned&&monthlyProtected&&slot.backendMonthlyPaymentAvailableAt&&!reservation?.paymentConfirmedAt
+          &&!["fully_paid","completed","cancelled","suspended"].includes(slot.backendMonthlyCycleStatus)
+          ?` · pagamento disponível a partir de ${backendDateLabel(slot.backendMonthlyPaymentAvailableAt)}`:"";
+        return `<div class="schedule-slot-stack"><button type="button" class="schedule-slot ${cls}" data-action="reserve-slot" data-venue="${esc(venue.id)}" data-time="${esc(slot.time)}" data-end="${esc(slotEndTime(slot))}" data-date="${esc(day.shortDate)}" data-full-date="${esc(day.date)}" data-space="${esc(normalizedSlotSpace(slot))}" data-slot-id="${esc(slot.backendId || "")}" ${unavailable ? "disabled" : ""}><span><strong>${esc(timeRange(slot.time,slotEndTime(slot)))}</strong><small>${esc(normalizedSlotSpace(slot))}</small><small>${esc(label)}${esc(openHint)}${!monthlyProtected&&monthlyVisible ? " · oferta mensalista disponível" : ""}</small></span>${priceMarkup}</button></div>`;
+      }).join("")}</div><div class="slot-legend schedule-legend"><span><i class="legend-dot"></i>Disponível</span><span><i class="legend-dot confirmed"></i>Sua reserva</span><span><i class="legend-dot unavailable"></i>Indisponível</span></div></section>`;
+  }
+
+  function openVenueSchedule(venueId, shortDate) {
+    const venue = state.venues.find((item) => item.id === venueId);
+    if (!venue) return;
+    detailDialog.dataset.view = "venue-schedule";
+    detailEyebrow.textContent = "Espaço parceiro";
+    detailTitle.textContent = venue.name;
+    const firstPublicDay = publicScheduleDays(venue).find((day) => publicSlotsForDay(day).length > 0);
+    detailBody.innerHTML = venueScheduleBody(venue, shortDate || firstPublicDay?.shortDate || "");
+    if (!detailDialog.open) {
+      detailDialog.showModal();
+      focusDialog(detailDialog);
+    }
+  }
+
+  async function openMonthlyLinkRequestConversation(request, {refresh=false}={}) {
+    if (state.role === "user" && !canManageMonthlyRequest(request)) {
+      showToast("Você não tem permissão para administrar este vínculo mensalista.");
+      return;
+    }
+    const identity=backendRuntime.identityId,epoch=++monthlyConversationEpoch;
+    const notificationIds=(state.personalNotifications||[]).filter(row=>row.profile_id===identity&&row.entity_type==="monthly_link_request"&&row.entity_id===request.id&&row.status==="unread").map(row=>row.id);
+    if(!refresh){
+      openDetail({eyebrow:"Solicitação mensalista",title:"Conversa",body:'<p role="status">Carregando a conversa…</p>'});
+      detailDialog.dataset.view="monthly-request-chat";detailDialog.dataset.requestId=request.id;
+    }
+    let messages=[];
+    try{messages=await window.MarketplaceBackend.monthlyLinkRequestMessages(request.id)||[];}
+    catch(error){if(identity===backendRuntime.identityId&&epoch===monthlyConversationEpoch)showToast(backendErrorMessage(error));return;}
+    if(identity!==backendRuntime.identityId||epoch!==monthlyConversationEpoch||!detailDialog.open||detailDialog.dataset.view!=="monthly-request-chat"||detailDialog.dataset.requestId!==request.id)return;
+    const closed=["converted","rejected","cancelled","expired"].includes(request.status);
+    const requestStatusLabel=state.role==="partner"?partnerMonthlyLinkRequestStatusLabel(request.status):monthlyLinkRequestStatusLabel(request.status);
+    const proposal=request.status==="proposal_sent"?`<div class="callout"><strong>${state.role==="partner"?"Proposta enviada":"Proposta do parceiro"}</strong><p>${money(request.proposedMonthlyPrice)}/mês · início em ${monthlyPeriodLabel(request.proposedStartMonth)}${request.proposedRequireRenewalConfirmation?" · confirmação mensal não financeira":""}.</p></div>`:"";
+    const conversation=messages.length?`<div class="monthly-request-conversation">${messages.map((message)=>`<article class="monthly-request-message ${message.sender_side===state.role?"own":""}"><strong>${esc(message.sender_name||"Participante")}</strong><p>${esc(message.body)}</p><small>${esc(backendDateTimeLabel(message.created_at))}</small></article>`).join("")}</div>`:emptyState("…","A conversa ainda não possui mensagens.");
+    const actions=closed?"":`<div class="dialog-actions monthly-request-actions"><button class="button secondary" data-action="message-monthly-request" data-id="${esc(request.id)}">Enviar mensagem</button>${request.canManageAsPartner&&["pending_partner","in_conversation"].includes(request.status)?`<button class="button primary" data-action="propose-monthly-request" data-id="${esc(request.id)}">Enviar proposta</button>`:""}</div>`;
+    openDetail({eyebrow:"Solicitação mensalista",title:`${request.groupName} · ${request.venueName}`,body:`<div class="summary-card"><strong>${esc(requestStatusLabel)}</strong><div class="meta-row"><span>${esc(request.spaceName)}</span><span>${esc(["","Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"][request.weekday])} · ${esc(timeRange(request.startTime,request.endTime))}</span><span>Início desejado: ${esc(monthlyPeriodLabel(request.requestedStartMonth))}</span></div></div>${proposal}<div class="section-heading"><div><h3>Conversa</h3><p>Somente o grupo, o parceiro e a Administração podem visualizar estas mensagens.</p></div></div>${conversation}${actions}`});
+    detailDialog.dataset.view="monthly-request-chat";detailDialog.dataset.requestId=request.id;
+    if(!document.hidden)await persistNotificationReads(notificationIds);
+  }
+
+  async function refreshMonthlyLinkRequestConversation(requestId) {
+    const updated=(state.monthlyLinkRequests||[]).find((item)=>item.id===requestId);
+    if(updated&&detailDialog.open&&detailDialog.dataset.view==="monthly-request-chat"&&detailDialog.dataset.requestId===requestId)await openMonthlyLinkRequestConversation(updated,{refresh:true});
+  }
+
+  function openMonthlyCycleActivation(cycle, venue, day, slot) {
+    if (state.role === "user" && !canManageMonthlySubject(cycle)) {
+      showToast("Você não tem permissão para administrar este vínculo mensalista.");
+      return;
+    }
+    if (!cycle?.id || !cycle.link) {
+      showToast("O ciclo mensalista protegido ainda não está disponível.");
+      return;
+    }
+    const reservation=(state.reservations||[]).find((item)=>item.monthlyCycleId===cycle.id||item.backendId===cycle.reservationId);
+    const startTime=slot?.time||cycle.link.startTime||reservation?.time||"";
+    const endTime=slot?slotEndTime(slot):cycle.link.endTime||reservation?.endTime||"";
+    const displayPeriod=startTime&&endTime?timeRange(startTime,endTime):"Horário protegido";
+    const displayDate=day?.date||reservation?.date||monthlyPeriodLabel(cycle.serviceMonth);
+    const displaySpace=slot?normalizedSlotSpace(slot):cycle.spaceName||reservation?.space||"Espaço mensalista";
+    if(!reservation){
+      const reviewedTotal=Number(cycle.monthlyTotal);
+      openForm({
+        eyebrow:"Mensalista protegido",
+        title:`Confirmar pré-reserva de ${cycle.groupName}`,
+        description:`${displayDate} · ${displaySpace} · ${displayPeriod}. Confira o valor deste mês antes de aceitar. Plano, forma de pagamento, responsável e rateio serão definidos em Minhas reservas.`,
+        submitLabel:"Criar pré-reserva",
+        fields:[
+          {name:"cycleSummary",type:"custom",full:true,html:`<div class="detail-list"><div class="detail-line"><span>Mensalidade</span><strong>${money(cycle.monthlyTotal)}</strong></div><div class="detail-line"><span>Ocorrências protegidas</span><strong>${esc(cycle.occurrenceCount)}</strong></div><div class="detail-line"><span>Mínimo para os primeiros eventos</span><strong>${money(cycle.guaranteeRequired||cycle.initialRequired)} · até ${esc(backendDateTimeLabel(cycle.initialDueAt||cycle.balanceDueAt))}</strong></div><div class="detail-line"><span>Quitação do mês</span><strong>${money(cycle.monthlyTotal)} · até ${esc(backendDateTimeLabel(cycle.balanceDueAt))}</strong></div></div>`},
+          {name:"monthlyPolicy",label:"Regras do ciclo",type:"checkbox-group",required:true,full:true,help:"O mínimo para garantir corresponde ao maior valor entre 30% da mensalidade e o valor das ocorrências protegidas até o quinto dia útil. Esse mínimo vence 15 minutos antes do primeiro evento; depois de atingido, as cotas restantes continuam abertas até o prazo do saldo.",options:[{value:"monthly_policy_accepted",label:"Aceito o valor deste mês, as regras mensalistas e os prazos apresentados",help:"Em Minhas reservas será criado um único rateio do valor mensal, sem segunda cobrança para os mesmos pagadores.",checked:false}]}
+        ],
+        onSubmit:async(data)=>{
+          if(data.monthly_policy_accepted!=="true")return markFormFieldInvalid("monthlyPolicy","Campo obrigatório: aceite as regras para criar a pré-reserva.");
+          const result=await runBackendMutation("Pré-reserva mensalista criada. Defina o pagamento em Minhas reservas.",()=>window.MarketplaceBackend.activateMonthlyCyclePrebooking({monthlyCycleId:cycle.id,expectedTotal:reviewedTotal,policyVersion:"marketplace-0.2.0-part-22ar",policyAccepted:true}));
+          if(!result)return false;
+          state.activePage.user="reservations";
+          state.userReservationTab="monthly";
+          saveState();
+          render();
+          return true;
+        }
+      });
+      return;
+    }
+    const action=`<div class="dialog-actions"><button type="button" class="button primary" data-action="open-monthly-reservation-payment" data-id="${esc(reservation.id)}">${reservation.paymentConfigured?"Ver em Minhas reservas":"Definir pagamento em Minhas reservas"}</button></div>`;
+    openDetail({
+      eyebrow:"Mensalista protegido",
+      title:`${cycle.groupName} · ${displayPeriod}`,
+      body:`<div class="summary-card"><strong>${esc(cycle.statusLabel)}</strong><div class="meta-row" style="margin-top:7px"><span>${esc(displayDate)}</span><span>${esc(displaySpace)}</span><span>${esc(cycle.occurrenceCount)} ocorrência(s)</span></div><p class="dialog-description">O horário já está protegido. A forma de pagamento e a arrecadação mensal única ficam concentradas em Minhas reservas.</p></div><div class="detail-list" style="margin-top:12px"><div class="detail-line"><span>Mensalidade</span><strong>${money(cycle.monthlyTotal)}</strong></div><div class="detail-line"><span>Mínimo para os primeiros eventos</span><strong>${money(cycle.guaranteeRequired||cycle.initialRequired)} · até ${esc(backendDateTimeLabel(cycle.initialDueAt||cycle.balanceDueAt))}</strong></div><div class="detail-line"><span>Quitação do mês</span><strong>${money(cycle.monthlyTotal)} · até ${esc(backendDateTimeLabel(cycle.balanceDueAt))}</strong></div><div class="detail-line"><span>Modelo</span><strong>Uma única cota por pagador</strong></div></div>${action}`
+    });
+  }
+
+  function refreshOpenVenueScheduleFromBackend() {
+    if (!backendIsOnline() || !detailDialog.open || detailDialog.dataset.view !== "venue-schedule" || !selectedVenueSchedule) return;
+    const context = { ...selectedVenueSchedule };
+    const dialogScrollTop = detailDialog.scrollTop;
+    const bodyScrollTop = detailBody.scrollTop;
+    openVenueSchedule(context.venueId, context.shortDate);
+    requestAnimationFrame(() => {
+      detailDialog.scrollTop = dialogScrollTop;
+      detailBody.scrollTop = bodyScrollTop;
+    });
+  }
+
+  function refreshOpenReservationFromBackend() {
+    if (!backendIsOnline() || !reservationDialog.open || !selectedReservation) return true;
+    const current = currentReservationSelection(selectedReservation);
+    if (!reservationSelectionAvailable(current)) {
+      reservationReturnContext = null;
+      selectedReservation = null;
+      reservationDialog.close();
+      showToast("O horário foi alterado ou ficou indisponível. Consulte a agenda atualizada.");
+      return false;
+    }
+    const previousSignature = selectedReservation.reviewSignature;
+    const monthly = isMonthlySelection();
+    if (monthly && !monthlyOfferContinuity(current).eligible) {
+      reservationReturnContext = null;
+      selectedReservation = null;
+      reservationDialog.close();
+      showToast("A sequência mensalista deixou de estar disponível. Consulte a agenda e escolha novamente a modalidade.");
+      return false;
+    }
+    const nextSignature = reservationReviewSignature(current, monthly);
+    selectedReservation = current;
+    if (previousSignature && previousSignature !== nextSignature) {
+      reservationPolicyAcknowledge.checked = false;
+      setReservationPolicyInvalid(false);
+      showToast("As datas ou o valor da reserva foram atualizados. Confira e aceite as regras novamente.");
+    }
+    updateMonthlyReservationPreview();
+    populateVoucherOptions();
+    populateReservationGroups(true);
+    if (monthly !== isMonthlySelection()) updateReservationEventOptions();
+    updateReservationSubmitState();
+    return true;
+  }
+
+  function openReservation(venueId, time, shortDate, requestedEndTime = "", requestedSpace = "", requestedSlotId = "") {
+    const venue = state.venues.find((item) => item.id === venueId);
+    if (!venue) return;
+    const selection = reservationSelectionForSlot(venue, time, shortDate, requestedEndTime, requestedSpace, requestedSlotId);
+    if (!selection) { showToast("Este horário mudou. Selecione novamente na agenda atualizada."); return; }
+    const {day, slot} = selection;
+    const endTime = slotEndTime(slot);
+    if (slot.backendMonthlyProtected && slot.backendMonthlyAuthorized && slot.backendMonthlyCycleId && slot.backendMarketplaceStatus !== "reserved") {
+      openMonthlyCycleActivation(monthlyCycleForSlot(slot),venue,day,slot);
+      return;
+    }
+    const existing = slot.backendId ? null : findReservationForSlot(venueId, time, day.date, endTime, normalizedSlotSpace(slot));
+    if (existing) {
+      const visual = reservationStatus(existing.statusKey);
+      detailReturnContext = { venueId: venue.id, shortDate: day.shortDate };
+      openDetail({ eyebrow: "Status do horário", title: `${venue.name} · ${timeRange(time,endTime)}`, body: `<div class="summary-card"><strong>${visual.label}</strong></div><p class="dialog-description">Horários cancelados deixam de bloquear a agenda e permanecem apenas no histórico de reservas.</p>` });
+      return;
+    }
+    if (slot.blocked) {
+      detailReturnContext = { venueId: venue.id, shortDate: day.shortDate };
+      openDetail({ eyebrow: "Horário indisponível", title: `${venue.name} · ${timeRange(time,endTime)}`, body: `<p class="dialog-description">Este horário foi bloqueado pelo parceiro e não pode ser reservado.</p>` });
+      return;
+    }
+    if (!reservationSelectionAvailable(selection)) { showToast("Este horário não está mais disponível para reserva."); return; }
+    selectedReservation = selection;
+    reservationReturnContext = { venueId: venue.id, shortDate: day.shortDate };
+    reservationTitle.textContent = `${venue.name} · ${timeRange(time,endTime)}`;
+    monthlyReservationToggle.checked = false;
+    reservationPolicyAcknowledge.checked = false;
+    setReservationPolicyInvalid(false);
+    if (paymentMethodSelect) paymentMethodSelect.value = (window.TAMO_ON_MARKETPLACE_CONFIG || window.TAMO_ON_PARTNERS_CONFIG)?.payments?.defaultMethod || "pix_direct_partner";
+    if (pixSplitToggle) pixSplitToggle.checked = false;
+    if (pixSplitMode) pixSplitMode.value = "equal";
+    if (pixSplitConfig) pixSplitConfig.hidden = true;
+    if (pixSplitMembers) pixSplitMembers.innerHTML = "";
+    if (pixSplitSummary) pixSplitSummary.innerHTML = "";
+    if (singlePayerPanel) singlePayerPanel.hidden = true;
+    if (singlePayerSelect) singlePayerSelect.innerHTML = "";
+    if (reservationPolicyText) reservationPolicyText.textContent = "Reserva avulsa: a pré-reserva permite pagar em até 30 minutos. Após o pagamento, o usuário pode cancelar em até 24 horas para receber o voucher previsto nas regras. Mensalista: aplica-se o prazo próprio do ciclo. Parceiro ou Tâmo On: reembolso integral. Fora do prazo não há crédito automático." + " " + splitCancellationPolicyText({monthly:false});
+    populateVoucherOptions();
+    updateMonthlyReservationPreview();
+    populateReservationGroups();
+    if (detailDialog.open) detailDialog.close();
+    reservationDialog.showModal();
+    focusDialog(reservationDialog);
+  }
+
+  function applyUserReservationStatus(id, statusKey) {
+    const reservation = state.reservations.find((item) => item.id === id);
+    if (!reservation) return;
+    const linkedVoucher = reservation.cancellationVoucherId ? state.cancellationVouchers.find((voucher) => voucher.id === reservation.cancellationVoucherId) : null;
+    if (statusKey === "confirmed") {
+      const complement = Number(reservation.paymentDue || 0);
+      const hadAccounting = Number(reservation.accountingRecognizedValue || 0) > 0;
+      const paymentMethod = reservation.paymentMethod || "credit_card_asaas";
+      const isCard = paymentMethod === "credit_card_asaas";
+      const provider = reservation.paymentProvider || (isCard ? "ASAAS" : "GENERIC_MANUAL");
+      Object.assign(reservation, {
+        statusKey: "confirmed",
+        status: complement > 0 ? "Confirmada — complemento pago" : "Confirmada",
+        paymentConfirmedAtIso:new Date().toISOString(),
+        endpoint: isCard ? "asaas.webhook.payment_confirmed" : "bank_pix.webhook.received",
+        paymentStatus: complement > 0 ? (isCard ? "Complemento pago no cartão" : "Complemento Pix confirmado") : (isCard ? "Pagamento no cartão confirmado" : "Pagamento Pix confirmado"),
+        complementPaid: complement,
+        accountingRecognizedValue: complement > 0 ? complement : Number(reservation.accountingRecognizedValue || reservation.value),
+        fiscalObligationValue: complement > 0 ? complement : Number(reservation.fiscalObligationValue || reservation.value),
+        accountingMonth: accountingMonth()
+      });
+      const paymentIntent = state.paymentIntents.find((item) => item.id === reservation.paymentIntentId);
+      if (paymentIntent) Object.assign(paymentIntent, { status:"CONFIRMED", confirmedAt:new Date().toLocaleString("pt-BR") });
+      state.paymentWebhookLog.unshift({ id:nextId("WH-", state.paymentWebhookLog), provider, event:isCard ? "PAYMENT_CONFIRMED" : "PIX_RECEIVED", reservationId:reservation.id, status:"Processado", createdAt:new Date().toLocaleString("pt-BR") });
+      if (linkedVoucher) {
+        Object.assign(linkedVoucher, { status: "used", usedAt: new Date().toLocaleString("pt-BR"), usedReservationId: reservation.id, consumedValue: linkedVoucher.value });
+      }
+      if (complement > 0) {
+        state.accountingLedger.unshift({ id: nextId("LED-", state.accountingLedger), type: "voucher_complement", reservationId: reservation.id, voucherId: linkedVoucher?.id || "", venueId: reservation.venueId, venue: reservation.venue, amount: complement, fiscalAmount: complement, accountingMonth: reservation.accountingMonth, description: "Complemento pago em reserva com voucher" });
+      } else if (!linkedVoucher && !hadAccounting) {
+        state.accountingLedger.unshift({ id: nextId("LED-", state.accountingLedger), type: "service_payment", reservationId: reservation.id, venueId: reservation.venueId, venue: reservation.venue, amount: reservation.value, fiscalAmount: reservation.value, accountingMonth: reservation.accountingMonth, description: "Pagamento da reserva" });
+      }
+      const published = publishStandbyEventForReservation(reservation, complement > 0 ? "event.publish_after_complement" : "event.publish_after_payment");
+      syncPartnerReservationFromUser(reservation);
+      ensureChatThread(reservation);
+      saveState(); render();
+      showToast(published ? `${id}: pagamento confirmado, evento publicado e push registrado.` : `${id}: pagamento confirmado.`);
+      return;
+    }
+    if (linkedVoucher?.status === "reserved") Object.assign(linkedVoucher, { status: "active", reservedReservationId: "", reservedAt: "" });
+    Object.assign(reservation, { statusKey: "cancelled", status: "Cancelada", endpoint: "reservation.cancelled", pushStatus: "Não enviado" });
+    if (reservation.eventMode === "new" && reservation.eventId) {
+      const linkedEvent = state.groupEvents.find((event) => event.id === reservation.eventId);
+      if (linkedEvent && linkedEvent.statusKey === "standby_payment") {
+        Object.assign(linkedEvent, { statusKey: "cancelled", status: "Cancelado", published: false, publicationEndpoint: "reservation.cancelled", pushStatus: "Não enviado" });
+        reservation.eventPublicationStatus = "cancelled";
+      }
+    }
+    saveState(); render(); showToast(`${id}: reserva cancelada; o evento em espera não foi publicado.`);
+  }
+
+  function openPromotionForm(issuerType) {
+    const isPartner = issuerType === "partner";
+    const venueOptions = isPartner ? [{ value:state.partnerProfile.venueId, label:state.partnerProfile.tradeName }] : [{ value:"all", label:"Todos os parceiros" }, ...state.venues.filter(partnerVisibleInMarketplace).map((venue) => ({ value:venue.id, label:venue.name }))];
+    const today = new Date();
+    const expiry = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+    const expiryIso = `${expiry.getFullYear()}-${String(expiry.getMonth()+1).padStart(2,"0")}-${String(expiry.getDate()).padStart(2,"0")}`;
+    openForm({ eyebrow:isPartner ? "Voucher do parceiro" : "Voucher da administração", title:"Criar voucher promocional", description:"O desconto será aplicado diretamente ao valor da reserva quando o usuário selecionar este código no checkout.", fields:[
+      {name:"title",label:"Nome da campanha",value:"",required:true},
+      {name:"code",label:"Código do voucher",value:"",required:true},
+      {name:"venueId",label:"Onde pode ser usado",type:"select",value:isPartner?state.partnerProfile.venueId:"all",options:venueOptions,required:true},
+      {name:"discountType",label:"Tipo de desconto",type:"select",value:"percentage",options:[{value:"percentage",label:"Percentual (%)"},{value:"fixed",label:"Valor fixo (R$)"}],required:true},
+      {name:"discountValue",label:"Valor do desconto",type:"number",step:"0.01",value:10,required:true},
+      {name:"minimumReservationValue",label:"Valor mínimo da reserva",type:"number",step:"0.01",value:0},
+      {name:"bookingMode",label:"Modalidade",type:"select",value:"any",options:[{value:"any",label:"Avulsa ou mensalista"},{value:"single",label:"Somente avulsa"},{value:"monthly",label:"Somente mensalista"}],required:true},
+      {name:"eventRestriction",label:"Data e horário do jogo",type:"select",value:"any",options:[{value:"any",label:"Sem restrição de data e horário"},{value:"specific",label:"Data e faixa de horário específicas"}],full:true},
+      {name:"eventDate",label:"Data do jogo",type:"date",required:true},
+      {name:"eventStartTime",label:"Início da faixa",type:"time",required:true},
+      {name:"eventEndTime",label:"Término da faixa",type:"time",value:"",required:true,help:"Use o seletor de horário. Para terminar à meia-noite, selecione 00:00; o sistema registrará 24:00 no fim da faixa."},
+      {name:"validUntil",label:"Código pode ser utilizado até",type:"date",value:expiryIso,required:true}
+    ], submitLabel:"Criar voucher", onChange:()=>{
+      const specific=dynamicForm.elements.eventRestriction?.value==="specific";
+      ["eventDate","eventStartTime","eventEndTime"].forEach(name=>setFormFieldVisible(name,specific));
+      if(specific)dynamicForm.elements.bookingMode.value="single";
+      dynamicForm.elements.bookingMode.disabled=specific;
+    }, onSubmit:async(data)=>{
+      const specific=data.eventRestriction==="specific";
+      data.bookingMode=specific?"single":data.bookingMode;
+      const selectedEndTime=data.eventEndTime;
+      const normalizedEndTime=selectedEndTime==="00:00"?"24:00":selectedEndTime;
+      if(specific&&(!/^\d{4}-\d{2}-\d{2}$/.test(data.eventDate||"")||!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.eventStartTime||"")||!/^(([01]\d|2[0-3]):[0-5]\d|24:00)$/.test(normalizedEndTime||"")||timeToMinutes(data.eventStartTime)>=timeToMinutes(normalizedEndTime)))return markFormFieldInvalid("eventEndTime","Informe uma faixa válida, com término após o início e até a meia-noite.");
+      if(specific)data.eventEndTime=normalizedEndTime;
+      if(specific&&new Date(`${data.eventDate}T${data.eventStartTime}:00-03:00`).getTime()<=Date.now())return markFormFieldInvalid("eventDate","Escolha uma data e horário futuros.");
+      const eventWindow={eventDate:specific?data.eventDate:null,eventStartTime:specific?data.eventStartTime:null,eventEndTime:specific?data.eventEndTime:null};
+      const code=String(data.code||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"");
+      if(code.length<3){showToast("Informe um código com pelo menos 3 caracteres.");return false;}
+      if(state.promotions.some((promo)=>String(promo.code).toUpperCase()===code)){showToast("Já existe um voucher com esse código.");return false;}
+      const discountValue=Number(data.discountValue||0);
+      if(discountValue<=0 || (data.discountType==="percentage" && discountValue>100)){showToast("Revise o valor do desconto.");return false;}
+      const venueId=isPartner?state.partnerProfile.venueId:data.venueId;
+      const venue=venueId==="all"?null:state.venues.find((item)=>item.id===venueId);
+      const validDate=new Date(`${data.validUntil}T12:00:00`);
+      if (backendIsOnline()) {
+        const partnerId=venueId==="all"?null:(venue?.backendPartnerId||state.partnerProfile.backendPartnerId||null);
+        const result=await runBackendMutation(`Voucher ${code} criado no staging.`,()=>window.MarketplaceBackend.createPromotionalVoucher({
+          title:String(data.title||"").trim(),
+          code,
+          discountType:data.discountType,
+          discountValue,
+          expiresAt:`${data.validUntil}T23:59:59-03:00`,
+          partnerId,
+          minimumValue:Number(data.minimumReservationValue||0),
+          bookingScope:data.bookingMode,
+          singleUse:false,...eventWindow
+        }));
+        if (!result) return false;
+        return true;
+      }
+      const promo={ ...eventWindow,id:nextId("P-",state.promotions), title:data.title, code, discountType:data.discountType, discountValue, benefit:data.discountType==="percentage"?`${discountValue}% de desconto`:`${money(discountValue)} de desconto`, minimumReservationValue:Number(data.minimumReservationValue||0), bookingMode:data.bookingMode, venueId, venue:venue?.name||"Todos os parceiros", validUntil:formatPtDate(validDate), active:true, issuerType, issuerName:isPartner?state.partnerProfile.tradeName:"Tâmo On", createdAt:new Date().toLocaleString("pt-BR"), usedCount:0 };
+      state.promotions.unshift(promo); saveState(); render(); showToast(`Voucher ${code} criado.`);
+    }});
+  }
+
+  function partnerDetailsBody(partner) {
+    const currentProfile = state.partnerProfile?.venueId === partner.venueId ? state.partnerProfile : null;
+    const application = partnerApplicationForAdminPartner(partner);
+    const partnerId=partner.backendPartnerId || partner.id;
+    const docs = backendIsOnline() ? backendPartnerDocuments(partnerId) : (currentProfile?.documents || []);
+    const team = backendIsOnline() ? backendTeamMembers(partnerId) : (currentProfile ? state.partnerTeam : []);
+    const onboarding = partnerOnboardingForPartner(partnerId);
+    const venues = (backendRuntime.bootstrap?.venues || []).filter((item) => item.partner_id === partnerId);
+    const venueIds = new Set(venues.map((item) => item.id));
+    const spaces = (backendRuntime.bootstrap?.spaces || []).filter((item) => venueIds.has(item.venue_id));
+    const photos = (backendRuntime.bootstrap?.venue_photos || []).filter((item) => venueIds.has(item.venue_id));
+    const facilities = backendIsOnline() ? `<div class="detail-group"><h3>Endereço e espaços para conferência</h3><div class="detail-list">${venues.map((v) => `<div class="detail-line"><span>${esc(v.name)}</span><strong>${esc([v.street,v.street_number,v.neighborhood,v.city,v.state,v.zip].filter(Boolean).join(", ") || "Endereço pendente")}</strong></div>`).join("")}${spaces.map((sp) => `<div class="detail-line"><span>${esc(sp.name)} · ${esc(sp.type)}</span><strong>${money(sp.base_price)} · ${sp.active ? "Ativo" : "Inativo"}</strong></div>`).join("") || "<p>Nenhum espaço cadastrado.</p>"}</div><div class="partner-photo-grid">${photos.map((ph) => `<article class="partner-photo-item"><img src="${esc(backendPhotoUrl(ph))}" alt="${esc(ph.display_name || "Foto do estabelecimento")}"><small>${esc(ph.display_name || "Foto do estabelecimento")}</small></article>`).join("")}</div></div>` : "";
+    return `${onboarding ? partnerOnboardingPanel(onboarding,true) : ""}<div class="details-grid">${facilities}
+      <div class="detail-group"><h3>Empresa</h3><div class="detail-list"><div class="detail-line"><span>Razão social</span><strong>${esc(partner.legalName)}</strong></div><div class="detail-line"><span>CNPJ</span><strong>${esc(partner.cnpj)}</strong></div><div class="detail-line"><span>Cidade</span><strong>${esc(partner.city)}</strong></div>${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Atividade declarada</span><strong>${esc(partner.activity)}</strong></div>`}${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Regime tributário</span><strong>${esc(partner.taxRegime)}</strong></div>`}</div></div>
+      <div class="detail-group"><h3>Responsável</h3><div class="detail-list"><div class="detail-line"><span>Nome</span><strong>${esc(partner.responsible)}</strong></div><div class="detail-line"><span>E-mail da conta</span><strong>${esc(partner.email)}</strong></div><div class="detail-line"><span>E-mail secundário</span><strong>${esc(partner.secondaryEmail || "Não informado")}</strong></div><div class="detail-line"><span>Telefone</span><strong>${esc(partner.phone)}</strong></div><div class="detail-line"><span>Tipos de espaço</span><strong>${esc(partner.types)}</strong></div></div></div>
+      <div class="detail-group"><h3>Contrato e aceites</h3><div class="detail-list"><div class="detail-line"><span>Contrato</span><strong>${esc(partner.contract)}</strong></div><div class="detail-line"><span>Termos</span><strong>${esc(partner.terms || "Pendente")}</strong></div><div class="detail-line"><span>Privacidade</span><strong>${esc(partner.privacy || "Pendente")}</strong></div>${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Documento fiscal</span><strong>${esc(partner.fiscal)}</strong></div>`}<div class="detail-line"><span>Comissão</span><strong>${esc(partner.commission)}%</strong></div></div></div>
+      <div class="detail-group"><h3>Homologação</h3><div class="detail-list"><div class="detail-line"><span>Origem</span><strong>${esc(partner.source || "Administração")}</strong></div>${application ? `<div class="detail-line"><span>Solicitação</span><strong>${esc(application.id)} · ${esc(application.requestedAt || "")}</strong></div>` : ""}<div class="detail-line"><span>Dados bancários</span><strong>${esc(partner.banking)}</strong></div><div class="detail-line"><span>Status</span><strong>${esc(partner.status)}</strong></div><div class="detail-line"><span>Completude</span><strong>${esc(partner.score)}%</strong></div><div class="detail-line"><span>Vouchers ativos</span><strong>${esc(activeVoucherLiability(partner.venueId).count)} · ${money(activeVoucherLiability(partner.venueId).value)}</strong></div><div class="progress"><span style="width:${Math.min(100,partner.score)}%"></span></div></div></div>
+      <div class="detail-group"><h3>Documentos do Portal</h3><div class="detail-list">${docs.map((doc) => `<div class="toggle-row partner-document-row"><div class="toggle-copy"><strong>${esc(doc.name)}</strong><small>${esc(doc.originalName || "Arquivo protegido")} · ${esc(doc.uploadedAt || "")}${doc.reviewNotes ? ` · parecer: ${esc(doc.reviewNotes)}` : ""}</small></div><span class="status ${statusClass(doc.status)}">${esc(doc.status)}</span>${doc.backendId ? `<div class="item-actions"><button type="button" class="button ghost small" data-action="open-partner-document" data-id="${esc(doc.id)}">Visualizar</button>${partnerOnboardingForPartner(partnerId)?.flow === "22x" && ["Contrato de parceria","Termos de uso","Política de privacidade","Dados bancários"].includes(doc.name) ? "" : `<button class="button secondary small" data-action="review-partner-document" data-id="${esc(doc.id)}" data-partner-id="${esc(partnerId)}">Revisar</button>`}</div>` : ""}</div>`).join("") || `<p class="dialog-description">Nenhum documento enviado ao staging.</p>`}</div></div>
+      <div class="detail-group"><h3>Equipe e acessos</h3><div class="detail-list">${team.map((member)=>`<div class="toggle-row"><div class="toggle-copy"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${esc(member.email)}<br>${esc(member.permission)}</small></div><span class="status ${statusClass(member.status)}">${esc(member.status)}</span></div>`).join("") || `<p class="dialog-description">Nenhum membro vinculado ao parceiro.</p>`}</div></div>
+    </div>${partnerApplicationDecisionActions(application,onboarding)}`;
+  }
+
+  function backendBooleanValue(value) {
+    if (value === "Sim") return true;
+    if (value === "Não") return false;
+    return null;
+  }
+
+  function backendSpacePayload(data) {
+    return {
+      name: String(data.name || "").trim(),
+      type: String(data.type || "").trim(),
+      floor: String(data.floor || "").trim() || null,
+      capacity: Number(data.capacity) > 0 ? Number(data.capacity) : null,
+      base_price: Math.max(0, Number(data.price || 0)),
+      monthly_price: data.monthlyPrice === "" ? null : Math.max(0, Number(data.monthlyPrice || 0)),
+      active: data.status === "Ativo",
+      lights: backendBooleanValue(data.lights),
+      covered: backendBooleanValue(data.covered),
+      ...("maintenance" in data ? {maintenance_date:data.maintenance || null} : {})
+    };
+  }
+
+  async function saveBackendSpace(data, item) {
+    if(!hasPartnerPermission("manage_spaces")) {showToast("Acesso Restrito.");return null;}
+    const venueId = state.partnerProfile.backendVenueId;
+    if (!venueId) { showToast("Cadastre primeiro o endereço do estabelecimento."); return; }
+    return runBackendMutation(item ? "Espaço atualizado no staging." : "Espaço cadastrado no staging.", async () => {
+      const payload = backendSpacePayload(data);
+      if (item?.backendId) return window.MarketplaceBackend.updateVenueSpace(item.backendId, payload);
+      return window.MarketplaceBackend.createVenueSpace(venueId, payload);
+    });
+  }
+
+  async function toggleBackendSpace(item) {
+    if (!item?.backendId) return;
+    const active = item.status !== "Ativo";
+    await runBackendMutation(`${item.name}: ${active ? "Ativo" : "Inativo"}.`, () => window.MarketplaceBackend.updateVenueSpace(item.backendId, { active }));
+  }
+
+  async function saveBackendPartnerSection(action, data) {
+    const p = state.partnerProfile;
+    if (!p.backendPartnerId) return;
+    if (action === "edit-company-data") {
+      await runBackendMutation("Dados da empresa atualizados no staging.", async () => {
+        await window.MarketplaceBackend.updatePartnerProfile(p.backendPartnerId, {
+          trade_name: String(data.tradeName || "").trim(),
+          legal_name: String(data.legalName || "").trim(),
+          ...("taxRegime" in data ? {tax_regime:String(data.taxRegime || "").trim() || null} : {}),
+          ...("declaredActivity" in data ? {declared_activity:String(data.declaredActivity || "").trim() || null} : {}),
+          ...("municipalRegistration" in data ? {municipal_registration:String(data.municipalRegistration || "").trim() || null} : {})
+        });
+        if (p.backendVenueId) await window.MarketplaceBackend.updateVenue(p.backendVenueId, { name: String(data.tradeName || "").trim() });
+      });
+      return;
+    }
+    if (action === "edit-responsible-data") {
+      await runBackendMutation("Responsável e contatos atualizados no staging.", () => window.MarketplaceBackend.updatePartnerProfile(p.backendPartnerId, {
+        responsible_name: String(data.responsibleName || "").trim() || null,
+        email: String(data.email || "").trim() || null,
+        secondary_email: String(data.secondaryEmail || "").trim() || null,
+        phone: String(data.phone || "").trim() || null
+      }));
+      return;
+    }
+    if (action === "edit-address-data") {
+      await runBackendMutation("Endereço atualizado no staging e no marketplace.", async () => {
+        const venuePatch = {
+          street: String(data.street || "").trim() || null,
+          street_number: String(data.streetNumber || "").trim() || null,
+          neighborhood: String(data.neighborhood || "").trim() || null,
+          city: String(data.city || "").trim(),
+          state: String(data.state || "PR").trim().toUpperCase().slice(0, 2),
+          zip: String(data.zip || "").trim() || null
+        };
+        if (p.backendVenueId) await window.MarketplaceBackend.updateVenue(p.backendVenueId, venuePatch);
+        else {
+          const slugBase = String(p.tradeName || "espaco").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "espaco";
+          await window.MarketplaceBackend.createVenue(p.backendPartnerId, { ...venuePatch, slug:`${slugBase}-${p.backendPartnerId.slice(0, 6)}`, name:p.tradeName, published:false, amenities:[] });
+        }
+        await window.MarketplaceBackend.updatePartnerProfile(p.backendPartnerId, { city: venuePatch.city });
+      });
+    }
+  }
+
+  async function handleAction(button) {
+    // Capture the native change before asynchronous authorization/dispatch yields.
+    const actionChecked = button.checked;
+    partnerActionContext=state.role==="partner"?window.MarketplacePartnerOperations.actionPermission(button.dataset.action||""):null;
+    if(backendRuntime.enabled&&state.role==="partner"&&partnerActionContext&&!hasPartnerPermission(partnerActionContext)){
+      showToast("Acesso Restrito. Esta função não está autorizada para sua conta.");return;
+    }
+    if(button.dataset.action==="exit-partner-readonly"){await changePartnerReadonly();return;}
+    if(button.dataset.action==="admin-view-partner"){
+      const partner=state.adminPartners.find(item=>item.id===button.dataset.id);
+      if(partner?.backendPartnerId)await changePartnerReadonly(partner.backendPartnerId);
+      return;
+    }
+    if(partnerReadonlyActive()&&!partnerReadonlyActions.has(button.dataset.action)){showToast("Esta visualização é somente leitura.");return;}
+    if (button.dataset.action === "open-partner-document") {
+      await openPartnerDocument(button.dataset.id, button);
+      return;
+    }
+    if (await handleRegistrationAction(button)) return;
+    if (await handlePartnerOnboardingAction(button)) return;
+    if(button.dataset.action==="register-external-receipt"){openPartnerExternalReceipt(button.dataset.id);return;}
+    if(button.dataset.action==="notification-open"){await openPersonalNotification(button.dataset.id);return;}
+    if(button.dataset.action==="notification-read"){if(await readPersonalNotification(button.dataset.id))openNotificationInbox();return;}
+    if(button.dataset.action==="notification-inbox"){openNotificationInbox();return;}
+    const action = button.dataset.action;
+    if(action==="user-reservation-tab"){
+      state.userReservationTab=button.dataset.tab==="monthly"?"monthly":"single";
+      saveState();render();return;
+    }
+    if (state.role === "user" && !userMonthlyActionAllowed(action, button.dataset.id)) {
+      showToast("Você não tem permissão para administrar este vínculo mensalista.");
+      return;
+    }
+    if(action==="asaas-refund-open" || action==="asaas-refund-reconcile"){
+      await openAsaasRefund(button.dataset.reservationId,action==="asaas-refund-open"?"preview":"reconcile",null,button.dataset.paymentId||null);return;
+    }
+    if(action==="asaas-refund-submit" || action==="asaas-refund-retry"){
+      if(partnerReadonlyActive() || !(state.role==="admin" || (state.role==="partner" && canManageBackendFinance())))return;
+      const reservationId=button.dataset.reservationId,paymentId=button.dataset.paymentId,expected=button.dataset.requestId||null,identity=backendRuntime.identityId;
+      try{
+        const c=await window.MarketplaceBackend.asaasRefund(reservationId,'preview');
+        if(identity!==backendRuntime.identityId)return;
+        const p=c.payments.find(x=>x.payment_id===paymentId),retry=action==='asaas-refund-retry';
+        if(!p||p.request_id!==expected||p.transfer_lookup||!(retry?p.can_retry:p.can_submit)){await openAsaasRefund(reservationId);return;}
+        const value=Number(p.amount);
+        if(!Number.isFinite(value)||value<=0){await openAsaasRefund(reservationId);return;}
+        askConfirm({title:retry?'Solicitar novo reembolso':`Devolver ${money(value)}`,message:`Devolver ${money(value)} do pagamento de ${esc(p.payer_name)} pela reserva ${c.reservation_code}? O sistema consultará o Asaas antes do envio. ${p.split_enabled?'A comissão será devolvida proporcionalmente. ':''}As tarifas ficam com o estabelecimento.`,confirmLabel:'Conferir e solicitar',onConfirm:async()=>{if(identity===backendRuntime.identityId)await openAsaasRefund(reservationId,retry?'retry':'submit',expected,paymentId,null);}});
+      }catch(error){showToast(backendErrorMessage(error));}
+      return;
+    }
+    if(action==="partner-finance-tab"){
+      if(!["partner","admin"].includes(state.role)||!window.PartnerFinanceView.tabs.some(([key])=>key===button.dataset.tab))return;
+      state.ui=state.ui||{};state.ui[state.role==="admin"?"adminFinanceTab":"partnerFinanceTab"]=button.dataset.tab;
+      saveState();refreshFinancialPeriodPanel();return;
+    }
+    if(action==="finance-reservation-open"){
+      if(!["partner","admin"].includes(state.role))return;
+      const reservationId=button.dataset.reservationId;
+      const admin=state.role==="admin";
+      const rows=admin?adminFinancialRows():[currentPartnerFinancialSummary()];
+      const snapshot=rows.flatMap(finance=>(finance.reservationBreakdown||[]).filter(row=>!row.partner_id||row.partner_id===finance.partnerId)).find(row=>row.reservation_id===reservationId);
+      const reservation=state.reservations.find(row=>row.backendId===reservationId&&(admin?Boolean(snapshot):row.venueId===state.partnerProfile.venueId));
+      if(reservation){
+        if(admin){await handleAction({dataset:{action:"reservation-details",id:reservation.id}});return;}
+        const item=syncPartnerReservationFromUser(reservation);
+        if(item){await handleAction({dataset:{action:"partner-reservation-details",id:item.id}});return;}
+      }
+      if(snapshot)openDetail({eyebrow:"Financeiro da reserva",title:snapshot.reservation_code,
+        body:reservationFinancialDetails({backendId:reservationId,financialSummary:snapshot})});
+      else showToast("Os detalhes atuais desta reserva não estão disponíveis. Consulte Detalhar pagamentos.");
+      return;
+    }
+    if(action==="finance-payment-details"){
+      if(!["partner","admin"].includes(state.role))return;
+      const context=financePeriodKey(),identity=financeScreenIdentity(),sequence=++financialPaymentAuditSequence;
+      const current=()=>context===financePeriodKey()&&identity===financeScreenIdentity()&&sequence===financialPaymentAuditSequence&&state.activePage?.[state.role]==="finance";
+      button.disabled=true;button.setAttribute?.("aria-busy","true");
+      try{
+        const data=await window.MarketplaceBackend.rpc('reservation_payment_audit',{p_reservation_id:button.dataset.reservationId});
+        if(!current())return;
+        openDetail({eyebrow:"Pagamentos de origem",title:data.reservation?.reservation_code||"Conferência da reserva",
+          body:window.PartnerFinanceView.audit(data,{esc,money,channelLabel:window.MarketplaceFinancePeriod.channelLabel,dateTime:backendDateTimeLabel})});
+      }catch(error){if(current())showToast(backendErrorMessage(error));}
+      finally{button.disabled=false;button.removeAttribute?.("aria-busy");}
+      return;
+    }
+    if(action==="export-reservation-payment-audit"){
+      await exportReservationPaymentConference(button);
+      return;
+    }
+    if(action==="export-finance-movements"){exportFinancialPeriod(true);return;}
+    if(action==="finance-period-retry"){financialPeriodRuntime.key="";refreshFinancialPeriodPanel();return;}
+    if(action.startsWith("finance-period-")){
+      const helper=window.MarketplaceFinancePeriod,current=financePeriodSelection();
+      const value=action==="finance-period-all"?"all":action==="finance-period-today"?helper.currentMonth():helper.shiftMonth(current==="all"?helper.currentMonth():current,action==="finance-period-prev"?-1:1);
+      changeFinancePeriod(value);return;
+    }
+    const id = button.dataset.id;
+
+    if (action === "admin-partners-tab") {
+      if (state.role !== "admin" || !["applications","registered"].includes(button.dataset.tab)) return;
+      state.ui.adminPartnersTab = button.dataset.tab;
+      saveState(); render();
+    } else if (action === "backend-google-login") {
+      backendGoogleLogin();
+    } else if (action === "open-reservation-chat") {
+      openReservationChat(id);
+    } else if (action === "pix-split-details") {
+      openPixSplitDetails(id);
+    } else if (action === "simulate-pix-share-paid") {
+      simulatePixSharePaid(id);
+    } else if (action === "toggle-favorite") {
+      state.favorites = state.favorites.includes(id) ? state.favorites.filter((item) => item !== id) : [...state.favorites,id];
+      saveState(); render(); showToast(state.favorites.includes(id) ? "Quadra adicionada aos favoritos." : "Quadra removida dos favoritos.");
+    } else if (action === "reserve-slot") {
+      openReservation(button.dataset.venue, button.dataset.time, button.dataset.fullDate || button.dataset.date,
+        button.dataset.end || "", button.dataset.space || "", button.dataset.slotId || "");
+    } else if (action === "open-monthly-request") {
+      const request=(state.monthlyLinkRequests||[]).find((item)=>item.id===id);
+      if(request)await openMonthlyLinkRequestConversation(request);
+    } else if (action === "message-monthly-request") {
+      openForm({eyebrow:"Conversa mensalista",title:"Enviar mensagem",submitLabel:"Enviar",fields:[{name:"message",label:"Mensagem",type:"textarea",value:"",required:true,full:true}],onSubmit:async(data)=>{
+        const result=await runBackendMutation("Mensagem enviada e notificação registrada.",()=>window.MarketplaceBackend.sendMonthlyLinkRequestMessage(id,String(data.message||"").trim()));
+        if(result===null)return false;
+        if(formDialog.open)formDialog.close();
+        await refreshMonthlyLinkRequestConversation(id);
+        return true;
+      }});
+    } else if (action === "propose-monthly-request") {
+      const request=(state.monthlyLinkRequests||[]).find((item)=>item.id===id);
+      if(!request)return;
+      openForm({eyebrow:"Proposta mensalista",title:`Proposta para ${request.groupName}`,description:"Ao enviar, o horário recorrente passa a ser pré-reservado exclusivamente para o grupo até o aceite.",submitLabel:"Enviar proposta",fields:[
+        {name:"monthlyPrice",label:"Valor mensal",type:"number",min:0.01,step:"0.01",value:request.proposedMonthlyPrice||0,required:true},
+        {name:"startMonth",label:"Mês inicial",type:"month",value:String(request.requestedStartMonth||"").slice(0,7),required:true},
+        {name:"response",label:"Mensagem e condições",type:"textarea",value:"Segue nossa proposta para o horário mensal.",required:true,full:true},
+        {name:"renewal",label:"Renovação",type:"checkbox-group",full:true,options:[{value:"require_renewal_confirmation",label:"Exigir confirmação mensal não financeira",help:"Não antecipa pagamento.",checked:false}]}
+      ],onSubmit:async(data)=>{
+        const result=await runBackendMutation("Proposta enviada; o horário foi pré-reservado para o grupo.",async()=>({completed:true,payload:await window.MarketplaceBackend.partnerProposeMonthlyLinkRequest({requestId:id,monthlyPrice:Number(data.monthlyPrice),startMonth:`${data.startMonth}-01`,requireRenewalConfirmation:data.require_renewal_confirmation==="true",response:String(data.response||"").trim()})}));
+        if(!result?.completed)return false;
+        closeMonthlyWorkflowDialogs();
+        return true;
+      }});
+    } else if (action === "close-monthly-request") {
+      const decision=button.dataset.decision;
+      askConfirm({title:decision==="rejected"?"Recusar solicitação":"Cancelar solicitação",message:"A conversa será encerrada. Como ainda não há proposta aceita, nenhum horário será mantido bloqueado.",confirmLabel:decision==="rejected"?"Recusar":"Cancelar",onConfirm:()=>runBackendMutation("Solicitação mensalista encerrada.",()=>window.MarketplaceBackend.closeMonthlyLinkRequest(id,decision,null))});
+    } else if (action === "accept-monthly-link") {
+      const periods=(state.monthlyCycles||[]).filter(c=>c.monthlyLinkId===id||c.link?.id===id).sort((a,b)=>String(a.serviceMonth).localeCompare(String(b.serviceMonth)));
+      const prices=periods.map(c=>`${monthlyPeriodLabel(c.serviceMonth)}: ${money(c.monthlyTotal)}`).join("; ");
+      askConfirm({title:"Aceitar vínculo mensalista",message:`O horário ficará protegido para este grupo. ${prices?`Valores publicados: ${prices}. `:""}O parceiro pode definir um novo preço para futuras agendas. O valor de cada mês será apresentado no aceite da pré-reserva; a garantia e o saldo seguem os prazos do ciclo.`,confirmLabel:"Aceitar regras",onConfirm:()=>runBackendMutation("Vínculo mensalista aceito e pré-reservas sincronizadas.",()=>window.MarketplaceBackend.acceptMonthlyCustomerLink(id))});
+    } else if (action === "confirm-monthly-renewal") {
+      const cycle=(state.monthlyCycles||[]).find(c=>c.id===id);
+      if(!cycle)return;
+      askConfirm({title:"Confirmar renovação",message:`${monthlyPeriodLabel(cycle.serviceMonth)}: ${money(cycle.monthlyTotal)}. Esta confirmação mantém o horário protegido e não gera cobrança antecipada. Confira o valor e as condições ao criar a pré-reserva.`,confirmLabel:"Confirmar renovação",onConfirm:()=>runBackendMutation("Renovação mensalista confirmada.",()=>window.MarketplaceBackend.confirmMonthlyCycleRenewal(id))});
+    } else if (action === "activate-monthly-cycle") {
+      const cycle=(state.monthlyCycles||[]).find((item)=>item.id===id);
+      const venue=state.venues.find((item)=>item.backendId===cycle?.link?.venueId||item.id===cycle?.link?.venueId);
+      openMonthlyCycleActivation(cycle,venue,null,null);
+    } else if (action === "reactivate-monthly-link") {
+      openForm({eyebrow:"Mensalista protegido",title:"Reativar vínculo mensalista",description:"A reativação volta a proteger os horários futuros disponíveis para o mesmo grupo.",submitLabel:"Reativar",fields:[{name:"reason",label:"Motivo da reativação",type:"textarea",value:"Regularização financeira confirmada",required:true,full:true}],onSubmit:(data)=>runBackendMutation("Vínculo mensalista reativado e pré-reservas futuras sincronizadas.",()=>window.MarketplaceBackend.reactivateMonthlyCustomerLink(id,String(data.reason||"").trim()))});
+    } else if (action === "venue-details") {
+      openVenueSchedule(id);
+    } else if (action === "venue-gallery") {
+      openVenueGallery(id);
+    } else if (action === "venue-schedule-day") {
+      openVenueSchedule(id, button.dataset.date);
+    } else if (action === "reservation-details") {
+      const reservation = state.reservations.find((item) => item.id === id);
+      if (reservation) {
+        const linkedEvent = state.groupEvents.find((event) => event.id === reservation.eventId);
+        const latestPush = state.pushLog.find((push) => push.eventId === reservation.eventId);
+        const officialConfirmed = Boolean(reservation.backendOfficial && reservation.statusKey === "confirmed");
+        const officialExpired = reservationIsExpired(reservation);
+        const officialCancelled = Boolean(reservation.backendOfficial && reservation.statusKey === "cancelled" && !officialExpired);
+        const publicationEndpoint = officialCancelled ? "supabase.marketplace_events.cancelled" : officialConfirmed && reservation.eventPublicationStatus === "published" ? "supabase.marketplace_events.published" : linkedEvent?.publicationEndpoint || "Aguardando pagamento";
+        const notificationStatus = officialExpired ? "Expiração registrada" : officialCancelled ? "Cancelamento comunicado" : officialConfirmed ? "Notificações registradas no staging" : reservation.pushStatus || linkedEvent?.pushStatus || "Não iniciado";
+        const notificationRecipients = officialCancelled || officialConfirmed ? "Usuário e responsáveis do parceiro" : latestPush ? `${latestPush.recipients} membros` : "Aguardando publicação";
+        const communitySplitNotification = reservation.pixSplit ? communitySplitNotificationForReservation(reservation) : null;
+        const notificationEndpoint = communitySplitNotification ? "supabase.community_marketplace_notifications" : officialCancelled || officialConfirmed ? "supabase.notifications" : latestPush?.endpoint || "push.group_members";
+        const splitCommunityDetail = reservation.pixSplit ? `<div class="detail-line"><span>Rateio na Comunidade</span><strong>${communitySplitNotification ? `Sua cota foi enviada ao grupo · ${communitySplitNotification.status === "read" ? "Lida" : "Não lida"}` : "Avisos individuais protegidos por membro"}</strong></div>` : "";
+        const displayedReservationStatus=officialExpired?"Expirada":reservation.monthlyCycleId?monthlyPaymentPresentation(reservation).label:reservation.status;
+        const paymentTimeLabel=reservation.monthlyCollectionMode==="single_monthly_pool"?"Último pagamento":"Confirmado em";
+        const closedPaymentLabel = closedReservationPaymentLabel(reservation);
+        const occurrenceTransferPanel=reservationOccurrenceTransferPanel(reservation,"user");
+        openDetail({ eyebrow: "Reserva", title: reservation.id, body: `<div class="details-grid"><div class="detail-group"><h3>Horário</h3><div class="detail-list"><div class="detail-line"><span>Local</span><strong>${esc(reservation.venue)}</strong></div><div class="detail-line"><span>Data</span><strong>${esc(reservation.date)}</strong></div><div class="detail-line"><span>Período</span><strong>${esc(timeRange(reservation.time,reservation.endTime))}</strong></div><div class="detail-line"><span>Modalidade</span><strong>${reservation.monthly ? `Mensalista · ${esc(reservation.occurrenceCount)} datas` : "Avulsa"}</strong></div></div></div><div class="detail-group"><h3>${reservation.groupId ? "Grupo e evento" : "Responsável e evento"}</h3><div class="detail-list"><div class="detail-line"><span>${reservation.groupId ? "Grupo" : "Responsável"}</span><strong>${esc(reservationSubjectLabel(reservation))}</strong></div><div class="detail-line"><span>Evento</span><strong>${esc(reservation.event || "Não informado")}</strong></div></div></div><div class="detail-group"><h3>Pagamento</h3><div class="detail-list"><div class="detail-line"><span>Reserva</span><strong>${esc(displayedReservationStatus)}</strong></div><div class="detail-line"><span>Situação</span><strong>${esc(reservation.paymentStatus || "Não informada")}</strong></div><div class="detail-line"><span>${esc(paymentTimeLabel)}</span><strong>${esc(reservation.paymentConfirmedAt || "Nenhum pagamento")}</strong></div>${reservation.paymentConfigured?`<div class="detail-line"><span>Forma de pagamento</span><strong>${esc(reservation.paymentMethodLabel || paymentMethodLabel(reservation.paymentMethod))}</strong></div>`:""}${singleCardPaymentResponsibleDetail(reservation)}<div class="detail-line"><span>Evento</span><strong>${esc(linkedEvent?.status || eventPublicationLabel(reservation.eventPublicationStatus).label)}</strong></div></div></div><div class="detail-group"><h3>Informações da reserva</h3><div class="detail-list"><div class="detail-line"><span>Valor total</span><strong>${money(reservation.value)}</strong></div><div class="detail-line"><span>Notificações</span><strong>${esc(notificationStatus)}</strong></div>${splitCommunityDetail}<div class="detail-line"><span>Voucher</span><strong>${esc(reservation.voucher || "Não aplicado")}</strong></div><div class="detail-line"><span>Valor abatido</span><strong>${money(reservation.voucherAppliedValue || 0)}</strong></div><div class="detail-line"><span>${reservation.monthlyCycleId?"Saldo a pagar":"Valor a pagar"}</span>${closedPaymentLabel ? `<strong class="reservation-cancelled-value">${esc(closedPaymentLabel)}</strong>` : `<strong>${money(reservationRemainingBalance(reservation))}</strong>`}</div></div></div>${reservation.cancellationSource ? `<div class="detail-group"><h3>Cancelamento</h3><div class="detail-list"><div class="detail-line"><span>Responsável</span><strong>${esc(cancellationSourceLabel(reservation.cancellationSource))}</strong></div><div class="detail-line"><span>Resultado</span><strong>${reservation.cancellationMode === "voucher" ? "Voucher" : reservation.cancellationMode === "refund" ? "Reembolso integral" : "Sem compensação"}</strong></div><div class="detail-line"><span>Motivo</span><strong>${esc(reservation.cancellationReason || "Não informado")}</strong></div>${reservationCancellationVoucherMarkup(reservation)}<div class="detail-line"><span>Reembolso</span><strong>${money(reservation.refundValue || 0)}</strong></div><div class="detail-line"><span>Horário</span><strong>${reservation.slotReleased ? "Liberado" : "Bloqueado"}</strong></div></div></div>` : ""}${reservationPrebookingEditAction(reservation)}${occurrenceTransferPanel}${singlePrebookingDeadlineMarkup(reservation)}${reservationContactHistory(reservation)}${reservationFinancialDetails(reservation)}</div>` });
+        detailDialog.dataset.view="reservation-notices";detailDialog.dataset.reservationAction=action;detailDialog.dataset.reservationId=id;
+        markOccurrenceTransferNotificationsReadForReservation(reservation);
+      }
+    } else if (action === "request-occurrence-transfer") {
+      const reservation=state.reservations.find((item)=>item.id===button.dataset.reservation);
+      const occurrence=(reservation?.allOccurrences||reservation?.occurrences||[]).find((item)=>item.backendId===id);
+      if(reservation&&occurrence){if(detailDialog.open)detailDialog.close();openOccurrenceTransferRequest(reservation,occurrence);}
+    } else if (action === "partner-cancel-occurrence") {
+      const reservation=state.reservations.find((item)=>item.id===button.dataset.reservation);
+      const occurrence=(reservation?.allOccurrences||reservation?.occurrences||[]).find((item)=>item.backendId===id);
+      if(reservation&&occurrence){if(detailDialog.open)detailDialog.close();openPartnerOccurrenceCancellation(reservation,occurrence);}
+    } else if (action === "open-occurrence-transfer-chat") {
+      await openOccurrenceTransferConversation(id);
+    } else if (action === "send-occurrence-transfer-message") {
+      await sendOccurrenceTransferChatMessage(id);
+    } else if (action === "occurrence-transfer-availability") {
+      const request=(state.occurrenceTransfers||[]).find(item=>item.id===id);
+      if(request)await openOccurrenceTransferAvailability(request);
+    } else if (action === "propose-occurrence-transfer") {
+      const request=(state.occurrenceTransfers||[]).find((item)=>item.id===id);
+      await openOccurrenceTransferProposal(request);
+    } else if (action === "accept-occurrence-transfer") {
+      const request=(state.occurrenceTransfers||[]).find(item=>item.id===id);
+      if(request)openOccurrenceTransferConfirmation(request);
+    } else if (action === "refund-occurrence-transfer") {
+      const request=(state.occurrenceTransfers||[]).find((item)=>item.id===id);
+      if(!request)return;
+      if(detailDialog.open)detailDialog.close();
+      askConfirm({title:"Escolher restituição integral",message:`Nenhuma nova data será reservada. Será registrada a restituição integral de ${money(request.value)} referente ao horário cancelado pelo parceiro.`,confirmLabel:"Solicitar restituição",onConfirm:async()=>{
+        await runBackendMutation("Restituição integral da ocorrência registrada como pendente.",()=>window.MarketplaceBackend.resolveMonthlyOccurrenceTransferRefund(request.id));
+      }});
+    } else if (action === "cancel-occurrence-transfer") {
+      const request=(state.occurrenceTransfers||[]).find((item)=>item.id===id);
+      if(!request)return;
+      if(detailDialog.open)detailDialog.close();
+      askConfirm({title:"Cancelar pedido de troca",message:"O horário original continuará reservado e nenhuma alteração financeira será realizada.",confirmLabel:"Cancelar pedido",onConfirm:async()=>{
+        await runBackendMutation("Pedido cancelado. O horário original continua reservado.",()=>window.MarketplaceBackend.cancelMonthlyOccurrenceTransfer(request.id));
+      }});
+    } else if (action === "decline-occurrence-transfer") {
+      const request=(state.occurrenceTransfers||[]).find((item)=>item.id===id);
+      if(!request)return;
+      if(detailDialog.open)detailDialog.close();
+      openForm({eyebrow:"Remarcação mensalista",title:"Não aprovar pedido",description:"O horário original do grupo continuará reservado. Nenhum valor será alterado.",submitLabel:"Não aprovar",fields:[{name:"reason",label:"Motivo ao grupo",type:"textarea",value:"",required:true,full:true}],onSubmit:async(data)=>Boolean(await runBackendMutation("Pedido não aprovado; horário original preservado.",()=>window.MarketplaceBackend.declineMonthlyOccurrenceTransfer(request.id,String(data.reason||"").trim()))) });
+    } else if (action === "open-monthly-reservation-payment") {
+      const reservation=state.reservations.find((item)=>item.id===id);
+      if(detailDialog.open)detailDialog.close();
+      state.activePage.user="reservations";
+      state.userReservationTab="monthly";
+      saveState();
+      render();
+      if(reservation&&!reservation.paymentConfigured&&reservation.statusKey==="pending")setTimeout(()=>openReservationPaymentConfiguration(reservation),0);
+    } else if (action === "edit-reservation-prebooking") {
+      const reservation = state.reservations.find((item) => item.id === id);
+      openReservationPrebookingEdit(reservation);
+    } else if (action === "configure-reservation-payment") {
+      const reservation=state.reservations.find((item)=>item.id===id);
+      openReservationPaymentConfiguration(reservation);
+    } else if (action === "retry-asaas-checkout") {
+      const reservation=state.reservations.find((item)=>item.id===id);
+      const retry=asaasCheckoutRetryContext;
+      if(!reservation || !retry || retry.identity!==backendRuntime.identityId || retry.reservationId!==reservation.backendId)return;
+      asaasCheckoutRetryContext=null;
+      button.disabled=true;
+      await openOfficialAsaasPayment(reservation,retry.token);
+    } else if (action === "confirm-staging-payment") {
+      const reservation = state.reservations.find((item) => item.id === id);
+      requestOfficialStagingPaymentConfirmation(reservation, "Usuário");
+    } else if (action === "settle-monthly-share") {
+      openMonthlyShareSettlement(id,button.dataset.reservation||"");
+    } else if (action === "cancel-paid-user-reservation") {
+      const reservation = state.reservations.find((item) => item.id === id);
+      if (reservation?.backendOfficial) openOfficialReservationCancellation(reservation, "Usuário");
+      else openPaidCancellation("user", id);
+    } else if (action === "request-cancellation-exception") {
+      const reservation = state.reservations.find((item) => item.id === id);
+      if (!reservation) return;
+      openForm({ eyebrow: "Análise excepcional", title: `Solicitar análise de ${reservation.id}`, description: "A solicitação será analisada conjuntamente pelo Tâmo On e pelo parceiro. Não há concessão automática de reembolso ou voucher.", fields: [{ name: "details", label: "Justificativa e circunstâncias excepcionais", type: "textarea", value: "", required: true, full: true }], submitLabel: "Enviar para análise", onSubmit: (data) => { const reviewId = nextId("EXC-", state.cancellationExceptionReviews); state.cancellationExceptionReviews.unshift({ id: reviewId, reservationId: reservation.id, venueId: reservation.venueId, venue: reservation.venue, user: reservation.user, details: data.details, status: "Pendente de análise conjunta", partnerDecision: "Pendente", tamoDecision: "Pendente", createdAt: new Date().toLocaleString("pt-BR") }); reservation.exceptionReviewId = reviewId; reservation.exceptionReviewStatus = "Pendente de análise conjunta"; saveState(); render(); showToast("Solicitação excepcional enviada ao Tâmo On e ao parceiro."); } });
+    } else if (action === "reservation-status") {
+      const reservation = state.reservations.find((item) => item.id === id);
+      if (reservation?.backendOfficial) {
+        if (button.dataset.status === "cancelled") openOfficialReservationCancellation(reservation, "Usuário");
+        else showToast("A confirmação desta reserva será realizada na etapa financeira.");
+        return;
+      }
+      const label = button.dataset.status === "confirmed" ? "confirmar pelo pagamento" : "cancelar";
+      askConfirm({ title: "Alterar reserva", message: `Deseja ${label} a reserva ${id}?`, confirmLabel: "Aplicar endpoint", onConfirm: () => applyUserReservationStatus(id, button.dataset.status) });
+    } else if (action === "apply-voucher") {
+      const code = button.dataset.code;
+      if (!state.appliedVouchers.includes(code)) state.appliedVouchers.push(code);
+      saveState(); render(); showToast(`Voucher ${code} aplicado à próxima reserva.`);
+    } else if (action === "sync-main-profile") {
+      state.userProfile.lastSync = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+      saveState(); render(); showToast("Perfil principal sincronizado com o marketplace.");
+    } else if (action === "manage-main-profile") {
+      openDetail({ eyebrow: "Perfil principal", title: "Gerenciar dados no Tâmo On", body: `<div class="profile-central-explanation"><p>Nome e e-mail são fornecidos pela conta Google. Telefone, cidade e preferências são preenchidos uma única vez no perfil principal do Tâmo On.</p><div class="detail-list"><div class="detail-line"><span>Marketplace</span><strong>Somente leitura</strong></div><div class="detail-line"><span>Grupos</span><strong>Usa o mesmo perfil</strong></div><div class="detail-line"><span>Administração e organização</span><strong>Permissões herdadas dos grupos</strong></div></div><p class="dialog-description">Na aplicação unificada, este botão abrirá o perfil principal. O Marketplace não cria outro cadastro nem duplica os campos pessoais.</p></div>` });
+    } else if (action === "create-partner-promotion") {
+      openPromotionForm("partner");
+    } else if (action === "create-admin-promotion") {
+      openPromotionForm("admin");
+    } else if (action === "toggle-promotion") {
+      const promo = state.promotions.find((item) => item.id === id);
+      const partnerCanManage = state.role === "partner" && promotionIssuerType(promo) === "partner" && promotionVenueId(promo) === state.partnerProfile.venueId;
+      const adminCanManage = state.role === "admin";
+      if (promo && !promo.deleted && (partnerCanManage || adminCanManage)) {
+        if (backendIsOnline() && promo.backendId) {
+          runBackendMutation(`Voucher ${promo.code} ${promo.active ? "desativado" : "ativado"} no staging.`, () => window.MarketplaceBackend.setPromotionalVoucherActive(promo.backendId, !promo.active));
+        } else {
+          promo.active = !promo.active; saveState(); render(); showToast(`Voucher ${promo.code} ${promo.active ? "ativado" : "desativado"}.`);
+        }
+      }
+    } else if (action === "delete-promotion") {
+      const promo = state.promotions.find((item) => item.id === id);
+      if (!promotionCanBeManagedByCurrentRole(promo)) return;
+      if (promotionCurrentlyInUse(promo)) {
+        openDetail({eyebrow:"Voucher",title:"Exclusão indisponível",body:`<div class="cancellation-warning"><strong>${esc(promo.code)} está em uso</strong><p>Há uma seleção ou reserva pendente utilizando este voucher. Finalize ou cancele essa operação antes de excluir.</p></div>`});
+        return;
+      }
+      const hasHistory = promotionHasHistory(promo);
+      askConfirm({title:"Excluir voucher",message:hasHistory ? `O voucher ${promo.code} já foi utilizado. Ele será retirado das ofertas, mas permanecerá no histórico das reservas e do financeiro.` : `Excluir definitivamente o voucher ${promo.code}?`,confirmLabel:"Excluir voucher",onConfirm:async()=>{
+        if (backendIsOnline() && promo.backendId) {
+          await runBackendMutation(hasHistory ? "Voucher retirado das ofertas e preservado no histórico oficial." : "Voucher excluído do staging.", () => window.MarketplaceBackend.deleteVoucher(promo.backendId));
+          return;
+        }
+        if (hasHistory) { Object.assign(promo,{deleted:true,active:false,deletedAt:new Date().toLocaleString("pt-BR"),deletedBy:state.role === "admin" ? "Administração" : "Parceiro"}); state.appliedVouchers = state.appliedVouchers.filter((code)=>code !== promo.code); }
+        else { state.promotions = state.promotions.filter((item)=>item.id !== promo.id); state.appliedVouchers = state.appliedVouchers.filter((code)=>code !== promo.code); }
+        saveState();render();showToast(hasHistory ? "Voucher removido das ofertas e preservado no histórico." : "Voucher excluído.");
+      }});
+    } else if (action === "upload-partner-photos") {
+      document.getElementById("partnerPhotoUpload")?.click();
+    } else if (action === "upload-partner-document") {
+      document.getElementById("partnerDocumentUpload")?.click();
+    } else if (action === "remove-partner-document") {
+      const document=backendPartnerDocumentById(id);
+      if (!document || !documentCanBeRemovedByPartner(document)) { showToast("Somente documentos pendentes ou rejeitados podem ser excluídos pelo parceiro."); return; }
+      askConfirm({title:"Excluir documento",message:`Excluir ${document.name} e o arquivo privado correspondente?`,confirmLabel:"Excluir",onConfirm:async()=>{
+        await runBackendMutation("Documento removido do cadastro e do Storage privado.",()=>window.MarketplaceBackend.deletePartnerDocument({id:document.id,storage_path:document.storagePath}));
+      }});
+    } else if (action === "review-partner-document") {
+      const document=backendPartnerDocumentById(id);
+      if (!document || state.role!=="admin") return;
+      const partnerId=button.dataset.partnerId || document.partnerId;
+      openForm({eyebrow:"Homologação documental",title:document.name,description:`Arquivo: ${document.originalName}. ${document.name === "Contrato de parceria" ? "Marque como Validado somente depois de conferir as assinaturas no contrato anexado." : "Somente a Administração define este status."}`,submitLabel:"Salvar revisão",fields:[{name:"status",label:"Status",type:"select",value:document.status,options:["Pendente","Em análise","Validado","Rejeitado"],required:true},{name:"notes",label:"Parecer",type:"textarea",value:document.reviewNotes||"",full:true}],onSubmit:async(data)=>{
+        const result=await runBackendMutation("Revisão documental salva no staging.",()=>window.MarketplaceBackend.reviewPartnerDocument(document.id,data.status,data.notes));
+        if (!result) return;
+        const partner=state.adminPartners.find((item)=>String(item.backendPartnerId||item.id)===String(partnerId));
+        if (partner) openPartnerDossier(partner.id);
+      }});
+    } else if (action === "set-partner-favorite-photo") {
+      const photo=(state.partnerProfile.photos||[]).find((item)=>item.id===id);if(!photo)return;
+      if (backendIsOnline() && photo.backendId) {
+        runBackendMutation("Foto favorita atualizada no marketplace.", () => window.MarketplaceBackend.setFavoriteVenuePhoto(photo.backendId));
+      } else {
+        state.partnerProfile.favoritePhotoId=photo.id;state.partnerProfile.photos.forEach((item)=>item.favorite=item.id===photo.id);syncCurrentPartnerToConnectedAreas();saveState();render();showToast("Foto favorita atualizada no marketplace e no resumo da reserva.");
+      }
+    } else if (action === "remove-partner-photo") {
+      const photos=state.partnerProfile.photos||[];const photo=photos.find((item)=>item.id===id);if(!photo)return;
+      if(photo.id===state.partnerProfile.favoritePhotoId && photos.length===1){showToast("Carregue outra foto antes de remover a única imagem do estabelecimento.");return;}
+      askConfirm({title:"Remover foto",message:`Remover ${photo.name || "esta foto"} do cadastro?`,confirmLabel:"Remover",onConfirm:async()=>{
+        if (backendIsOnline() && photo.backendId) {
+          await runBackendMutation("Foto removida do cadastro e do Storage.", async () => {
+            if (photo.id === state.partnerProfile.favoritePhotoId) {
+              const next = photos.find((item) => item.id !== photo.id && item.backendId);
+              if (next) await window.MarketplaceBackend.setFavoriteVenuePhoto(next.backendId);
+            }
+            await window.MarketplaceBackend.deleteVenuePhoto({ id:photo.backendId, storage_path:photo.storagePath });
+          });
+          return;
+        }
+        state.partnerProfile.photos=photos.filter((item)=>item.id!==photo.id);
+        if(photo.id===state.partnerProfile.favoritePhotoId){const next=state.partnerProfile.photos[0];state.partnerProfile.favoritePhotoId=next?.id||"";state.partnerProfile.photos.forEach((item)=>item.favorite=item.id===state.partnerProfile.favoritePhotoId);}
+        syncCurrentPartnerToConnectedAreas();saveState();render();showToast("Foto removida.");
+      }});
+    } else if (action === "clear-admin-reservation-filters") {
+      state.filters.adminReservationStatus="Todos";state.filters.adminReservationPartner="Todos";state.filters.adminReservationUser="Todos";state.filters.adminReservationDate="";saveState();render();
+    } else if (["partner-agenda-prev","partner-agenda-next","partner-agenda-month","partner-agenda-year","partner-agenda-today"].includes(action)) {
+      const venue=state.venues.find(item=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const nav=window.MarketplaceAgendaNavigation,view=partnerAgendaView(venue);let month=view.month,date="";
+      if(action==="partner-agenda-prev"||action==="partner-agenda-next")month=nav.shiftMonth(month,action==="partner-agenda-prev"?-1:1);
+      if(action==="partner-agenda-month")month=`${month.slice(0,4)}-${button.value}`;
+      if(action==="partner-agenda-year")month=`${button.value}-${month.slice(5)}`;
+      if(action==="partner-agenda-today"){date=nav.today(venue.timezone || "America/Sao_Paulo");month=date.slice(0,7);}
+      if(!nav.validMonth(month))return;
+      state.ui.partnerAgendaMonth=month;state.ui.partnerAgendaDate=date;state.ui.selectedAvailabilityKeys=[];saveState();render();
+    } else if (action === "partner-schedule-date") {
+      const venue=state.venues.find(item=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const date=window.MarketplaceAgendaNavigation.iso(button.dataset.date),view=partnerAgendaView(venue);
+      if(!date||date.slice(0,7)!==view.month||!view.days.some(day=>window.MarketplaceAgendaNavigation.dayIso(day)===date))return;
+      state.ui.partnerAgendaDate=date;state.ui.selectedAvailabilityKeys=[];saveState();render();
+    } else if (action === "toggle-availability-selection") {
+      const venue=state.venues.find((item)=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const eligible=selectableAvailabilityEntries(venue,selectedPartnerAgendaDate(venue)).map(entry=>entry.key);
+      const key=button.dataset.key;
+      if(!eligible.includes(key))return;
+      const selected=selectedAvailabilityKeys().filter(item=>eligible.includes(item));
+      state.ui.selectedAvailabilityKeys=actionChecked ? [...new Set([...selected,key])] : selected.filter((item)=>item!==key);
+      saveState();render();
+    } else if (action === "toggle-all-availability") {
+      const venue=state.venues.find((item)=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const selectedDate=selectedPartnerAgendaDate(venue);
+      const eligible=selectableAvailabilityEntries(venue,selectedDate).map((entry)=>entry.key);
+      state.ui.selectedAvailabilityKeys=actionChecked ? eligible : [];
+      saveState();render();
+    } else if (action === "delete-selected-availability") {
+      const venue=state.venues.find((item)=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const selected=selectedAvailabilityKeys();
+      const entries=publicAvailabilityEntries(venue).filter((entry)=>window.MarketplaceAgendaNavigation.dayIso(entry.day)===selectedPartnerAgendaDate(venue) && selected.includes(entry.key));
+      const blocked=entries.filter(({day,slot})=>availabilitySelectionProtected(venue,day,slot));
+      if(blocked.length){openDetail({eyebrow:"Agenda",title:"Há horários protegidos",body:`<div class="cancellation-warning"><strong>Exclusão em lote interrompida</strong><p>${esc(blocked.length)} horário(s) selecionado(s) possuem reserva ativa ou vínculo mensalista. Remova esses itens da seleção antes de continuar.</p></div>`});return;}
+      if(!entries.length){showToast("Selecione ao menos um horário para excluir.");return;}
+      askConfirm({title:"Excluir horários selecionados",message:`Excluir ${entries.length} horário(s) de ${entries[0].day.date}? A seleção inclui apenas este dia. Horários ocupados não entram nesta seleção.`,confirmLabel:"Excluir horários",onConfirm:async()=>{
+        if (backendScheduleIsOfficial(venue)) {
+          const slotIds=entries.map(({slot})=>slot.backendId).filter(Boolean);
+          state.ui.selectedAvailabilityKeys=[];
+          await runBackendMutation(`${slotIds.length} horário(s) processado(s) na agenda oficial.`,()=>window.MarketplaceBackend.deleteScheduleSlots(slotIds));
+          return;
+        }
+        const removed=removeAvailabilityEntries(venue,entries.map((entry)=>entry.key));saveState();render();showToast(`${removed} horário(s) excluído(s) da agenda.`);
+      }});
+    } else if (action === "new-availability" || action === "edit-availability") {
+      const venue = state.venues.find((item) => item.id === state.partnerProfile.venueId);
+      if (!venue) return;
+      const editSelection=action==="edit-availability"?reservationSelectionForSlot(venue,button.dataset.time,button.dataset.fullDate || button.dataset.date,button.dataset.end,button.dataset.space,button.dataset.slotId):null;
+      const editDay=editSelection?.day || null, editSlot=editSelection?.slot || null;
+      if(action==="edit-availability" && !editSlot){showToast("O horário não está mais disponível. Atualize a agenda.");return;}
+      if (editSlot && scheduleSlotProtectionReason(venue,editDay,editSlot)) {
+        const occupied=findReservationForSlot(venue.id,editSlot.time,editDay.date,slotEndTime(editSlot),normalizedSlotSpace(editSlot));
+        openDetail({eyebrow:"Agenda",title:"Horário vinculado a uma reserva",body:`<div class="cancellation-warning"><strong>Edição protegida</strong><p>O período ${esc(timeRange(editSlot.time,slotEndTime(editSlot)))} está vinculado a ${esc(occupied?.id || "uma reserva ativa")}. Altere ou cancele a reserva na área de Reservas antes de modificar a grade.</p></div>`});
+        return;
+      }
+      const defaultSpace = state.partnerSpaces.find((space) => space.name === normalizedSlotSpace(editSlot)) || state.partnerSpaces[0];
+      const defaultIsoDate = editDay ? `${editDay.date.slice(6)}-${editDay.date.slice(3,5)}-${editDay.date.slice(0,2)}` : "2026-08-01";
+      if (editSlot) {
+        const repeatCandidates=scheduleEditCandidates(venue,editDay,editSlot);
+        const editReference=scheduleSlotReference(venue,editDay,editSlot);
+        const editOfficial=backendScheduleIsOfficial(venue);
+        openForm({ eyebrow:"Agenda pública", title:"Editar horário disponível", description:"A alteração afeta somente esta data. Para repetir início, duração e valores em outras datas do mês, selecione-as no calendário. A reorganização atua apenas nas datas escolhidas, preservando reservas e o limite de meia-noite.", fields:[
+          {name:"date",label:"Data",type:"date",value:defaultIsoDate,required:true},
+          {name:"startTime",label:"Início",type:"time",value:editSlot.time,required:true},
+          {name:"durationMinutes",label:"Duração (min)",type:"number",min:15,max:1440,step:1,value:timeToMinutes(slotEndTime(editSlot))-timeToMinutes(editSlot.time),required:true,help:"O término é calculado pelo início e deve ficar até 00:00."},
+          {name:"space",label:"Espaço",type:"select",value:normalizedSlotSpace(editSlot),options:state.partnerSpaces.filter((item)=>item.status==="Ativo").map((item)=>item.name),required:true},
+          {name:"price",label:"Valor avulso",type:"number",step:"0.01",value:editSlot.price,required:true},
+          {name:"monthlyEnabled",label:"Disponível para mensalista",type:"select",value:editSlot.monthlyEligible?"Sim":"Não",options:["Sim","Não"]},
+          {name:"monthlyPrice",label:"Valor do pacote mensal",type:"number",step:"0.01",value:editSlot.monthlyPrice||defaultSpace?.monthlyPrice||440,help:"Valor total da aquisição mensalista."},
+          {name:"cascadeFollowing",label:"Reorganizar horários subsequentes",type:"select",value:"Sim",options:["Sim","Não"],full:true,help:"Ao alterar o término, os próximos horários do mesmo dia e espaço passam a iniciar no término do anterior, preservando a duração de cada período."},
+          scheduleCalendarField("repeatDates","Repetir também em outras datas (opcional)",editDay,repeatCandidates,
+            "Selecione no calendário as datas seguintes deste mês com o mesmo horário e espaço. Somente as datas marcadas serão alteradas; reservas, bloqueios e vínculos mensalistas ficam protegidos.")
+        ], submitLabel:"Salvar horário", onSubmit:async(data)=>{
+          const start=timeToMinutes(data.startTime), duration=Number(data.durationMinutes), end=start+duration;
+          if(!Number.isFinite(start)||!Number.isInteger(duration)||duration<15||end>1440){showToast("Informe uma duração válida, com término até a meia-noite.");markFormFieldInvalid("durationMinutes","O horário precisa terminar até 00:00.");return false;}
+          data.endTime=minutesToTime(end);
+          const selectedRepeats=repeatCandidates.filter((item)=>data[item.key]==="true");
+          if(selectedRepeats.some((item)=>item.disabled)){showToast("Remova as datas protegidas da seleção.");return false;}
+          if(editOfficial && !backendScheduleIsOfficial(venue)){showToast("Reconecte-se para editar horários da agenda oficial.");return false;}
+          const checked=resolveScheduleSelection([editReference,...selectedRepeats.map((item)=>item.reference)]);
+          if(!checked.valid){showToast(checked.reason);return false;}
+          if(selectedRepeats.length && (data.date!==defaultIsoDate || data.space!==normalizedSlotSpace(editSlot))){showToast("Para repetir em outras datas, mantenha a data e o espaço originais.");return false;}
+          if(backendScheduleIsOfficial(venue) && editSlot.backendId){
+            const selectedSpace=state.partnerSpaces.find((space)=>space.name===data.space);
+            if(selectedSpace?.backendId && selectedSpace.backendId!==editSlot.backendSpaceId){showToast("Na agenda oficial, altere o espaço criando um novo horário e excluindo o anterior.");return false;}
+            const startsAt=backendWallTimeToIso(data.date,data.startTime,venue.timezone||"America/Sao_Paulo");
+            const endsAt=backendWallTimeToIso(data.date,data.endTime,venue.timezone||"America/Sao_Paulo");
+            const updated=await runBackendMutation("Horário atualizado na agenda oficial.",()=>window.MarketplaceBackend.updateScheduleSlotChain({
+              slotId:editSlot.backendId,
+              startsAt,
+              endsAt,
+              price:Number(data.price),
+              monthlyEligible:data.monthlyEnabled==="Sim",
+              monthlyPackagePrice:data.monthlyEnabled==="Sim"?Number(data.monthlyPrice):null,
+              propagateFollowing:data.cascadeFollowing==="Sim",
+              additionalSlotIds:selectedRepeats.map((item)=>item.slot.backendId)
+            }));
+            return Boolean(updated);
+          }
+          const meta=scheduleDayFromDate(isoToLocalDate(data.date));
+          const sameDay=meta.shortDate===editDay.shortDate;
+          const sameSpace=data.space===normalizedSlotSpace(editSlot);
+          const cascade=data.cascadeFollowing==="Sim" && sameDay && sameSpace;
+          let cascadePlan={valid:true,changes:[]};
+          if(cascade){
+            cascadePlan=cascadeAvailabilityPlan(venue,editDay,editSlot,data.endTime);
+            if(!cascadePlan.valid){openDetail({eyebrow:"Reorganização da agenda",title:"Não foi possível ajustar os próximos horários",body:`<div class="cancellation-warning"><strong>Alteração interrompida</strong><p>${esc(cascadePlan.reason)}</p></div>`});return false;}
+            const followingSet=new Set(cascadePlan.changes.map((change)=>change.slot));
+            const unaffected=editDay.slots.filter((slot)=>slot!==editSlot && !followingSet.has(slot) && normalizedSlotSpace(slot)===data.space);
+            const proposed=[{startTime:data.startTime,endTime:data.endTime},...cascadePlan.changes];
+            const collision=proposed.find((period)=>unaffected.some((slot)=>timeRangesOverlap(period.startTime,period.endTime,slot.time,slotEndTime(slot))));
+            if(collision){const conflict=unaffected.find((slot)=>timeRangesOverlap(collision.startTime,collision.endTime,slot.time,slotEndTime(slot)));openDetail({eyebrow:"Conflito de agenda",title:"A sequência encontraria outro horário",body:`<div class="cancellation-warning"><strong>Não foi possível salvar</strong><p>A reorganização de ${esc(timeRange(collision.startTime,collision.endTime))} encontraria o período independente ${esc(timeRange(conflict.time,slotEndTime(conflict)))}. Ajuste o término ou edite a outra sequência.</p></div>`});return false;}
+          } else {
+            const conflict=scheduleConflict(venue,meta,data.space,data.startTime,data.endTime,editSlot);
+            if(conflict){openDetail({eyebrow:"Conflito de agenda",title:"Horário sobreposto",body:`<div class="cancellation-warning"><strong>Não foi possível salvar</strong><p>${esc(meta.date)} · ${esc(data.space)} já possui o período ${esc(timeRange(conflict.time,slotEndTime(conflict)))}. Ative a reorganização automática para deslocar a sequência quando aplicável.</p></div>`});return false;}
+          }
+          let monthlyPlan={valid:true,dayPlans:[]};
+          const syncMonthly=selectedRepeats.length>0 && sameDay && sameSpace;
+          if(syncMonthly){
+            monthlyPlan=monthlyAvailabilityPropagationPlan(venue,editDay,editSlot,data.startTime,data.endTime,selectedRepeats.map((item)=>item.day),data.cascadeFollowing==="Sim");
+            if(!monthlyPlan.valid){openDetail({eyebrow:"Mensalista",title:"Não foi possível alterar as datas selecionadas",body:`<div class="cancellation-warning"><strong>Alteração interrompida</strong><p>${esc(monthlyPlan.reason)}</p><p>Nenhuma data foi alterada. Ajuste a seleção ou a duração para preservar os horários existentes.</p></div>`});return false;}
+          }
+          if(cascade){
+            Object.assign(editSlot,{time:data.startTime,endTime:data.endTime,price:Number(data.price),space:data.space,monthlyEligible:data.monthlyEnabled==="Sim",monthlyPrice:data.monthlyEnabled==="Sim"?Number(data.monthlyPrice):0});
+            cascadePlan.changes.forEach((change)=>{change.slot.time=change.startTime;change.slot.endTime=change.endTime;});
+            editDay.slots.sort((a,b)=>a.time.localeCompare(b.time));
+            const monthlyResult=syncMonthly?applyMonthlyAvailabilityPropagation(monthlyPlan,data.startTime,data.endTime,Number(data.monthlyPrice),Number(data.price),data.monthlyEnabled==="Sim"):null;
+            focusPartnerAgendaDate(meta);
+            state.ui.selectedAvailabilityKeys=[];
+            saveState();render();
+            if(monthlyResult?.changedDays){showToast(`Horário atualizado em ${monthlyResult.changedDays + 1} data(s); ${cascadePlan.changes.length + monthlyResult.shiftedSlots} período(s) subsequente(s) reorganizado(s).`);}
+            else showToast(cascadePlan.changes.length?`Horário atualizado e ${cascadePlan.changes.length} período(s) subsequente(s) reorganizado(s).`:"Horário atualizado.");
+            return;
+          }
+          editDay.slots=editDay.slots.filter((slot)=>slot!==editSlot);
+          if(!editDay.slots.length) venue.schedule=venue.schedule.filter((day)=>day!==editDay);
+          let day=venue.schedule.find((item)=>item.date===meta.date);
+          if(!day){day={...meta,slots:[]};venue.schedule.push(day);}
+          day.slots.push({time:data.startTime,endTime:data.endTime,price:Number(data.price),space:data.space,monthlyEligible:data.monthlyEnabled==="Sim",monthlyPrice:data.monthlyEnabled==="Sim"?Number(data.monthlyPrice):0,blocked:Boolean(editSlot.blocked),blockTitle:editSlot.blockTitle||"",blockDetail:editSlot.blockDetail||""});
+          day.slots.sort((a,b)=>a.time.localeCompare(b.time));
+          const monthlyResult=syncMonthly?applyMonthlyAvailabilityPropagation(monthlyPlan,data.startTime,data.endTime,Number(data.monthlyPrice),Number(data.price),data.monthlyEnabled==="Sim"):null;
+          venue.schedule.sort((a,b)=>parsePtDateTime(a.date,"12:00")-parsePtDateTime(b.date,"12:00"));
+          focusPartnerAgendaDate(meta);
+          state.ui.selectedAvailabilityKeys=[];
+          saveState();render();showToast(monthlyResult?.changedDays?`Horário atualizado e alterações aplicadas em ${monthlyResult.changedDays} outra(s) data(s).`:"Horário atualizado.");
+        }});
+      } else {
+        const agendaToday=new Date();
+        const agendaMonthEnd=new Date(agendaToday.getFullYear(),agendaToday.getMonth()+1,0,12,0,0);
+        const defaultAgendaStart=backendScheduleIsOfficial(venue)?isoDateString(agendaToday):"2026-08-01";
+        const defaultAgendaEnd=backendScheduleIsOfficial(venue)?isoDateString(agendaMonthEnd):"2026-08-31";
+        openForm({ eyebrow:"Agenda pública", title:"Criar agenda em lote", description:"Configure uma faixa do mês. A grade automática publica somente os períodos livres e preserva horários específicos, reservas e vínculos que já existirem.", fields:[
+          {name:"generationMode",label:"Como criar",type:"select",value:"Grade automática do dia",options:["Grade automática do dia","Um horário recorrente"],full:true,help:"Grade automática: informe o primeiro e o último início do dia, a duração e o intervalo. Horário recorrente: informe o início e a duração."},
+          {name:"startDate",label:"Data inicial",type:"date",value:defaultAgendaStart,required:true},
+          {name:"endDate",label:"Data final",type:"date",value:defaultAgendaEnd,required:true},
+          {name:"daysPreset",label:"Dias que terão agenda",type:"select",value:"Segunda a sábado",options:["Todos os dias","Segunda a sexta","Segunda a sábado","Sábados e domingos","Mesmo dia da semana da data inicial"],full:true},
+          {name:"startTime",label:"Abertura / início",type:"time",value:"08:00",required:true},
+          {name:"lastStartTime",label:"Último horário do dia",type:"time",value:"22:00",required:true,help:"Último início permitido. A duração deve terminar até 00:00. Exemplo: 23:00 com duração de 60 minutos."},
+          {name:"durationMinutes",label:"Duração de cada horário (min)",type:"number",min:15,max:1440,step:15,value:60,required:true,help:"O término nunca pode ultrapassar a meia-noite."},
+          {name:"intervalMinutes",label:"Intervalo entre horários (min)",type:"number",min:0,step:5,value:0,help:"Use 0 para horários consecutivos."},
+          {name:"space",label:"Espaço",type:"select",value:defaultSpace?.name,options:state.partnerSpaces.filter((item)=>item.status==="Ativo").map((item)=>item.name),required:true},
+          {name:"price",label:"Valor avulso por horário",type:"number",step:"0.01",value:defaultSpace?.price||120,required:true},
+          {name:"monthlyEnabled",label:"Permitir mensalista",type:"select",value:"Sim",options:["Sim","Não"]},
+          {name:"monthlyPrice",label:"Valor do pacote mensal",type:"number",step:"0.01",value:defaultSpace?.monthlyPrice||440,help:"Aplicado a cada faixa semanal equivalente."}
+        ], submitLabel:"Gerar e publicar agenda", onChange:updateAgendaGenerationFields, onSubmit:async(data)=>{
+          if(data.endDate<data.startDate){showToast("A data final não pode ser anterior à data inicial.");return markFormFieldInvalid("endDate","Informe uma data final igual ou posterior à data inicial.");}
+          const dates=datesForAgendaRange(data.startDate,data.endDate,data.daysPreset);
+          const ranges=rangesForAgendaGeneration(data.generationMode,data.startTime,data.lastStartTime,data.durationMinutes,data.intervalMinutes);
+          if(!dates.length){showToast("Nenhuma data foi encontrada no período e nos dias escolhidos.");return markFormFieldInvalid("daysPreset","Escolha dias que existam dentro do período informado.");}
+          if(!ranges.length){showToast("Revise os horários e a duração: nenhum período pode ultrapassar a meia-noite.");return markFormFieldInvalid("durationMinutes","O último início deve ser igual ou posterior ao primeiro, e a duração deve terminar até 00:00.");}
+          const total=dates.length*ranges.length;
+          if(total>600){showToast(`A configuração geraria ${total} horários. Reduza o período.`);return markFormFieldInvalid("endDate","Período muito amplo: limite a geração a no máximo 600 horários.");}
+          const conflicts=[];
+          dates.forEach((date)=>{const meta=scheduleDayFromDate(date);ranges.forEach((range)=>{const conflict=scheduleConflict(venue,meta,data.space,range.startTime,range.endTime);if(conflict)conflicts.push(`${meta.date} · ${timeRange(range.startTime,range.endTime)} sobrepõe ${timeRange(conflict.time,slotEndTime(conflict))}`);});});
+          if(backendScheduleIsOfficial(venue)){
+            const space=state.partnerSpaces.find((item)=>item.name===data.space && item.backendId);
+            if(!space){showToast("O espaço selecionado não está vinculado ao backend.");return;}
+            const recurring=data.generationMode==="Um horário recorrente";
+            // Close only after field validation, before the network request.
+            if(formDialog.open)formDialog.close();
+            formHandler=null;formChangeHandler=null;
+            openDetail({eyebrow:"Agenda pública",title:"Criando agenda",body:'<div role="status" aria-live="polite" aria-busy="true"><p>Estamos criando os horários e preservando os vínculos existentes. Aguarde a conclusão.</p></div>'});
+            let creationError=null;
+            const result=await runBackendMutation("",async()=>{
+              try { return await window.MarketplaceBackend.createScheduleSeries({
+              spaceId:space.backendId,
+              startDate:data.startDate,
+              endDate:data.endDate,
+              weekdays:backendWeekdaysForPreset(data.startDate,data.daysPreset),
+              openingTime:recurring?null:data.startTime,
+              closingTime:recurring?null:ranges.at(-1).endTime,
+              slotMinutes:recurring?null:Number(data.durationMinutes),
+              intervalMinutes:recurring?0:Number(data.intervalMinutes||0),
+              price:Number(data.price),
+              monthlyEligible:data.monthlyEnabled==="Sim",
+              monthlyPackagePrice:data.monthlyEnabled==="Sim"?Number(data.monthlyPrice):null,
+              mode:recurring?"recurring_single":"grid",
+              specificStart:recurring?data.startTime:null,
+              specificEnd:recurring?ranges[0].endTime:null
+              }); } catch(error) { creationError=error;throw error; }
+            });
+            if(!result){
+              openDetail({eyebrow:"Agenda pública",title:creationError?"Não foi possível criar a agenda":"Confira a agenda",body:`<div class="cancellation-warning" role="alert"><strong>${creationError?"Criação interrompida":"Resultado não confirmado"}</strong><p>${esc(creationError?backendErrorMessage(creationError):"Não foi possível atualizar o resultado. Consulte a agenda antes de tentar novamente.")}</p></div>`});
+              return false;
+            }
+            const protectedCreated=Number(result.protected_created||0);
+            const protectedPreserved=Number(result.protected_preserved||0);
+            const created=Number(result.created||0);
+            const skipped=Number(result.skipped_conflicts||0);
+            const skippedProtected=Number(result.skipped_protected||0);
+            state.ui.partnerAgendaMonth=data.startDate.slice(0,7);
+            state.ui.partnerAgendaDate=data.startDate;
+            saveState();render();
+            const title=created?"Grade criada":"Horários preservados";
+            openDetail({eyebrow:"Agenda pública",title,body:`<div class="summary-card" role="status"><strong>${created} horário(s) criado(s)</strong><p>${created-protectedCreated} livre(s) e ${protectedCreated} protegido(s) pelo vínculo mensalista.</p>${protectedCreated+protectedPreserved?`<p>${protectedCreated+protectedPreserved} horário(s) protegido(s) mantido(s), com o valor do respectivo mês, indisponíveis para terceiros.</p>`:""}${skipped?`<p>${skipped} período(s) já existente(s) preservado(s).</p>`:""}${skippedProtected?`<p>${skippedProtected} faixa(s) da grade que coincidiam ou se sobrepunham aos horários protegidos foram preservadas sem substituição. Os demais horários compatíveis foram publicados.</p>`:""}</div>`});
+            showToast(created?`${created} horário(s) criado(s). Vínculos existentes preservados.`:"Nenhum horário novo. Períodos existentes preservados.");
+            return false;
+          }
+          let created=0;
+          let skipped=0;
+          dates.forEach((date)=>{
+            const meta=scheduleDayFromDate(date);
+            ranges.forEach((range)=>{
+              if(scheduleConflict(venue,meta,data.space,range.startTime,range.endTime)){skipped+=1;return;}
+              let day=venue.schedule.find((item)=>item.date===meta.date);
+              if(!day){day={...meta,slots:[]};venue.schedule.push(day);}
+              day.slots.push({time:range.startTime,endTime:range.endTime,price:Number(data.price),space:data.space,monthlyEligible:data.monthlyEnabled==="Sim",monthlyPrice:data.monthlyEnabled==="Sim"?Number(data.monthlyPrice):0});
+              day.slots.sort((a,b)=>a.time.localeCompare(b.time));
+              created+=1;
+            });
+          });
+          venue.schedule.sort((a,b)=>parsePtDateTime(a.date,"12:00")-parsePtDateTime(b.date,"12:00"));
+          saveState();render();showIncrementalAgendaResult(created,skipped,total,conflicts);
+        }});
+      }
+    } else if (action === "delete-availability") {
+      const venue=state.venues.find((item)=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const selected=reservationSelectionForSlot(venue,button.dataset.time,button.dataset.fullDate || button.dataset.date,button.dataset.end,button.dataset.space,button.dataset.slotId);
+      if(!selected){showToast("O horário não está mais disponível. Atualize a agenda.");return;}
+      openScheduleDeletion(venue,selected.day,selected.slot);
+    } else if (action === "new-block") {
+      const venue=state.venues.find((item)=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const available=blockableAvailabilityEntries(venue);
+      if(!available.length){openDetail({eyebrow:"Agenda",title:"Nenhum horário disponível para bloquear",body:`<div class="cancellation-warning"><strong>A grade não possui horários livres.</strong><p>Crie novos horários ou libere uma reserva/bloqueio existente antes de realizar outro bloqueio.</p></div>`});return;}
+      const selectedDate=selectedPartnerAgendaDate(venue);
+      const preferred=available.find(({day})=>window.MarketplaceAgendaNavigation.dayIso(day)===selectedDate)||available[0];
+      openForm({eyebrow:"Agenda",title:"Novo bloqueio",description:"Selecione um horário já disponível na agenda. Somente dias e períodos livres são exibidos.",fields:[
+        {name:"slotKey",label:"Dia e horário disponível",type:"select",value:preferred.key,required:true,options:available.map(({day,slot,key})=>({value:key,label:`${day.date} · ${timeRange(slot.time,slotEndTime(slot))} · ${normalizedSlotSpace(slot)}`}))},
+        {name:"title",label:"Motivo",value:"Manutenção",required:true},{name:"detail",label:"Observação",type:"textarea",value:"Bloqueio interno",full:true}
+      ],submitLabel:"Bloquear horário",onSubmit:(data)=>{
+        const [shortDate,time,space]=String(data.slotKey||"").split("::");
+        const day=venue.schedule.find((item)=>item.shortDate===shortDate);
+        const slot=day?.slots.find((item)=>item.time===time && normalizedSlotSpace(item)===space);
+        if(!day||!slot){showToast("O horário selecionado não existe mais na agenda.");return;}
+        if(slot.blocked||availabilityHasActiveReservation(venue,day,slot)){openDetail({eyebrow:"Bloqueio",title:"Horário não está mais disponível",body:`<div class="cancellation-warning"><strong>Bloqueio não aplicado</strong><p>Este período foi reservado ou bloqueado depois da abertura do formulário. Atualize a agenda e tente novamente.</p></div>`});return;}
+        if(backendScheduleIsOfficial(venue)&&slot.backendId){runBackendMutation("Horário bloqueado na agenda oficial.",()=>window.MarketplaceBackend.setSlotBlocked(slot.backendId,true,[data.title,data.detail].filter(Boolean).join(" — ")));return;}
+        slot.blocked=true;slot.blockTitle=data.title;slot.blockDetail=data.detail||"Bloqueio interno";
+        focusPartnerAgendaDate(day);state.ui.selectedAvailabilityKeys=[];saveState();render();showToast("Horário bloqueado e retirado imediatamente da disponibilidade do marketplace.");
+      }});
+    } else if (action === "block-availability") {
+      const venue=state.venues.find((item)=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const selection=partnerScheduleSelection(venue,button),day=selection?.day,slot=selection?.slot;
+      if(!day||!slot)return;
+      if(slot.blocked||availabilityHasActiveReservation(venue,day,slot)){showToast("Este horário não está disponível para bloqueio.");return;}
+      openForm({eyebrow:"Agenda",title:`Bloquear ${day.date} · ${timeRange(slot.time,slotEndTime(slot))}`,description:`${normalizedSlotSpace(slot)} será retirado da disponibilidade do marketplace.`,fields:[{name:"title",label:"Motivo",value:"Manutenção",required:true},{name:"detail",label:"Observação",type:"textarea",value:"Bloqueio interno",full:true}],submitLabel:"Bloquear horário",onSubmit:(data)=>{
+        if(slot.blocked||availabilityHasActiveReservation(venue,day,slot)){showToast("Este horário não está mais disponível para bloqueio.");return;}
+        if(backendScheduleIsOfficial(venue)&&slot.backendId){runBackendMutation("Horário bloqueado na agenda oficial.",()=>window.MarketplaceBackend.setSlotBlocked(slot.backendId,true,[data.title,data.detail].filter(Boolean).join(" — ")));return;}
+        slot.blocked=true;slot.blockTitle=data.title;slot.blockDetail=data.detail||"Bloqueio interno";focusPartnerAgendaDate(day);state.ui.selectedAvailabilityKeys=[];saveState();render();showToast("Horário bloqueado e retirado imediatamente da disponibilidade do marketplace.");
+      }});
+    } else if (action === "new-partner-reservation") {
+      if(backendIsOnline()){showToast("A reserva manual será conectada em uma etapa posterior; nenhum dado local será criado no modo online.");return;}
+      const venue=state.venues.find((item)=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const selectedDate=selectedPartnerAgendaDate(venue);
+      const selectedDay=venue.schedule.find((day)=>window.MarketplaceAgendaNavigation.dayIso(day)===selectedDate);
+      const defaultIso=selectedDay?`${selectedDay.date.slice(6)}-${selectedDay.date.slice(3,5)}-${selectedDay.date.slice(0,2)}`:"2026-08-13";
+      openForm({ eyebrow:"Reservas",title:"Nova reserva manual",description:"A reserva será vinculada à mesma grade exibida no marketplace. Se o horário ainda não existir e não houver conflito, ele será criado automaticamente.",fields:[
+        {name:"client",label:"Cliente ou grupo",value:"",required:true},{name:"date",label:"Data inicial",type:"date",value:defaultIso,required:true},
+        {name:"time",label:"Início",type:"time",value:"18:00",required:true},{name:"endTime",label:"Término",type:"time",value:"19:00",required:true},{name:"space",label:"Espaço",type:"select",options:state.partnerSpaces.map((item)=>item.name)},
+        {name:"bookingMode",label:"Modalidade",type:"select",value:"Avulsa",options:["Avulsa","Mensalista"]},{name:"value",label:"Valor avulso",type:"number",step:"0.01",value:120,required:true},{name:"monthlyValue",label:"Valor mensalista",type:"number",step:"0.01",value:440},{name:"status",label:"Status",type:"select",value:"Pendente",options:["Pendente","Confirmada"]}
+      ],submitLabel:"Salvar reserva",onSubmit:(data)=>{
+        const start=timeToMinutes(data.time),end=timeToMinutes(data.endTime);if(end<=start){showToast("O término deve ser posterior ao início.");return;}
+        const monthly=data.bookingMode==="Mensalista";const base=isoToLocalDate(data.date);const occurrences=[];
+        if(monthly){for(let date=new Date(base);date.getMonth()===base.getMonth();date.setDate(date.getDate()+7)){const meta=scheduleDayFromDate(date);occurrences.push({...meta,time:data.time,endTime:data.endTime,space:data.space});}}
+        else{const meta=scheduleDayFromDate(base);occurrences.push({...meta,time:data.time,endTime:data.endTime,space:data.space});}
+        const problems=[];
+        occurrences.forEach((occ)=>{
+          const meta={date:occ.date,shortDate:occ.shortDate,weekday:occ.weekday,dayLabel:occ.dayLabel};
+          const exact=slotForSchedulePeriod(venue,meta,data.space,data.time,data.endTime);
+          if(exact.slot){
+            if(exact.slot.blocked) problems.push(`${occ.date} · horário bloqueado`);
+            else if(availabilityHasActiveReservation(venue,exact.day,exact.slot)) problems.push(`${occ.date} · horário já reservado`);
+          }else{
+            const conflict=scheduleConflict(venue,meta,data.space,data.time,data.endTime);
+            if(conflict) problems.push(`${occ.date} · sobreposição com ${timeRange(conflict.time,slotEndTime(conflict))}`);
+          }
+        });
+        if(problems.length){openDetail({eyebrow:"Reserva manual",title:"Não foi possível vincular a reserva",body:`<div class="cancellation-warning"><strong>Conflitos encontrados</strong><ul>${problems.slice(0,10).map((item)=>`<li>${esc(item)}</li>`).join("")}</ul></div>`});return;}
+        occurrences.forEach((occ)=>{
+          const meta={date:occ.date,shortDate:occ.shortDate,weekday:occ.weekday,dayLabel:occ.dayLabel};
+          const exact=slotForSchedulePeriod(venue,meta,data.space,data.time,data.endTime);
+          if(!exact.slot){const day=ensureScheduleDay(venue,meta);day.slots.push({time:data.time,endTime:data.endTime,price:Number(data.value),space:data.space,monthlyEligible:monthly,monthlyPrice:monthly?Number(data.monthlyValue):0});day.slots.sort((a,b)=>a.time.localeCompare(b.time));}
+        });
+        state.partnerReservations.unshift({id:nextId("RP-",state.partnerReservations),createdAtIso:new Date().toISOString(),client:data.client,date:occurrences[0].date,time:data.time,endTime:data.endTime,space:data.space,value:Number(monthly?data.monthlyValue:data.value),monthly,occurrenceCount:occurrences.length,occurrences,status:data.status,payment:"Externo"});
+        focusPartnerAgendaDate(occurrences[0]);state.ui.selectedAvailabilityKeys=[];saveState();render();showToast(monthly?`Reserva mensalista vinculada à grade em ${occurrences.length} datas.`:"Reserva manual vinculada à grade publicada.");
+      } });
+    } else if (action === "schedule-slot-details") {
+      const venue=state.venues.find((item)=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const selection=partnerScheduleSelection(venue,button),day=selection?.day,slot=selection?.slot;
+      if(!day||!slot)return;
+      const info=operationalSlotInfo(venue,day,slot);
+      const reservationMode=partnerSlotHasMonthlyLink(slot,info.reservation)?`<div class="detail-line"><span>Modalidade</span><strong>Mensalista · horário protegido</strong></div>`:info.reservation?`<div class="detail-line"><span>Modalidade reservada</span><strong>${info.reservation.monthly?"Mensalista":"Avulsa"}</strong></div>`:`<div class="detail-line"><span>Oferta mensal</span><strong>${slot.monthlyEligible ? `Elegível · ${money(slot.monthlyPrice)}` : "Não elegível"}</strong></div>`;
+      let monthlyDetails=partnerMonthlySlotDetails(slot,info.reservation);
+      monthlyDetails=`${partnerSlotReservationFinancialDetails(info.reservation)}${monthlyDetails}`;
+      const slotOccurrence=(info.reservation?.allOccurrences||info.reservation?.occurrences||[]).find((occurrence)=>occurrence.backendSlotId===slot.backendId||(window.MarketplaceAgendaNavigation.dateMatches(occurrence.date,day.date,occurrence.shortDate)&&occurrence.time===slot.time));
+      const occurrencePanel=slotOccurrence?reservationOccurrenceTransferPanel(info.reservation,"partner",slotOccurrence.backendId):"";
+      const agendaDetails=info.type==="monthly"&&!info.reservation?"":`<div class="detail-group"><h3>Agenda e reserva</h3><div class="detail-list"><div class="detail-line"><span>Marketplace</span><strong>${slot.blocked ? "Indisponível" : partnerSlotHasMonthlyLink(slot,info.reservation) ? info.statusLabel : info.reservation ? info.statusLabel : `Disponível por ${money(slot.price)}`}</strong></div>${reservationMode}<div class="detail-line"><span>Fonte dos dados</span><strong>Agenda publicada do parceiro</strong></div></div></div>`;
+      openDetail({eyebrow:"Detalhes do horário",title:`${day.date} · ${timeRange(slot.time,slotEndTime(slot))}`,body:`<div class="summary-card"><strong>${esc(info.statusLabel)}</strong><div class="meta-row" style="margin-top:7px"><span>${esc(normalizedSlotSpace(slot))}</span><span>${esc(info.title)}</span></div><p class="dialog-description">${esc(info.detail)}</p></div><div class="details-grid agenda-slot-details-grid ${info.type==="monthly"?"monthly-pending-slot-grid":""}">${agendaDetails}${monthlyDetails}${occurrencePanel}${reservationContactHistory(info.reservation)}${reservationFinancialDetails(info.reservation)}</div>`});
+    } else if (action === "unblock-availability") {
+      const venue=state.venues.find((item)=>item.id===state.partnerProfile.venueId);if(!venue)return;
+      const selection=partnerScheduleSelection(venue,button),day=selection?.day,slot=selection?.slot;
+      if(!day||!slot||!slot.blocked)return;
+      if(backendScheduleIsOfficial(venue)&&slot.backendId){runBackendMutation("Horário desbloqueado na agenda oficial.",()=>window.MarketplaceBackend.setSlotBlocked(slot.backendId,false,null));return;}
+      slot.blocked=false;delete slot.blockTitle;delete slot.blockDetail;
+      if(Number(slot.price||0)<=0){const baseSpace=state.partnerSpaces.find((item)=>item.name===normalizedSlotSpace(slot));slot.price=Number(baseSpace?.price||0);}
+      saveState();render();showToast("Horário desbloqueado e disponibilizado na mesma grade do marketplace.");
+    } else if (action === "partner-reservation-details") {
+      const item=state.partnerReservations.find((r)=>r.id===id);
+      if(item){
+        const reservation=state.reservations.find((entry)=>entry.id===item.userReservationId);
+        const occurrencePanel=reservationOccurrenceTransferPanel(reservation,"partner");
+        openDetail({eyebrow:"Reserva do parceiro",title:item.backendOfficial ? item.userReservationId : item.id,body:`<div class="details-grid"><div class="detail-group"><h3>Reserva</h3><div class="detail-list"><div class="detail-line"><span>Cliente</span><strong>${esc(item.client)}</strong></div><div class="detail-line"><span>Data</span><strong>${esc(item.date)} · ${esc(timeRange(item.time,item.endTime))}${item.monthly ? ` · Mensalista (${esc(item.occurrenceCount)} datas)` : ""}</strong></div><div class="detail-line"><span>Espaço</span><strong>${esc(item.space)}</strong></div></div></div><div class="detail-group"><h3>Financeiro</h3><div class="detail-list"><div class="detail-line"><span>Valor total</span><strong>${money(item.value)}</strong></div><div class="detail-line"><span>Voucher aplicado</span><strong>${esc(item.voucher || "Não aplicado")}</strong></div><div class="detail-line"><span>Valor abatido</span><strong>${money(item.voucherAppliedValue || 0)}</strong></div><div class="detail-line"><span>Valor após vouchers</span><strong>${money(item.paymentDue || 0)}</strong></div><div class="detail-line"><span>Status</span><strong>${esc(item.status)}</strong></div><div class="detail-line"><span>Pagamento</span><strong>${esc(item.payment)}</strong></div>${singleCardPaymentResponsibleDetail(item)}</div></div>${item.cancellationSource ? `<div class="detail-group"><h3>Cancelamento</h3><div class="detail-list"><div class="detail-line"><span>Responsável</span><strong>${esc(cancellationSourceLabel(item.cancellationSource))}</strong></div><div class="detail-line"><span>Modalidade</span><strong>${item.cancellationMode === "voucher" ? "Voucher" : item.cancellationMode === "refund" ? "Reembolso integral" : "Sem compensação"}</strong></div><div class="detail-line"><span>Motivo</span><strong>${esc(item.cancellationReason || "Não informado")}</strong></div>${reservationCancellationVoucherMarkup(item)}<div class="detail-line"><span>Reembolso</span><strong>${money(item.refundValue || 0)}</strong></div><div class="detail-line"><span>Taxas suportadas por</span><strong>${item.refundFeePayer ? esc(cancellationSourceLabel(item.refundFeePayer)) : "Não aplicável"}</strong></div></div></div>` : ""}${occurrencePanel}${singlePrebookingDeadlineMarkup(reservation)}${reservationContactHistory(reservation)}${reservationFinancialDetails(reservation)}</div>`});
+        detailDialog.dataset.view="reservation-notices";detailDialog.dataset.reservationAction=action;detailDialog.dataset.reservationId=id;
+        if(reservation)markOccurrenceTransferNotificationsReadForReservation(reservation);
+      }
+    } else if (action === "cancel-paid-partner-reservation") {
+      const item = state.partnerReservations.find((r) => r.id === id);
+      const reservation = item ? state.reservations.find((entry) => entry.id === item.userReservationId) : null;
+      if (reservation?.backendOfficial) openOfficialReservationCancellation(reservation, "Parceiro");
+      else if (item) openPaidCancellation("partner", item.userReservationId || "", item.id);
+    } else if (action === "cancel-backend-partner-reservation") {
+      const item = state.partnerReservations.find((entry) => entry.id === id);
+      const reservation = item ? state.reservations.find((entry) => entry.id === item.userReservationId) : null;
+      if (reservation) openOfficialReservationCancellation(reservation, "Parceiro");
+    } else if (action === "partner-reservation-status") {
+      const item=state.partnerReservations.find((r)=>r.id===id); if(item){item.status=button.dataset.status;saveState();render();showToast(`${id}: ${item.status}.`);}
+    } else if (action === "export-partner-reservations") {
+      exportCsv(`reservas-parceiro-${VERSION}.csv`,[["Reserva","Cliente","Data","Hora","Espaço","Valor","Responsável pelo pagamento","Situação do responsável","Status"],...state.partnerReservations.map((r)=>[r.id,r.client,r.date,r.time,r.space,r.value,hasSingleCardPaymentResponsible(r)?paymentResponsibleDisplayName(r):"Rateio Pix ou quitação por voucher",hasSingleCardPaymentResponsible(r)?paymentResponsibleStatusLabel(r):paymentResponsibilitySummary(r),r.status])]);
+    } else if (action === "new-space" || action === "edit-space") {
+      const item=action==="edit-space"?state.partnerSpaces.find((s)=>s.id===id):null;
+      openForm({eyebrow:"Espaços",title:item?"Editar espaço":"Cadastrar espaço",description:backendIsOnline()?"As alterações são gravadas no Supabase staging e respeitam as permissões do parceiro.":"",fields:[{name:"name",label:"Nome",value:item?.name||"",required:true},{name:"type",label:"Tipo",type:"select",value:item?.type||"Society",options:["Futsal","Society","Campo"]},{name:"floor",label:"Piso",value:item?.floor||"Grama sintética"},{name:"capacity",label:"Capacidade",type:"number",min:1,value:item?.capacity||14},{name:"price",label:"Preço-base",type:"currency",value:item?.price ?? 0,required:true},{name:"monthlyPrice",label:"Preço mensalista padrão",type:"currency",value:item?.monthlyPrice ?? 0,required:true},{name:"status",label:"Status",type:"select",value:item?.status||"Ativo",options:["Ativo","Inativo"]},{name:"lights",label:"Iluminação",type:"select",value:item?.lights||"Sim",options:["Sim","Não","A informar"]},{name:"covered",label:"Coberta",type:"select",value:item?.covered||"Não",options:["Sim","Não","A informar"]}],onSubmit:async(data)=>{
+        if (backendRuntime.enabled) { return Boolean(await saveBackendSpace(data,item)); }
+        const normalized={...data,capacity:Number(data.capacity),price:Number(data.price),monthlyPrice:Number(data.monthlyPrice)};if(item)Object.assign(item,normalized);else state.partnerSpaces.push({id:nextId("E-",state.partnerSpaces),...normalized});syncCurrentPartnerToConnectedAreas();saveState();render();showToast(item?"Espaço atualizado e sincronizado.":"Espaço cadastrado e sincronizado.");
+      }});
+    } else if (action === "toggle-space") {
+      const item=state.partnerSpaces.find((s)=>s.id===id);if(item){if(backendRuntime.enabled){if(item.backendId)await toggleBackendSpace(item);}else{item.status=item.status==="Ativo"?"Inativo":"Ativo";syncCurrentPartnerToConnectedAreas();saveState();render();showToast(`${item.name}: ${item.status}.`);}}
+    } else if (action === "new-client" || action === "edit-client") {
+      const item=action==="edit-client"?state.partnerClients.find((c)=>c.id===id):null;
+      openForm({eyebrow:"Clientes",title:item?"Editar cliente":"Cadastrar cliente",fields:[{name:"name",label:"Grupo ou cliente",value:item?.name||"",required:true},{name:"contact",label:"Responsável",value:item?.contact||"",required:true},{name:"phone",label:"Telefone",value:item?.phone||""},{name:"frequency",label:"Frequência",type:"select",value:item?.frequency||"Semanal",options:["Semanal","Quinzenal","Mensal","Eventual"]},{name:"lastBooking",label:"Última reserva",value:item?.lastBooking||"",readonly:backendRuntime.enabled,help:backendRuntime.enabled?"Atualizada pelas reservas confirmadas.":""},{name:"notes",label:"Observações",type:"textarea",value:item?.notes||"",full:true}],onSubmit:async(data)=>{
+        if(backendRuntime.enabled)return Boolean(await runBackendMutation(item?"Cliente atualizado.":"Cliente cadastrado.",()=>window.MarketplaceBackend.upsertPartnerClient({partnerId:state.partnerProfile.backendPartnerId,clientId:item?.backendId||null,...data})));
+        if(item)Object.assign(item,data);else state.partnerClients.push({id:nextId("C-",state.partnerClients),source:"manual",...data});saveState();render();showToast(item?"Cliente atualizado.":"Cliente cadastrado.");
+      }});
+    } else if (action === "client-details") {
+      const item=state.partnerClients.find((c)=>c.id===id);if(item)openDetail({eyebrow:"Cliente",title:item.name,body:`<div class="detail-group"><div class="detail-list"><div class="detail-line"><span>Responsável</span><strong>${esc(item.contact)}</strong></div><div class="detail-line"><span>Telefone</span><strong>${esc(item.phone)}</strong></div><div class="detail-line"><span>Frequência</span><strong>${esc(item.frequency)}</strong></div><div class="detail-line"><span>Observações</span><strong>${esc(item.notes)}</strong></div></div></div>`});
+    } else if (action === "new-team-member" || action === "edit-team-member") {
+      const item=action==="edit-team-member"?state.partnerTeam.find((m)=>m.id===id):null;
+      if (backendIsOnline()) {
+        if (!canManageBackendTeam()) { showToast("Sua função não permite gerenciar a equipe."); return; }
+        const identityFields=item ? [{name:"name",label:"Nome do perfil",value:item.name,readonly:true},{name:"email",label:"E-mail da conta",type:"email",value:item.email,readonly:true,required:true}] : [{name:"email",label:"E-mail da conta",type:"email",value:"",required:true,help:"Informe a conta Google que a pessoa já usa na Comunidade do Tâmo On. O primeiro acesso ao Marketplace pode acontecer depois."}];
+        const initialRole=item?.roleKey||"attendant";
+        const initialPermissions=item?.permissions||TEAM_ROLE_PERMISSION_PRESETS[initialRole]||TEAM_ROLE_PERMISSION_PRESETS.attendant;
+        openForm({eyebrow:"Equipe oficial",title:item?"Editar função e acesso":"Adicionar conta à equipe",description:"A função define uma sugestão inicial. As permissões marcadas abaixo determinam o acesso efetivo; o Proprietário mantém acesso total obrigatório.",fields:[...identityFields,{name:"role",label:"Função",type:"select",value:initialRole,options:[{value:"owner",label:"Proprietário"},{value:"manager",label:"Gerente"},{value:"attendant",label:"Atendimento"},{value:"schedule",label:"Agenda"},{value:"finance",label:"Financeiro"}],required:true},{name:"permissions",label:"Permissões de acesso",type:"checkbox-group",full:true,help:initialRole==="owner"?"O Proprietário mantém obrigatoriamente todas as permissões.":"A função aplica uma sugestão inicial. Você pode personalizar as permissões antes de salvar.",options:TEAM_PERMISSION_DEFINITIONS.map((permission)=>({value:permission.key,label:permission.label,help:permission.help,checked:initialRole==="owner"||Boolean(initialPermissions?.[permission.key]),disabled:initialRole==="owner"}))},{name:"status",label:"Status",type:"select",value:item?.status||"Ativo",options:["Ativo","Inativo"],required:true}],onSubmit:async(data)=>{
+          await runBackendMutation(item?"Função e permissões atualizadas no staging.":"Pessoa adicionada à equipe oficial.",()=>window.MarketplaceBackend.upsertPartnerTeamMember({partnerId:state.partnerProfile.backendPartnerId,email:item?.email||String(data.email||"").trim(),role:data.role,permissions:teamPermissionsFromForm(data,data.role),active:data.status==="Ativo",pending:Boolean(item?.accessPending)}));
+        }});
+        configureTeamPermissionRolePresets(item?.roleKey||"");
+      } else {
+        openForm({eyebrow:"Equipe",title:item?"Editar pessoa":"Adicionar pessoa",fields:[{name:"name",label:"Nome",value:item?.name||"",required:true},{name:"email",label:"E-mail",type:"email",value:item?.email||"",required:true},{name:"role",label:"Função",value:item?.role||"Atendimento"},{name:"permission",label:"Permissão",type:"select",value:item?.permission||"Agenda e reservas",options:["Total","Agenda e reservas","Agenda e bloqueios","Somente leitura"]},{name:"status",label:"Status",type:"select",value:item?.status||"Ativo",options:["Ativo","Inativo"]}],onSubmit:(data)=>{if(item)Object.assign(item,data);else state.partnerTeam.push({id:nextId("T-",state.partnerTeam),...data});saveState();render();showToast(item?"Pessoa atualizada.":"Pessoa adicionada.");}});
+      }
+    } else if (action === "toggle-team-member") {
+      const item=state.partnerTeam.find((m)=>m.id===id);if(item){if(backendIsOnline()&&item.backendId){if(!canManageBackendTeam()){showToast("Sua função não permite gerenciar a equipe.");return;}const nextActive=item.status!=="Ativo";await runBackendMutation(`${item.name}: ${nextActive?"Ativo":"Inativo"}.`,()=>window.MarketplaceBackend.setPartnerTeamMemberActive(item.backendId,nextActive,Boolean(item.accessPending)));}else{item.status=item.status==="Ativo"?"Inativo":"Ativo";saveState();render();showToast(`${item.name}: ${item.status}.`);}}
+    } else if (action === "export-partner-finance") {
+      if(financePeriodSelection()!=="all"){exportFinancialPeriod();return;}
+      const finance=currentPartnerFinancialSummary();
+      exportCsv(`financeiro-parceiro-${VERSION}.csv`,[["Parceiro", "Contratado original apos descontos", "Valor contratado vigente", "Recebido bruto", "Devolvido", "Recebido menos devolucoes", "Saldo aberto", "Asaas Pix", "Asaas cartao", "Recebido externamente", "Bloqueado Asaas", "Liquidado", "Tarifas Asaas", "Tarifas estimadas", "Comissao", "Comissao provisoria", "Comissao a reter", "Comissao pendente parceiro", "Apuracao a conciliar", "Créditos ao parceiro após devoluções","Bloqueado restituicao","Bloqueado remarcacao","Excedente a conferir","Parcial bloqueado","Recebimento em conferencia","Liquido do parceiro","Encerrado ou cancelado"],...[finance].map((row)=>[row.partnerName,row.contractedValue,row.finalDueValue,row.receivedTotal,row.refundCompleted,row.receivedNet,row.balancePending,row.asaasPixValue,row.asaasCardValue,row.externalReceived,row.asaasBlocked,row.liquidatedValue,row.asaasFeeTotal,row.asaasFeeEstimated,row.commissionTotal,row.commissionProvisional,row.commissionRetained,row.commissionPending,row.asaasPartnerPayout,row.partnerPaid,row.blockedRefund,row.blockedResolution,row.blockedExcess,row.blockedPartial,row.blockedReview,window.MarketplaceFinancePeriod.position(row).partnerNet,row.cancelledValue||0])]);
+    } else if (action === "edit-bank-data") {
+      const p=state.partnerProfile;openForm({eyebrow:"Financeiro",title:"Editar dados bancários",fields:[{name:"bank",label:"Banco",value:p.bank},{name:"branch",label:"Agência",value:p.branch},{name:"account",label:"Conta",value:p.account},{name:"pixKey",label:"Chave Pix",value:p.pixKey},{name:"asaasSubaccount",label:"Subconta Asaas",value:p.asaasSubaccount,full:true}],onSubmit:(data)=>{Object.assign(p,data);syncCurrentPartnerToConnectedAreas();saveState();render();showToast("Dados bancários atualizados e sincronizados.");}});
+    } else if (["edit-company-data","edit-responsible-data","edit-address-data","edit-contract-data","edit-fiscal-data","edit-payment-integrations"].includes(action)) {
+      editPartnerProfileSection(action);
+    } else if (action === "add-document" || action === "edit-document") {
+      const index=Number(button.dataset.index);const item=action==="edit-document"?state.partnerProfile.documents[index]:null;
+      openForm({eyebrow:"Documentos",title:item?"Alterar documento":"Adicionar documento",fields:[{name:"name",label:"Documento",value:item?.name||"",required:true},{name:"status",label:"Status",type:"select",value:item?.status||"Pendente",options:["Pendente","Enviado","Em análise","Validado","Rejeitado","Assinado"]}],onSubmit:(data)=>{if(item)Object.assign(item,data);else state.partnerProfile.documents.push(data);saveState();render();showToast("Lista de documentos atualizada.");}});
+    } else if (action === "partner-application-details") {
+      await openPartnerApplicationDetails(id);
+    } else if (action === "partner-application-review") {
+      openPartnerApplicationReview(id,button.dataset.decision);
+    } else if (action === "open-approved-partner") {
+      if(backendAllowedRoles().has("partner"))setRole("partner");
+    } else if (action === "review-next-partner") {
+      const application=pendingPartnerApplications()[0];
+      if(application && backendIsOnline()){await openPartnerApplicationDetails(application.id);return;}
+      const partner=state.adminPartners.find((p)=>["Pendente","Em análise"].includes(p.status));if(partner)openDetail({eyebrow:"Próximo parceiro",title:partner.tradeName,body:partnerDetailsBody(partner)});else showToast("Não há parceiros pendentes.");
+    } else if (action === "partner-initial-agenda") {
+      if(state.role!=="partner"||!backendIsOnline()||partnerReadonlyActive()||!hasPartnerPermission("manage_schedule"))return;
+      const identity=backendRuntime.identityId,partnerId=state.partnerProfile.backendPartnerId;
+      openDetail({eyebrow:"Primeiros passos do parceiro",title:"Importar agenda inicial",body:'<div id="partnerInitialAgenda"></div>'});
+      window.MarketplaceAgendaInitial.mountManager({root:detailBody.querySelector("#partnerInitialAgenda"),partnerId,partnerName:state.partnerProfile.tradeName,
+        rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args),
+        isAllowed:()=>state.role==="partner"&&backendIsOnline()&&!partnerReadonlyActive()&&hasPartnerPermission("manage_schedule")&&backendRuntime.identityId===identity&&state.partnerProfile.backendPartnerId===partnerId,
+        onChanged:()=>refreshBackendAfterMutation()});
+    } else if (action === "user-initial-agenda") {
+      if(state.role!=="user"||!backendIsOnline()||partnerReadonlyActive())return;
+      const identity=backendRuntime.identityId;
+      openDetail({eyebrow:"Área do usuário",title:"Vincular horário importado",body:'<div id="userInitialAgenda"></div>'});
+      window.MarketplaceAgendaInitial.mountUser({root:detailBody.querySelector("#userInitialAgenda"),rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args),
+        isAllowed:()=>state.role==="user"&&backendIsOnline()&&!partnerReadonlyActive()&&backendRuntime.identityId===identity,
+        onChanged:()=>refreshBackendAfterMutation()});
+    } else if (action === "admin-import-agenda") {
+      if(state.role!=="admin" || !backendIsOnline() || partnerReadonlyActive())return;
+      const partner=state.adminPartners.find(item=>String(item.id)===String(id));
+      if(!partner?.backendPartnerId || partner.status!=="Aprovado")return;
+      const identity=backendRuntime.identityId;
+      openDetail({eyebrow:"Administração",title:"Importar agenda inicial",body:'<div id="adminAgendaImport"></div>'});
+      window.MarketplaceAgendaInitial.mountManager({root:detailBody.querySelector("#adminAgendaImport"),
+        partnerId:partner.backendPartnerId,partnerName:partner.tradeName,
+        rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args),
+        isAllowed:()=>state.role==="admin" && backendIsOnline() && !partnerReadonlyActive() && backendRuntime.identityId===identity,
+        onChanged:()=>refreshBackendAfterMutation()});
+    } else if (action === "export-admin-overview") {
+      exportCsv(`resumo-administrativo-${VERSION}.csv`,[["Indicador","Valor"],["Parceiros",state.adminPartners.length],["Usuários",state.adminUsers.length],["Reservas",state.reservations.length]]);
+    } else if (action === "new-admin-partner" || action === "edit-admin-partner") {
+      if(backendRuntime.enabled && !backendIsOnline()){showToast("Reconecte sua conta para alterar o cadastro oficial.");return;}
+      if(backendIsOnline() && action === "new-admin-partner"){
+        openDetail({eyebrow:"Novo parceiro",title:"Cadastro pela conta do responsável",body:"<p>O responsável deve entrar com sua própria conta, abrir <strong>Quero ser parceiro</strong> e enviar o formulário. A solicitação aparecerá aqui para análise. Ao iniciar a validação, essa conta poderá completar o cadastro. A aprovação final libera a operação.</p>"});return;
+      }
+      const item=action==="edit-admin-partner"?state.adminPartners.find((p)=>String(p.id)===String(id)):null;
+      openForm({eyebrow:"Parceiros",title:item?"Editar parceiro":"Cadastrar parceiro",description:"As alterações salvas aqui devem refletir no Marketplace e no Portal do parceiro pela mesma fonte de dados.",fields:[
+        {name:"tradeName",label:"Nome fantasia",value:item?.tradeName||"",required:true},
+        {name:"legalName",label:"Razão social",value:item?.legalName||"",required:true},
+        {name:"cnpj",label:"CNPJ",value:item?.cnpj||"",required:true},
+        {name:"city",label:"Cidade",value:item?.city||"Curitiba"},
+        {name:"spaces",label:"Número de espaços",type:"number",value:item?.spaces||1},
+        {name:"types",label:"Tipos de espaço",value:item?.types||"Society"},
+        {name:"responsible",label:"Responsável",value:item?.responsible||""},
+        {name:"email",label:"E-mail",type:"email",value:item?.email||""},
+        {name:"phone",label:"Telefone",value:item?.phone||"",required:true},
+        {name:"taxRegime",label:"Regime tributário",value:item?.taxRegime||"Simples Nacional"},
+        {name:"activity",label:"Atividade declarada",value:item?.activity||"Gestão de espaços esportivos",full:true},
+        {name:"status",label:"Status",type:"select",value:item?.status||"Pendente",options:["Pendente","Em análise","Aprovado","Suspenso","Rejeitado","Encerrado"]},
+        {name:"contract",label:"Contrato",type:"select",value:item?.contract||"Não enviado",options:["Não enviado","Enviado","Assinado"]},
+        {name:"terms",label:"Termos",type:"select",value:item?.terms||"Pendente",options:["Pendente","Aceitos"]},
+        {name:"privacy",label:"Privacidade / LGPD",type:"select",value:item?.privacy||"Pendente",options:["Pendente","Aceita"]},
+        {name:"fiscal",label:"Emissão fiscal",value:item?.fiscal||"A validar"},
+        {name:"banking",label:"Dados bancários",value:item?.banking||"Pendente"},
+        {name:"commission",label:"Comissão (%)",type:"number",step:"0.1",value:item?.commission??state.settings.defaultCommission},
+        {name:"score",label:"Completude (%)",type:"number",min:0,max:100,value:item?.score||30}
+      ].filter((field)=>(!backendIsOnline()||!["cnpj","taxRegime","activity","score"].includes(field.name)) && !(item?.onboardingVersion > 0 && ["email","status","contract","terms","privacy","fiscal","banking"].includes(field.name))),onSubmit:async(data)=>{
+        if(backendRuntime.enabled){
+          const result=await runBackendMutation("Cadastro do parceiro atualizado.",()=>window.MarketplaceBackend.adminUpdatePartner(item.backendPartnerId,adminPartnerPatch(data)));
+          return Boolean(result);
+        }
+        const normalized={...data,spaces:Number(data.spaces),commission:Number(data.commission),score:Number(data.score)};
+        let partner=item;
+        if(partner) {
+          Object.assign(partner,normalized);
+        } else {
+          const nextNumericId=Math.max(0,...state.adminPartners.map((p)=>Number(p.id)||0))+1;
+          partner={id:nextNumericId,venueId:uniqueVenueId(normalized.tradeName),source:"Administração",requestedAt:new Date().toLocaleString("pt-BR"),...normalized};
+          state.adminPartners.push(partner);
+        }
+        if(partner.status==="Aprovado") partner.score=Math.max(partner.score,90);
+        syncAdminPartnerToConnectedAreas(partner);
+        saveState();render();showToast(item?"Parceiro atualizado e sincronizado.":"Parceiro cadastrado e sincronizado.");
+      }});
+    } else if (action === "admin-partner-details") {
+      openPartnerDossier(id);
+    } else if (action === "admin-partner-status") {
+      const partner=state.adminPartners.find((p)=>String(p.id)===String(id));
+      if(partner){
+        if (partner.onboardingVersion > 0 && partner.status === "Em análise") { await openPartnerApplicationDetails(partner.applicationId); return; }
+        const next=button.dataset.status;
+        askConfirm({title:`${next} parceiro`,message:`Aplicar o status ${next} a ${partner.tradeName}? A mudança será refletida nas demais áreas.`,confirmLabel:"Aplicar status",onConfirm:async()=>{
+          if(backendRuntime.enabled){await runBackendMutation("Status do parceiro atualizado.",()=>window.MarketplaceBackend.adminUpdatePartner(partner.backendPartnerId,adminPartnerPatch({status:next})));return;}
+          partner.status=next;
+          if(next==="Aprovado") partner.score=Math.max(partner.score,90);
+          syncAdminPartnerToConnectedAreas(partner);
+          saveState();render();showToast(`${partner.tradeName}: ${next}.`);
+        }});
+      }
+    } else if (action === "delete-admin-partner") {
+      const partner=state.adminPartners.find((p)=>String(p.id)===String(id));
+      if(!partner)return;
+      const liability=activeVoucherLiability(partner.venueId);
+      if(liability.count>0){
+        openDetail({eyebrow:"Exclusão bloqueada",title:partner.tradeName,body:`<div class="cancellation-warning"><strong>${liability.count} voucher(es) ativos · ${money(liability.value)}</strong><p>O cadastro não pode ser excluído enquanto houver vouchers que ainda precisem ser honrados ou ressarcidos.</p></div>`});
+        return;
+      }
+      askConfirm({title:"Excluir parceiro",message:`Excluir ${partner.tradeName}? O espaço deixará imediatamente de aparecer no marketplace e o acesso correspondente será removido. Reservas históricas serão preservadas.`,confirmLabel:"Excluir",onConfirm:async()=>{
+        if(backendRuntime.enabled){await runBackendMutation("Parceiro encerrado, com histórico preservado.",()=>window.MarketplaceBackend.adminDeletePartner(partner.backendPartnerId,"Encerramento pela Administração"));return;}
+        const result=removePartnerFromConnectedAreas(partner);
+        if(!result.ok)return;
+        saveState();render();showToast("Parceiro excluído e removido das áreas conectadas.");
+      }});
+    } else if (action === "export-admin-partners") {
+      exportCsv(`parceiros-${VERSION}.csv`,[["Nome fantasia","Razão social","CNPJ","Cidade","Status","Origem","Completude"],...state.adminPartners.map((p)=>[p.tradeName,p.legalName,p.cnpj,p.city,p.status,p.source||"Administração",p.score])]);
+    } else if (action === "export-admin-reservations") {
+      exportCsv(`reservas-administracao-${VERSION}.csv`,[["Reserva","Parceiro","Usuário","Data","Hora","Responsável pelo pagamento","Situação do responsável","Status"],...state.reservations.map((r)=>[r.id,r.venue,r.user,r.date,r.time,hasSingleCardPaymentResponsible(r)?paymentResponsibleDisplayName(r):"Rateio Pix ou quitação por voucher",hasSingleCardPaymentResponsible(r)?paymentResponsibleStatusLabel(r):paymentResponsibilitySummary(r),r.status])]);
+    } else if (action === "cancel-paid-tamo-reservation") {
+      const reservation = state.reservations.find((item) => item.id === id);
+      if (reservation?.backendOfficial) openOfficialReservationCancellation(reservation, "Administração");
+      else openPaidCancellation("tamo", id);
+    } else if (action === "cancel-backend-admin-reservation") {
+      const reservation = state.reservations.find((item) => item.id === id);
+      if (reservation) openOfficialReservationCancellation(reservation, "Administração");
+    } else if (action === "admin-reservation-edit") {
+      const item=state.reservations.find((r)=>r.id===id);if(!item)return;
+      if (item.backendOfficial) { showToast("O status oficial é controlado pelas RPCs de reserva, cancelamento e pagamento."); return; }
+      openForm({eyebrow:"Reservas",title:`Alterar ${item.id}`,fields:[{name:"statusKey",label:"Status",type:"select",value:item.statusKey,options:[{value:"pending",label:"Reserva pendente"},{value:"confirmed",label:"Confirmada"},{value:"cancelled",label:"Cancelada"}]},{name:"endpoint",label:"Endpoint",value:item.endpoint,full:true}],onSubmit:(data)=>{item.statusKey=data.statusKey;item.status=reservationStatus(data.statusKey).label;item.endpoint=data.endpoint;saveState();render();showToast("Reserva atualizada.");}});
+    } else if (action === "admin-user-details") {
+      const user=state.adminUsers.find((u)=>u.id===id);if(user)openDetail({eyebrow:"Usuário",title:user.name,body:adminUserDetails(user)});
+    } else if (action === "toggle-admin-user") {
+      const user=state.adminUsers.find((u)=>u.id===id);if(user)openUserStatusForm(user);
+    } else if (action === "export-admin-users") {
+      exportCsv(`usuarios-${VERSION}.csv`,[["ID","Nome","E-mail","Cidade","Grupos","Reservas","Status"],...state.adminUsers.map((u)=>[u.id,u.name,u.email,u.city,u.groups,u.reservations,u.status])]);
+    } else if (action === "export-admin-finance") {
+      if(financePeriodSelection()!=="all"){exportFinancialPeriod();return;}
+      exportCsv(`conciliacao-financeira-${VERSION}.csv`,[["Parceiro", "Contratado original apos descontos", "Valor contratado vigente", "Recebido bruto", "Devolvido", "Recebido menos devolucoes", "Saldo aberto", "Asaas Pix", "Asaas cartao", "Recebido externamente", "Bloqueado Asaas", "Liquidado", "Tarifas Asaas", "Tarifas estimadas", "Comissao", "Comissao provisoria", "Comissao a reter", "Comissao pendente parceiro", "Apuracao a conciliar", "Créditos ao parceiro após devoluções","Bloqueado restituicao","Bloqueado remarcacao","Excedente a conferir","Parcial bloqueado","Recebimento em conferencia","Liquido do parceiro","Encerrado ou cancelado"],...adminFinancialRows().map((row)=>[row.partnerName,row.contractedValue,row.finalDueValue,row.receivedTotal,row.refundCompleted,row.receivedNet,row.balancePending,row.asaasPixValue,row.asaasCardValue,row.externalReceived,row.asaasBlocked,row.liquidatedValue,row.asaasFeeTotal,row.asaasFeeEstimated,row.commissionTotal,row.commissionProvisional,row.commissionRetained,row.commissionPending,row.asaasPartnerPayout,row.partnerPaid,row.blockedRefund,row.blockedResolution,row.blockedExcess,row.blockedPartial,row.blockedReview,window.MarketplaceFinancePeriod.position(row).partnerNet,row.cancelledValue||0])]);
+    } else if (action === "toggle-setting") {
+      const key=button.dataset.key;if(key!=="realMoney"){state.settings[key]=!state.settings[key];saveState();render();showToast("Configuração atualizada.");}
+    } else if (action === "edit-commercial-settings") {
+      openForm({eyebrow:"Configurações",title:"Regras comerciais",fields:[{name:"defaultCommission",label:"Comissão Tâmo On (%)",type:"number",step:"0.1",value:state.settings.defaultCommission},{name:"asaasPixFixedFee",label:"Tarifa Pix Asaas (R$)",type:"number",step:"0.01",value:state.settings.asaasPixFixedFee},{name:"asaasCardFixedFee",label:"Tarifa fixa do cartão Asaas (R$)",type:"number",step:"0.01",value:state.settings.asaasCardFixedFee},{name:"asaasCardPercentageFee",label:"Tarifa percentual do cartão Asaas (%)",type:"number",step:"0.01",value:state.settings.asaasCardPercentageFee},{name:"cancellationHours",label:"Prazo do cancelamento pelo usuário (horas)",type:"number",value:state.settings.cancellationHours},{name:"voucherValidityDays",label:"Validade nominal do voucher (dias)",type:"number",value:state.settings.voucherValidityDays},{name:"voucherCompatibilityWindowHours",label:"Tolerância da faixa compatível (horas)",type:"number",value:state.settings.voucherCompatibilityWindowHours},{name:"voucherMinimumCompatibleDates",label:"Mínimo de datas compatíveis",type:"number",value:state.settings.voucherMinimumCompatibleDates},{name:"voucherExtensionDays",label:"Prorrogação automática (dias)",type:"number",value:state.settings.voucherExtensionDays}],onSubmit:(data)=>{state.settings.defaultCommission=Number(data.defaultCommission);state.settings.asaasPixFixedFee=Number(data.asaasPixFixedFee);state.settings.asaasCardFixedFee=Number(data.asaasCardFixedFee);state.settings.asaasCardPercentageFee=Number(data.asaasCardPercentageFee);state.settings.cancellationHours=Number(data.cancellationHours);state.settings.voucherValidityDays=Number(data.voucherValidityDays);state.settings.voucherCompatibilityWindowHours=Number(data.voucherCompatibilityWindowHours);state.settings.voucherMinimumCompatibleDates=Number(data.voucherMinimumCompatibleDates);state.settings.voucherExtensionDays=Number(data.voucherExtensionDays);saveState();render();showToast("Regras comerciais atualizadas.");}});
+    } else if (action === "request-partner-closure") {
+      const liability = activeVoucherLiability(state.partnerProfile.venueId);
+      if (liability.count > 0) {
+        openDetail({ eyebrow: "Encerramento bloqueado", title: "Existem vouchers pendentes", body: `<div class="cancellation-warning"><strong>${liability.count} voucher(es) · ${money(liability.value)}</strong><p>O parceiro deve manter a operação até o uso dos créditos ou ressarcir o Tâmo On. Após o ressarcimento, a administração poderá realocar os vouchers para outra quadra.</p></div>` });
+      } else {
+        askConfirm({ title: "Solicitar encerramento", message: "Não há vouchers ativos. Registrar solicitação de encerramento do parceiro?", confirmLabel: "Solicitar", onConfirm: () => showToast("Solicitação de encerramento registrada no ambiente de homologação.") });
+      }
+    } else if (action === "request-admin-partner-closure") {
+      const partner = state.adminPartners.find((item) => String(item.id) === String(id));
+      if (!partner) return;
+      const liability = activeVoucherLiability(partner.venueId);
+      if (liability.count > 0) {
+        openDetail({ eyebrow: "Encerramento bloqueado", title: partner.tradeName, body: `<div class="cancellation-warning"><strong>${liability.count} voucher(es) ativos · ${money(liability.value)}</strong><p>O encerramento somente poderá ser concluído depois da utilização dos vouchers ou do ressarcimento ao Tâmo On para realocação dos créditos.</p></div>` });
+      } else {
+        askConfirm({ title: "Encerrar parceiro", message: `Registrar o encerramento de ${partner.tradeName}? O espaço será retirado do marketplace e o acesso do parceiro será bloqueado.`, confirmLabel: "Encerrar", onConfirm: () => { partner.status = "Encerrado"; syncAdminPartnerToConnectedAreas(partner); saveState(); render(); showToast("Parceiro encerrado e sincronizado nas demais áreas."); } });
+      }
+    } else if (action === "reassign-cancellation-voucher") {
+      const voucher = state.cancellationVouchers.find((item) => item.id === id);
+      if (!voucher) return;
+      if (voucher.backendOfficial) { showToast("A realocação financeira de crédito oficial exige uma operação administrativa específica e não é simulada no navegador."); return; }
+      const targets = state.venues.filter((venue) => venue.id !== voucher.venueId && partnerVisibleInMarketplace(venue));
+      openForm({ eyebrow: "Ressarcimento e realocação", title: voucher.code, description: "Simula o ressarcimento do parceiro original ao Tâmo On e a disponibilização do crédito em outra quadra.", fields: [{ name: "targetVenueId", label: "Novo parceiro", type: "select", options: targets.map((venue) => ({ value: venue.id, label: venue.name })), required: true }, { name: "reimbursementReference", label: "Referência do ressarcimento", value: `RESS-${voucher.id}`, required: true }], submitLabel: "Ressarcir e realocar", onSubmit: (data) => { const target = state.venues.find((venue) => venue.id === data.targetVenueId); if (!target) return; const formerVenue = voucher.venue; voucher.reassignedFrom = formerVenue; voucher.originalVenueId = voucher.venueId; voucher.venueId = target.id; voucher.venue = target.name; voucher.partnerReimbursed = true; voucher.reimbursementReference = data.reimbursementReference; voucher.reassignmentStatus = `Realocado de ${formerVenue} para ${target.name}`; state.accountingLedger.unshift({ id: nextId("LED-", state.accountingLedger), type: "partner_reimbursement", voucherId: voucher.id, venueId: voucher.originalVenueId, venue: formerVenue, amount: voucher.value, fiscalAmount: 0, accountingMonth: accountingMonth(), description: `Ressarcimento para realocação em ${target.name}` }); saveState(); render(); showToast("Voucher ressarcido e realocado para outro parceiro."); } });
+    } else if (action === "reset-local-data") {
+      askConfirm({title:"Restaurar dados iniciais",message:"Todos os dados do fallback local serão apagados deste navegador.",confirmLabel:"Restaurar",onConfirm:resetState});
+    }
+  }
+
+  function editPartnerProfileSection(action) {
+    const p=state.partnerProfile;
+    if (backendIsOnline()) {
+      const onlineConfigs={
+        "edit-company-data":{title:"Dados da empresa",description:"CNPJ e situação administrativa são controlados pela Administração; os demais campos abaixo podem ser atualizados pelo parceiro.",fields:[{name:"tradeName",label:"Nome fantasia",value:p.tradeName,required:true},{name:"legalName",label:"Razão social",value:p.legalName,required:true},{name:"cnpj",label:"CNPJ",value:p.cnpj,readonly:true,help:"Alteração disponível somente mediante análise administrativa."}]},
+        "edit-responsible-data":{title:"Responsável e contatos",description:"Estes dados são gravados no cadastro oficial do parceiro no staging.",fields:[{name:"responsibleName",label:"Nome",value:p.responsibleName,required:true},{name:"email",label:"E-mail da conta",type:"email",value:p.email,required:true,readonly:p.onboardingVersion > 0},{name:"secondaryEmail",label:"E-mail secundário (opcional)",type:"email",value:p.secondaryEmail || ""},{name:"phone",label:"Telefone",value:p.phone,required:true}]},
+        "edit-address-data":{title:"Endereço do estabelecimento",description:"O endereço atualizado passa a ser a referência pública do espaço no marketplace.",fields:[{name:"street",label:"Rua / logradouro",value:p.street||"",required:true},{name:"streetNumber",label:"Número",value:p.streetNumber||"",required:true},{name:"neighborhood",label:"Bairro",value:p.neighborhood,required:true},{name:"city",label:"Cidade",value:p.city,required:true},{name:"state",label:"UF",value:p.state||"PR",required:true},{name:"zip",label:"CEP",value:p.zip,required:true}]}
+      };
+      const onlineConfig=onlineConfigs[action];
+      if (!onlineConfig) { showToast("Este bloco será conectado ao backend em uma etapa posterior."); return; }
+      openForm({eyebrow:"Cadastro do parceiro",title:onlineConfig.title,description:onlineConfig.description,fields:onlineConfig.fields,onSubmit:(data)=>saveBackendPartnerSection(action,data)});
+      return;
+    }
+    const configs={
+      "edit-company-data":{title:"Dados da empresa",fields:[{name:"tradeName",label:"Nome fantasia",value:p.tradeName},{name:"legalName",label:"Razão social",value:p.legalName},{name:"cnpj",label:"CNPJ",value:p.cnpj,required:true},{name:"legalNature",label:"Natureza jurídica",value:p.legalNature}]},
+      "edit-responsible-data":{title:"Responsável e contatos",fields:[{name:"responsibleName",label:"Nome",value:p.responsibleName},{name:"responsibleCpf",label:"CPF",value:p.responsibleCpf},{name:"responsibleRole",label:"Função",value:p.responsibleRole},{name:"email",label:"E-mail",type:"email",value:p.email},{name:"phone",label:"Telefone",value:p.phone,required:true},{name:"whatsapp",label:"WhatsApp",value:p.whatsapp}]},
+      "edit-address-data":{title:"Endereço",fields:[{name:"address",label:"Logradouro",value:p.address,full:true},{name:"neighborhood",label:"Bairro",value:p.neighborhood},{name:"city",label:"Cidade",value:p.city},{name:"state",label:"UF",value:p.state},{name:"zip",label:"CEP",value:p.zip}]},
+      "edit-contract-data":{title:"Contratos e regras",fields:[{name:"contractStatus",label:"Contrato",type:"select",value:p.contractStatus,options:["Não enviado","Enviado","Assinado"]},{name:"termsStatus",label:"Termos",type:"select",value:p.termsStatus,options:["Pendente","Aceitos"]},{name:"privacyStatus",label:"LGPD",type:"select",value:p.privacyStatus,options:["Pendente","Aceita"]},{name:"cancellationPolicy",label:"Política de cancelamento",value:p.cancellationPolicy,full:true}]},
+      "edit-fiscal-data":{title:"Fiscal e financeiro",fields:[{name:"fiscalIssuer",label:"Documento fiscal do serviço",value:p.fiscalIssuer,full:true},{name:"commissionInvoice",label:"Documento fiscal da comissão",value:p.commissionInvoice,full:true},{name:"paymentModel",label:"Modelo de pagamento",value:p.paymentModel},{name:"commissionRate",label:"Comissão (%)",type:"number",step:"0.1",value:p.commissionRate}]},
+      "edit-payment-integrations":{title:"Integrações de pagamento",fields:[{name:"bankProviderId",label:"Banco / adaptador Pix",type:"select",value:p.bankProviderId||"GENERIC_MANUAL",options:(window.TamoOnBankPix?.listProviders()||[]).map((provider)=>({value:provider.id,label:provider.label}))},{name:"branch",label:"Agência",value:p.branch},{name:"account",label:"Conta",value:p.account},{name:"pixKey",label:"Chave Pix",value:p.pixKey},{name:"pixApiStatus",label:"Status da API Pix",value:p.pixApiStatus,full:true},{name:"asaasSubaccount",label:"Subconta Asaas",value:p.asaasSubaccount},{name:"asaasWalletId",label:"Wallet ID Asaas",value:p.asaasWalletId},{name:"asaasCardStatus",label:"Status do cartão Asaas",value:p.asaasCardStatus,full:true}]}
+    };
+    const config=configs[action];if(!config)return;
+    openForm({eyebrow:"Cadastro do parceiro",title:config.title,fields:config.fields,onSubmit:(data)=>{if("commissionRate" in data)data.commissionRate=Number(data.commissionRate);if(data.bankProviderId){const provider=window.TamoOnBankPix?.provider(data.bankProviderId);if(provider){data.bank=provider.label;data.pixAutoReconciliation=provider.mode==="api";data.pixWebhookStatus=provider.mode==="api"?"Rota preparada":"Confirmação manual";}}Object.assign(p,data);syncCurrentPartnerToConnectedAreas();saveState();render();showToast(`${config.title} atualizado e sincronizado.`);}});
+  }
+
+  function analyzePhotoTone(src) {
+    return new Promise((resolve) => {
+      const fallback = { tone:"dark", luminance:128 };
+      if (!src) { resolve(fallback); return; }
+      const image = new Image();
+      image.onload = () => {
+        try {
+          const size = 32;
+          const canvas = document.createElement("canvas");
+          canvas.width = size;
+          canvas.height = size;
+          const context = canvas.getContext("2d", { willReadFrequently:true });
+          if (!context) { resolve(fallback); return; }
+          context.drawImage(image, 0, 0, size, size);
+          const pixels = context.getImageData(0, 0, size, size).data;
+          let weightedLuminance = 0;
+          let totalWeight = 0;
+          for (let y = 0; y < size; y += 1) {
+            const verticalWeight = y >= Math.floor(size * 0.45) ? 1.75 : 1;
+            for (let x = 0; x < size; x += 1) {
+              const index = (y * size + x) * 4;
+              const alpha = pixels[index + 3];
+              if (alpha < 32) continue;
+              const red = pixels[index];
+              const green = pixels[index + 1];
+              const blue = pixels[index + 2];
+              const luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+              weightedLuminance += luminance * verticalWeight;
+              totalWeight += verticalWeight;
+            }
+          }
+          const average = totalWeight ? weightedLuminance / totalWeight : fallback.luminance;
+          resolve({ tone: average >= 150 ? "light" : "dark", luminance: Math.round(average) });
+        } catch (_error) {
+          resolve(fallback);
+        }
+      };
+      image.onerror = () => resolve(fallback);
+      image.src = src;
+    });
+  }
+
+  async function ensurePartnerPhotoTones() {
+    const photos = Array.isArray(state.partnerProfile?.photos) ? state.partnerProfile.photos : [];
+    let changed = false;
+    for (const photo of photos) {
+      if (!photo?.src || (["light","dark"].includes(photo.tone) && Number.isFinite(Number(photo.luminance)))) continue;
+      const analysis = await analyzePhotoTone(photo.src);
+      photo.tone = analysis.tone;
+      photo.luminance = analysis.luminance;
+      changed = true;
+    }
+    if (!changed) return;
+    syncCurrentPartnerToConnectedAreas();
+    saveState();
+    render();
+  }
+
+  function resizePartnerPhoto(file, maxSize = 1280, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type || "")) { reject(new Error("Formato não suportado")); return; }
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Falha ao ler a imagem"));
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = () => reject(new Error("Imagem inválida"));
+        image.onload = () => {
+          const scale = Math.min(1, maxSize / Math.max(image.width || 1, image.height || 1));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          const context = canvas.getContext("2d");
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handlePartnerPhotoUpload(fileList) {
+    if(!hasPartnerPermission("manage_profile")){showToast("Acesso Restrito.");return;}
+    const existing = state.partnerProfile.photos || (state.partnerProfile.photos = []);
+    const originalPhotos = existing.map((photo) => ({...photo}));
+    const originalFavorite = state.partnerProfile.favoritePhotoId || "";
+    const room = Math.max(0, 6 - existing.length);
+    const files = [...fileList].slice(0, room);
+    if (!room) { showToast("O limite de 6 fotos já foi atingido."); return; }
+    if (!files.length) return;
+    if (backendIsOnline()) {
+      const partnerId = state.partnerProfile.backendPartnerId;
+      const venueId = state.partnerProfile.backendVenueId;
+      if (!partnerId || !venueId) { showToast("Cadastre primeiro o estabelecimento antes de enviar fotos."); return; }
+      await runBackendMutation(`${files.length} foto(s) enviada(s) ao Storage do staging.`, async () => {
+        let favoritePending = !state.partnerProfile.favoritePhotoId;
+        for (const file of files) {
+          const src = await resizePartnerPhoto(file);
+          const analysis = await analyzePhotoTone(src);
+          const blob = await (await fetch(src)).blob();
+          const baseName = String(file.name || "foto").replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9._-]+/g, "-") || "foto";
+          const resizedFile = new File([blob], `${baseName}.jpg`, { type:"image/jpeg", lastModified:Date.now() });
+          await window.MarketplaceBackend.uploadVenuePhoto({ partnerId, venueId, file:resizedFile, tone:analysis.tone, luminance:analysis.luminance, isFavorite:favoritePending });
+          favoritePending = false;
+        }
+      });
+      return;
+    }
+    try {
+      for (const file of files) {
+        const src = await resizePartnerPhoto(file);
+        const analysis = await analyzePhotoTone(src);
+        const id = nextId("PHOTO-", state.partnerProfile.photos);
+        const favorite = !state.partnerProfile.favoritePhotoId;
+        state.partnerProfile.photos.push({ id, name:String(file.name || "Foto do estabelecimento").replace(/\.[^.]+$/, ""), src, favorite, uploadedAt:new Date().toLocaleString("pt-BR"), tone:analysis.tone, luminance:analysis.luminance });
+        if (favorite) state.partnerProfile.favoritePhotoId = id;
+      }
+      state.partnerProfile.photos.forEach((photo)=>photo.favorite=photo.id===state.partnerProfile.favoritePhotoId);
+      syncCurrentPartnerToConnectedAreas();
+      try { saveState(); } catch (_error) { state.partnerProfile.photos = originalPhotos; state.partnerProfile.favoritePhotoId = originalFavorite; syncCurrentPartnerToConnectedAreas(); showToast("As imagens ficaram grandes demais para o armazenamento local. Tente arquivos menores ou remova uma foto."); return; }
+      render();showToast(`${files.length} foto(s) adicionada(s).`);
+    } catch (_error) { showToast("Não foi possível processar uma das imagens selecionadas."); }
+  }
+
+  async function handlePartnerDocumentUpload(file) {
+    if(!hasPartnerPermission("manage_documents")){showToast("Acesso Restrito.");return;}
+    if (!backendIsOnline() || !file) return;
+    const partnerId=state.partnerProfile.backendPartnerId;
+    const documentType=document.getElementById("partnerDocumentType")?.value || "Outro documento";
+    if (!partnerId) { showToast("O cadastro do parceiro ainda não está disponível."); return; }
+    if (!partnerUploadDocumentTypes(partnerOnboardingForPartner(partnerId)).includes(documentType)) {
+      showToast("Use a etapa Contrato de parceria para devolver o contrato disponibilizado pela Administração.");
+      return;
+    }
+    if (!['application/pdf','image/jpeg','image/png'].includes(file.type || '')) { showToast("Envie um arquivo PDF, JPEG ou PNG."); return; }
+    if (!file.size || file.size > 15728640) { showToast("O documento deve ter no máximo 15 MB."); return; }
+    await runBackendMutation(`${documentType} enviado ao Storage privado do staging.`,()=>window.MarketplaceBackend.uploadPartnerDocument({partnerId,documentType,file}));
+  }
+
+  function resetState() {
+    state=initialState();saveState();render();showToast("Dados fictícios restaurados.");
+  }
+
+  function showNotificationAlertForCurrentRole(rows) {
+    const visible=rows.filter(row=>notificationVisibleForRole(row));
+    if(!visible.length)return;
+    showToast(visible.length===1?(visible[0].title||"Nova atualização"):`${visible.length} novas atualizações. Abra Atualizações para acompanhar.`);
+  }
+
+  const operationalAlerts=window.createMarketplaceAlerts({
+    storage:(()=>{try{return window.localStorage;}catch(_){return null;}})(),
+    audioFactory:()=>{const Audio=window.AudioContext||window.webkitAudioContext;return Audio?new Audio():null;},
+    onVisual:showNotificationAlertForCurrentRole
+  });
+  function renderNotificationControls(){
+    const button=document.getElementById("openNotifications"),sound=document.getElementById("toggleNotificationSound");
+    if(!button||!sound)return;
+    const online=backendIsOnline();button.hidden=!online;sound.hidden=!online;
+    const count=personalNotificationsForRole().filter((row)=>row.status==="unread").length;
+    button.textContent=`Atualizações${count?` (${count})`:""}`;
+    button.classList.toggle("has-unread",count>0);
+    button.setAttribute("aria-label",`Atualizações, ${count} não lidas`);
+    const enabled=operationalAlerts.isEnabled();
+    sound.textContent=enabled?"Som: ativado":"Ativar som";
+    sound.setAttribute("aria-pressed",String(enabled));
+  }
+  function openNotificationInbox(){
+    const rows=personalNotificationsForRole().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+    openDetail({eyebrow:"Sua conta",title:"Atualizações",body:`<p>Mensagens, propostas e decisões para você. Abrir esta lista mantém os avisos pendentes até sua leitura.</p><div class="notification-inbox">${rows.length?rows.map((row)=>`<article class="notification-item ${row.status==="unread"?"has-unread":""}"><strong>${esc(row.title||"Atualização")}</strong><p>${esc(reservationNoticeBody(row,(state.reservations||[]).find(item=>item.backendId===(row.entity_type==="reservation"?row.entity_id:row.data?.reservation_id)))||"")}</p><small>${esc(backendDateTimeLabel(row.created_at))} · ${row.status==="unread"?"Não lida":"Lida"}</small><div class="item-actions"><button class="button secondary small" data-action="notification-open" data-id="${esc(row.id)}">Ver detalhes</button>${row.status==="unread"?`<button class="button ghost small" data-action="notification-read" data-id="${esc(row.id)}">Marcar como lida</button>`:""}</div></article>`).join(""):"<p>Você está em dia. Nenhuma atualização recebida.</p>"}</div>`});
+    detailDialog.dataset.view="notifications";
+  }
+  async function readPersonalNotification(id){
+    if(partnerReadonlyActive())return true;
+    if(!personalNotificationsForRole().some(row=>row.id===id))return false;
+    return persistNotificationReads([id]);
+  }
+
+  async function openPersonalNotification(id){
+    const row=(state.personalNotifications||[]).find((item)=>item.id===id);if(!row)return;
+    if(!notificationVisibleForRole(row)){
+      showToast("Esta atualização de pagamento está disponível na área Usuário.");return;
+    }
+    if(row.entity_type==="partner_application"){
+      if(!(state.partnerApplications||[]).some((item)=>item.id===row.entity_id)){
+        try{await refreshBackendBootstrap(true);}catch(error){showToast(backendErrorMessage(error));return;}
+      }
+      await openPartnerApplicationDetails(row.entity_id);return;
+    }
+    if(row.entity_type==="occurrence_transfer" && (state.occurrenceTransfers||[]).some(item=>item.id===row.entity_id && (item.canManageAsGroup||item.canManageAsPartner))) {
+      await openOccurrenceTransferConversation(row.entity_id);return;
+    }
+    if(row.entity_type==="voucher"&&row.type==="cancellation_voucher_issued"){
+      state.role="user";state.activePage.user="promotions";detailDialog.close();render();await readPersonalNotification(id);return;
+    }
+    if(row.entity_type==="monthly_link_request"){
+      const request=(state.monthlyLinkRequests||[]).find((item)=>item.id===row.entity_id);
+      if(request){await openMonthlyLinkRequestConversation(request);return;}
+    }
+    const transfer=(state.occurrenceTransfers||[]).find((item)=>item.id===row.entity_id);
+    const reservationId=row.entity_type==="reservation"?row.entity_id:row.data?.reservation_id||transfer?.reservationBackendId;
+    const reservation=state.reservations.find((item)=>item.backendId===reservationId);
+    if(reservation){
+      const partnerItem=state.partnerReservations.find((item)=>item.userReservationId===reservation.id);
+      const action=/chat/i.test(row.type||"")?"open-reservation-chat":state.role==="partner"&&partnerItem?"partner-reservation-details":"reservation-details";
+      detailDialog.close();await handleAction({dataset:{action,id:action==="partner-reservation-details"?partnerItem.id:reservation.id}});
+      if(action!=="open-reservation-chat"&&detailDialog.open&&!document.hidden)await readPersonalNotification(id);
+      return;
+    }
+    openDetail({eyebrow:"Atualização",title:row.title||"Mensagem",body:`<p class="notification-full-text">${esc(reservationNoticeBody(row,(state.reservations||[]).find(item=>item.backendId===(row.entity_type==="reservation"?row.entity_id:row.data?.reservation_id)))||"")}</p><small>${esc(backendDateTimeLabel(row.created_at))}</small><div class="dialog-actions"><button class="button secondary" data-action="notification-inbox">Voltar às atualizações</button></div>`});
+    if(!document.hidden)await readPersonalNotification(id);
+  }
+  document.addEventListener("click",event=>{
+    const link=event.target.closest?.('[data-asaas-checkout="true"]');
+    if(link)rememberAsaasReturn(link.dataset.id);
+  },true);
+  document.getElementById("openNotifications")?.addEventListener("click",openNotificationInbox);
+  document.getElementById("toggleNotificationSound")?.addEventListener("click",async()=>{
+    const enabling=!operationalAlerts.isEnabled();const ready=await operationalAlerts.setEnabled(enabling);
+    renderNotificationControls();showToast(!enabling?"Som dos alertas desativado.":ready?"Som ativado para novas atualizações.":"Preferência salva. O som depende da liberação de áudio deste navegador.");
+  });
+  document.addEventListener("pointerdown",()=>operationalAlerts.arm(),{passive:true});
+  document.addEventListener("keydown",()=>operationalAlerts.arm());
+  // Recupera avisos perdidos durante desconexao sem depender apenas do Realtime.
+  setInterval(()=>{if(backendIsOnline()&&!document.hidden&&!backendRuntime.mutating&&!app.contains(document.activeElement?.closest("input,textarea,select")))refreshBackendBootstrap(true).catch(()=>{});},30000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&backendIsOnline())refreshBackendBootstrap(true).catch(()=>{});});
+
+  document.addEventListener("submit",event=>{
+    if(partnerReadonlyActive() && event.submitter?.value!=="cancel"){
+      event.preventDefault();event.stopImmediatePropagation();showToast("Esta visualização é somente leitura.");
+    }
+  },true);
+  document.addEventListener("click",event=>{
+    if(!partnerReadonlyActive())return;
+    const button=event.target.closest('[data-action]');
+    if(button && !partnerReadonlyActions.has(button.dataset.action)){
+      event.preventDefault();event.stopImmediatePropagation();showToast("Esta visualização é somente leitura.");
+    }
+  },true);
+  new MutationObserver(()=>applyPartnerReadonlyControls()).observe(document.body,{childList:true,subtree:true});
+
+  document.querySelectorAll("dialog").forEach((dialog) => {
+    dialog.addEventListener("click", (event) => {
+      const cancelButton = event.target.closest('button[value="cancel"]');
+      if (!cancelButton) return;
+      event.preventDefault();
+      dialog.close("cancel");
+    });
+  });
+
+  function handleMarketplaceActionClick(event) {
+    const actionButton = event.target.closest("[data-action]");
+    if (!actionButton) return;
+    // Checkboxes commit their native state through change, not a cancelled click.
+    if (actionButton.matches('input[type="checkbox"][data-action],select[data-action]')) return;
+    // Acoes dentro de <form method="dialog"> nao devem enviar ou fechar o formulario.
+    event.preventDefault();
+    if (!actionButton.disabled) return handleAction(actionButton);
+  }
+
+  function handleMarketplaceActionChange(event) {
+    const control = event.target;
+    if (control.matches('input[type="checkbox"][data-action],select[data-action]') && !control.disabled) return handleAction(control);
+  }
+
+  app.addEventListener("change", handleMarketplaceActionChange);
+  app.addEventListener("click", (event) => {
+    const navButton=event.target.closest("[data-nav]");
+    if(navButton){if(state.role==="partner"&&!partnerPageAllowed(navButton.dataset.nav)){showToast("Acesso Restrito.");return;}nav(state.role,navButton.dataset.nav);return;}
+    handleMarketplaceActionClick(event);
+  });
+
+  detailDialog.addEventListener("click", handleMarketplaceActionClick);
+  formDialog.addEventListener("click", handleMarketplaceActionClick);
+  formDialog.addEventListener("close", refreshOpenPartnerReview);
+  formDialog.addEventListener("close",()=>{
+    if(detailDialog.open&&detailDialog.dataset.view==="occurrence-transfer-chat")openOccurrenceTransferConversation(detailDialog.dataset.requestId,{refresh:true});
+  });
+
+  detailDialog.addEventListener("close", () => {
+    if(detailDialog.open)return;
+    monthlyConversationEpoch++;
+    transferConversationEpoch++;
+    detailDialog.dataset.view = "";
+    if (!detailReturnContext) {
+      selectedVenueSchedule = null;
+      return;
+    }
+    const context = detailReturnContext;
+    detailReturnContext = null;
+    setTimeout(() => openVenueSchedule(context.venueId, context.shortDate), 10);
+  });
+
+  reservationDialog.addEventListener("close", () => {
+    if (!reservationReturnContext) {
+      selectedReservation = null;
+      return;
+    }
+    const context = reservationReturnContext;
+    reservationReturnContext = null;
+    selectedReservation = null;
+    setTimeout(() => openVenueSchedule(context.venueId, context.shortDate), 10);
+  });
+
+  groupSelect.addEventListener("change", updateReservationEventOptions);
+  eventSelect.addEventListener("change", updateNewEventPanel);
+  newEventTitle.addEventListener("input", updateReservationSubmitState);
+  voucherSelect.addEventListener("change", updateVoucherPaymentPreview);
+  paymentMethodSelect?.addEventListener("change", () => { updateVoucherPaymentPreview(); updateSinglePayerPanel(); updatePixSplitPanel(); updateReservationSubmitState(); });
+  singlePayerSelect?.addEventListener("change", updateReservationSubmitState);
+  pixSplitToggle?.addEventListener("change", () => { updatePixSplitPanel(); updateReservationSubmitState(); });
+  pixSplitMode?.addEventListener("change", updatePixSplitPanel);
+  pixSplitMembers?.addEventListener("change", (event) => { if (event.target.matches('[data-split-member]')) updatePixSplitPanel(); });
+  pixSplitMembers?.addEventListener("input", (event) => { if (event.target.matches('[data-split-value]')) updatePixSplitSummary(); });
+  monthlyReservationToggle.addEventListener("change", () => {
+    if (eventSelect.value === "__new__" && selectedReservation) newEventTitle.value = defaultEventTitle(selectedReservation);
+    updateMonthlyReservationPreview();
+    populateVoucherOptions();
+    updateReservationEventOptions();
+    updateReservationSubmitState();
+  });
+  reservationPolicyAcknowledge.addEventListener("change", () => {
+    setReservationPolicyInvalid(!reservationPolicyAcknowledge.checked);
+    updateReservationSubmitState();
+  });
+
+  app.addEventListener("submit", async (event) => {
+    if (event.target.id === "marketplaceLoginForm") {
+      event.preventDefault();
+      backendEmailLogin(event.target);
+      return;
+    }
+    if (event.target.id !== "partnerInterestForm") return;
+    event.preventDefault();
+    validateMaskedFields(event.target);
+    if (!event.target.reportValidity()) return;
+    const data = Object.fromEntries(new FormData(event.target).entries());
+    if (data.contactConsent !== "yes") {
+      showToast("Autorize o contato para enviar a solicitação.");
+      return;
+    }
+    if (backendRuntime.enabled && !backendIsOnline()) {
+      showToast("Reconecte sua conta antes de enviar a solicitação."); return;
+    }
+    capturePartnerInterestDraft(event.target);
+    if (partnerInterestSubmitting) return;
+    if (backendIsOnline()) {
+      await submitPartnerInterest(data);
+      return;
+    }
+    const duplicate = state.adminPartners.find((partner) => String(partner.cnpj || "").replace(/\D/g,"") === String(data.cnpj || "").replace(/\D/g,"") && !["Rejeitado","Encerrado"].includes(partner.status));
+    if (duplicate) {
+      showToast(`Já existe uma solicitação ou parceiro cadastrado para este CNPJ (${duplicate.status}).`);
+      return;
+    }
+    const requestedAt = new Date().toLocaleString("pt-BR");
+    const applicationId = nextId("APP-", state.partnerApplications);
+    const venueId = uniqueVenueId(data.tradeName);
+    const adminPartnerId = Math.max(0, ...state.adminPartners.map((partner) => Number(partner.id) || 0)) + 1;
+    const application = {
+      id: applicationId,
+      adminPartnerId,
+      venueId,
+      tradeName: data.tradeName.trim(),
+      legalName: data.legalName.trim(),
+      cnpj: data.cnpj.trim(),
+      city: data.city.trim(),
+      spaces: Number(data.spaces || 1),
+      types: data.types.trim(),
+      responsible: data.responsible.trim(),
+      email: data.email.trim(),
+      phone: data.phone.trim(),
+      notes: String(data.notes || "").trim(),
+      contactConsent: true,
+      source: "Solicitação pelo app",
+      status: "Pendente",
+      requestedAt
+    };
+    state.partnerApplications.unshift(application);
+    state.adminPartners.push({
+      id: adminPartnerId,
+      applicationId,
+      venueId,
+      tradeName: application.tradeName,
+      legalName: application.legalName,
+      cnpj: application.cnpj,
+      city: application.city,
+      spaces: application.spaces,
+      types: application.types,
+      status: "Pendente",
+      responsible: application.responsible,
+      email: application.email,
+      phone: application.phone,
+      taxRegime: "A informar",
+      activity: "A validar durante a homologação",
+      contract: "Não enviado",
+      terms: "Pendente",
+      privacy: "Pendente",
+      fiscal: "A validar",
+      banking: "Não informado",
+      commission: Number(state.settings.defaultCommission || 0),
+      score: 35,
+      source: "Solicitação pelo app",
+      requestedAt
+    });
+    saveState();
+    render();
+    clearPartnerInterestDraft();
+    showToast("Solicitação enviada para Administração → Parceiros.");
+  });
+
+  document.addEventListener("input", (event) => {
+    if (maskedFieldType(event.target)) applyMaskToField(event.target);
+    if (event.target.form?.id === "partnerInterestForm") capturePartnerInterestDraft(event.target.form);
+  });
+  document.addEventListener("blur", (event) => {
+    if (maskedFieldType(event.target)) validateMaskedField(event.target);
+  }, true);
+
+  app.addEventListener("input", (event) => {
+    if(event.target.id==="venueSearch"){state.search.venue=event.target.value;saveState();render();const input=document.getElementById("venueSearch");input?.focus();input?.setSelectionRange(state.search.venue.length,state.search.venue.length);}
+    if(event.target.id==="adminApplicationSearch"){state.search.adminApplication=event.target.value;saveState();render();const input=document.getElementById("adminApplicationSearch");input?.focus();input?.setSelectionRange(state.search.adminApplication.length,state.search.adminApplication.length);}
+    if(event.target.id==="adminPartnerSearch"){state.search.adminPartner=event.target.value;saveState();render();const input=document.getElementById("adminPartnerSearch");input?.focus();input?.setSelectionRange(state.search.adminPartner.length,state.search.adminPartner.length);}
+    if(event.target.id==="adminUserSearch"){state.search.adminUser=event.target.value;saveState();render();const input=document.getElementById("adminUserSearch");input?.focus();input?.setSelectionRange(state.search.adminUser.length,state.search.adminUser.length);}
+  });
+
+  app.addEventListener("change", (event) => {
+    if(event.target.id==="financeMonth"){changeFinancePeriod(event.target.value);return;}
+    if(event.target.id==="financePeriodMode"){changeFinancePeriod(event.target.value==="all"?"all":window.MarketplaceFinancePeriod.currentMonth());return;}
+    if (event.target.form?.id === "partnerInterestForm") capturePartnerInterestDraft(event.target.form);
+    if(event.target.id==="userReservationFilter"){state.filters.userReservationStatus=event.target.value;saveState();render();}
+    if(event.target.id==="userShareFilter"){state.filters.userShareStatus=event.target.value;saveState();render();}
+    if(event.target.id==="partnerReservationFilter"){state.filters.partnerReservationStatus=event.target.value;saveState();render();}
+    if(event.target.id==="adminApplicationFilter"){state.filters.adminApplicationStatus=event.target.value;saveState();render();}
+    if(event.target.id==="adminPartnerFilter"){state.filters.adminPartnerStatus=event.target.value;saveState();render();}
+    if(event.target.id==="adminFinancePartner"){state.filters.adminFinancePartner=event.target.value;saveState();render();}
+    if(event.target.id==="adminReservationFilter"){state.filters.adminReservationStatus=event.target.value;saveState();render();}
+    if(event.target.id==="adminReservationPartner"){state.filters.adminReservationPartner=event.target.value;saveState();render();}
+    if(event.target.id==="adminReservationUser"){state.filters.adminReservationUser=event.target.value;saveState();render();}
+    if(event.target.id==="adminReservationDate"){state.filters.adminReservationDate=event.target.value;saveState();render();}
+    if(event.target.id==="partnerPhotoUpload" && event.target.files?.length){handlePartnerPhotoUpload(event.target.files);}
+    if(event.target.id==="partnerDocumentUpload" && event.target.files?.[0]){handlePartnerDocumentUpload(event.target.files[0]);event.target.value="";}
+  });
+
+  setInterval(() => {
+    if (chatDialog?.open && selectedChatReservationId) renderOpenChat();
+  }, 30000);
+
+  roleButtons.forEach((button)=>button.addEventListener("click",()=>setRole(button.dataset.role)));
+  themeButton?.addEventListener("click", toggleMarketplaceTheme);
+  document.getElementById("openReleaseNotes").addEventListener("click",()=>{infoDialog.showModal();focusDialog(infoDialog);});
+  document.getElementById("resetPreview").addEventListener("click",()=>askConfirm({title:"Restaurar fallback local",message:"Apagar os dados do fallback local e recuperar a massa fictícia inicial?",confirmLabel:"Restaurar",onConfirm:resetState}));
+
+  dynamicForm.addEventListener("change",(event)=>{
+    const field=event.target.closest("[data-field-name]");
+    if (field) clearFormFieldInvalid(field.dataset.fieldName);
+    formChangeHandler?.(event,dynamicForm);
+  });
+
+  dynamicForm.addEventListener("input",(event)=>{
+    if(event.target.matches("[data-currency]")) {
+      const digits=event.target.value.replace(/\D/g, "").slice(0,11);
+      event.target.value=money(Number(digits || 0)/100);
+    }
+    if(event.target.matches("[data-payment-split-amount]"))formChangeHandler?.(event,dynamicForm);
+  });
+
+  dynamicForm.addEventListener("submit",async(event)=>{
+    if(event.submitter?.value==="cancel")return;
+    event.preventDefault();
+    if(formSubmitting)return;
+    validateMaskedFields(dynamicForm);
+    if(!dynamicForm.reportValidity())return;
+    const data=Object.fromEntries(new FormData(dynamicForm).entries());
+    dynamicForm.querySelectorAll("[data-currency]").forEach(input=>{ data[input.name]=registrationCurrency(input.value); });
+    const handler=formHandler;
+    const intent=event.submitter?.value==="later"?"later":"now";
+    formSubmitting=true;
+    formSubmit.disabled=true;
+    formSecondarySubmit.disabled=true;
+    try {
+      const result=await handler?.(data,{intent});
+      if(result===false)return;
+      if(formDialog.open)formDialog.close();formHandler=null;formChangeHandler=null;
+      if(typeof result?.afterClose==="function")await result.afterClose();
+    } finally {
+      formSubmitting=false;
+      formSubmit.disabled=false;
+      formSecondarySubmit.disabled=false;
+    }
+  });
+
+  confirmForm.addEventListener("submit",async(event)=>{
+    if(event.submitter?.value==="cancel")return;
+    event.preventDefault();
+    const handler=confirmHandler;confirmDialog.close();confirmHandler=null;await handler?.();
+  });
+
+  cancellationForm.addEventListener("submit", (event) => {
+    if (event.submitter?.value === "cancel") return;
+    event.preventDefault();
+    if (!selectedCancellation || !cancellationForm.reportValidity()) return;
+    const payload = { ...selectedCancellation, reason: cancellationReason.value.trim() };
+    cancellationDialog.close();
+    selectedCancellation = null;
+    completePaidCancellation(payload);
+  });
+
+  cancellationDialog.addEventListener("close", () => {
+    selectedCancellation = null;
+    cancellationReason.value = "";
+    cancellationAcknowledge.checked = false;
+  });
+
+  reservationForm.addEventListener("submit",async (event)=>{
+    if(event.submitter?.value==="cancel")return;
+    event.preventDefault();
+    if(!selectedReservation)return;
+    if (!refreshOpenReservationFromBackend() || !selectedReservation) return;
+    if (!reservationSelectionAvailable(currentReservationSelection(selectedReservation))
+      || (isMonthlySelection() && !monthlyOccurrencesForSelection(selectedReservation).length)) {
+      showToast("Não há ocorrências disponíveis para esta reserva. Consulte a agenda atualizada.");
+      return;
+    }
+    const personal = isPersonalReservationSelection();
+    const group = userGroup(groupSelect.value);
+    if (!personal && (!group || !canManageGroupEvents(group))) {
+      groupPermissionNote.textContent = "A reserva exige vínculo ativo com o grupo e permissão para criar eventos.";
+      groupPermissionNote.classList.add("permission-denied");
+      return;
+    }
+    if (!reservationPolicyAcknowledge.checked) {
+      setReservationPolicyInvalid(true);
+      reservationPolicyAcknowledge.focus();
+      showToast("Confirme o aceite da política de cancelamento, voucher e reembolso.");
+      return;
+    }
+    setReservationPolicyInvalid(false);
+    const directMonthly = isMonthlySelection();
+    const createsNewEvent = !personal && (directMonthly || eventSelect.value === "__new__");
+    const reservationWithoutEvent = personal || (!directMonthly && eventSelect.value === "__none__");
+    const existingEvent = directMonthly || reservationWithoutEvent || createsNewEvent ? null : state.groupEvents.find((item) => item.id === eventSelect.value && item.groupId === group.id && item.published && item.statusKey !== "cancelled" && !item.sourceReservationId && !state.reservations.some((reservation)=>reservation.eventId===item.id&&!['cancelled','expired'].includes(reservation.statusKey)) && item.date === selectedReservation.day.date && item.time === selectedReservation.time && item.endTime === selectedReservation.endTime);
+    if (!directMonthly && !reservationWithoutEvent && !createsNewEvent && !existingEvent) {
+      showToast("Crie um evento na Comunidade, selecione um evento publicado do mesmo dia e horário ou faça somente a reserva.");
+      return;
+    }
+    const title = createsNewEvent ? defaultEventTitle(selectedReservation) : existingEvent?.title || "Nenhum evento vinculado";
+    if (backendIsOnline()) {
+      const slotId = selectedReservation.slot?.backendId;
+      const groupId = personal ? null : (group.backendId || group.id);
+      const eventId = existingEvent?.backendId || existingEvent?.id || null;
+      if (!slotId || (!personal && !groupId)) {
+        showToast("A agenda ou o grupo ainda não possui identificação oficial do staging.");
+        return;
+      }
+      const request = { slotId,groupId,eventId,createEvent:createsNewEvent,
+        policyVersion:"marketplace-0.2.0-part-22ar",policyAccepted:true };
+      reservationReturnContext = null;
+      reservationDialog.close();
+      const result = await runBackendMutation("", () => directMonthly
+        ? window.MarketplaceBackend.contractDirectMonthlyPrebooking(request)
+        : window.MarketplaceBackend.createReservationPrebooking(request));
+      if (result) {
+        state.activePage.user = "reservations";
+        state.userReservationTab=directMonthly?"monthly":"single";
+        saveState();
+        render();
+        if (directMonthly) {
+          showToast(`Mensalista ${result.public_code || "oficial"} pré-reservado. Defina o pagamento em Minhas reservas.`);
+        } else {
+          showToast(`Pré-reserva ${result.public_code || "oficial"} criada. Defina o pagamento em Minhas reservas dentro do prazo informado.`);
+        }
+      }
+      return;
+    }
+    const id=nextId("R-",state.reservations);
+    const monthly=isMonthlySelection();
+    const occurrences=monthly?monthlyOccurrencesForSelection(selectedReservation):[{date:selectedReservation.day.date,shortDate:selectedReservation.day.shortDate,weekday:selectedReservation.day.weekday,dayLabel:selectedReservation.day.dayLabel,time:selectedReservation.time,endTime:selectedReservation.endTime,space:normalizedSlotSpace(selectedReservation.slot),value:selectedReservation.value}];
+    const value=currentReservationValue();
+    const eventId=existingEvent?.id||(createsNewEvent?nextId("EV-",state.groupEvents):"");
+    if(createsNewEvent)state.groupEvents.unshift({id:eventId,groupId:group.id,title,date:selectedReservation.day.date,time:selectedReservation.time,endTime:selectedReservation.endTime,recurrence:monthly?"weekly_month":"single",occurrences,venue:selectedReservation.venue.name,statusKey:"standby_payment",status:"Aguardando pagamento",published:false,source:"reservation",sourceReservationId:id,publicationEndpoint:"waiting.payment.confirmed",pushStatus:"Aguardando publicação"});
+    const createdAt=new Date();
+    const newReservation={id,venueId:selectedReservation.venue.id,venue:selectedReservation.venue.name,space:normalizedSlotSpace(selectedReservation.slot),user:state.userProfile.name,date:selectedReservation.day.date,shortDate:selectedReservation.day.shortDate,time:selectedReservation.time,endTime:selectedReservation.endTime,value,bookingMode:monthly?"monthly":"single",monthly,occurrenceCount:occurrences.length,occurrences,statusKey:"pending",status:"Pré-reserva pendente",endpoint:"reservation.prebooked",paymentStatus:"Defina o pagamento em Minhas reservas",paymentDue:value,paymentMethod:"",paymentMethodLabel:"",paymentProvider:"",paymentConfigured:false,paymentExpiresAt:new Date(createdAt.getTime()+30*60000).toISOString(),createdAtIso:createdAt.toISOString(),userId:backendRuntime.identityId||state.userProfile.id,groupId:group?.id||"",groupName:group?.name||"Reserva pessoal",groupRole:group?.role||"Titular",eventId,event:title,eventMode:createsNewEvent?"new":existingEvent?"existing":"none",eventPublicationStatus:createsNewEvent?"standby_payment":existingEvent?"linked_existing":"none",pushStatus:createsNewEvent?"Aguardando pagamento":existingEvent?"Não aplicável":"Não enviado",cancellationPolicyAccepted:true,cancellationPolicyAcceptedAt:createdAt.toLocaleString("pt-BR"),cancellationPolicyVersion:monthly?"marketplace-0.2.0-part-22p":"marketplace-0.2.0-part-22p-r7",accountingRecognizedValue:0,fiscalObligationValue:0};
+    state.reservations.unshift(newReservation);syncPartnerReservationFromUser(newReservation);state.userReservationTab=monthly?"monthly":"single";saveState();reservationDialog.close();state.activePage.user="reservations";render();showToast(`Pré-reserva ${id} criada. Defina o pagamento em Minhas reservas.`);
+  });
+
+  chatForm?.addEventListener("submit", (event) => {
+    if (event.submitter?.value === "cancel") return;
+    event.preventDefault();
+    sendChatMessage(chatInput.value);
+  });
+
+  chatDialog?.addEventListener("close", () => {
+    selectedChatReservationId = null;
+    chatInput.value = "";
+  });
+
+  applyMarketplaceTheme(storedMarketplaceTheme(), false);
+  window.addEventListener("tamo-on-marketplace-backend", (event) => handleBackendStatus(event.detail || {}));
+  sessionButton?.addEventListener("click", backendSignOut);
+  if (window.MarketplaceBackend) handleBackendStatus({ type:"ready" });
+  // The Community owns the root service worker. No competing Marketplace worker.
+  render();
+  ensurePartnerPhotoTones();
+})();

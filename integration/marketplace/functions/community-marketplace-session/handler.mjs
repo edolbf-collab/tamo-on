@@ -1,0 +1,54 @@
+// No email/UID from the caller is used to select the Marketplace account.
+export function createHandler({createClient, env, communityUrl, communityKey}) {
+  const origins = new Set(["https://app.tamoon.app.br", "https://marketplace-build-166.resenhafc-beta.pages.dev"]);
+  const key = (plural, legacy) => {
+    try { const parsed = JSON.parse(env(plural) || "{}"); if (parsed.default) return parsed.default; } catch {}
+    return env(legacy);
+  };
+  return async req => {
+    const origin = req.headers.get("origin");
+    const headers = {"Content-Type":"application/json", "Cache-Control":"no-store", "Vary":"Origin"};
+    if (origin && origins.has(origin)) Object.assign(headers, {
+      "Access-Control-Allow-Origin":origin, "Access-Control-Allow-Headers":"authorization, content-type, apikey, x-client-info",
+      "Access-Control-Allow-Methods":"POST, OPTIONS"
+    });
+    const reply = (status, body) => new Response(JSON.stringify(body), {status, headers});
+    if (origin && !origins.has(origin)) return reply(403, {error:"ORIGIN_DENIED"});
+    if (req.method === "OPTIONS") return new Response(null, {status:204, headers});
+    if (req.method !== "POST") return reply(405, {error:"METHOD_NOT_ALLOWED"});
+    const authorization = req.headers.get("authorization") || "";
+    if (!/^Bearer \S+$/.test(authorization)) return reply(401, {error:"AUTH_REQUIRED"});
+    try {
+      const body = await req.json();
+      if (!["status","session"].includes(body.action)) return reply(400, {error:"INVALID_ACTION"});
+      const community = createClient(communityUrl, communityKey, {
+        auth:{persistSession:false, autoRefreshToken:false}, global:{headers:{Authorization:authorization}}
+      });
+      const {data:identity, error:authError} = await community.auth.getUser(authorization.slice(7));
+      if (authError || !identity?.user) return reply(401, {error:"AUTH_REQUIRED"});
+      const user = identity.user;
+      if (!user.email_confirmed_at || !user.identities?.some(i => i.provider === "google")) return reply(403, {error:"PILOT_RESTRICTED"});
+      const url = env("SUPABASE_URL");
+      const admin = createClient(url, key("SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY"), {auth:{persistSession:false, autoRefreshToken:false}});
+      // Service-only RPC resolves the fixed mapping and rate-limits session exchanges.
+      const {data:mapping, error:mappingError} = await admin.rpc("community_marketplace_pilot_identity", {
+        p_community_id:user.id, p_exchange:body.action === "session"
+      });
+      if (mappingError || !mapping?.marketplace_id || mapping.email?.toLowerCase() !== user.email?.toLowerCase()) return reply(mappingError?.code === "PT429" ? 429 : 403, {error:"PILOT_RESTRICTED"});
+      const [adminAccess, legalAccess] = await Promise.all([
+        community.rpc("is_platform_admin"), community.rpc("get_community_legal_access_status")
+      ]);
+      if (adminAccess.error || adminAccess.data !== true || legalAccess.error || legalAccess.data?.allowed !== true) return reply(403, {error:"PILOT_RESTRICTED"});
+      if (body.action === "status") return reply(200, {allowed:true, environment:"staging", realMoney:false});
+      const {data:link, error:linkError} = await admin.auth.admin.generateLink({type:"magiclink", email:mapping.email});
+      if (linkError || link.user?.id !== mapping.marketplace_id || !link.properties?.hashed_token) return reply(503, {error:"SESSION_UNAVAILABLE"});
+      const client = createClient(url, key("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY"), {auth:{persistSession:false, autoRefreshToken:false}});
+      const {data:verified, error:verifyError} = await client.auth.verifyOtp({token_hash:link.properties.hashed_token, type:"magiclink"});
+      if (verifyError || verified.user?.id !== mapping.marketplace_id || !verified.session) return reply(503, {error:"SESSION_UNAVAILABLE"});
+      // Generates a session without sending an email; tokens stay out of URLs and logs.
+      return reply(200, {session:{access_token:verified.session.access_token, refresh_token:verified.session.refresh_token}, environment:"staging", realMoney:false});
+    } catch {
+      return reply(503, {error:"ACCESS_UNAVAILABLE"});
+    }
+  };
+}

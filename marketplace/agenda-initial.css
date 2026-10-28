@@ -1,0 +1,19 @@
+.agenda-initial{--initial-surface:#152b24;--initial-soft:#19372c;--initial-text:#e8f2ec;--initial-muted:#adc4b7;--initial-border:#355046;--initial-error:#ffaaa2;display:grid;gap:16px;max-width:100%;color:var(--initial-text)}
+[data-theme=light] .agenda-initial{--initial-surface:#fff;--initial-soft:#f1f8f4;--initial-text:#182b23;--initial-muted:#566b5e;--initial-border:#d6e2da;--initial-error:#b42318}
+.agenda-initial p{line-height:1.5}.agenda-initial .field{display:grid;gap:6px;min-width:0}
+.agenda-initial input:not([type=checkbox]),.agenda-initial select{width:100%;padding:10px 12px;border:1px solid var(--initial-border);border-radius:9px;background:var(--initial-surface);color:var(--initial-text);box-sizing:border-box}
+.initial-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:12px 0}.initial-controls .field{flex:1;min-width:220px}
+.initial-check{display:flex;align-items:flex-start;gap:10px;line-height:1.5;margin:12px 0}.initial-check input{flex:0 0 auto;width:18px;height:18px;margin-top:3px;accent-color:#0fa463}
+.initial-entry,.initial-task{border:1px solid var(--initial-border);border-radius:12px;background:var(--initial-surface);padding:16px;margin-bottom:12px;overflow-wrap:anywhere}
+.initial-entry h4,.initial-task h4{margin:10px 0;font-size:1.05rem}.initial-entry p{margin:7px 0}.initial-claim,.initial-offer{background:var(--initial-soft);border-radius:9px;padding:14px;margin-top:12px}.initial-task{border-color:#0fa463}
+.agenda-initial small{display:block;color:var(--initial-muted);line-height:1.5}.agenda-initial .is-error{color:var(--initial-error)}.agenda-initial [hidden]{display:none!important}
+.agenda-initial-table{width:100%;border-collapse:collapse;font-size:.92rem}.agenda-initial-table th,.agenda-initial-table td{text-align:left;padding:11px;border-bottom:1px solid var(--initial-border);vertical-align:top}.agenda-initial-table th{background:var(--initial-soft)}
+.agenda-initial [data-message]{min-height:1.5em;white-space:pre-line}.agenda-initial details{padding:12px;border-top:1px solid var(--initial-border)}.agenda-initial summary{cursor:pointer;font-weight:600}.agenda-initial .table-wrap{overflow-x:auto}
+[aria-busy=true]>.agenda-initial{cursor:progress}dialog:has(.agenda-initial){width:min(1100px,calc(100vw - 32px));max-width:calc(100vw - 32px)}
+@media(max-width:600px){.initial-controls{align-items:stretch}.initial-controls .button{flex:1}.initial-entry{padding:12px}.agenda-initial-table{min-width:600px}}
+
+/* Keep the entire import flow inside the dialog, even with long file/space names. */
+.dialog.detail-dialog:has(.agenda-initial){width:min(980px,calc(100vw - 32px));max-width:calc(100vw - 32px);box-sizing:border-box}
+.dialog:has(.agenda-initial) form,.dialog:has(.agenda-initial) #detailBody,.agenda-initial,.agenda-initial>*,.initial-controls>*{min-width:0;box-sizing:border-box}
+.agenda-initial>*,.agenda-initial input[type=file]{max-width:100%}.agenda-initial .table-wrap{width:100%;min-width:0;overflow-x:auto}.agenda-initial .section-heading{flex-wrap:wrap;gap:10px}.initial-controls .field{flex:1 1 240px;min-width:0}.initial-controls>.button{max-width:100%;white-space:normal}.agenda-initial input[type=file]{min-width:0}.agenda-initial .section-heading h3{margin:0}.agenda-initial [data-entries]:empty{display:none}
+@media(max-width:640px){.initial-controls .field{flex-basis:100%;order:-1}.initial-controls>.button{flex:1 1 120px}.agenda-initial-table{min-width:550px}.agenda-initial input[type=file]{font-size:11px}.dialog:has(.agenda-initial) form{padding:15px}.agenda-initial [data-import-area]>p{font-size:12px}}
