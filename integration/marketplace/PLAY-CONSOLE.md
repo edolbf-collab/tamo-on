@@ -12,7 +12,7 @@ Tâmo On organizes sports groups, attendance, teams, announcements and manually 
 
 This update adds an explicitly restricted Marketplace pilot for booking physical sports venues. The pilot runs in a separate staging environment and is available only to the platform operator and two explicitly authorized sandbox accounts with customer and partner roles. Payments are simulated; no real charges or transfers are enabled. The pilot synchronizes sandbox reservations only with the explicitly configured test group (Teste FC). New games are published there after simulated confirmation and are clearly labeled as tests. Other groups are excluded; simulated amounts never become real Community cash entries.
 
-Access path: sign in to the Community, open Home, then “Onde jogar”. Authorized users see “Teste privado”. The Marketplace displays a permanent private-test and simulated-payments banner. Other users cannot open its data or operations, including through direct URLs.
+Access path: sign in to the Community, open Home, then “Onde jogar, quadras e reservas”. The customer search screen opens directly for authorized users. The Marketplace displays a permanent private-test and simulated-payments banner. Other users cannot open its data or operations, including through direct URLs.
 
 The review account and its access instructions must be supplied in the App access section before this feature is submitted for review. Do not use the operator's personal Google account. Access for reviewers must cover the functionality under review without granting access to live customer data.
 

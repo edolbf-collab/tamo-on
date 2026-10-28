@@ -1,4 +1,4 @@
-# Marketplace privado — incremental 166-R3
+# Marketplace privado — incremental 166-R5
 
 Integração da Comunidade build 164 com o Marketplace 0.2.0, base consolidada 22BB-C39-R1. Inclui o piloto 166-R1 e a sincronização com o grupo Teste FC. O motor de reservas, mensalidades, parceiros e financeiro do sandbox foi preservado.
 
@@ -23,22 +23,22 @@ A interface 166-R2 foi incorporada à `main` e publicada em `app.tamoon.app.br` 
 - Mensalidades usam as ocorrências emitidas pelo motor C39. A ponte não recalcula vencimentos, valores ou financiamento.
 - Alterações de horário/local e cancelamentos atualizam somente jogos futuros criados pela ponte. Presenças, times, churrasco e demais configurações nativas são preservados. Jogos passados permanecem no histórico.
 - Reserva vinculada a um jogo já existente: mantém a referência, sem sobrescrever ou cancelar o jogo criado manualmente na Comunidade.
-- Repetir uma sincronização não duplica jogos. Versões antigas são ignoradas. Em falha de rede, o titular pode tentar novamente.
+- Repetir uma sincronização não duplica jogos. Versões antigas são ignoradas. Em falha de rede, a entrega automática tenta novamente; o titular também dispõe de uma tentativa manual de diagnóstico.
 - Nenhum valor simulado é lançado no caixa real da Comunidade. A ponte não envia avisos nem notificações automaticamente.
 
-A sincronização ocorre ao abrir o Marketplace, depois das operações de alteração, pelo botão **Sincronizar Comunidade** e a cada minuto enquanto a tela está aberta. Não existe tarefa em segundo plano com o app fechado. O painel **Reservas de teste** mostra a última sincronização concluída. Outros grupos do sandbox continuam isolados da Comunidade.
+A revisão 166-R5 entrega alterações pelo servidor, mesmo com o app fechado. Mudanças de reservas, ocorrências e eventos do titular no Teste FC incrementam uma fila persistente. Uma tarefa verifica a fila a cada dez segundos; falhas usam novas tentativas com intervalo crescente, até cinco minutos. O resumo privado continua acessível em **Ajuda → Diagnóstico do grupo de teste**, junto da tentativa manual de recuperação. Não há botão de sincronização no cabeçalho. Outros grupos do sandbox continuam isolados da Comunidade.
 
 A revisão 166-R3 autoriza duas contas de homologação adicionais: cliente e parceiro. Nenhuma delas se torna administradora da plataforma. A conta de parceiro conserva a associação à Arena Central de homologação. A ponte do Teste FC e seu painel continuam exclusivos do titular. A conta de parceiro deve primeiro entrar na Comunidade com o mesmo Google e concluir seu próprio aceite legal; o vínculo entre os projetos é estabelecido pelo servidor após essa verificação.
 
 ## Proteções
 
-- As duas Edge Functions verificam a identidade pelo serviço Auth. A sincronização exige tokens válidos da Comunidade e do Marketplace, pertencentes às contas fixadas no servidor.
-- O contexto da Comunidade exige sessão ativa, administrador, permissão de gerenciar jogos no grupo configurado e aceite legal. O navegador não fornece o snapshot de reservas que será aplicado.
+- As Edge Functions de entrada e diagnóstico verificam a identidade pelo serviço Auth. A sincronização manual exige tokens válidos da Comunidade e do Marketplace, pertencentes às contas fixadas no servidor. A entrega automática usa uma rota separada autenticada por HMAC, descrita abaixo.
+- O acesso interativo à Comunidade exige sessão ativa, administrador, permissão de gerenciar jogos no grupo configurado e aceite legal. O navegador não fornece o snapshot de reservas que será aplicado.
 - A importação e a escrita final são RPCs exclusivas de serviço. O gateway lê as reservas diretamente do Marketplace com a sessão autenticada do titular e valida o grupo de destino novamente na Comunidade.
 - O Marketplace mantém o filtro de requisições e as políticas RLS restritivas do piloto 166-R1, incluindo a verificação da sessão própria. Fotos permanecem privadas e usam URLs assinadas por dez minutos.
 - Tokens do Marketplace ficam em memória, fora de URLs e logs. Dados transitórios são limpos na entrada/saída. `/marketplace/` fica fora do cache offline.
 - As tabelas privadas da ponte não possuem políticas de acesso direto: isso é intencional. Apenas funções controladas podem acessá-las.
-- `verify_jwt=false` nas Edge Functions permite os tokens de projetos distintos; a autenticação e autorização completas são feitas dentro das funções.
+- `verify_jwt=false` nas funções de acesso permite os tokens de projetos distintos; a autenticação e autorização completas são feitas dentro das funções. Na rota de entrega, a assinatura HMAC é verificada no banco antes de qualquer escrita; o navegador não recebe a chave.
 
 Os advisors foram consultados após as migrações. Os avisos sobre [tabelas privadas sem políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy) e [funções SECURITY DEFINER autenticadas](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable) são cobertos pelos bloqueios de schema, permissões explícitas, `search_path` fixo e testes de identidade. Permanecem avisos anteriores dos projetos, fora do escopo deste incremental; isto não constitui auditoria de toda a plataforma.
 
@@ -76,20 +76,38 @@ O teste visual em navegador não pôde ser repetido nesta sessão: Chromium foi 
 
 Para repetir os testes Node: `cd integration/marketplace`, `npm install`, `npx playwright install chromium`, `npm test`, `npm run test:browser`. Os testes SQL são exclusivos dos respectivos ambientes: `tests/export.sql` no Marketplace e `../community/test-sync.sql` na Comunidade. Eles usam transação e rollback. Não transformar os dados de teste em migrações.
 
-## Roteiro no celular
+## Roteiro no celular — 166-R5
 
-1. Abrir a Comunidade com a conta autorizada e selecionar Teste FC. Conferir os jogos, presenças, times e caixa existentes.
-2. Abrir **Onde jogar → Teste privado**. Conferir o aviso permanente de sandbox e escolher **Teste FC · Comunidade** como grupo da reserva.
-3. Criar uma reserva futura para um evento novo. Sincronizar. Conferir o estado pendente em **Reservas de teste**, sem novo jogo no grupo.
-4. Confirmar pelo fluxo de pagamento simulado do sandbox. Sincronizar. Abrir o novo jogo na Comunidade e testar presença, times e churrasco com o grupo.
-5. Repetir a sincronização e verificar que não duplica. Testar alteração de horário e cancelamento em uma reserva de teste futura.
-6. Testar uma reserva vinculada a jogo existente: os ajustes nativos desse jogo devem permanecer intactos.
-7. Testar mensalidade/ocorrências, desconexão e tentativa posterior. Confirmar que o caixa real não recebeu lançamentos.
-8. Com as contas de homologação, testar os perfis de cliente e parceiro e conferir que não aparece Administração nem sincronização do Teste FC. Com uma conta fora da lista, confirmar que o Marketplace é negado, mesmo pelo link direto. Integrantes do Teste FC continuam podendo ver os jogos publicados conforme as permissões normais.
-9. Registrar resultado, aparelho, horário e evidência, sem tokens nem informações pessoais desnecessárias.
+1. Abrir a Comunidade com uma das três contas autorizadas. Conferir a revisão **166-R5** em Sobre.
+2. Tocar na única entrada **Onde jogar, quadras e reservas**. A área do usuário abre em Buscar quadras. O botão **Voltar** retorna à Comunidade mantendo a conta conectada.
+3. No iPhone instalado, abrir ajuda, detalhes, agenda, formulário de reserva e chat. Conferir a margem abaixo do relógio, a rolagem interna e a área acima do indicador inferior. Repetir em paisagem e com teclado aberto.
+4. Como titular, escolher **Teste FC · Comunidade**, criar reserva futura e confirmar pelo fluxo sandbox. Aguardar a entrega automática, voltar à Comunidade e conferir o jogo. Testar também fechando o Marketplace imediatamente após a confirmação; não é necessário manter a página aberta.
+5. Conferir pendências pelo resumo em **Ajuda → Diagnóstico do grupo de teste**. Uma pré-reserva pendente não cria jogo no grupo. Repetir atualização não deve duplicar jogos.
+6. Testar alteração de horário, cancelamento, mensalidade e reserva vinculada a jogo manual. Presenças, times, churrasco, histórico e caixa real devem permanecer preservados.
+7. Nas contas cliente e parceiro, conferir os próprios papéis e ausência do diagnóstico do titular. Outra conta deve continuar bloqueada, inclusive por URL direta.
+8. Conferir a ajuda prática e a ausência de **Nova reserva** em Minhas reservas. Fazer novas reservas pela agenda em Buscar quadras.
+9. Registrar aparelho, horário e resultado, sem tokens. Avaliação do parceiro e distância ficam para outra etapa.
+
+## Experiência e entrega automática — 166-R5
+
+- Uma entrada na Comunidade e retorno com **Voltar**, sem encerrar o login da Comunidade. O token temporário do Marketplace é encerrado apenas localmente.
+- Dezessete arquivos JavaScript passam a um pacote com hash de conteúdo. `npm run build` recria o pacote e o manifesto. Os arquivos-fonte permanecem no repositório para manutenção. Executar esse comando sempre que um deles mudar.
+- A Comunidade pode antecipar o carregamento somente desse pacote público após a autorização de acesso e quando a economia de dados não está ativa. Não antecipa consultas de reservas, credenciais nem pagamentos. A importação do grupo e o carregamento de assets ocorrem em paralelo; a autorização continua obrigatória.
+- HTML e manifesto não são armazenados; o pacote com hash pode usar cache HTTP persistente. O Marketplace continua fora do cache offline do service worker da Comunidade. A autenticação e a rede ainda geram tempo de espera; não foi feita medição em iPhone físico.
+- Diálogos móveis usam `safe-area-inset-*` e altura dinâmica de viewport, com rolagem interna. A ajuda foi reescrita para orientar reservas, pagamentos, cotas, chat, cancelamentos e retorno.
+
+A migração `automatic_pilot_delivery` instala a fila privada e o cron `tamoon-community-sync` no Marketplace staging. A migração `automatic_pilot_receiver` instala a aplicação idempotente e os recibos na Comunidade; `pilot_delivery_edge_auth` restringe a RPC receptora a `service_role`. A função Edge **community-marketplace-delivery** recebe o envelope e chama essa RPC com a credencial do próprio servidor. O aceite legal das rotas de usuários permanece obrigatório e não foi alterado.
+
+A assinatura SHA-256/HMAC usa uma chave de 256 bits provisionada no Vault dos dois projetos, chamada `tamoon_community_sync_hmac_v1`. Essa chave não está nos arquivos nem no frontend. O receptor verifica assinatura, validade de cinco minutos, nonce e as identidades/grupo fixados na configuração. Recibos impedem repetição; o avanço da versão entregue preserva mudanças que chegaram durante a transmissão. A origem dos dados é o snapshot do banco do Marketplace, nunca o navegador.
+
+Validação R5: 47 testes Node passaram, incluindo acesso restrito, mudança de conta durante carregamento, retorno com falha de rede, pré-carregamento restrito ao pacote público e autenticação da entrega. Testes SQL com rollback cobriram assinatura/repetição/expiração/escopo, fila concorrente, retentativa, cancelamento e preservação de jogos manuais. Uma entrega real entre os servidores, com snapshot vazio, foi recebida e confirmada; a fila ficou sem pendências ou falhas. Não foram mantidos jogos ou cobranças sintéticos.
+
+Os advisors posteriores acrescentaram somente dois informes de RLS sem políticas, um por nova tabela privada, intencionalmente inacessíveis aos clientes. Os avisos anteriores permanecem fora do escopo. A validação visual em iPhone físico ainda é necessária; a restrição do ambiente impediu repetir o teste de navegador local.
 
 ## Suspensão e reversão
 
 Na Comunidade: `update marketplace_pilot.config set enabled=false where singleton;` bloqueia a ponte e o painel privado. No Marketplace: `update private.community_marketplace_pilot set enabled=false where singleton;` bloqueia o acesso ao piloto, inclusive do titular. Preservar tabelas e histórico.
+
+Para suspender somente a entrega automática, sem fechar o Marketplace: `update private.community_sync_delivery set enabled=false where singleton;`. Para retomar: `update private.community_sync_delivery set enabled=true,next_attempt_at=now() where singleton;`. Alterações acumuladas permanecem na fila.
 
 A suspensão não apaga os jogos de teste já publicados. Para retirar a interface, restaurar o deploy anterior. Não remover indiscriminadamente RLS nem migrações. A abertura pública exige revisão própria de permissões, pagamentos e publicação nas lojas.

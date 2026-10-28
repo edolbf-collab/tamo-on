@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 115,
   "mandatory": false,
-  "notes": "Atalhos diretos para buscar quadras e consultar minhas reservas no Marketplace privado.",
+  "notes": "Entrada única para quadras e reservas, retorno à Comunidade, ajuda atualizada e sincronização automática do piloto.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R4"
+  "integration": "166-R5"
 }

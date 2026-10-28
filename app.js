@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 166, database: 151, edge: 115, integration: "166-R4" });
-  const APP_ASSET_TOKEN = "beta166r4";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 166, database: 151, edge: 115, integration: "166-R5" });
+  const APP_ASSET_TOKEN = "beta166r5";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -151,7 +151,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta166r4`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta166r5`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -1336,6 +1336,12 @@
           Object.assign(this.repo.state, {marketplace_pilot:access.allowed, marketplace_sync:access.canSyncCommunity});
           Object.assign(this.state, {marketplace_pilot:access.allowed, marketplace_sync:access.canSyncCommunity});
           this.pilotAccessStatus = access.status;
+          if (access.allowed && !this.pilotAssetsPreloaded && !navigator.connection?.saveData) {
+            this.pilotAssetsPreloaded = true;
+            const warm = () => window.TamoonPilotAccess.preloadMarketplace().catch(() => { this.pilotAssetsPreloaded = false; });
+            if (window.requestIdleCallback) window.requestIdleCallback(warm, {timeout:3000});
+            else setTimeout(warm, 1000);
+          }
           if (this.route === "home" || !this.currentGroup()) this.render();
           if (access.canSyncCommunity && new URLSearchParams(location.search).get("pilot") === "reservas" && !this.pilotOverviewOpened) {
             this.pilotOverviewOpened = true; this.openMarketplacePilotOverview();
@@ -1584,7 +1590,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta166r4");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta166r5");
       }, true);
     },
 
@@ -1981,7 +1987,7 @@
     },
 
     emptyGroupPage() {
-      return `<section class="welcome-field"><div class="welcome-overlay"><img src="brand/tamo-on-logo-horizontal-negative.svg" alt="" class="welcome-mark"><span class="eyebrow">CONTA GOOGLE CONECTADA</span><h1>Monte seu grupo</h1><p>Crie um grupo com escudo próprio ou entre usando um código de convite.</p><div class="welcome-actions"><button class="btn btn-primary btn-small" data-action="create-group">+ Criar grupo</button><button class="btn btn-secondary btn-small" data-action="join-group">Inserir código</button><button class="btn btn-secondary btn-small" data-action="community-safety">Segurança e convivência</button>${this.state.marketplace_pilot ? `<button class="btn btn-primary btn-small" data-action="playing-spaces">Onde jogar · Marketplace</button>` : ""}</div></div></section>`;
+      return `<section class="welcome-field"><div class="welcome-overlay"><img src="brand/tamo-on-logo-horizontal-negative.svg" alt="" class="welcome-mark"><span class="eyebrow">CONTA GOOGLE CONECTADA</span><h1>Monte seu grupo</h1><p>Crie um grupo com escudo próprio ou entre usando um código de convite.</p><div class="welcome-actions"><button class="btn btn-primary btn-small" data-action="create-group">+ Criar grupo</button><button class="btn btn-secondary btn-small" data-action="join-group">Inserir código</button><button class="btn btn-secondary btn-small" data-action="community-safety">Segurança e convivência</button>${this.state.marketplace_pilot ? `<button class="btn btn-primary btn-small" data-action="playing-spaces">Onde jogar, quadras e reservas</button>` : ""}</div></div></section>`;
     },
 
     homePage() {
@@ -2015,8 +2021,7 @@
         </section>
         ${notice ? `<button class="home-notice" data-action="announcement-center" data-id="${notice.id}"><span>📣</span><div><strong>${escapeHtml(notice.title)}</strong><small>${escapeHtml(notice.body)}</small></div><b>›</b></button>` : ""}
         <div class="home-quick-grid">
-          <button class="quick-card ${this.state.marketplace_pilot ? "" : "quick-card-coming-soon"}" data-action="playing-spaces"><span class="quick-icon">⌖</span><span><strong>Onde jogar</strong><small>${this.state.marketplace_pilot ? "Teste privado" : "Em construção"}</small></span></button>
-          ${this.state.marketplace_sync ? `<button class="quick-card" data-action="pilot-reservations"><span class="quick-icon">▣</span><span><strong>Reservas de teste</strong><small>Minhas reservas no Marketplace</small></span></button>` : ""}
+          <button class="quick-card ${this.state.marketplace_pilot ? "" : "quick-card-coming-soon"}" data-action="playing-spaces"><span class="quick-icon">⌖</span><span><strong>Onde jogar, quadras e reservas</strong><small>${this.state.marketplace_pilot ? "Teste privado" : "Em construção"}</small></span></button>
           <button class="quick-card" data-route="teams"><span class="quick-icon">⇄</span><span><strong>Times</strong><small>Equilíbrio do elenco</small></span></button>
           <button class="quick-card" data-action="players"><span class="quick-icon">＋</span><span><strong>Convidados</strong><small>Incluir no evento</small></span></button>
           <button class="quick-card" data-action="invite"><span class="quick-icon">↗</span><span><strong>Convidar</strong><small>WhatsApp e código</small></span></button>
@@ -2342,7 +2347,6 @@
           rsvp: () => this.openRsvp(data.id || this.nextMatch()?.id),
           "home-game-response": () => this.setHomeGameResponse(data.id, data.value),
           "home-bbq-response": () => this.setHomeBbqResponse(data.id, data.value),
-          "pilot-reservations": () => this.state.marketplace_sync && location.assign("/marketplace/?page=reservations"),
           "playing-spaces": () => this.state.marketplace_pilot ? location.assign("/marketplace/?page=discover") : this.toast("Onde jogar está em construção. O acesso será liberado quando a Comunidade for conectada aos espaços parceiros."),
           "draw-teams": () => this.openTeamsForMatch(data.id),
           "configure-teams": () => this.drawTeams(data.id, Number($("#teamCountSelect")?.value || 2)),

@@ -25,6 +25,10 @@ begin
  out:=public.pilot_export_community_events();
  if not exists(select 1 from jsonb_array_elements(out) e where (e->>'reservation_id')::uuid=rid and e->>'state'='cancelled') then raise exception 'Cancellation missing'; end if;
  if exists(select 1 from jsonb_array_elements(out) e where e->>'group_id'<>c.community_group_id::text) then raise exception 'Another group exported'; end if;
+ if to_regclass('private.community_sync_delivery') is not null then
+  if (select requested_version from private.community_sync_delivery where singleton)<4 then raise exception 'Business transitions not queued'; end if;
+  if not exists(select 1 from jsonb_array_elements(private.community_sync_snapshot()) e where (e->>'reservation_id')::uuid=rid and e->>'state'='cancelled') then raise exception 'Server snapshot missing cancellation'; end if;
+ end if;
 end $$;
 rollback;
 select 'PASS: group import idempotence, group scope, real C39 prebooking, standby/paid/cancelled export' as result;

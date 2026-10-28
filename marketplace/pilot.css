@@ -16,3 +16,37 @@ body:not(.pilot-locked) #pilotGate { display: none; }
   .header-actions { width: 100%; display: flex; flex-wrap: wrap; justify-content: flex-start; }
   #openNotifications, #toggleNotificationSound { width: auto; min-width: fit-content; flex: 0 0 auto; padding: 0 12px; white-space: nowrap; }
 }
+
+/* One navigation vocabulary and safe bounds shared by every Marketplace dialog. */
+.marketplace-session-label { display:inline !important; }
+.marketplace-session-avatar { font-size:1.2rem; }
+.marketplace-help h3 { margin:18px 0 6px; font-size:16px; }
+.marketplace-help p { line-height:1.55; color:var(--muted); }
+#pilotDiagnostics { margin:20px 0; padding-top:12px; border-top:1px solid var(--line); }
+#pilotDiagnostics[hidden] { display:none !important; }
+#pilotDiagnostics summary { cursor:pointer; }
+.pilot-loader { display:block; width:28px; height:28px; border:3px solid #ffffff30; border-top-color:#1ed17a; border-radius:50%; animation:pilot-spin .8s linear infinite; }
+.pilot-failed .pilot-loader { display:none; }
+@keyframes pilot-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .pilot-loader { animation:none; } }
+:root { --market-dialog-height:calc(100vh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 18px); }
+@supports (height:100dvh) { :root { --market-dialog-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 18px); } }
+@media (max-width:700px), (max-height:500px) and (pointer:coarse) {
+  .dialog, .dialog.compact, .dialog.form-dialog, .dialog.detail-dialog,
+  .dialog.cancellation-dialog, .dialog.gallery-dialog, .dialog.chat-dialog,
+  .dialog.detail-dialog:has(.agenda-initial) {
+    position:fixed;
+    top:calc(env(safe-area-inset-top,0px) + 8px);
+    right:calc(env(safe-area-inset-right,0px) + 8px);
+    left:calc(env(safe-area-inset-left,0px) + 8px);
+    bottom:auto; margin:0; width:auto; max-width:none;
+    max-height:var(--market-dialog-height); box-sizing:border-box; overflow:hidden;
+  }
+  .dialog > form, .dialog.detail-dialog > form, .dialog.chat-dialog > .chat-form {
+    min-height:0; max-height:calc(var(--market-dialog-height) - 2px);
+    box-sizing:border-box; overflow-x:hidden; overflow-y:auto;
+    overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  }
+  .dialog.chat-dialog > .chat-form { height:calc(var(--market-dialog-height) - 2px); overflow:hidden !important; }
+  .dialog .dialog-header { flex-shrink:0; }
+}

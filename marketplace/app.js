@@ -612,8 +612,8 @@
     if (resetButton) resetButton.hidden = true;
     if (signedIn) {
       const display = backendRuntime.bootstrap?.profile?.display_name || backendRuntime.session.user.email || "Conta";
-      sessionButton.title = `${display} · sair`;
-      sessionButton.setAttribute("aria-label", `${display} · sair do Marketplace`);
+      sessionButton.title = `${display} · voltar à Comunidade`;
+      sessionButton.setAttribute("aria-label", `${display} · voltar à Comunidade`);
     }
   }
 
@@ -2536,7 +2536,6 @@
       const result = await operation();
       await refreshBackendAfterMutation();
       if(mutationIdentity!==backendRuntime.identityId)return null;
-      await window.TamoonMarketplacePilot?.sync();
       if (successMessage) showToast(successMessage);
       return result;
     } catch (error) {
@@ -2807,10 +2806,10 @@
     catch (error) { backendRuntime.loading = false; backendRuntime.error = backendErrorMessage(error); render(); }
   }
 
-  async function backendSignOut() {
+  async function returnToCommunity() {
     if (!window.MarketplaceBackend) return;
     partnerInterestDraft = null;
-    try { await window.MarketplaceBackend.signOut(); }
+    try { await window.TamoonMarketplacePilot.leave(); }
     catch (error) { showToast(backendErrorMessage(error)); }
   }
 
@@ -6512,7 +6511,7 @@
     const content=tab==="monthly"
       ? `${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Seus horários mensalistas</strong><small>Acompanhe os horários que você administra e as reservas de cada mês. Suas cotas individuais ficam em Minhas cotas.</small></div>`:""}${backendIsOnline()?`<div class="toolbar"><button class="button secondary" data-action="user-initial-agenda">Vincular horário importado</button></div>`:""}${monthlyCustomerUserPanel()||(reservations.length?"":emptyState("↻","Você não possui vínculos mensalistas sob sua gestão."))}<div class="section-heading"><div><h2>Pré-reservas e pagamentos</h2><p>Depois de criar a pré-reserva, defina o pagamento e acompanhe a arrecadação aqui.</p></div></div>${userReservationList(reservations,"userReservationFilter","Nenhuma reserva mensalista encontrada neste filtro.")}`
       : `${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Reservas avulsas sob sua responsabilidade</strong><small>Esta lista considera a autoria da reserva e as permissões atuais de administrador ou organizador do grupo.</small></div>`:""}${transferUnreadTotal?`<div class="message-alert-banner" role="status"><span class="message-alert-icon">●</span><div><strong>${esc(transferUnreadTotal)} atualização${transferUnreadTotal===1?" de remarcação":"ões de remarcação"}</strong><small>As reservas destacadas possuem pedido, proposta ou devolutiva ainda não visualizada.</small></div></div>`:""}${userReservationList(reservations,"userReservationFilter")}`;
-    return `${pageHeader("Área do usuário", "Minhas reservas", "Administre reservas avulsas e mensalistas sem misturar as cotas atribuídas à sua conta.", `<button class="button primary small" data-nav="discover">Nova reserva</button>`)}${tabs}${content}`;
+    return `${pageHeader("Área do usuário", "Minhas reservas", "Administre reservas avulsas e mensalistas sem misturar as cotas atribuídas à sua conta.")}${tabs}${content}`;
   }
 
   function userShares() {
@@ -9856,7 +9855,7 @@
 
   applyMarketplaceTheme(storedMarketplaceTheme(), false);
   window.addEventListener("tamo-on-marketplace-backend", (event) => handleBackendStatus(event.detail || {}));
-  sessionButton?.addEventListener("click", backendSignOut);
+  sessionButton?.addEventListener("click", returnToCommunity);
   if (window.MarketplaceBackend) handleBackendStatus({ type:"ready" });
   // The Community owns the root service worker. No competing Marketplace worker.
   render();

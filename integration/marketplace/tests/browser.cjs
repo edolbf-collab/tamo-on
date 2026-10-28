@@ -53,8 +53,11 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
     assert.equal(await page.evaluate(()=>navigator.serviceWorker.controller),null);
     assert.ok(await page.getByText('Pagamentos simulados',{exact:false}).isVisible());
     if(isOwner) {
-    await page.getByRole('button',{name:'Sincronizar Comunidade',exact:true}).click();
+    await page.getByRole('button',{name:'Ajuda para quadras e reservas',exact:true}).click();
+    await page.locator('#pilotDiagnostics summary').click();
+    await page.getByRole('button',{name:'Tentar sincronização agora',exact:true}).click();
     await page.getByText('Teste FC atualizado',{exact:false}).waitFor();
+    await page.locator('#infoDialog').getByRole('button',{name:'Entendi',exact:true}).click();
     await page.getByRole('button',{name:'Administração',exact:true}).click();
     } else {assert.equal(await page.locator('.pilot-sync-bar').isVisible(),false);assert.equal(actions.includes('import_group'),false);assert.equal(requests.some(p=>p.includes('marketplace-group-pilot')),false);assert.equal(await page.getByRole('button',{name:'Administração',exact:true}).isVisible(),false);}
     if(process.env.PILOT_TEST_SCREENSHOT)await page.screenshot({path:process.env.PILOT_TEST_SCREENSHOT,fullPage:true});
