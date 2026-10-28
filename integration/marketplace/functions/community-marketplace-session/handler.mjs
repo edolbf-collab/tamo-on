@@ -20,7 +20,7 @@ export function createHandler({createClient, env, communityUrl, communityKey}) {
     if (!/^Bearer \S+$/.test(authorization)) return reply(401, {error:"AUTH_REQUIRED"});
     try {
       const body = await req.json();
-      if (!["status","session"].includes(body.action)) return reply(400, {error:"INVALID_ACTION"});
+      if (!["status","session","import_group"].includes(body.action)) return reply(400, {error:"INVALID_ACTION"});
       const community = createClient(communityUrl, communityKey, {
         auth:{persistSession:false, autoRefreshToken:false}, global:{headers:{Authorization:authorization}}
       });
@@ -39,6 +39,13 @@ export function createHandler({createClient, env, communityUrl, communityKey}) {
         community.rpc("is_platform_admin"), community.rpc("get_community_legal_access_status")
       ]);
       if (adminAccess.error || adminAccess.data !== true || legalAccess.error || legalAccess.data?.allowed !== true) return reply(403, {error:"PILOT_RESTRICTED"});
+      if (body.action === "import_group") {
+        const context = await community.rpc("community_marketplace_pilot_context");
+        if (context.error || context.data?.user_id !== user.id || context.data?.marketplace_user_id !== mapping.marketplace_id) return reply(403,{error:"PILOT_GROUP_DENIED"});
+        const imported = await admin.rpc("pilot_import_community_group",{p_context:context.data});
+        if (imported.error) return reply(503,{error:"GROUP_IMPORT_FAILED"});
+        return reply(200,{group_id:imported.data,community_group_id:context.data.group_id,name:context.data.name});
+      }
       if (body.action === "status") return reply(200, {allowed:true, environment:"staging", realMoney:false});
       const {data:link, error:linkError} = await admin.auth.admin.generateLink({type:"magiclink", email:mapping.email});
       if (linkError || link.user?.id !== mapping.marketplace_id || !link.properties?.hashed_token) return reply(503, {error:"SESSION_UNAVAILABLE"});

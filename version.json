@@ -5,6 +5,7 @@
   "database": 151,
   "edge": 115,
   "mandatory": false,
-  "notes": "Marketplace de homologação integrado, com acesso privado validado no servidor.",
-  "label": "Tâmo On Beta 1.0 Build 166"
+  "notes": "Piloto privado de marketplace conectado ao grupo Teste FC, com pagamentos simulados.",
+  "label": "Tâmo On Beta 1.0 Build 166",
+  "integration": "166-R2"
 }

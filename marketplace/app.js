@@ -2527,6 +2527,7 @@
       const result = await operation();
       await refreshBackendAfterMutation();
       if(mutationIdentity!==backendRuntime.identityId)return null;
+      await window.TamoonMarketplacePilot?.sync();
       if (successMessage) showToast(successMessage);
       return result;
     } catch (error) {

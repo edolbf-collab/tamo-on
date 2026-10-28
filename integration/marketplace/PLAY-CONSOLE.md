@@ -10,7 +10,7 @@ O piloto atual autoriza apenas o titular. Portanto, as instruções abaixo são 
 
 Tâmo On organizes sports groups, attendance, teams, announcements and manually recorded group finances.
 
-This update adds an explicitly restricted Marketplace pilot for booking physical sports venues. The pilot runs in a separate staging environment and is initially available only to the platform operator. Payments are simulated; no real charges or transfers are enabled. Marketplace test reservations do not create events or financial entries in live Community groups.
+This update adds an explicitly restricted Marketplace pilot for booking physical sports venues. The pilot runs in a separate staging environment and is initially available only to the platform operator. Payments are simulated; no real charges or transfers are enabled. The pilot synchronizes sandbox reservations only with the explicitly configured test group (Teste FC). New games are published there after simulated confirmation and are clearly labeled as tests. Other groups are excluded; simulated amounts never become real Community cash entries.
 
 Access path: sign in to the Community, open Home, then “Onde jogar”. Authorized users see “Teste privado”. The Marketplace displays a permanent private-test and simulated-payments banner. Other users cannot open its data or operations, including through direct URLs.
 

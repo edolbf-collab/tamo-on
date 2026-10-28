@@ -33,7 +33,8 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
    if(url.pathname.includes('/functions/v1/community-marketplace-session')) {
     if(scenario==='denied') {status=403;data={error:'PILOT_RESTRICTED'}}
     else data={session:session(marketId),allowed:true};
-   } else if(url.pathname==='/auth/v1/user')data=user(marketId);
+   } else if(url.pathname.includes('/functions/v1/marketplace-group-pilot'))data={group_name:'Teste FC',updated:1};
+   else if(url.pathname==='/auth/v1/user')data=user(marketId);
    else if(url.pathname.endsWith('/partner_readonly_status'))data={available:true,active:false};
    else if(url.pathname.endsWith('/marketplace_bootstrap'))data=bootstrap;
    else if(url.pathname.endsWith('/assert_marketplace_writable'))data=true;
@@ -49,6 +50,8 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
     assert.equal(await page.evaluate(()=>localStorage.getItem('sb-owybghlwcohfyapvsfdo-auth-token')),null);
     assert.equal(await page.evaluate(()=>navigator.serviceWorker.controller),null);
     assert.ok(await page.getByText('Pagamentos simulados',{exact:false}).isVisible());
+    await page.getByRole('button',{name:'Sincronizar Comunidade',exact:true}).click();
+    await page.getByText('Teste FC atualizado',{exact:false}).waitFor();
     await page.getByRole('button',{name:'Administração',exact:true}).click();
     if(process.env.PILOT_TEST_SCREENSHOT)await page.screenshot({path:process.env.PILOT_TEST_SCREENSHOT,fullPage:true});
     await page.evaluate(()=>window.MarketplaceBackend.client.auth.signOut({scope:'local'}));
