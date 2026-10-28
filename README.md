@@ -1,17 +1,13 @@
-# Tâmo On — Beta 1.0 Build 161
+# Tâmo On — Build 165: preparação iOS
 
-Aplicativo PWA para organização de grupos esportivos, eventos, confirmações, times, churrasco, caixa e notificações.
+Base: build 164 publicada no repositório, commit 704a625b1e297599b64dee61c6c544099a700a52.
 
-## Versões
-- Aplicativo, HTML e Service Worker: 161
-- Banco: 149
-- publish-announcement: 114
-- delete-beta-user: 106
+Esta preparação acrescenta projeto iOS com Capacitor 8.5.3, login nativo Apple, OAuth Google por sessão de autenticação do iOS, Keychain, compartilhamento, exportação de arquivos e solicitação de exclusão dentro do app.
 
-## Implantação
-Leia `ATUALIZACAO-TAMO-ON-BETA-1.0-BUILD-161.md`.
-Esta atualização permite escolher Vou, Não vou, Espera e Sem resposta antes de compartilhar ou copiar a lista do evento. Todas as categorias começam selecionadas, em duas linhas compactas.
+Leia `PREPARACAO-IOS-BUILD-165.md` antes de implantar. O projeto ainda precisa das credenciais Apple, compilação no Xcode e validação em iPhone. Push APNs e a atualização dos documentos de privacidade continuam pendentes.
 
-Não há SQL ou Edge Functions a atualizar. A instalação e a ativação jurídica da Build 157 permanecem independentes, conforme `ATUALIZACAO-TAMO-ON-BETA-1.0-BUILD-157.md`. Os documentos, a vigência e os aceites existentes são preservados.
+Não há IPA assinado neste pacote. Nenhuma alteração desta preparação foi aplicada ao Supabase, Cloudflare ou Google Play em produção.
 
-Preserve `supabase-config.js`, os ícones e a estrutura das pastas. Não execute o schema consolidado sobre o banco atual.
+Versões: cliente 165; incremento de banco 152; publish-announcement 115 (preservado); delete-beta-user 107; apple-sign-in 1.
+
+O pacote é incremental sobre a build 164: não execute `backend/supabase-schema.sql`, não recrie tabelas e não substitua as credenciais existentes. Os documentos 1.2 e seus aceites foram preservados.

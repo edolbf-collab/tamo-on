@@ -1,0 +1,30 @@
+name: Validar preparação iOS
+on:
+  workflow_dispatch:
+jobs:
+  simulator:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Verificar Xcode
+        run: |
+          xcodebuild -version
+          major=$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)
+          test "$major" -ge 26
+      - run: npm ci
+      - run: npm run sync
+      - run: npm run check
+      - name: Compilar para simulador (sem assinatura ou envio)
+        run: >-
+          xcodebuild -project ios/App/App.xcodeproj -scheme App
+          -configuration Debug -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath build CODE_SIGNING_ALLOWED=NO build

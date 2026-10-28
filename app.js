@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 164, database: 151, edge: 115 });
-  const APP_ASSET_TOKEN = "beta164r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 165, database: 152, edge: 115 });
+  const APP_ASSET_TOKEN = "beta165r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -151,7 +151,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta164r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta165r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -232,7 +232,7 @@
     constructor(config) {
       this.config = config;
       this.client = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !window.TamoonNative?.isIOS, ...(window.TamoonNative?.isIOS ? {flowType: "pkce", storage: window.TamoonNative.storage} : {}) },
         global: { fetch: async (...args) => {
           const response = await fetch(...args);
           if (response.status === 403) {
@@ -288,7 +288,7 @@
 
     async signInWithGoogleOAuth() {
       const configuredRedirect = String(this.config.authRedirectUrl || "").trim();
-      const redirectTo = configuredRedirect || appBaseUrl();
+      const redirectTo = window.TamoonNative?.isIOS ? "br.app.tamoon://auth/callback" : configuredRedirect || appBaseUrl();
       return this.client.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -1331,6 +1331,7 @@
 
       this.repo = new SupabaseRepository(config);
       try {
+        await window.TamoonNative?.checkAppleCredential(this.repo.client);
         const loadedState = await this.repo.init(this.launchGroupId || localStorage.getItem("tamoon-current-group") || null);
         if (!loadedState) {
           this.cancelBootFeedback();
@@ -1539,7 +1540,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta164r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta165r1");
       }, true);
     },
 
@@ -1936,7 +1937,7 @@
     },
 
     emptyGroupPage() {
-      return `<section class="welcome-field"><div class="welcome-overlay"><img src="brand/tamo-on-logo-horizontal-negative.svg" alt="" class="welcome-mark"><span class="eyebrow">CONTA GOOGLE CONECTADA</span><h1>Monte seu grupo</h1><p>Crie um grupo com escudo próprio ou entre usando um código de convite.</p><div class="welcome-actions"><button class="btn btn-primary btn-small" data-action="create-group">+ Criar grupo</button><button class="btn btn-secondary btn-small" data-action="join-group">Inserir código</button><button class="btn btn-secondary btn-small" data-action="community-safety">Segurança e convivência</button></div></div></section>`;
+      return `<section class="welcome-field"><div class="welcome-overlay"><img src="brand/tamo-on-logo-horizontal-negative.svg" alt="" class="welcome-mark"><span class="eyebrow">CONTA CONECTADA</span><h1>Monte seu grupo</h1><p>Crie um grupo com escudo próprio ou entre usando um código de convite.</p><div class="welcome-actions"><button class="btn btn-primary btn-small" data-action="create-group">+ Criar grupo</button><button class="btn btn-secondary btn-small" data-action="join-group">Inserir código</button><button class="btn btn-secondary btn-small" data-action="community-safety">Segurança e convivência</button><button class="btn btn-secondary btn-small" data-action="account-delete">Excluir minha conta</button></div></div></section>`;
     },
 
     homePage() {
@@ -2283,9 +2284,9 @@
     morePage() {
       const group = this.currentGroup();
       const pushConfigured = Boolean(String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim());
-      const pushText = !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
-      const adminTools = this.state.is_platform_admin ? '<div class="section-title"><h2>Operação do beta</h2><small>Acesso exclusivo da plataforma.</small></div><button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel Beta</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button><button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : "";
-      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>' : ""}<button class="card menu-row" data-action="community-safety"><span class="menu-icon">🛡</span><div class="list-main"><strong>Segurança e convivência</strong><small>${this.state.is_platform_admin && this.state.safety?.pending_reports ? `${Number(this.state.safety.pending_reports)} denúncia(s) aguardando análise.` : "Denúncias e participantes bloqueados."}</small></div><strong>›</strong></button><button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Documentos, aceites e exclusão da conta.</small></div><strong>›</strong></button><div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar e escolher outra conta Google.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta aberto</div>`;
+      const pushText = window.TamoonNative?.isIOS ? "Consulte os avisos na central do aplicativo." : !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
+      const adminTools = this.state.is_platform_admin ? '<div class="section-title"><h2>Operação do beta</h2><small>Acesso exclusivo da plataforma.</small></div><button class="card menu-row admin-menu-row" data-action="deletion-admin"><span class="menu-icon">§</span><div class="list-main"><strong>Pedidos de exclusão</strong><small>Solicitações e prazos de atendimento.</small></div><strong>›</strong></button><button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel Beta</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button><button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : "";
+      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>' : ""}<button class="card menu-row" data-action="community-safety"><span class="menu-icon">🛡</span><div class="list-main"><strong>Segurança e convivência</strong><small>${this.state.is_platform_admin && this.state.safety?.pending_reports ? `${Number(this.state.safety.pending_reports)} denúncia(s) aguardando análise.` : "Denúncias e participantes bloqueados."}</small></div><strong>›</strong></button><button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Documentos, aceites e exclusão da conta.</small></div><strong>›</strong></button><div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="account-delete"><span class="menu-icon">×</span><div class="list-main"><strong>Excluir minha conta</strong><small>Solicitar exclusão permanente e acompanhar o pedido.</small></div><strong>›</strong></button><button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar deste aparelho.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta aberto</div>`;
     },
 
     async handleAction(action, data) {
@@ -2327,6 +2328,8 @@
           "announcement-center": () => this.openAnnouncementCenter(data.id),
           "notification-settings": () => this.openNotificationSettings(),
           "legal-documents": () => window.TamoonLegal.openCenter(this),
+          "account-delete": () => window.TamoonDeletion.open(this),
+          "deletion-admin": () => window.TamoonDeletion.admin(this),
           profile: () => this.openProfileModal(),
           export: () => this.exportData(),
           "report-problem": () => this.openProblemReport(),
@@ -2388,6 +2391,8 @@
         }
       });
 
+      $("#deniedSignOut")?.insertAdjacentHTML("beforebegin", '<button class="btn btn-secondary btn-block" id="deniedDelete">Excluir minha conta</button>');
+      $("#deniedDelete")?.addEventListener("click",()=>window.TamoonDeletion.open(this));
       $("#deniedSignOut")?.addEventListener("click", async () => {
         try { await this.repo.signOut(); } catch {}
         location.reload();
@@ -2399,6 +2404,9 @@
       document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel"><div class="auth-stadium"><div class="auth-lights"></div><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><span class="auth-kicker">SUA PELADA. SEU GRUPO. SEU APP.</span></div><div class="auth-copy"><h1>Entre em campo</h1><p>Presença, times equilibrados, membros, caixa e churrasco em um único lugar.</p>${error ? `<div class="notice auth-error"><strong>Falha no login</strong><br>${escapeHtml(error)}</div>` : ""}<div class="google-card"><button id="googleLoginButton" class="google-oauth-button" type="button" aria-label="Continuar com Google"><svg class="google-g" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.23c1.89-1.74 2.99-4.3 2.99-7.41Z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.61-2.36l-3.23-2.54c-.9.6-2.04.96-3.38.96-2.6 0-4.81-1.76-5.6-4.13H3.07v2.62A9.99 9.99 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 13.93A6.02 6.02 0 0 1 6.08 12c0-.67.12-1.32.32-1.93V7.45H3.07A10 10 0 0 0 2 12c0 1.61.38 3.14 1.07 4.55l3.33-2.62Z"/><path fill="#EA4335" d="M12 5.94c1.47 0 2.79.51 3.83 1.5l2.87-2.88A9.64 9.64 0 0 0 12 2a9.99 9.99 0 0 0-8.93 5.45l3.33 2.62C7.19 7.7 9.4 5.94 12 5.94Z"/></svg><span>Continuar com Google</span><span class="google-login-spinner" aria-hidden="true"></span></button><p id="googleLoginMessage">Use sua conta Google para continuar. Não há cadastro por e-mail ou senha.</p></div><div class="auth-features"><span>✓ Acesso seguro</span><span>✓ Dados em nuvem</span><span>✓ Sincronização entre celulares</span></div></div></section></main><div id="toastRoot" class="toast-root"></div>`;
       $(".auth-copy")?.insertAdjacentHTML("beforeend", '<p class="legal-auth-links"><strong>Disponível apenas para pessoas com 18 anos completos ou mais.</strong><br><a href="/legal/">Termos de Uso, Privacidade e Código de Conduta</a></p>');
       this.setupGoogleLogin();
+      window.TamoonNative?.mountAppleLogin(this);
+      const receipt=localStorage.getItem("tamoon-deletion-receipt");
+      if(receipt && /^[a-f0-9-]{36}$/i.test(receipt)) $(".auth-copy")?.insertAdjacentHTML("beforeend", `<p><a href="https://app.tamoon.app.br/legal/protocolo-exclusao.html#${encodeURIComponent(receipt)}" target="_blank" rel="noopener">Consultar meu pedido de exclusão</a></p>`);
       if (error && history.replaceState) history.replaceState({}, document.title, location.pathname);
     },
 
@@ -2418,7 +2426,10 @@
           const { data, error } = await this.repo.signInWithGoogleOAuth();
           if (error) throw error;
           if (!data?.url) throw new Error("O endereço de autenticação não foi gerado.");
-          window.location.assign(data.url);
+          if (window.TamoonNative?.isIOS) {
+            await window.TamoonNative.finishGoogleLogin(this.repo.client, data.url);
+            location.reload();
+          } else window.location.assign(data.url);
         } catch (error) {
           console.error(error);
           button.disabled = false;
@@ -2571,9 +2582,9 @@
     openInviteModal() {
       const group = this.currentGroup();
       if (!group) return this.openGroupModal();
-      const url = new URL(appBaseUrl());
+      const url = new URL(window.TamoonNative?.isIOS ? "https://app.tamoon.app.br/" : appBaseUrl());
       url.searchParams.set("invite", group.invite_code);
-      const message = `⚽ Você foi convidado para o grupo ${group.name} no Tâmo On!\n\nCódigo de convite: ${group.invite_code}\n\nAcesse ${url.href}\nEntre com sua conta Google e informe o código para participar.`;
+      const message = `⚽ Você foi convidado para o grupo ${group.name} no Tâmo On!\n\nCódigo de convite: ${group.invite_code}\n\nAcesse ${url.href}\nEntre na sua conta e informe o código para participar.`;
       this.modal("Convidar para o grupo", `<section class="invite-card">${this.groupAvatar(group, "invite-avatar")}<h3>${escapeHtml(group.name)}</h3><p>Compartilhe o código com quem participará da pelada.</p><div class="invite-code"><strong>${escapeHtml(group.invite_code)}</strong><button id="copyInviteCode" aria-label="Copiar código">⧉</button></div><button class="btn btn-whatsapp btn-block" id="shareWhatsApp">WhatsApp</button><button class="btn btn-secondary btn-block" id="nativeShare">Compartilhar convite</button></section>`, (root) => {
         $("#copyInviteCode", root).addEventListener("click", async () => {
           await navigator.clipboard.writeText(group.invite_code);
@@ -4445,6 +4456,10 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     async openNotificationSettings() {
+      if(window.TamoonNative?.isIOS) {
+        this.modal("Notificações no iPhone", '<p>Nesta versão de preparação, os avisos ficam disponíveis na central do aplicativo. As notificações com o app fechado ainda não estão disponíveis.</p>',()=>{});
+        return;
+      }
       const supported = pushSupported();
       const configured = Boolean(String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim());
       const subscription = supported ? await this.currentPushSubscription() : null;
@@ -4598,6 +4613,10 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       if (!group?.id) return this.toast("Selecione um grupo antes de exportar.", true);
       try {
         const exported = await this.repo.platformGroupExport(group.id);
+        if(window.TamoonNative?.isIOS) {
+          await window.TamoonNative.saveJson({release: APP_RELEASE,currentGroupId:group.id,...exported},"tamo-on-backup.json");
+          return;
+        }
         const blob = new Blob([JSON.stringify({ release: APP_RELEASE, currentGroupId: group.id, ...exported }, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");

@@ -1,0 +1,24 @@
+{
+  "name": "tamoon-ios",
+  "private": true,
+  "version": "1.0.165",
+  "type": "module",
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "sync": "npm run build && cap sync ios",
+    "open": "cap open ios",
+    "check": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/share": "8.0.3",
+    "@capacitor/clipboard": "8.0.1",
+    "@supabase/supabase-js": "2.110.7"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "esbuild": "0.28.2"
+  }
+}

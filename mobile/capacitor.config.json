@@ -1,0 +1,7 @@
+{
+  "appId": "br.app.tamoon",
+  "appName": "Tâmo On",
+  "webDir": "www",
+  "ios": {"backgroundColor": "#061820", "preferredContentMode": "mobile"},
+  "server": {"hostname": "localhost", "iosScheme": "capacitor"}
+}

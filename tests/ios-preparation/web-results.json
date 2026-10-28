@@ -1,0 +1,25 @@
+{
+  "passed": 20,
+  "checks": [
+    "Deletion remains accessible when legal document fetch fails",
+    "Deadline shown before confirmation",
+    "Unchecked confirmation cannot submit",
+    "Failure preserves retry without false confirmation",
+    "Server receipt displayed",
+    "Receipt retained for post-deletion lookup",
+    "Deletion has no horizontal overflow at 320",
+    "Deletion has no horizontal overflow at 390",
+    "Deletion has no horizontal overflow at 430",
+    "Blocked account has deletion entry point",
+    "Web Google login preserved",
+    "Apple not offered on web without native configuration",
+    "Logged-out screen links to receipt",
+    "Native Google callback exchanges PKCE code",
+    "Foreign authorization URL rejected",
+    "Wrong callback rejected",
+    "Provider denial handled",
+    "Native session adapter reads Keychain bridge",
+    "Native Apple and Google offered together",
+    "Apple failure restores both login controls"
+  ]
+}

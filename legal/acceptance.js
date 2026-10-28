@@ -17,6 +17,7 @@
   };
   const documentsHtml = docs => docs.map(d=>`<details><summary>${esc(d.title)} · v${esc(d.version)}</summary><p class="legal-meta">Vigência: ${esc(date(d.effective_at))}</p><article class="legal-document">${d.content_html}</article><p><a href="${esc(d.public_url)}" target="_blank" rel="noopener">Abrir para imprimir ou salvar</a></p></details>`).join('');
   const download = (data,name) => {
+    if(window.TamoonNative?.isIOS)return window.TamoonNative.saveJson(data,name).catch(error=>window.App.toast(error.message,true));
     const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
@@ -62,7 +63,7 @@
       const profile=app.repo.state.profile;
       app.repo.state=app.emptyLegalState(profile);app.state=app.repo.state;
       // O fundo é apenas visual: os dados e as rotas continuam bloqueados.
-      document.body.innerHTML=`<main class="legal-gate-overlay"><section class="legal-gate legal-center" role="dialog" aria-modal="true" aria-labelledby="legalGateTitle" aria-describedby="legalGateIntro"><header class="legal-gate-header"><img class="auth-brand-logo" src="/brand/tamo-on-logo-horizontal-negative.svg" alt="Tâmo On"><h1 id="legalGateTitle" tabindex="-1">Antes de começar</h1><p id="legalGateIntro">Confirme sua maioridade e o aceite dos documentos para usar o Tâmo On.</p></header><div class="legal-gate-scroll" tabindex="0" role="region" aria-label="Documentos e declarações"><p class="legal-gate-age">Uso exclusivo para pessoas com <strong>18 anos completos ou mais</strong>.</p><p class="legal-muted">Leia os documentos e marque as declarações abaixo. Eles continuarão disponíveis em <strong>Documentos e privacidade</strong>.</p><div id="legalGateContent"><p role="status">Conferindo os documentos…</p></div></div><footer class="legal-gate-footer"><button id="legalAcceptButton" class="btn btn-primary btn-block" type="submit" form="legalAcceptanceForm" disabled>Aceitar e continuar</button><button type="button" id="legalSignOut" class="btn btn-secondary btn-block">Sair da conta</button><p class="legal-muted">Precisa de ajuda? <a href="mailto:suporte@tamoon.app.br">Fale com o suporte</a></p></footer></section></main>`;
+      document.body.innerHTML=`<main class="legal-gate-overlay"><section class="legal-gate legal-center" role="dialog" aria-modal="true" aria-labelledby="legalGateTitle" aria-describedby="legalGateIntro"><header class="legal-gate-header"><img class="auth-brand-logo" src="/brand/tamo-on-logo-horizontal-negative.svg" alt="Tâmo On"><h1 id="legalGateTitle" tabindex="-1">Antes de começar</h1><p id="legalGateIntro">Confirme sua maioridade e o aceite dos documentos para usar o Tâmo On.</p></header><div class="legal-gate-scroll" tabindex="0" role="region" aria-label="Documentos e declarações"><p class="legal-gate-age">Uso exclusivo para pessoas com <strong>18 anos completos ou mais</strong>.</p><p class="legal-muted">Leia os documentos e marque as declarações abaixo. Eles continuarão disponíveis em <strong>Documentos e privacidade</strong>.</p><div id="legalGateContent"><p role="status">Conferindo os documentos…</p></div></div><footer class="legal-gate-footer"><button id="legalAcceptButton" class="btn btn-primary btn-block" type="submit" form="legalAcceptanceForm" disabled>Aceitar e continuar</button><button type="button" id="legalDelete" class="btn btn-secondary btn-block">Excluir minha conta</button><button type="button" id="legalSignOut" class="btn btn-secondary btn-block">Sair da conta</button><p class="legal-muted">Precisa de ajuda? <a href="mailto:suporte@tamoon.app.br">Fale com o suporte</a></p></footer></section></main>`;
       const dialog=document.querySelector('.legal-gate');
       document.querySelector('#legalGateTitle').focus({preventScroll:true});
       dialog.addEventListener('keydown',event=>{
@@ -76,6 +77,7 @@
         }else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first?.focus();}
       });
       document.querySelector('#legalSignOut').addEventListener('click',async()=>{try{await signOut(app.repo);}catch(e){document.querySelector('#legalGateContent').textContent=e.message;}});
+      document.querySelector('#legalDelete').onclick=()=>window.TamoonDeletion.open(app);
       const target=document.querySelector('#legalGateContent');
       try {
         await validate(status);
@@ -147,8 +149,9 @@
     async openCenter(app) {
       // O pedido de exclusão é público e não depende da consulta dos documentos.
       let documents;
-      app.modal('Documentos e privacidade',`<div class="legal-center"><section class="legal-deletion-card" aria-labelledby="legalDeletionTitle"><h3 id="legalDeletionTitle">Excluir minha conta</h3><p>Consulte os dados envolvidos, os prazos e como enviar seu pedido por e-mail.</p><a class="legal-deletion-link" href="/legal/excluir-conta.html" target="_blank" rel="noopener noreferrer">Solicitar exclusão da conta</a><p class="legal-deletion-hint">Abre a página pública em uma nova aba.</p></section><div id="legalCenterDocuments"><p role="status">Carregando documentos…</p></div></div>`,root=>{
+      app.modal('Documentos e privacidade',`<div class="legal-center"><section class="legal-deletion-card" aria-labelledby="legalDeletionTitle"><h3 id="legalDeletionTitle">Excluir minha conta</h3><p>Solicite a exclusão aqui e acompanhe pelo protocolo, sem enviar e-mail.</p><button type="button" class="btn btn-danger-outline btn-block" id="legalCenterDelete">Solicitar exclusão da conta</button></section><div id="legalCenterDocuments"><p role="status">Carregando documentos…</p></div></div>`,root=>{
         documents=root.querySelector('#legalCenterDocuments');
+        root.querySelector('#legalCenterDelete').onclick=()=>window.TamoonDeletion.open(app);
       });
       try {
         const data=await request(app.repo,'get_community_legal_status');

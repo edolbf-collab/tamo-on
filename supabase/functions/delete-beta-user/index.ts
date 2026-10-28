@@ -1,5 +1,6 @@
-// Tâmo On delete-beta-user — Build 106
+// Tâmo On delete-beta-user — Build 107 — preparação iOS 165
 import { createClient } from "npm:@supabase/supabase-js@2.110.7";
+import { revokeAppleGrant } from "../_shared/apple.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,6 +61,7 @@ Deno.serve(async (req) => {
 
     const userClient = createClient(supabaseUrl, publicKey, {
       auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: authorization } },
     });
     const adminClient = createClient(supabaseUrl, secretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -69,6 +71,10 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await userClient.auth.getUser(accessToken);
     const actor = userData.user;
     if (userError || !actor) return json({ error: "Sessão inválida ou expirada.", code: "AUTH_INVALID" }, 401);
+
+    // getUser valida o JWT/usuário; esta RPC também exige session_id ainda ativo em auth.sessions.
+    const { error: sessionError } = await userClient.rpc("get_my_account_deletion_request");
+    if (sessionError) return json({ error: "Entre novamente para concluir a exclusão.", code: "AUTH_SESSION_INACTIVE" }, 401);
 
     const actorEmail = String(actor.email || "").trim().toLowerCase();
     const { data: platformAdmin, error: platformAdminError } = await adminClient
@@ -154,6 +160,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    stage = "revoke-apple";
+    const appleRevocation = await revokeAppleGrant(adminClient, targetUserId);
+    if (appleRevocation.status === 'manual_revocation_required') {
+      const { error: followupError } = await adminClient.from("account_deletion_requests")
+        .update({ apple_revocation_followup: true }).eq("user_id", targetUserId);
+      if (followupError) throw followupError;
+    }
+
     stage = "prepare-database";
     const { data: summary, error: prepareError } = await adminClient.rpc("platform_prepare_beta_user_deletion", {
       p_target_user_id: targetUserId,
@@ -167,7 +181,7 @@ Deno.serve(async (req) => {
     await adminClient.from("platform_user_deletion_audit").update({
       status: "prepared",
       stage,
-      summary: summary || {},
+      summary: { ...(summary || {}), apple_revocation: appleRevocation.status },
       updated_at: new Date().toISOString(),
     }).eq("id", auditId);
 
@@ -183,7 +197,7 @@ Deno.serve(async (req) => {
     await adminClient.from("platform_user_deletion_audit").update({
       status: "completed",
       stage: "completed",
-      summary: summary || {},
+      summary: { ...(summary || {}), apple_revocation: appleRevocation.status },
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", auditId);
@@ -192,7 +206,7 @@ Deno.serve(async (req) => {
       ok: true,
       invitationOnly: false,
       message: "Usuário excluído permanentemente.",
-      summary: summary || {},
+      summary: { ...(summary || {}), apple_revocation: appleRevocation.status },
     });
   } catch (error) {
     const message = cleanText((error as { message?: string })?.message || "Falha ao excluir o usuário.", 500);
