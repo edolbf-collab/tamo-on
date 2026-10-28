@@ -22,7 +22,7 @@ Integração da Comunidade com o Marketplace 0.2.0, base consolidada 22BB-C39-R1
 - A configuração `verify_jwt=false` na função é intencional: o token pertence ao outro projeto. A própria função faz a autenticação completa; tokens inválidos recebem 401.
 - Um filtro de requisições protege a API REST e as RPCs. Políticas RLS restritivas protegem tabelas e Storage, preservando as regras C39. A verificação exige uma sessão ativa do Marketplace.
 - Fotos de estabelecimentos deixam de ser públicas e usam URLs assinadas por dez minutos. Uma URL já emitida continua válida até vencer.
-- A interface revalida a autorização a cada minuto. A revogação da sessão da Comunidade é detectada pela interface nessa checagem; a sessão própria do Marketplace deve ser revogada também em caso de incidente.
+- A interface revalida a autorização a cada minuto e reage à saída ou troca de conta no navegador. A ponte valida o token da Comunidade pelo serviço Auth; isso não garante invalidação imediata de uma cópia de um token já emitido. Em caso de incidente, suspender o piloto e revogar as sessões nos dois projetos. A API do Marketplace verifica diretamente se a sessão própria ainda existe.
 - `/marketplace/` não entra no cache offline. Dados transitórios da tela usam sessionStorage e são limpos na entrada e na saída.
 - Sem integração de escrita com grupos, presenças, caixa ou eventos da Comunidade nesta fase. Os grupos exibidos no Marketplace são os grupos de teste já existentes no staging.
 
