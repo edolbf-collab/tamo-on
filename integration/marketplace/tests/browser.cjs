@@ -1,7 +1,6 @@
 const { chromium } = require('playwright');
 const fs=require('node:fs'); const assert=require('node:assert/strict'); const path=require('node:path');
 const repo=path.resolve(__dirname,'../../..');
-const sdk=fs.readFileSync(process.env.PILOT_TEST_SDK || path.resolve(repo,'../marketplace-integration/supabase-sdk.js'),'utf8');
 const communityId='11111111-1111-4111-8111-111111111111', marketId='22222222-2222-4222-8222-222222222222';
 const jwt=id=>[Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url'),Buffer.from(JSON.stringify({sub:id,exp:Math.floor(Date.now()/1000)+3600,role:'authenticated'})).toString('base64url'),'test-signature'].join('.');
 const user=id=>({id,email:'pilot@example.test',aud:'authenticated',role:'authenticated',app_metadata:{provider:'google'},user_metadata:{},created_at:'2026-01-01T00:00:00Z'});
@@ -9,6 +8,8 @@ const session=id=>({access_token:jwt(id),refresh_token:'mock-refresh',expires_in
 const bootstrap={profile:{id:marketId,display_name:'Conta de teste',status:'active'},is_admin:true,settings:{real_money_enabled:false,marketplace_enabled:true},generated_at:new Date().toISOString()};
 for(const key of ['chats','events','groups','spaces','venues','partners','payments','schedule','vouchers','chat_unread','occurrences','reservations','venue_photos','chat_messages','group_members','notifications','voucher_usages','payment_intents','pix_installments','partner_memberships','chat_effective_state','partner_applications','group_member_directory','reservation_participants'])bootstrap[key]=[];
 (async()=>{
+ const sdk=process.env.PILOT_TEST_SDK ? fs.readFileSync(process.env.PILOT_TEST_SDK,'utf8')
+   : await fetch('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js').then(r=>{if(!r.ok)throw new Error('SDK download failed');return r.text()});
  const server=require('node:http').createServer((req,res)=>{
    const pathname=decodeURIComponent(new URL(req.url,'http://test').pathname);
    const file=path.resolve(repo,'.'+pathname+(pathname.endsWith('/')?'index.html':''));
@@ -19,7 +20,7 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
    catch{res.writeHead(404);res.end()}
  });
  await new Promise(resolve=>server.listen(8766,'127.0.0.1',resolve));
- const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/root/.cache/ms-playwright/chromium_headless_shell-1194/chrome-linux/headless_shell'});
+ const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
  try {
  for(const scenario of ['anonymous','denied','owner']) {
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
@@ -49,7 +50,9 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
     assert.equal(await page.evaluate(()=>navigator.serviceWorker.controller),null);
     assert.ok(await page.getByText('Pagamentos simulados',{exact:false}).isVisible());
     await page.getByRole('button',{name:'Administração',exact:true}).click();
-    await page.screenshot({path:path.resolve(repo,'../marketplace-integration/pilot-owner-mobile.png'),fullPage:true});
+    if(process.env.PILOT_TEST_SCREENSHOT)await page.screenshot({path:process.env.PILOT_TEST_SCREENSHOT,fullPage:true});
+    await page.evaluate(()=>window.MarketplaceBackend.client.auth.signOut({scope:'local'}));
+    assert.ok(await page.locator('#pilotGate').isVisible());
     // A refresh callback after access failure cannot uncover the UI again.
     await page.evaluate(()=>{window.TamoonMarketplacePilot.fail();window.TamoonMarketplacePilot.ready()});
     assert.ok(await page.locator('#pilotGate').isVisible());

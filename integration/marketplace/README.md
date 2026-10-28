@@ -45,6 +45,8 @@ Nenhuma alteração no Play Console é realizada por estes arquivos. As instruç
 
 O login Google real e os fluxos comerciais no telefone ainda precisam ser validados pelo titular. Não foram efetuadas reservas, cobranças, reembolsos ou mensagens reais durante a implementação.
 
+Para repetir os testes: na pasta `integration/marketplace`, executar `npm install`, `npx playwright install chromium`, `npm test` e `npm run test:browser`. O teste de navegador carrega o SDK público fixado na versão 2.57.4 e simula as APIs; opcionalmente usar `PILOT_TEST_SDK` para um arquivo local e `CHROMIUM_PATH` para um navegador já instalado. `tests/access.sql` é exclusivo do banco staging e reverte a transação ao terminar.
+
 ## Roteiro no celular
 
 1. Confirmar que a Comunidade continua abrindo grupos, presença, times e caixa.
