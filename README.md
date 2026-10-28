@@ -1,4 +1,4 @@
-# Tâmo On — Beta 1.0 Build 166-R2
+# Tâmo On — Beta 1.0 Build 166-R3
 
 Comunidade PWA e aplicativo Android para grupos esportivos, jogos, presença, times, churrasco e caixa. A build 166-R2 inclui o piloto privado do Marketplace C39-R1, conectado exclusivamente ao grupo Teste FC.
 
@@ -6,7 +6,7 @@ Comunidade PWA e aplicativo Android para grupos esportivos, jogos, presença, ti
 
 | Componente | Versão |
 | --- | --- |
-| Web, HTML e Service Worker | 166 / revisão 166-R2 |
+| Web, HTML e Service Worker | 166 / revisão 166-R3 |
 | Android | `1.0.166` / código `166`, derivado de `version.json` |
 | Banco da Comunidade | 151 |
 | publish-announcement | 115 |
@@ -26,6 +26,8 @@ A publicação web não envia o AAB ao Play Console. O pacote Android correspond
 - [Android: compilação, assinatura e alinhamento de versões](android/README.md).
 - [Texto preparado para revisão no Google Play](integration/marketplace/PLAY-CONSOLE.md).
 
-O Marketplace continua autorizado somente para a conta configurada no servidor. Os membros do Teste FC podem usar as interações normais dos jogos publicados pela ponte. Pagamentos reais e e-mails automáticos do sandbox permanecem desativados. Nenhum valor simulado é lançado no caixa real da Comunidade.
+O Marketplace está autorizado para o titular e duas contas de homologação (cliente e parceiro), mantendo os papéis existentes. A sincronização com o Teste FC continua exclusiva do titular. Os membros do Teste FC podem usar as interações normais dos jogos publicados pela ponte. Pagamentos reais e e-mails automáticos do sandbox permanecem desativados. Nenhum valor simulado é lançado no caixa real da Comunidade.
 
 Preserve `supabase-config.js`, os ícones, as associações de domínio e as chaves de assinatura. Não publique credenciais privadas, não execute o schema consolidado sobre o banco atual e não reaplique as migrações já registradas.
+
+A revisão web 166-R3 corrige a revalidação do acesso no app instalado e reconhece a lista privada de testes. O AAB 1.0.166 permanece válido; nenhum código nativo Android ou assinatura foi alterado nesta revisão.

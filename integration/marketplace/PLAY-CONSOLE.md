@@ -4,13 +4,13 @@
 
 Manter a indicação de que parte das funcionalidades exige acesso autorizado. Atualizar as instruções em inglês e fornecer uma conta de revisão dedicada, reutilizável e com dados fictícios. A conta pessoal do administrador não deve ser compartilhada.
 
-O piloto atual autoriza apenas o titular. Portanto, as instruções abaixo são um rascunho: a conta e o caminho de revisão do Marketplace precisam estar configurados e testados antes de enviar uma versão com essa funcionalidade à análise. Não declarar que os revisores já têm acesso.
+O piloto atual autoriza o titular e duas contas de homologação, com os papéis próprios de cliente e parceiro. Portanto, as instruções abaixo são um rascunho: a conta e o caminho de revisão do Marketplace precisam estar configurados e testados antes de enviar uma versão com essa funcionalidade à análise. Não declarar que os revisores já têm acesso.
 
 ### Suggested review notes
 
 Tâmo On organizes sports groups, attendance, teams, announcements and manually recorded group finances.
 
-This update adds an explicitly restricted Marketplace pilot for booking physical sports venues. The pilot runs in a separate staging environment and is initially available only to the platform operator. Payments are simulated; no real charges or transfers are enabled. The pilot synchronizes sandbox reservations only with the explicitly configured test group (Teste FC). New games are published there after simulated confirmation and are clearly labeled as tests. Other groups are excluded; simulated amounts never become real Community cash entries.
+This update adds an explicitly restricted Marketplace pilot for booking physical sports venues. The pilot runs in a separate staging environment and is available only to the platform operator and two explicitly authorized sandbox accounts with customer and partner roles. Payments are simulated; no real charges or transfers are enabled. The pilot synchronizes sandbox reservations only with the explicitly configured test group (Teste FC). New games are published there after simulated confirmation and are clearly labeled as tests. Other groups are excluded; simulated amounts never become real Community cash entries.
 
 Access path: sign in to the Community, open Home, then “Onde jogar”. Authorized users see “Teste privado”. The Marketplace displays a permanent private-test and simulated-payments banner. Other users cannot open its data or operations, including through direct URLs.
 
@@ -20,7 +20,7 @@ The review account and its access instructions must be supplied in the App acces
 
 ```text
 <pt-BR>
-Preparação do marketplace para testes privados com a conta autorizada.
+Preparação do marketplace para testes privados com as contas autorizadas.
 Integração com o login da Comunidade e navegação em Onde jogar.
 Reservas e financeiro em ambiente de teste, com pagamentos simulados.
 O marketplace ainda não está liberado ao público.

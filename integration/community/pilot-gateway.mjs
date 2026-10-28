@@ -1,6 +1,6 @@
 // Deployed to Community. One authenticated operator, one configured group, two verified sessions.
 export function createGateway({createClient,env,marketUrl,marketKey,fetcher=fetch}) {
-  const origins=new Set(['https://app.tamoon.app.br','https://marketplace-build-166.resenhafc-beta.pages.dev']);
+  const origins=new Set(['https://app.tamoon.app.br','https://resenhafc-beta.pages.dev','https://marketplace-build-166.resenhafc-beta.pages.dev']);
   const key=(plural,legacy)=>{try{const v=JSON.parse(env(plural)||'{}');if(v.default)return v.default}catch{}return env(legacy)};
   return async req=>{
     const origin=req.headers.get('origin');

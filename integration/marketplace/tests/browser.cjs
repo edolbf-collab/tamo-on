@@ -22,21 +22,23 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
  await new Promise(resolve=>server.listen(8766,'127.0.0.1',resolve));
  const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
  try {
- for(const scenario of ['anonymous','denied','owner']) {
+ for(const scenario of ['anonymous','denied','owner','customer','partner']) {
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
-  const page=await context.newPage(); const errors=[],requests=[];
+  const page=await context.newPage(); const errors=[],requests=[],actions=[];
+  const allowed=['owner','customer','partner'].includes(scenario); const isOwner=scenario==='owner';
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('https://cdn.jsdelivr.net/**',r=>r.fulfill({contentType:'text/javascript',body:sdk}));
   await page.route('https://*.supabase.co/**',async r=>{
    const url=new URL(r.request().url());requests.push(url.pathname);
    let data=[],status=200;
    if(url.pathname.includes('/functions/v1/community-marketplace-session')) {
+    actions.push(r.request().postDataJSON()?.action);
     if(scenario==='denied') {status=403;data={error:'PILOT_RESTRICTED'}}
-    else data={session:session(marketId),allowed:true};
+    else data={session:session(marketId),allowed:true,canSyncCommunity:isOwner};
    } else if(url.pathname.includes('/functions/v1/marketplace-group-pilot'))data={group_name:'Teste FC',updated:1};
    else if(url.pathname==='/auth/v1/user')data=user(marketId);
    else if(url.pathname.endsWith('/partner_readonly_status'))data={available:true,active:false};
-   else if(url.pathname.endsWith('/marketplace_bootstrap'))data=bootstrap;
+   else if(url.pathname.endsWith('/marketplace_bootstrap'))data={...bootstrap,is_admin:isOwner};
    else if(url.pathname.endsWith('/assert_marketplace_writable'))data=true;
    await r.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
   });
@@ -44,15 +46,17 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
   await page.goto('http://127.0.0.1:8766/marketplace/');
   if(scenario==='anonymous')await page.getByText('Entre na Comunidade com sua conta autorizada').waitFor();
   if(scenario==='denied')await page.getByText('Sua conta ainda não tem acesso.',{exact:false}).waitFor();
-  if(scenario==='owner') {
+  if(allowed) {
     await page.waitForFunction(()=>!document.body.classList.contains('pilot-locked'),null,{timeout:15000});
     assert.equal(await page.evaluate(()=>localStorage.getItem('tamoon-marketplace-pilot-session')),null);
     assert.equal(await page.evaluate(()=>localStorage.getItem('sb-owybghlwcohfyapvsfdo-auth-token')),null);
     assert.equal(await page.evaluate(()=>navigator.serviceWorker.controller),null);
     assert.ok(await page.getByText('Pagamentos simulados',{exact:false}).isVisible());
+    if(isOwner) {
     await page.getByRole('button',{name:'Sincronizar Comunidade',exact:true}).click();
     await page.getByText('Teste FC atualizado',{exact:false}).waitFor();
     await page.getByRole('button',{name:'Administração',exact:true}).click();
+    } else {assert.equal(await page.locator('.pilot-sync-bar').isVisible(),false);assert.equal(actions.includes('import_group'),false);assert.equal(requests.some(p=>p.includes('marketplace-group-pilot')),false);assert.equal(await page.getByRole('button',{name:'Administração',exact:true}).isVisible(),false);}
     if(process.env.PILOT_TEST_SCREENSHOT)await page.screenshot({path:process.env.PILOT_TEST_SCREENSHOT,fullPage:true});
     await page.evaluate(()=>window.MarketplaceBackend.client.auth.signOut({scope:'local'}));
     assert.ok(await page.locator('#pilotGate').isVisible());

@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 115,
   "mandatory": false,
-  "notes": "Piloto privado de marketplace conectado ao grupo Teste FC, com pagamentos simulados.",
+  "notes": "Acesso privado ao Marketplace para três contas de teste e recuperação da sessão no app instalado.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R2"
+  "integration": "166-R3"
 }

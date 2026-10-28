@@ -39,10 +39,10 @@ Nome sugerido: `Tâmo On - Beta 1.0.166`.
 Integração com o marketplace em piloto privado.
 Reservas de quadras em ambiente de teste, com pagamentos simulados.
 Integração de jogos de teste com presença, times e churrasco da Comunidade.
-O acesso ao marketplace permanece restrito à conta autorizada.
+O acesso ao marketplace permanece restrito às contas autorizadas.
 </pt-BR>
 ```
 
-A restrição é aplicada pelo servidor e continua valendo para o AAB 166. Antes de submeter a funcionalidade à revisão, configurar e validar uma conta dedicada com acesso ao que será analisado. O piloto atual permite somente o titular; não compartilhar sua conta pessoal. Ver `../integration/marketplace/PLAY-CONSOLE.md`. Nenhum envio ao Google Play é executado pelo build ou pelo deploy web.
+A restrição é aplicada pelo servidor e continua valendo para o AAB 166. Antes de submeter a funcionalidade à revisão, configurar e validar uma conta dedicada com acesso ao que será analisado. O piloto atual permite o titular e duas contas de homologação com papéis de cliente e parceiro; não compartilhar sua conta pessoal. Ver `../integration/marketplace/PLAY-CONSOLE.md`. Nenhum envio ao Google Play é executado pelo build ou pelo deploy web.
 
 Referências: [versionamento Android](https://developer.android.com/studio/publish/versioning), [assinatura do aplicativo](https://developer.android.com/studio/publish/app-signing).

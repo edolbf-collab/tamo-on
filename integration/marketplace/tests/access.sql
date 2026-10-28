@@ -8,7 +8,7 @@ set local role authenticated;
 do $$ begin
   perform public.marketplace_pilot_check_request();
   if (select count(*) from public.profiles)=0 then raise exception 'Owner RLS read failed'; end if;
-  if has_function_privilege('authenticated','public.community_marketplace_pilot_identity(uuid,boolean)','execute') then raise exception 'Bridge RPC is exposed'; end if;
+  if has_function_privilege('authenticated','public.community_marketplace_pilot_identity(uuid,boolean,text)','execute') then raise exception 'Bridge RPC is exposed'; end if;
 end $$;
 select set_config('request.jwt.claims', jsonb_build_object('role','authenticated','sub',gen_random_uuid(),'session_id',gen_random_uuid())::text,true);
 do $$ begin
