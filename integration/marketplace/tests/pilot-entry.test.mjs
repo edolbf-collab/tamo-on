@@ -52,7 +52,10 @@ test('return clears only the Marketplace session and navigates to Community',asy
  await f.sandbox.window.TamoonMarketplacePilot.leave();
  assert.deepEqual(JSON.parse(JSON.stringify(f.signOuts)),[{scope:'local'}]);
  assert.deepEqual(f.navigations,['/']);
- assert.equal(f.classes.has('pilot-locked'),false);
+ assert.equal(f.classes.has('pilot-locked'),true);
+ assert.equal(f.classes.has('pilot-leaving'),true);
+ assert.equal(f.nodes.get('pilotMessage').textContent,'Voltando à Comunidade…');
+ assert.equal(f.sandbox.window.TamoonMarketplacePilot.leaving,true);
  await f.sandbox.window.TamoonMarketplacePilot.leave();assert.equal(f.signOuts.length,1);
 });
 test('return still navigates when Marketplace session cleanup fails',async()=>{

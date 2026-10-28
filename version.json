@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 115,
   "mandatory": false,
-  "notes": "Entrada única para quadras e reservas, retorno à Comunidade, ajuda atualizada e sincronização automática do piloto.",
+  "notes": "Controles móveis compactos, retorno sem tela de login e busca de quadras com carregamento progressivo.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R5"
+  "integration": "166-R6"
 }

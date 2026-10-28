@@ -2392,7 +2392,17 @@
       try {
         backendRuntime.session = window.MarketplaceBackend.session;
         const [bootstrap,initialSlotFlags] = await Promise.all([
-          window.MarketplaceBackend.bootstrap({ force, changes }),
+          window.MarketplaceBackend.bootstrap({ force, changes, onCore:core=>{
+            if(backendRuntime.bootstrap || new URLSearchParams(location.search).get("page")!=="discover"
+              || core?.profile?.status!=="active" || core.profile.id!==requestedIdentity
+              || window.MarketplaceBackend.session?.user?.id!==requestedIdentity
+              || requestedAccessGeneration!==partnerAccessGeneration || window.TamoonMarketplacePilot?.leaving)return;
+            backendRuntime.bootstrap=core;
+            backendRuntime.initialDetailsPending=true;
+            syncStateFromBackend(core);
+            updateBackendRoleAccess();render();
+            window.TamoonMarketplacePilot?.ready();
+          } }),
           window.MarketplaceBackend.rpc("agenda_initial_slot_flags",{})
         ]);
         bootstrap.agenda_initial_slots=initialSlotFlags||[];
@@ -2401,6 +2411,8 @@
         if(JSON.stringify(backendRuntime.bootstrap?.partner_memberships||[])!==JSON.stringify(bootstrap?.partner_memberships||[]))closePartnerAccessDialogs();
         const signature=JSON.stringify({...bootstrap,generated_at:undefined});
         changed=signature!==backendRefreshSignature || !backendRuntime.bootstrap || partnerAccessPending;
+        backendRuntime.initialDetailsPending=false;
+        if(window.performance?.getEntriesByName?.('marketplace-entry-start').length && !window.performance.getEntriesByName('marketplace-details-ready').length)window.performance.measure('marketplace-details-ready','marketplace-entry-start');
         backendRuntime.bootstrap = bootstrap || {};
         syncStateFromBackend(backendRuntime.bootstrap);
         window.TamoonMarketplacePilot?.ready();
@@ -2478,7 +2490,7 @@
   }
 
   async function handleBackendStatus(detail = {}) {
-    if (!backendRuntime.enabled) return;
+    if (!backendRuntime.enabled || window.TamoonMarketplacePilot?.leaving) return;
     if (detail.type === "team_access_pending") { showToast("O acesso à equipe aguarda confirmação da Comunidade. Tente recarregar a página em alguns instantes."); return; }
     if (detail.type === "loader_error") {
       backendRuntime.initialized = true;
@@ -5106,7 +5118,17 @@
     showToast("Arquivo CSV gerado com os dados fictícios atuais.");
   }
 
-  function setRole(role) {
+  async function waitForInitialDetails() {
+    if(window.TamoonMarketplacePilot?.leaving)return false;
+    if(!backendRuntime.initialDetailsPending)return true;
+    showToast("Concluindo a atualização das suas reservas…");
+    try { await backendBootstrapPromise; }
+    catch { return false; }
+    return !backendRuntime.initialDetailsPending && backendIsOnline() && !window.TamoonMarketplacePilot?.leaving;
+  }
+
+  async function setRole(role) {
+    if(!await waitForInitialDetails())return;
     if (backendRuntime.enabled && !backendAllowedRoles().has(role)) {
       showToast("Esta área não está liberada para a conta autenticada.");
       return;
@@ -5120,7 +5142,8 @@
     if (unread > 0) showToast(`Você tem ${unread} atualização${unread === 1 ? " nova" : "ões novas"}.`);
   }
 
-  function nav(role, page) {
+  async function nav(role, page) {
+    if(!await waitForInitialDetails())return;
     state.activePage[role] = page;
     saveState();
     render();
@@ -6450,6 +6473,13 @@
     return userReservationTabUnread("single") + userReservationTabUnread("monthly");
   }
 
+  function reservationEventSummary(reservation) {
+    const visual=eventPublicationLabel(reservation.eventPublicationStatus);
+    const title=String(reservation.event||"").trim();
+    if(reservation.eventMode==="none" || reservation.eventPublicationStatus==="none")return '<span>Nenhum evento vinculado</span>';
+    return `${title && title!==visual.label?`<span>${esc(title)}</span>`:""}<span class="status ${visual.className}">${visual.label}</span>`;
+  }
+
   function userReservationCard(reservation,{shareView=false}={}) {
     let visual = reservationStatus(reservationDisplayKey(reservation));
     if(reservation.monthlyCycleId && !reservationIsExpired(reservation)){
@@ -6457,7 +6487,6 @@
       visual={status:view.closed?"status-neutral":view.full?"status-ok":"status-warning",label:view.label};
     }
     const badge = reservationDateBadge(reservation.date);
-    const eventVisual = eventPublicationLabel(reservation.eventPublicationStatus);
     const unread = unreadForReservation(reservation.id,"user");
     const transferUnread=occurrenceTransferUnreadForReservation(reservation);
     const latestTransferNotification=latestOccurrenceTransferNotification(reservation);
@@ -6484,7 +6513,7 @@
     const transferNotice=transferUnread&&latestTransferNotification
       ? `<div class="inline-message-notice occurrence-transfer-notice has-unread"><span class="message-badge">${esc(transferUnread)}</span><div><strong>${esc(latestTransferNotification.title)}</strong><span>${esc(latestTransferNotification.body||"Abra os detalhes para visualizar a atualização.")}</span></div></div>`
       : pendingTransfer?`<div class="inline-message-notice occurrence-transfer-notice"><div><strong>${esc(pendingTransfer.statusLabel)}</strong><span>${pendingTransfer.targetDate?`Proposta: ${esc(pendingTransfer.targetDate)} · ${esc(timeRange(pendingTransfer.targetTime,pendingTransfer.targetEndTime))}`:"Abra os detalhes para acompanhar ou decidir."}</span></div></div>`:"";
-    return `<article data-ui-key="reservation-${esc(reservation.id)}" class="reservation-card ${unread||transferUnread ? "has-unread" : ""}"><div class="reservation-date"><strong>${esc(badge.day)}</strong><span>${esc(badge.month)}</span></div><div class="reservation-card-main"><div class="reservation-card-heading"><div><h2>${esc(reservation.venue)}</h2><small class="reservation-public-code">Reserva ${esc(reservation.id)}</small><p>${esc(timeRange(reservation.time,reservation.endTime))} · ${money(reservation.value)}${reservation.monthly ? ` · Mensalista (${esc(reservation.occurrenceCount)} datas)` : ""}${!closedReservationPaymentLabel(reservation)&&!reservation.monthly&&Number(reservation.paymentDue||0)>0 ? ` · Diferença ${money(reservation.paymentDue)}` : ""}${reservation.paymentMethodLabel ? ` · ${esc(reservation.paymentMethodLabel)}` : ""}${splitProgress}</p></div><span class="status ${visual.status}">${visual.label}</span></div><div class="reservation-group-line"><strong>${esc(reservationSubjectLabel(reservation))}</strong><span>${esc(reservation.groupId ? (reservation.groupRole || "") : "Reserva pessoal")}</span></div><div class="reservation-card-meta"><span>${esc(reservation.event || "Evento não informado")}</span><span class="status ${eventVisual.className}">${eventVisual.label}</span></div>${singlePrebookingDeadlineMarkup(reservation)}${assignedPayment}${shareView?"":transferNotice}${!shareView&&unread && reservationBelongsToCurrentUser(reservation) ? `<div class="inline-message-notice"><span class="message-badge">${esc(unread)}</span><strong>${unread === 1 ? "Nova mensagem do parceiro" : `${unread} novas mensagens do parceiro`}</strong></div>` : ""}<div class="reservation-card-actions"><button class="button ghost small" data-action="reservation-details" data-id="${esc(reservation.id)}">${!shareView&&transferUnread?"Ver atualização":"Detalhes"}${!shareView?messageBadge(transferUnread):""}</button>${!shareView&&reservationBelongsToCurrentUser(reservation) ? chatButtonForUser(reservation) : ""}${reservation.pixSplit ? `<button class="button secondary small" data-action="pix-split-details" data-id="${esc(reservation.id)}">${shareView?"Ver minha cota":"Acompanhar rateio"}</button>` : ""}${pendingActions}</div></div></article>`;
+    return `<article data-ui-key="reservation-${esc(reservation.id)}" class="reservation-card ${unread||transferUnread ? "has-unread" : ""}"><div class="reservation-date"><strong>${esc(badge.day)}</strong><span>${esc(badge.month)}</span></div><div class="reservation-card-main"><div class="reservation-card-heading"><div><h2>${esc(reservation.venue)}</h2><small class="reservation-public-code">Reserva ${esc(reservation.id)}</small><p>${esc(timeRange(reservation.time,reservation.endTime))} · ${money(reservation.value)}${reservation.monthly ? ` · Mensalista (${esc(reservation.occurrenceCount)} datas)` : ""}${!closedReservationPaymentLabel(reservation)&&!reservation.monthly&&Number(reservation.paymentDue||0)>0 ? ` · Diferença ${money(reservation.paymentDue)}` : ""}${reservation.paymentMethodLabel ? ` · ${esc(reservation.paymentMethodLabel)}` : ""}${splitProgress}</p></div><span class="status ${visual.status}">${visual.label}</span></div><div class="reservation-group-line"><strong>${esc(reservationSubjectLabel(reservation))}</strong><span>${esc(reservation.groupId ? (reservation.groupRole || "") : "Reserva pessoal")}</span></div><div class="reservation-card-meta">${reservationEventSummary(reservation)}</div>${singlePrebookingDeadlineMarkup(reservation)}${assignedPayment}${shareView?"":transferNotice}${!shareView&&unread && reservationBelongsToCurrentUser(reservation) ? `<div class="inline-message-notice"><span class="message-badge">${esc(unread)}</span><strong>${unread === 1 ? "Nova mensagem do parceiro" : `${unread} novas mensagens do parceiro`}</strong></div>` : ""}<div class="reservation-card-actions"><button class="button ghost small" data-action="reservation-details" data-id="${esc(reservation.id)}">${!shareView&&transferUnread?"Ver atualização":"Detalhes"}${!shareView?messageBadge(transferUnread):""}</button>${!shareView&&reservationBelongsToCurrentUser(reservation) ? chatButtonForUser(reservation) : ""}${reservation.pixSplit ? `<button class="button secondary small" data-action="pix-split-details" data-id="${esc(reservation.id)}">${shareView?"Ver minha cota":"Acompanhar rateio"}</button>` : ""}${pendingActions}</div></div></article>`;
   }
 
   function userReservationList(reservations,filterId="userReservationFilter",emptyText="Nenhuma reserva encontrada neste filtro.") {
@@ -6511,15 +6540,15 @@
     const content=tab==="monthly"
       ? `${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Seus horários mensalistas</strong><small>Acompanhe os horários que você administra e as reservas de cada mês. Suas cotas individuais ficam em Minhas cotas.</small></div>`:""}${backendIsOnline()?`<div class="toolbar"><button class="button secondary" data-action="user-initial-agenda">Vincular horário importado</button></div>`:""}${monthlyCustomerUserPanel()||(reservations.length?"":emptyState("↻","Você não possui vínculos mensalistas sob sua gestão."))}<div class="section-heading"><div><h2>Pré-reservas e pagamentos</h2><p>Depois de criar a pré-reserva, defina o pagamento e acompanhe a arrecadação aqui.</p></div></div>${userReservationList(reservations,"userReservationFilter","Nenhuma reserva mensalista encontrada neste filtro.")}`
       : `${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Reservas avulsas sob sua responsabilidade</strong><small>Esta lista considera a autoria da reserva e as permissões atuais de administrador ou organizador do grupo.</small></div>`:""}${transferUnreadTotal?`<div class="message-alert-banner" role="status"><span class="message-alert-icon">●</span><div><strong>${esc(transferUnreadTotal)} atualização${transferUnreadTotal===1?" de remarcação":"ões de remarcação"}</strong><small>As reservas destacadas possuem pedido, proposta ou devolutiva ainda não visualizada.</small></div></div>`:""}${userReservationList(reservations,"userReservationFilter")}`;
-    return `${pageHeader("Área do usuário", "Minhas reservas", "Administre reservas avulsas e mensalistas sem misturar as cotas atribuídas à sua conta.")}${tabs}${content}`;
+    return `<section class="customer-reservation-page">${pageHeader("Área do usuário", "Minhas reservas", "Administre reservas avulsas e mensalistas sem misturar as cotas atribuídas à sua conta.")}${tabs}${content}</section>`;
   }
 
   function userShares() {
     const reservations=userShareReservations();
     const pending=userPendingSharesCount();
-    return `${pageHeader("Área do usuário", "Minhas cotas", "Consulte e pague somente os valores atribuídos à sua conta, mesmo quando outra pessoa administra a reserva.", `<button class="button secondary small" data-nav="reservations">Ver minhas reservas</button>`)}
+    return `<section class="customer-reservation-page">${pageHeader("Área do usuário", "Minhas cotas", "Consulte e pague somente os valores atribuídos à sua conta, mesmo quando outra pessoa administra a reserva.", `<button class="button secondary small" data-nav="reservations">Ver minhas reservas</button>`)}
       ${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>${esc(pending)} pagamento${pending===1?" pendente":"s pendentes"}</strong><small>Cotas avulsas e mensalistas aparecem uma única vez por pagador. A reserva pode também constar em Minhas reservas quando você for responsável pela gestão, sem gerar cobrança duplicada.</small></div>`:""}
-      ${userReservationList(reservations,"userShareFilter","Nenhuma cota foi atribuída a esta conta.")}`;
+      ${userReservationList(reservations,"userShareFilter","Nenhuma cota foi atribuída a esta conta.")}</section>`;
   }
 
   function userFavorites() {
@@ -7791,6 +7820,7 @@
   }
 
   function render() {
+    if(window.TamoonMarketplacePilot?.leaving)return;
     capturePartnerInterestDraft();
     const financeScreen=state.activePage?.[state.role]==="finance"?captureFinanceScreen(app.querySelector(".finance-page")):null;
     const preserveFinance=financeScreen&&state.activePage?.[state.role]==="finance"&&financeScreen.identity===financeScreenIdentity();
@@ -8321,6 +8351,7 @@
   async function handleAction(button) {
     // Capture the native change before asynchronous authorization/dispatch yields.
     const actionChecked = button.checked;
+    if(!await waitForInitialDetails())return;
     partnerActionContext=state.role==="partner"?window.MarketplacePartnerOperations.actionPermission(button.dataset.action||""):null;
     if(backendRuntime.enabled&&state.role==="partner"&&partnerActionContext&&!hasPartnerPermission(partnerActionContext)){
       showToast("Acesso Restrito. Esta função não está autorizada para sua conta.");return;
@@ -9416,11 +9447,13 @@
     if(!button||!sound)return;
     const online=backendIsOnline();button.hidden=!online;sound.hidden=!online;
     const count=personalNotificationsForRole().filter((row)=>row.status==="unread").length;
-    button.textContent=`Atualizações${count?` (${count})`:""}`;
+    button.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="header-control-label">Atualizações</span>${count?`<span class="header-notification-count">${count>99?"99+":count}</span>`:""}`;
     button.classList.toggle("has-unread",count>0);
     button.setAttribute("aria-label",`Atualizações, ${count} não lidas`);
     const enabled=operationalAlerts.isEnabled();
-    sound.textContent=enabled?"Som: ativado":"Ativar som";
+    sound.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4 5 9H2v6h3l6 5V4Z"/>${enabled?'<path d="M15 8q4 4 0 8m3-11q7 7 0 14"/>':'<path d="m16 9 5 6m0-6-5 6"/>'}</svg><span class="header-control-label">${enabled?"Som ativado":"Ativar som"}</span>`;
+    sound.setAttribute("aria-label",enabled?"Desativar som":"Ativar som");
+    sound.title=enabled?"Desativar som":"Ativar som";
     sound.setAttribute("aria-pressed",String(enabled));
   }
   function openNotificationInbox(){
@@ -9472,7 +9505,7 @@
     const link=event.target.closest?.('[data-asaas-checkout="true"]');
     if(link)rememberAsaasReturn(link.dataset.id);
   },true);
-  document.getElementById("openNotifications")?.addEventListener("click",openNotificationInbox);
+  document.getElementById("openNotifications")?.addEventListener("click",async()=>{if(await waitForInitialDetails())openNotificationInbox();});
   document.getElementById("toggleNotificationSound")?.addEventListener("click",async()=>{
     const enabling=!operationalAlerts.isEnabled();const ready=await operationalAlerts.setEnabled(enabling);
     renderNotificationControls();showToast(!enabling?"Som dos alertas desativado.":ready?"Som ativado para novas atualizações.":"Preferência salva. O som depende da liberação de áudio deste navegador.");

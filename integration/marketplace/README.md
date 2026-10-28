@@ -1,4 +1,4 @@
-# Marketplace privado — incremental 166-R5
+# Marketplace privado — incremental 166-R6
 
 Integração da Comunidade build 164 com o Marketplace 0.2.0, base consolidada 22BB-C39-R1. Inclui o piloto 166-R1 e a sincronização com o grupo Teste FC. O motor de reservas, mensalidades, parceiros e financeiro do sandbox foi preservado.
 
@@ -111,3 +111,15 @@ Na Comunidade: `update marketplace_pilot.config set enabled=false where singleto
 Para suspender somente a entrega automática, sem fechar o Marketplace: `update private.community_sync_delivery set enabled=false where singleton;`. Para retomar: `update private.community_sync_delivery set enabled=true,next_attempt_at=now() where singleton;`. Alterações acumuladas permanecem na fila.
 
 A suspensão não apaga os jogos de teste já publicados. Para retirar a interface, restaurar o deploy anterior. Não remover indiscriminadamente RLS nem migrações. A abertura pública exige revisão própria de permissões, pagamentos e publicação nas lojas.
+
+## Ajustes após validação no iPhone — 166-R6
+
+- Voltar retangular, controles de notificações/som/tema/ajuda compactos em uma única linha. Ícones mantêm nomes acessíveis e contador de notificações. O texto não extrapola o botão.
+- O retorno apresenta uma transição para a Comunidade antes de encerrar a sessão temporária do Marketplace. Eventos Auth e renderizações tardias não apresentam o antigo formulário de login durante a saída.
+- Reservas e cotas compartilham cartões mais compactos: data pequena, status junto ao título, demais informações usando toda a largura e ações em duas colunas com quebra de texto. Prazos, valores e avisos permanecem visíveis. O estado sem evento vinculado aparece uma única vez.
+- A entrada por `?page=discover` apresenta o catálogo autenticado antes das consultas complementares de financeiro, reservas e administração. Navegação, troca de papel e ações aguardam os dados completos; nenhuma reserva/pagamento usa um snapshot parcial. Conta bloqueada e modo de consulta de parceiro não usam essa apresentação antecipada. Fotos carregam em paralelo às consultas complementares.
+- Os logs anteriores mostravam cerca de 0,85 s na função de acesso e 1,63 s na RPC principal, além das consultas adicionais. São tempos do servidor, não uma medição ponta a ponta do celular. O tempo relatado de 10–12 segundos não foi atribuído somente ao download dos scripts.
+- As medidas locais `marketplace-entry` e `marketplace-details-ready` permitem distinguir a abertura da busca da conclusão dos dados adicionais; não enviam informações pessoais. O pré-carregamento consome o corpo do pacote para concluir o cache. O build conserva o pacote da revisão imediatamente anterior para transições de deploy.
+- Validação: 54 testes Node passaram, incluindo catálogo antecipado, bloqueio de ações até completar dados, contas bloqueadas, modo de consulta, troca de identidade durante carregamento, retorno e duplicação de estado. O navegador local permaneceu indisponível; a conferência visual em iPhone físico deve ser feita na revisão publicada.
+
+Esta revisão não altera migrações, pagamentos, sincronização automática, lista de acesso ou `supabase-config.js`. Avaliação e distância continuam adiadas.

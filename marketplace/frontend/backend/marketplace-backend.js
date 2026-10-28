@@ -187,7 +187,7 @@
     return data;
   }
 
-  async function bootstrap({ force = false, changes = [] } = {}) {
+  async function bootstrap({ force = false, changes = [], onCore } = {}) {
     const requestedIdentity = session?.user?.id;
     const requestedContext = contextVersion;
     if (!requestedIdentity) throw new Error("AUTH_REQUIRED");
@@ -221,11 +221,14 @@
     const { data, error } = await c.rpc("marketplace_bootstrap");
     if (error) throw error;
     const snapshot = data || {};
-    await warmPhotoUrls(snapshot);
     if(snapshot.profile?.status === "blocked"){
       if(requestedContext!==contextVersion||session?.user?.id!==requestedIdentity||snapshot.profile.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
       bootstrapCache=snapshot;emit("bootstrap",{bootstrap:snapshot});return snapshot;
     }
+    if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity || snapshot.profile?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
+    // Discovery needs the verified catalog, not financial/admin directories.
+    onCore?.(snapshot);
+    const photosReady=warmPhotoUrls(snapshot).then(()=>null,error=>error);
     // Notification/chat-only events can reuse extra directories only when every other
     // core field (including financial rows and permissions) is identical to the last full read.
     const coreKeys=Object.keys(snapshot).filter(key=>!["generated_at","notifications","chats","chat_effective_state","chat_messages","chat_unread"].includes(key));
@@ -234,6 +237,8 @@
       && coreKeys.every(key=>JSON.stringify(snapshot[key])===JSON.stringify(lastCompleteBootstrap[key]));
     if(canReuse){
       if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity || snapshot.profile?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
+      const photoError=await photosReady;if(photoError)throw photoError;
+      if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
       const merged={...lastCompleteBootstrap,...snapshot};
       bootstrapCache=merged;emit("bootstrap",{bootstrap:merged});return merged;
     }
@@ -311,6 +316,8 @@
     snapshot.admin_users=adminUsersResult.data||[];
     snapshot.admin_reservations=adminReservationsResult.data||[];
     if (requestedContext!==contextVersion || session?.user?.id !== requestedIdentity || snapshot.profile?.id !== requestedIdentity) throw new Error("AUTH_IDENTITY_CHANGED");
+    const photoError=await photosReady;if(photoError)throw photoError;
+    if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
     lastCompleteBootstrap = snapshot;lastCompleteBootstrapAt=Date.now();
     bootstrapCache = snapshot;
     emit("bootstrap", { bootstrap: snapshot });

@@ -50,3 +50,49 @@ body:not(.pilot-locked) #pilotGate { display: none; }
   .dialog.chat-dialog > .chat-form { height:calc(var(--market-dialog-height) - 2px); overflow:hidden !important; }
   .dialog .dialog-header { flex-shrink:0; }
 }
+
+/* 166-R6: header controls stay inside one row; return is always rectangular. */
+.app-header .marketplace-session-button { width:auto; min-width:80px; border-radius:10px; padding:8px 12px; justify-content:center; white-space:nowrap; }
+.header-actions svg { width:18px; height:18px; flex:0 0 18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+#openNotifications, #toggleNotificationSound { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+#openNotifications[hidden], #toggleNotificationSound[hidden] { display:none !important; }
+.header-notification-count { font-size:10px; line-height:1; border-radius:7px; padding:3px; background:var(--green); color:var(--bg); }
+.pilot-leaving #pilotGate a { display:none; }
+@media (max-width:700px) {
+  .app-header .header-actions { display:flex; flex:1 1 100%; width:100%; min-width:0; flex-wrap:nowrap; gap:5px; justify-content:flex-end; margin:0; }
+  .app-header .header-actions > button { position:relative; box-sizing:border-box; flex:0 0 38px; width:38px; min-width:0; max-width:100%; height:38px; min-height:38px; padding:0; border-radius:10px; overflow:hidden; }
+  .app-header .header-actions > .marketplace-session-button { flex-basis:84px; width:84px; padding:0 8px; gap:5px; font-size:12px; }
+  .app-header .header-control-label, .app-header .theme-button-label { display:none; }
+  .app-header .header-notification-count { position:absolute; right:1px; top:1px; max-width:26px; font-size:9px; }
+  .app-header .theme-button-icon { font-size:18px; }
+  .reservation-list { gap:8px; }
+  .reservation-list .reservation-card { grid-template-columns:36px minmax(0,1fr); gap:7px 8px; padding:10px; border-radius:12px; min-width:0; }
+  .reservation-list .reservation-card-main { display:contents; }
+  .reservation-list .reservation-date { min-height:44px; border-radius:8px; }
+  .reservation-list .reservation-date strong { font-size:16px; }
+  .reservation-list .reservation-card-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px; align-items:start; }
+  .reservation-list .reservation-card-heading h2 { font-size:14px; overflow-wrap:anywhere; }
+  .reservation-list .reservation-card-heading > .status { max-width:110px; white-space:normal; overflow-wrap:anywhere; line-height:1.25; font-size:10px; padding:4px 6px; }
+  .reservation-list .reservation-card-heading p { font-size:11px; line-height:1.4; }
+  .reservation-list .reservation-public-code { font-size:10px; }
+  .reservation-list .reservation-card-main > :not(.reservation-card-heading) { grid-column:1 / -1; min-width:0; max-width:100%; overflow-wrap:anywhere; }
+  .reservation-list .reservation-group-line { flex-wrap:wrap; gap:3px 8px; font-size:11px; }
+  .reservation-list .reservation-group-line strong { font-size:11px; }
+  .reservation-list .reservation-group-line span { flex-shrink:1; }
+  .reservation-list .reservation-card-meta { flex-direction:row; flex-wrap:wrap; justify-content:flex-start; align-items:center; gap:4px 8px; font-size:11px; }
+  .reservation-list .prebooking-deadline, .reservation-list .inline-payment-assignment { margin:0; padding:7px 8px; border-radius:8px; gap:3px; font-size:11px; }
+  .reservation-list .prebooking-deadline small { line-height:1.3; }
+  .reservation-list .reservation-card-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; }
+  .reservation-list .reservation-card-actions .button { min-width:0; width:100%; min-height:36px; padding:6px; white-space:normal; overflow-wrap:anywhere; font-size:11px; line-height:1.25; }
+  .customer-reservation-page .page-header { margin-bottom:10px; gap:8px; }
+  .customer-reservation-page .page-header h1 { font-size:26px; }
+  .customer-reservation-page .page-header p { font-size:12px; line-height:1.4; }
+  .customer-reservation-page .backend-domain-note { margin:8px 0; padding:9px 10px; gap:5px 8px; }
+  .customer-reservation-page .backend-domain-note small { font-size:11px; line-height:1.4; }
+}
+@media (max-width:360px) {
+  .app-header .header-actions { gap:4px; }
+  .app-header .header-actions > button { flex-basis:36px; width:36px; }
+  .app-header .header-actions > .marketplace-session-button { flex-basis:80px; width:80px; }
+  .reservation-list .reservation-card-heading > .status { max-width:92px; }
+}

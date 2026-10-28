@@ -43,12 +43,17 @@
   async function leave() {
     if (leaving) return;
     leaving = true; clearInterval(timer); clearLocal();
+    message.textContent = "Voltando à Comunidade…";
+    retry.hidden = true;
+    document.body.classList.add("pilot-locked");
+    document.body.classList.add("pilot-leaving");
     try {
       if (window.MarketplaceBackend?.readonlyStatus?.active) await window.MarketplaceBackend.endPartnerReadonly();
       await window.MarketplaceBackend?.client?.auth.signOut({scope:"local"});
     } catch {} finally { location.assign("/"); }
   }
   window.TamoonMarketplacePilot = Object.freeze({
+    get leaving() { return leaving; },
     takeSession() { const session = pendingSession; pendingSession = null; return session; },
     ready() {
       if (!failed && !leaving) {
@@ -78,7 +83,7 @@
     ownerId = data.session.user.id; return result;
   }
   async function loadAssets() {
-    const response = await fetch("pilot-assets.json?v=166r5", {cache:"no-store"});
+    const response = await fetch("pilot-assets.json?v=166r6", {cache:"no-store"});
     if (!response.ok) throw new Error("LOAD_FAILED");
     // The manifest normally contains one immutable bundle; async=false preserves fallback order.
     await Promise.all((await response.json()).map(script));
