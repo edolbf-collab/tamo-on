@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 115,
   "mandatory": false,
-  "notes": "Acesso privado ao Marketplace para três contas de teste e recuperação da sessão no app instalado.",
+  "notes": "Atalhos diretos para buscar quadras e consultar minhas reservas no Marketplace privado.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R3"
+  "integration": "166-R4"
 }

@@ -1,4 +1,4 @@
-# Tâmo On — Beta 1.0 Build 166-R3
+# Tâmo On — Beta 1.0 Build 166-R4
 
 Comunidade PWA e aplicativo Android para grupos esportivos, jogos, presença, times, churrasco e caixa. A build 166-R2 inclui o piloto privado do Marketplace C39-R1, conectado exclusivamente ao grupo Teste FC.
 
@@ -6,7 +6,7 @@ Comunidade PWA e aplicativo Android para grupos esportivos, jogos, presença, ti
 
 | Componente | Versão |
 | --- | --- |
-| Web, HTML e Service Worker | 166 / revisão 166-R3 |
+| Web, HTML e Service Worker | 166 / revisão 166-R4 |
 | Android | `1.0.166` / código `166`, derivado de `version.json` |
 | Banco da Comunidade | 151 |
 | publish-announcement | 115 |
@@ -31,3 +31,5 @@ O Marketplace está autorizado para o titular e duas contas de homologação (cl
 Preserve `supabase-config.js`, os ícones, as associações de domínio e as chaves de assinatura. Não publique credenciais privadas, não execute o schema consolidado sobre o banco atual e não reaplique as migrações já registradas.
 
 A revisão web 166-R3 corrige a revalidação do acesso no app instalado e reconhece a lista privada de testes. O AAB 1.0.166 permanece válido; nenhum código nativo Android ou assinatura foi alterado nesta revisão.
+
+A revisão web 166-R4 diferencia os atalhos da Comunidade: **Onde jogar** abre Buscar quadras e **Reservas de teste** abre Minhas reservas diretamente. O resumo dos jogos sincronizados continua no link **Resumo do grupo na Comunidade**, dentro do Marketplace. Os atalhos escolhem apenas telas da área do usuário após a validação de acesso; permissões, pagamentos, banco, pacote Android e assinatura permanecem iguais.

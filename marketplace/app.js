@@ -1944,7 +1944,16 @@
     const isNewIdentity = backendRuntime.identityId !== userId;
     backendRuntime.identityId = userId;
     const allowed = backendAllowedRoles();
-    if (isNewIdentity) partnerInterestDraft = null;
+    if (isNewIdentity) {
+      partnerInterestDraft = null;
+      // Community shortcuts select a customer page only after access is verified.
+      const entryPage = new URLSearchParams(location.search).get("page");
+      if (allowed.has("user") && ["discover", "reservations"].includes(entryPage)) {
+        state.role = "user";
+        state.activePage.user = entryPage;
+        return;
+      }
+    }
     if (!isNewIdentity && allowed.has(state.role)) return;
     state.role = bootstrap?.is_admin ? "admin" : bootstrap?.partner_memberships?.length ? "partner" : "user";
   }
