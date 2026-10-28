@@ -1,46 +1,46 @@
-const SW_BUILD = 164;
-const CACHE = "tamo-on-beta-1.0-build-164-r1";
+const SW_BUILD = 166;
+const CACHE = "tamo-on-beta-1.0-build-166-r2";
 const BADGE_DB_NAME = "tamoon-pwa-state";
 const BADGE_DB_VERSION = 1;
 const BADGE_STORE_NAME = "app-state";
 const BADGE_COUNT_KEY = "unread-notification-count";
 const ASSETS = [
   "/",
-  "/legal/acceptance.js?v=beta164r1",
-  "/legal/legal.css?v=beta164r1",
+  "/legal/acceptance.js?v=beta166r2",
+  "/legal/legal.css?v=beta166r2",
   "/legal/",
   "/legal/excluir-conta.html",
-  "/legal/public.js?v=beta164r1",
+  "/legal/public.js?v=beta166r2",
   "/legal/termos-de-uso-v1.2.html",
   "/legal/privacidade-v1.2.html",
   "/legal/codigo-de-conduta-v1.2.html",
   "/index.html",
-  "/styles.css?v=beta164r1",
-  "/app.js?v=beta164r1",
-  "/community-safety.js?v=beta164r1",
-  "/pwa-bootstrap.js?v=beta164r1",
+  "/styles.css?v=beta166r2",
+  "/app.js?v=beta166r2",
+  "/community-safety.js?v=beta166r2",
+  "/pwa-bootstrap.js?v=beta166r2",
   "/supabase-config.js?v=0.3.3",
-  "/group-avatars-data.js?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-01.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-02.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-03.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-04.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-05.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-06.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-07.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-08.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-09.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-10.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-11.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-12.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-13.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-14.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-15.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-16.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-17.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-18.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-19.png?v=beta164r1",
-  "/assets/group-avatars-build-142/badge-20.png?v=beta164r1",
+  "/group-avatars-data.js?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-01.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-02.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-03.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-04.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-05.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-06.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-07.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-08.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-09.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-10.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-11.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-12.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-13.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-14.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-15.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-16.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-17.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-18.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-19.png?v=beta166r2",
+  "/assets/group-avatars-build-142/badge-20.png?v=beta166r2",
   "/manifest.json",
   "/offline.html",
   "/version.json",
@@ -135,6 +135,9 @@ self.addEventListener("fetch", event => {
   // Igual à Build 115: recursos externos não são interceptados pelo service worker.
   // O navegador carrega diretamente Google, Supabase CDN e demais origens permitidas pelo CSP.
   if (url.origin !== self.location.origin) return;
+
+  // Private Marketplace pages and data must never enter the shared offline cache.
+  if (url.pathname.startsWith("/marketplace/")) return;
 
   const navigation = event.request.mode === "navigate";
   event.respondWith(

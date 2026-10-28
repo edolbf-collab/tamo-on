@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1f17" id="marketplaceThemeColor">
+  <meta name="description" content="Marketplace do Tâmo On em ambiente de homologação, com backend de staging preparado para testes multiaparelho.">
+  <title>Marketplace Tâmo On — 0.2.0</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/preview-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css?v=part-22bb-c39-r1">
+  <link rel="stylesheet" href="marketplace-updates.css?v=part-22bb-c39-r1">
+  <link rel="stylesheet" href="reservation-cancellation.css?v=part-22bb-c39-r1">
+  <link rel="stylesheet" href="finance-transactions.css?v=part-22bb-c39-r1">
+  <link rel="stylesheet" href="partner-finance-view.css?v=part-22bb-c39-r1">
+  <link rel="stylesheet" href="asaas-communication.css?v=part-22bb-c39-r1">
+  <link rel="stylesheet" href="partner-agenda-ui.css?v=part-22bb-c39-r1">
+  <link rel="stylesheet" href="agenda-initial.css?v=part-22bb-c39-r1">
+  <link rel="stylesheet" href="asaas-pix.css?v=part-22bb-c39-r1">
+  <link rel="stylesheet" href="monthly-customer-view.css?v=part-22bb-c39-r1">
+  <link rel="stylesheet" href="pilot.css?v=166">
+</head>
+<body class="pilot-locked">
+  <section id="pilotGate" role="status" aria-live="polite"><h1>Marketplace em testes</h1><p id="pilotMessage">Verificando seu acesso…</p><a href="/">Voltar à Comunidade</a><button id="pilotRetry" type="button" hidden>Tentar novamente</button></section>
+  <div class="sandbox-ribbon" role="status">
+    <a href="/" id="pilotBack">← Comunidade</a> · Teste privado · Pagamentos simulados
+  </div>
+
+  <div class="app-shell">
+    <section class="pilot-sync-bar"><button id="pilotSync" class="button secondary" type="button">Sincronizar Comunidade</button><span id="pilotSyncStatus" role="status">Grupo de teste conectado</span><a href="/?pilot=reservas">Ver reservas na Comunidade</a></section>
+    <header class="app-header">
+      <div class="brand-lockup" aria-label="Marketplace Tâmo On">
+        <div class="brand-symbol" aria-hidden="true">✓</div>
+        <div>
+          <div class="brand-name">Tâmo On</div>
+          <div class="brand-subtitle">Marketplace 0.2.0 · staging</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="theme-button" id="openNotifications" type="button" hidden aria-live="polite">Atualizações</button>
+        <button class="theme-button" id="toggleNotificationSound" type="button" hidden aria-pressed="false" title="Alertas sonoros enquanto o Marketplace estiver aberto">Ativar som</button>
+        <button class="marketplace-session-button" id="marketplaceSessionButton" type="button" hidden>
+          <span class="marketplace-session-avatar" aria-hidden="true">●</span>
+          <span class="marketplace-session-label">Sair</span>
+        </button>
+        <button class="theme-button" id="toggleMarketplaceTheme" type="button" aria-pressed="false" aria-label="Ativar tema claro" title="Ativar tema claro">
+          <span class="theme-button-icon" aria-hidden="true">☀</span>
+          <span class="theme-button-label">Tema claro</span>
+        </button>
+        <button class="backend-status-button" id="openBackendStatus" type="button" aria-label="Status do backend" title="Status do backend"><span class="backend-dot" aria-hidden="true"></span><span class="backend-status-label">Backend</span></button>
+        <button class="icon-button" id="resetPreview" aria-label="Restaurar dados locais de homologação" title="Restaurar dados locais de homologação">↺</button>
+        <button class="icon-button" id="openReleaseNotes" aria-label="Informações da versão" title="Informações da versão">i</button>
+      </div>
+    </header>
+
+    <section class="role-switcher" id="marketplaceRoleSwitcher" aria-label="Alternar área disponível">
+      <button class="role-chip active" data-role="user">Usuário</button>
+      <button class="role-chip" data-role="partner">Parceiro</button>
+      <button class="role-chip" data-role="admin">Administração</button>
+      <button class="role-chip" data-role="candidate">Quero ser parceiro</button>
+    </section>
+
+    <main id="app" tabindex="-1"></main>
+  </div>
+
+  <dialog id="reservationDialog" class="dialog" tabindex="-1">
+    <form method="dialog" id="reservationForm">
+      <div class="dialog-header">
+        <div>
+          <span class="eyebrow">Reserva de teste</span>
+          <h2 id="reservationTitle">Confirmar horário</h2>
+        </div>
+        <button class="icon-button" value="cancel" formnovalidate aria-label="Fechar">×</button>
+      </div>
+      <div class="summary-card reservation-summary-card" id="reservationSummary">
+        <div id="reservationSummaryHead"></div>
+        <label class="field compact-voucher-field reservation-summary-voucher" hidden aria-hidden="true">
+          <span>Voucher <small class="inline-hint">opcional</small></span>
+          <select id="voucherSelect">
+            <option value="">Não utilizar voucher</option>
+          </select>
+        </label>
+        <div class="voucher-payment-preview" id="reservationVoucherPreview" hidden aria-hidden="true"></div>
+        <div id="reservationSummaryTotal"></div>
+      </div>
+      <div class="monthly-reservation-panel compact-reservation-section" id="monthlyReservationPanel" hidden>
+        <label class="cancellation-acknowledge monthly-toggle-row">
+          <input id="monthlyReservationToggle" type="checkbox">
+          <span><strong>Reservar como mensalista</strong><small>Contrata diretamente a oferta publicada pelo parceiro e protege este dia e horário nos próximos ciclos.</small></span>
+        </label>
+        <div class="monthly-reservation-preview" id="monthlyReservationPreview"></div>
+      </div>
+      <div class="reservation-link-grid compact-reservation-grid">
+        <label class="field">
+          <span>Reservar para</span>
+          <select id="groupSelect" required aria-describedby="groupPermissionNote"></select>
+          <small class="field-help" id="groupPermissionNote">Reserve para você ou escolha um grupo autorizado.</small>
+        </label>
+        <label class="field" id="reservationEventField">
+          <span>Evento</span>
+          <select id="eventSelect" required disabled></select>
+          <small class="field-help">Na reserva avulsa, você pode apenas reservar, criar um novo evento na Comunidade ou vincular um evento publicado do mesmo dia e horário.</small>
+        </label>
+      </div>
+      <div class="new-event-panel" id="newEventPanel" hidden aria-hidden="true">
+        <input id="newEventTitle" type="hidden">
+      </div>
+      <section class="payment-method-panel compact-payment-panel" aria-labelledby="paymentMethodTitle" hidden aria-hidden="true">
+        <div class="payment-method-heading">
+          <strong id="paymentMethodTitle">Pagamento</strong>
+        </div>
+        <label class="field">
+          <span>Forma</span>
+          <select id="paymentMethodSelect">
+            <option value="pix_direct_partner">Pix</option>
+            <option value="credit_card_asaas">Cartão de crédito</option>
+          </select>
+          <small class="field-help" id="paymentMethodNote"></small>
+        </label>
+        <div id="paymentProviderPreview" class="payment-provider-preview compact-provider-preview"></div>
+        <section id="singlePayerPanel" class="single-payer-panel" hidden>
+          <label class="field">
+            <span>Responsável pelo pagamento</span>
+            <select id="singlePayerSelect"></select>
+            <small class="field-help">No cartão, somente o membro escolhido realiza o pagamento integral em uma única parcela.</small>
+          </label>
+        </section>
+        <section id="pixSplitPanel" class="pix-split-panel" hidden>
+          <label class="cancellation-acknowledge pix-split-toggle-row">
+            <input id="pixSplitToggle" type="checkbox">
+            <span><strong>Ratear entre membros</strong><small>Cria uma cota Pix para cada participante selecionado.</small></span>
+          </label>
+          <div id="pixSplitConfig" class="pix-split-config" hidden>
+            <label class="field">
+              <span>Divisão</span>
+              <select id="pixSplitMode">
+                <option value="equal">Dividir igualmente</option>
+                <option value="custom">Definir valores individualmente</option>
+              </select>
+            </label>
+            <div class="pix-split-members" id="pixSplitMembers"></div>
+            <div class="pix-split-summary" id="pixSplitSummary"></div>
+          </div>
+        </section>
+      </section>
+      <details class="reservation-rules" id="reservationRules">
+        <summary>Ver regras de cancelamento e voucher</summary>
+        <p id="reservationPolicyText">Após a pré-reserva, defina o pagamento em Minhas reservas. Se já estiver paga, a reserva avulsa pode ser cancelada em até 24 horas após a confirmação para gerar voucher, conforme as regras aplicáveis.</p>
+      </details>
+      <label class="cancellation-acknowledge reservation-terms-compact">
+        <input id="reservationPolicyAcknowledge" type="checkbox">
+        <span><strong>Aceito os termos da reserva e cancelamento.</strong><small class="field-error" id="reservationPolicyError" role="alert" hidden>Este aceite é obrigatório para continuar.</small></span>
+      </label>
+      <div class="reservation-outcome-note" id="reservationAutomationPreview">
+        <strong>Próxima etapa</strong>
+        <span>O horário será pré-reservado. Forma de pagamento, voucher e eventual rateio serão definidos em Minhas reservas.</span>
+        <small id="automationPaymentText" hidden>Aguardando confirmação</small>
+      </div>
+      <div class="dialog-actions">
+        <button class="button ghost" value="cancel" formnovalidate>Voltar</button>
+        <button class="button primary" id="confirmReservation" value="default">Fazer pré-reserva</button>
+      </div>
+    </form>
+  </dialog>
+
+
+  <dialog id="cancellationDialog" class="dialog cancellation-dialog" tabindex="-1">
+    <form method="dialog" id="cancellationForm">
+      <div class="dialog-header">
+        <div>
+          <span class="eyebrow" id="cancellationEyebrow">Cancelamento</span>
+          <h2 id="cancellationTitle">Cancelar reserva paga</h2>
+        </div>
+        <button class="icon-button" value="cancel" formnovalidate aria-label="Fechar">×</button>
+      </div>
+      <div class="summary-card" id="cancellationSummary"></div>
+      <div class="cancellation-warning" role="note">
+        <strong>Antes de continuar</strong>
+        <p id="cancellationWarningText">Esta ação seguirá a regra aplicável ao responsável pelo cancelamento. No staging, compensações financeiras reais permanecem desativadas.</p>
+        <ul id="cancellationImpactList"></ul>
+      </div>
+      <label class="field full">
+        <span id="cancellationReasonLabel">Motivo do cancelamento</span>
+        <textarea id="cancellationReason" minlength="10" maxlength="500" required></textarea>
+        <small class="field-help">O motivo ficará registrado no histórico da reserva.</small>
+      </label>
+      <label class="cancellation-acknowledge">
+        <input id="cancellationAcknowledge" type="checkbox" required>
+        <span id="cancellationAcknowledgeText">Estou ciente das consequências financeiras e operacionais desta ação.</span>
+      </label>
+      <div class="dialog-actions">
+        <button class="button ghost" value="cancel" formnovalidate>Voltar</button>
+        <button class="button danger" id="cancellationSubmit" value="default">Cancelar e gerar voucher</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="formDialog" class="dialog form-dialog" tabindex="-1">
+    <form method="dialog" id="dynamicForm">
+      <div class="dialog-header">
+        <div>
+          <span class="eyebrow" id="formEyebrow">Editar dados</span>
+          <h2 id="formTitle">Formulário</h2>
+          <p class="dialog-description" id="formDescription"></p>
+        </div>
+        <button class="icon-button" value="cancel" formnovalidate aria-label="Fechar">×</button>
+      </div>
+      <div id="formFields" class="form-grid"></div>
+      <div class="dialog-actions">
+        <button class="button ghost" value="cancel" formnovalidate>Cancelar</button>
+        <button class="button secondary" id="formSecondarySubmit" value="later" hidden>Confirmar e pagar depois</button>
+        <button class="button primary" id="formSubmit" value="default">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="detailDialog" class="dialog detail-dialog" tabindex="-1">
+    <form method="dialog">
+      <div class="dialog-header">
+        <div>
+          <span class="eyebrow" id="detailEyebrow">Detalhes</span>
+          <h2 id="detailTitle">Informações</h2>
+        </div>
+        <button class="icon-button" value="cancel" formnovalidate aria-label="Fechar">×</button>
+      </div>
+      <div id="detailBody" class="detail-body"></div>
+      <div class="dialog-actions">
+        <button class="button primary" value="cancel" formnovalidate>Fechar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="galleryDialog" class="dialog gallery-dialog" tabindex="-1">
+    <form method="dialog">
+      <div class="dialog-header">
+        <div>
+          <span class="eyebrow">Galeria do parceiro</span>
+          <h2 id="galleryTitle">Fotos do estabelecimento</h2>
+        </div>
+        <button class="icon-button" value="cancel" formnovalidate aria-label="Fechar galeria">×</button>
+      </div>
+      <div id="galleryBody" class="venue-gallery-body"></div>
+      <div class="dialog-actions">
+        <button class="button primary" value="cancel" formnovalidate>Fechar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="chatDialog" class="dialog chat-dialog" tabindex="-1">
+    <form method="dialog" id="chatForm" class="chat-form">
+      <div class="dialog-header chat-header">
+        <div>
+          <span class="eyebrow">Chat da reserva</span>
+          <h2 id="chatTitle">Conversa</h2>
+          <p class="dialog-description" id="chatSubtitle"></p>
+        </div>
+        <button class="icon-button" value="cancel" formnovalidate aria-label="Fechar chat">×</button>
+      </div>
+      <div class="chat-meta-row">
+        <span id="chatStatus" class="status status-ok">Reserva paga · conversa ativa</span>
+        <small>Canal oficial e protegido entre o usuário da reserva e o parceiro.</small>
+      </div>
+      <div id="chatMessages" class="chat-messages" aria-live="polite"></div>
+      <div class="chat-composer">
+        <label for="chatInput" class="sr-only">Mensagem</label>
+        <textarea id="chatInput" maxlength="1000" rows="2" placeholder="Digite uma mensagem..."></textarea>
+        <button id="chatSend" type="submit" class="button primary">Enviar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirmDialog" class="dialog compact" tabindex="-1">
+    <form method="dialog" id="confirmForm">
+      <div class="dialog-header">
+        <div>
+          <span class="eyebrow">Confirmar ação</span>
+          <h2 id="confirmTitle">Tem certeza?</h2>
+        </div>
+        <button class="icon-button" value="cancel" formnovalidate aria-label="Fechar">×</button>
+      </div>
+      <p id="confirmMessage" class="dialog-description"></p>
+      <div class="dialog-actions">
+        <button class="button ghost" value="cancel" formnovalidate>Voltar</button>
+        <button class="button danger" id="confirmSubmit" value="default">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="infoDialog" class="dialog compact" tabindex="-1">
+    <form method="dialog">
+      <div class="dialog-header">
+        <div>
+          <span class="eyebrow">Versão</span>
+          <h2>Marketplace Tâmo On 0.2.0</h2>
+        </div>
+        <button class="icon-button" value="cancel" formnovalidate aria-label="Fechar">×</button>
+      </div>
+      <p class="dialog-description">Linha de homologação do Marketplace Tâmo On. As Partes 22A a 22L conectam identidade, cadastro, documentos e equipe do parceiro, agenda, reservas, confirmação financeira, chat, vouchers, cancelamentos, notificações destinadas à Comunidade e mensalistas protegidos ao Supabase de staging, mantendo o fallback local somente para os domínios que ainda serão migrados.</p>
+      <ul class="plain-list">
+        <li>Parte 22A: autenticação, perfil único, bootstrap, acesso por perfil e atualização Realtime conectados e aprovados na homologação.</li>
+        <li>Parte 22B: empresa, responsável, endereço, espaços e fotos do parceiro persistidos no banco e no Storage do staging.</li>
+        <li>Parte 22C-R1: agenda e horários conectados ao backend, com criação em lote, edição encadeada, bloqueio, exclusão protegida e atualização Realtime inclusive no modal público já aberto.</li>
+        <li>Parte 22D-R2: reservas oficiais criadas no staging, protegidas contra dupla ocupação, visíveis nas três áreas e com histórico preservado após cancelamento e exclusão do horário.</li>
+        <li>Parte 22E: cobrança e confirmação financeira de homologação usam Edge Functions autenticadas; a confirmação atualiza a reserva, publica o evento e é refletida por Realtime, sem dinheiro real.</li>
+        <li>Parte 22F: chat oficial liberado após a confirmação, com mensagens, leituras, alertas e atualização Realtime entre Usuário e Parceiro.</li>
+        <li>Parte 22G: vouchers e cancelamentos oficiais com crédito integral, promoções protegidas, prorrogação por disponibilidade e efeitos financeiros auditáveis.</li>
+        <li>Parte 22G-R1: detalhe do Parceiro identifica o voucher aplicado, o abatimento, o complemento e o código público da reserva.</li>
+        <li>Parte 22G-R2: confirmações integrais por voucher exibem o marco temporal oficial gravado diretamente na reserva, mesmo sem pagamento ou intent.</li>
+        <li>Parte 22G-R3: a consulta administrativa entrega esse marco temporal ao frontend e elimina a resposta “Não confirmado” em reservas já confirmadas.</li>
+        <li>Parte 22H-R3: Pix pode ser rateado entre membros do grupo; no cartão integral, o responsável escolhido permanece identificado antes e depois do pagamento nas áreas Usuário, Parceiro e Administração.</li>
+        <li>Parte 22I: documentos do parceiro usam banco e Storage privados, com envio e consulta pelo Portal e revisão de status exclusiva da Administração.</li>
+        <li>Parte 22I-R2: toda a interface do Marketplace passa a usar Arial, com Helvetica e sans-serif apenas como contingência.</li>
+        <li>Parte 22J: equipe do parceiro conectada a identidades reais, funções, permissões, auditoria, RLS e Realtime; a Administração consulta os acessos no dossiê.</li>
+        <li>Parte 22J-R1: a função aplica uma predefinição e as seis permissões podem ser personalizadas por caixas de seleção; somente o Proprietário mantém acesso total obrigatório.</li>
+        <li>Parte 22K: cada cota Pix gera um aviso pessoal protegido para a área do grupo na Comunidade, com contrato versionado, RLS, leitura individual e Realtime.</li>
+        <li>Parte 22L-R3: grupos solicitam o horário mensalista diretamente ao parceiro, conversam antes da proposta e não compartilham códigos; telas exibem apenas os dados necessários a cada perfil.</li>
+        <li>Parte 22L-R4: solicitações e mensagens mensalistas geram alertas visíveis; propostas fecham após o envio e Pix ou cartão exibem somente seus próprios campos.</li>
+        <li>Parte 22L-R5: após solicitar o vínculo ou enviar a proposta, os formulários e detalhes relacionados são encerrados e o perfil retorna à sua tela principal.</li>
+        <li>Parte 22P: Buscar quadras cria somente a pré-reserva; pagamento, voucher e rateio são definidos em Minhas reservas. O prazo de pagamento avulso permanece inalterado e o cancelamento com voucher passa a contar 24 horas da confirmação financeira.</li>
+        <li>Parte 22AJ: A oferta mensalista exige continuidade semanal do mesmo espaço e horário até o fim do primeiro ciclo. A agenda e a contratação revalidam as datas disponíveis.</li>
+        <li>Parte 22AH-C1: Minhas reservas reúne as abas Avulsas e Mensalistas sob gestão; Minhas cotas permanece no menu principal com os pagamentos atribuídos à conta. O voucher volta a usar os seletores nativos de horário nos dois campos.</li>
+        <li>Parte 22O-R3: a oferta mensalista é contratada diretamente, sem botão de proposta; a agenda separa preços avulso e mensal, usa datas curtas e apresenta somente “Pix” ao usuário.</li>
+        <li>Usuário comum acessa Usuário e Quero ser parceiro; parceiro também acessa Portal do parceiro; administrador também acessa Administração.</li>
+        <li>Backend Supabase de staging com banco normalizado, RLS, Realtime, Storage, RPCs e Edge Functions.</li>
+        <li>Perfil único do Tâmo On reutilizado pelo marketplace, sem recadastro de dados pessoais.</li>
+        <li>Campos mobile com tamanho compatível para evitar zoom automático durante o preenchimento.</li>
+        <li>Cadastro de parceiros com blocos cadastral, operacional, contratual, fiscal e financeiro.</li>
+        <li>Administração → Parceiros sincronizada com o marketplace e com o Portal do parceiro aplicável.</li>
+        <li>Nova tela “Quero ser parceiro” para envio de solicitação básica diretamente pelo app e entrada automática na fila administrativa.</li>
+        <li>Busca do usuário com cards compactos, fachada ilustrativa, agenda interna e preços por horário.</li>
+        <li>Clientes e financeiro operacional permanecem na demonstração local ou em consulta até suas etapas de integração.</li>
+        <li>Vouchers promocionais aplicam desconto real ao checkout; parceiro e administração podem criar campanhas próprias.</li>
+        <li>Mensalista exibe em texto corrido e formato curto todas as datas e horários que compõem o pacote.</li>
+        <li>Fluxo local de grupo, evento em espera, confirmação simulada, publicação e registro de push.</li>
+        <li>Cancelamento pós-pagamento conforme o responsável: voucher para o usuário elegível, reembolso integral para cancelamento do parceiro ou Tâmo On e ausência de crédito automático fora do prazo.</li>
+        <li>Chat da reserva liberado somente após confirmação financeira e encerrado para novos envios ao fim do último horário reservado.</li>
+        <li>Sem dinheiro real: Asaas permanece em Sandbox/simulação e os adaptadores Pix bancários só serão ativados após homologação de cada instituição.</li>
+      </ul>
+      <button class="button primary full" value="cancel" formnovalidate>Entendi</button>
+    </form>
+  </dialog>
+
+  <div id="backendSyncStatus" role="status" aria-live="polite" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/supabase-config.js?v=0.3.3"></script>
+  <script src="pilot-entry.js?v=166"></script>
+</body>
+</html>

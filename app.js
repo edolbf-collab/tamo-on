@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 164, database: 151, edge: 115 });
-  const APP_ASSET_TOKEN = "beta164r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 166, database: 151, edge: 115 });
+  const APP_ASSET_TOKEN = "beta166r2";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -151,7 +151,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta164r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta166r2`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -1313,6 +1313,38 @@
       return false;
     },
 
+    async openMarketplacePilotOverview() {
+      try {
+        const {data,error}=await this.repo.client.rpc("community_marketplace_pilot_overview");
+        if(error)throw error;
+        const labels={standby_payment:"Aguardando pagamento simulado",published:"Pagamento simulado confirmado",cancelled:"Reserva cancelada"};
+        const rows=(data.events||[]).map(e=>`<article class="card"><strong>${escapeHtml(e.code||"Reserva")}</strong><p>${escapeHtml(labels[e.state]||e.state)}</p><p>${escapeHtml(new Date(e.starts_at).toLocaleString("pt-BR"))} · ${Number(e.amount||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})} (simulado)</p>${e.match_id?`<button class="btn btn-secondary" data-pilot-match="${escapeHtml(e.match_id)}">Abrir jogo</button>`:"<small>O jogo novo será publicado depois da confirmação do sandbox.</small>"}</article>`).join("");
+        this.modal(`Reservas de teste — ${data.name}`,`<p>Valores de sandbox, sem lançamento no caixa do grupo.</p>${rows||"<p>Nenhuma reserva sincronizada.</p>"}<a class="btn btn-primary" href="/marketplace/">Abrir marketplace</a>`,(root,close)=>{
+          root.querySelectorAll("[data-pilot-match]").forEach(button=>button.addEventListener("click",async()=>{
+            close();this.state=await this.repo.init(data.group_id);this.render();this.openRsvp(button.dataset.pilotMatch);
+          }));
+        });
+      } catch {this.toast("Não foi possível consultar as reservas de teste. Abra o marketplace e sincronize novamente.");}
+    },
+
+    async refreshMarketplacePilot() {
+      try {
+        const session = await this.repo.session();
+        if (!session) return;
+        const response = await fetch("https://owybghlwcohfyapvsfdo.supabase.co/functions/v1/community-marketplace-session", {
+          method:"POST", cache:"no-store", signal:AbortSignal.timeout(5000),
+          headers:{"Content-Type":"application/json", Authorization:`Bearer ${session.access_token}`},
+          body:JSON.stringify({action:"status"})
+        });
+        const allowed = response.ok && (await response.json()).allowed === true;
+        if ((await this.repo.session())?.user.id !== session.user.id) return;
+        this.state.marketplace_pilot = allowed;
+        this.repo.state.marketplace_pilot = allowed;
+        if (this.route === "home") this.render();
+        if (allowed && new URLSearchParams(location.search).get("pilot") === "reservas") this.openMarketplacePilotOverview();
+      } catch { /* An optional pilot must never interrupt the Community. */ }
+    },
+
     async init() {
       this.bindGlobal();
       migrateClientKeys();
@@ -1341,6 +1373,7 @@
         this.finishBootFeedback();
         this.render();
         this.startAccessMonitor();
+        this.refreshMarketplacePilot();
         await this.registerServiceWorker();
         this.repo.logEvent("app_open", {
           groups: Array.isArray(this.state?.groups) ? this.state.groups.length : 0,
@@ -1539,7 +1572,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta164r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta166r2");
       }, true);
     },
 
@@ -1970,7 +2003,8 @@
         </section>
         ${notice ? `<button class="home-notice" data-action="announcement-center" data-id="${notice.id}"><span>📣</span><div><strong>${escapeHtml(notice.title)}</strong><small>${escapeHtml(notice.body)}</small></div><b>›</b></button>` : ""}
         <div class="home-quick-grid">
-          <button class="quick-card quick-card-coming-soon" data-action="playing-spaces"><span class="quick-icon">⌖</span><span><strong>Onde jogar</strong><small>Em construção</small></span></button>
+          <button class="quick-card ${this.state.marketplace_pilot ? "" : "quick-card-coming-soon"}" data-action="playing-spaces"><span class="quick-icon">⌖</span><span><strong>Onde jogar</strong><small>${this.state.marketplace_pilot ? "Teste privado" : "Em construção"}</small></span></button>
+          ${this.state.marketplace_pilot ? `<button class="quick-card" data-action="pilot-reservations"><span class="quick-icon">▣</span><span><strong>Reservas de teste</strong><small>Marketplace e Comunidade</small></span></button>` : ""}
           <button class="quick-card" data-route="teams"><span class="quick-icon">⇄</span><span><strong>Times</strong><small>Equilíbrio do elenco</small></span></button>
           <button class="quick-card" data-action="players"><span class="quick-icon">＋</span><span><strong>Convidados</strong><small>Incluir no evento</small></span></button>
           <button class="quick-card" data-action="invite"><span class="quick-icon">↗</span><span><strong>Convidar</strong><small>WhatsApp e código</small></span></button>
@@ -2296,7 +2330,8 @@
           rsvp: () => this.openRsvp(data.id || this.nextMatch()?.id),
           "home-game-response": () => this.setHomeGameResponse(data.id, data.value),
           "home-bbq-response": () => this.setHomeBbqResponse(data.id, data.value),
-          "playing-spaces": () => this.toast("Onde jogar está em construção. O acesso será liberado quando a Comunidade for conectada aos espaços parceiros."),
+          "pilot-reservations": () => this.openMarketplacePilotOverview(),
+          "playing-spaces": () => this.state.marketplace_pilot ? location.assign("/marketplace/") : this.toast("Onde jogar está em construção. O acesso será liberado quando a Comunidade for conectada aos espaços parceiros."),
           "draw-teams": () => this.openTeamsForMatch(data.id),
           "configure-teams": () => this.drawTeams(data.id, Number($("#teamCountSelect")?.value || 2)),
           "clear-teams": () => this.undoTeamSeparation(data.id),

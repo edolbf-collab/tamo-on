@@ -1,0 +1,17 @@
+body.pilot-locked > :not(#pilotGate):not(script) { display: none !important; }
+#pilotGate { max-width: 34rem; margin: 12vh auto; padding: 1.5rem; color: #e7f8ef; background: #10392f; border-radius: 1.2rem; }
+#pilotGate a, .sandbox-ribbon a { color: inherit; text-decoration: underline; }
+#pilotRetry { margin: 1rem 0; padding: .8rem; }
+#openBackendStatus, #resetPreview { display: none !important; }
+#toggleNotificationSound[aria-pressed="true"] { color: #bff5da; }
+.sandbox-ribbon { padding-top: max(8px, env(safe-area-inset-top)); }
+.pilot-sync-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:12px 0; font-size:13px; }
+.pilot-sync-bar a { color:inherit; text-decoration:underline; }
+.pilot-locked #pilotGate { display: block; }
+body:not(.pilot-locked) #pilotGate { display: none; }
+@media(max-width: 600px) { #pilotGate { margin: 10vh 1rem; } }
+@media(max-width: 600px) {
+  .app-header { flex-wrap: wrap; gap: 12px; }
+  .header-actions { width: 100%; display: flex; flex-wrap: wrap; justify-content: flex-start; }
+  #openNotifications, #toggleNotificationSound { width: auto; min-width: fit-content; flex: 0 0 auto; padding: 0 12px; white-space: nowrap; }
+}

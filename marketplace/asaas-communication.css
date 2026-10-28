@@ -1,0 +1,11 @@
+.asaas-communication{width:min(420px,calc(100vw - 32px));padding:0;border:1px solid #315a49;border-radius:22px;background:#0c241a;color:#f3faf6;box-shadow:0 24px 90px #0008;}
+.asaas-communication::backdrop{background:rgba(3,14,10,.78);backdrop-filter:blur(3px);}
+.asaas-communication-content{padding:34px 26px;text-align:center;}
+.asaas-communication h2{font-size:1.2rem;line-height:1.4;margin:22px 0 12px;outline:none;}
+.asaas-communication p{line-height:1.55;margin:0 0 16px;}
+.asaas-communication small{display:block;color:#b5c7be;line-height:1.4;}
+.asaas-communication-spinner{display:block;width:48px;height:48px;margin:auto;border:4px solid #274c3c;border-top-color:#1ed17a;border-radius:50%;animation:asaas-communication-spin 1s linear infinite;}
+.asaas-refund-feedback{padding:12px 14px;border-radius:12px;background:#132f25;line-height:1.5;}
+.asaas-refund-error{color:#ffd0cb;border-left:3px solid #fa8072;}
+@keyframes asaas-communication-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.asaas-communication-spinner{animation:none;}}
