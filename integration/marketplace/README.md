@@ -13,7 +13,7 @@ Integração da Comunidade build 164 com o Marketplace 0.2.0, base consolidada 2
 | Integrantes do grupo | Usam presença, times, convidados e churrasco normalmente; não recebem acesso ao Marketplace |
 | Pagamentos e e-mails automáticos | Dinheiro real e e-mails automáticos desativados no servidor |
 
-`main`, `supabase-config.js` e a branch iOS 165 foram preservados. A interface está na branch `marketplace-build-166`; este documento não significa que ela já foi publicada no domínio de produção.
+A interface 166-R2 foi incorporada à `main` e publicada em `app.tamoon.app.br` em 28/10/2026, após autorização do titular. `supabase-config.js` e a branch iOS 165 foram preservados.
 
 ## Fluxos conectados
 
@@ -45,7 +45,7 @@ Os advisors foram consultados após as migrações. Os avisos sobre [tabelas pri
 ## Implantação
 
 1. As migrações novas e as funções de backend desta pasta e de `integration/community/` já foram aplicadas em 28/10/2026, nos projetos correspondentes. O grupo Teste FC e as duas identidades do titular já estão configurados. Não reaplicar migrações históricas C39 nem executar os arquivos no projeto errado.
-2. Revisar o PR e publicar os arquivos web no mesmo domínio da Comunidade para reutilizar a sessão Google. A prévia de outra origem não herda esse login e pode exigir configuração de OAuth.
+2. O frontend já foi publicado no domínio da Comunidade, reutilizando sua sessão Google. A prévia de outra origem não herda esse login e pode exigir configuração de OAuth.
 3. No ZIP incremental, copiar o conteúdo de `web/` para a raiz da aplicação, preservando os demais arquivos. A pasta `integracao/` contém fontes e documentação de backend, não é uma aplicação independente. O manifesto permite conferir os arquivos e as versões de origem.
 4. O wrapper Android existente carrega o site hospedado. Publicar apenas um AAB não publica estes arquivos web. Este pacote não contém um novo AAB nem publica uma versão na loja.
 5. As propostas de documentação do Google Play estão em `PLAY-CONSOLE.md`; não foram enviadas ao Console. Uma conta de revisão dedicada precisa estar configurada antes de submeter a funcionalidade à revisão.
@@ -57,7 +57,7 @@ Os advisors foram consultados após as migrações. Os avisos sobre [tabelas pri
 - Teste transacional no Marketplace: importação idempotente, limite por grupo, reserva criada pelo fluxo C39 real e exportação dos estados pendente, confirmado e cancelado. A confirmação nesse teste foi simulada no banco, sem cobrança ao provedor.
 - Ambos os testes SQL terminaram com rollback: nenhum jogo, reserva ou cobrança de exemplo foi mantido.
 - Navegador a 390 × 844: visitante e conta negada bloqueados; titular simulado carrega a interface, sincroniza e perde o acesso ao sair. Integrações remotas simuladas nesse teste de interface.
-- A validação prática com Google, telefone e grupo ainda será realizada pelo titular após publicar a interface.
+- A validação prática com Google, telefone e grupo ainda será realizada pelo titular na interface publicada.
 
 Para repetir os testes Node: `cd integration/marketplace`, `npm install`, `npx playwright install chromium`, `npm test`, `npm run test:browser`. Os testes SQL são exclusivos dos respectivos ambientes: `tests/export.sql` no Marketplace e `../community/test-sync.sql` na Comunidade. Eles usam transação e rollback. Não transformar os dados de teste em migrações.
 
