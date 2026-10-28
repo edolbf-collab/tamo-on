@@ -67,3 +67,26 @@ test('navigation cannot resume if returning to Community while loading details',
  const result=f.waitForInitialDetails();f.window.TamoonMarketplacePilot.leaving=true;state.initialDetailsPending=false;d.resolve();
  assert.equal(await result,false);
 });
+test('partner preview never calls writable agenda setup; normal mode still loads it',async()=>{
+ const preview=await fixture({preview:true});await preview.backend.bootstrap();
+ assert.equal(preview.calls.includes('agenda_initial_slot_flags'),false);
+ assert.equal(preview.calls.includes('assert_marketplace_writable'),false);
+ const normal=await fixture();normal.extra.resolve({data:[]});const data=await normal.backend.bootstrap();
+ assert.ok(normal.calls.includes('agenda_initial_slot_flags'));assert.ok(Array.isArray(data.agenda_initial_slots));
+});
+test('share attention follows unpaid balance, including confirmed reservations',()=>{
+ const context={reservationIsExpired:r=>r.expired,monthlyPaymentPresentation:r=>({closed:r.closed}),currentUserShare:r=>r.share};
+ vm.createContext(context);vm.runInContext(extract('userShareIsPending','userPendingSharesCount'),context);
+ for(const statusKey of ['pending','confirmed'])assert.equal(context.userShareIsPending({statusKey,share:{amount:30,paid:false}}),true);
+ for(const r of [{statusKey:'cancelled'},{statusKey:'expired'},{statusKey:'confirmed',expired:true},{statusKey:'pending',monthlyCycleId:'cycle',closed:true},{statusKey:'confirmed',share:{amount:30,paid:true}},{statusKey:'pending',share:{amount:0,paid:false}}])assert.equal(context.userShareIsPending({share:{amount:30,paid:false},...r}),false);
+});
+test('payment notification opens and focuses its own share despite a previous filter',async()=>{
+ const reservation={id:'R1',backendId:'uuid1'},row={id:'N1',type:'pix_share_pending',entity_type:'reservation',entity_id:'uuid1'};
+ let focused=false,scrolled=false,read=false;
+ const context={state:{role:'user',personalNotifications:[row],reservations:[reservation],activePage:{user:'discover'},filters:{userShareStatus:'Confirmadas'}},
+ notificationVisibleForRole:()=>true,currentUserShare:()=>({amount:30,paid:false}),detailDialog:{close(){}},saveState(){},render(){},document:{hidden:false},window:{matchMedia:()=>({matches:true})},
+ app:{querySelectorAll:()=>[{dataset:{uiKey:'reservation-R1'},scrollIntoView(){scrolled=true},focus(){focused=true}}]},readPersonalNotification:async()=>{read=true}};
+ const start=appSource.indexOf('  async function openPersonalNotification('),end=appSource.indexOf('  document.addEventListener("click",event=>',start);
+ vm.createContext(context);vm.runInContext(appSource.slice(start,end),context);await context.openPersonalNotification('N1');
+ assert.equal(context.state.activePage.user,'shares');assert.equal(context.state.filters.userShareStatus,'Todas');assert.ok(focused&&scrolled&&read);
+});

@@ -404,7 +404,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     return data;
   }
 
-  async function bootstrap({ force = false, changes = [] } = {}) {
+  async function bootstrap({ force = false, changes = [], onCore } = {}) {
     const requestedIdentity = session?.user?.id;
     const requestedContext = contextVersion;
     if (!requestedIdentity) throw new Error("AUTH_REQUIRED");
@@ -421,7 +421,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       const {data:clients,error:clientsError}=await c.rpc("partner_client_directory",{p_partner_id:snapshot.preview.partner_id});
       if(clientsError)throw clientsError;
       if(requestedContext!==contextVersion || requestedIdentity!==session?.user?.id)throw new Error("PREVIEW_CONTEXT_CHANGED");
-      snapshot.partner_clients=clients||[];
+      snapshot.partner_clients=clients||[];snapshot.agenda_initial_slots=[];
       await warmPhotoUrls(snapshot);
       bootstrapCache=snapshot;emit("bootstrap",{bootstrap:snapshot});return snapshot;
     }
@@ -438,11 +438,14 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const { data, error } = await c.rpc("marketplace_bootstrap");
     if (error) throw error;
     const snapshot = data || {};
-    await warmPhotoUrls(snapshot);
     if(snapshot.profile?.status === "blocked"){
       if(requestedContext!==contextVersion||session?.user?.id!==requestedIdentity||snapshot.profile.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
       bootstrapCache=snapshot;emit("bootstrap",{bootstrap:snapshot});return snapshot;
     }
+    if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity || snapshot.profile?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
+    // Discovery needs the verified catalog, not financial/admin directories.
+    onCore?.(snapshot);
+    const photosReady=warmPhotoUrls(snapshot).then(()=>null,error=>error);
     // Notification/chat-only events can reuse extra directories only when every other
     // core field (including financial rows and permissions) is identical to the last full read.
     const coreKeys=Object.keys(snapshot).filter(key=>!["generated_at","notifications","chats","chat_effective_state","chat_messages","chat_unread"].includes(key));
@@ -451,6 +454,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       && coreKeys.every(key=>JSON.stringify(snapshot[key])===JSON.stringify(lastCompleteBootstrap[key]));
     if(canReuse){
       if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity || snapshot.profile?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
+      const photoError=await photosReady;if(photoError)throw photoError;
+      if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
       const merged={...lastCompleteBootstrap,...snapshot};
       bootstrapCache=merged;emit("bootstrap",{bootstrap:merged});return merged;
     }
@@ -458,7 +463,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if (voucherRefreshError) throw voucherRefreshError;
     const [voucherStateResult, cancellationResult, ledgerResult, financialReconciliationResult, paymentResponsibleDirectoryResult, partnerDocumentsResult, partnerTeamResult, communityNotificationsResult,
       monthlyLinksResult, monthlyLinkDirectoryResult, monthlySplitDirectoryResult, monthlyCyclesResult, monthlyPreReservationsResult, monthlyStagesResult, monthlyEventsResult, monthlyRequestsResult, occurrenceTransfersResult, reservationFinancialStatusResult, partnerOnboardingResult, partnerClientsResult,
-      scheduleDetailsResult, adminUsersResult, adminReservationsResult] = await Promise.all([
+      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult] = await Promise.all([
       c.from("marketplace_voucher_effective_state").select("*").order("created_at", { ascending: false }),
       c.from("cancellation_requests").select("*").order("created_at", { ascending: false }),
       c.from("accounting_ledger").select("*").order("created_at", { ascending: false }),
@@ -481,7 +486,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       c.rpc("partner_client_directory",{p_partner_id:null}),
       snapshot.partner_memberships?.length ? c.from("schedule_slots").select("id,venue_space_id,series_id,monthly_link_key,starts_at,ends_at,status,blocked_reason,blocked_at") : Promise.resolve({data:[]}),
       snapshot.is_admin===true ? c.rpc("admin_marketplace_users") : Promise.resolve({data:[]}),
-      snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]})
+      snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]}),
+      c.rpc("agenda_initial_slot_flags",{})
     ]);
     if (voucherStateResult.error) throw voucherStateResult.error;
     if (cancellationResult.error) throw cancellationResult.error;
@@ -523,11 +529,14 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     snapshot.monthly_link_requests = monthlyRequestsResult.data || [];
     snapshot.occurrence_transfer_requests = occurrenceTransfersResult.data || [];
     snapshot.reservation_financial_status = reservationFinancialStatusResult.data || [];
-    for(const result of [scheduleDetailsResult,adminUsersResult,adminReservationsResult])if(result.error)throw result.error;
+    for(const result of [scheduleDetailsResult,adminUsersResult,adminReservationsResult,initialSlotFlagsResult])if(result.error)throw result.error;
+    snapshot.agenda_initial_slots=initialSlotFlagsResult.data||[];
     snapshot.schedule_details=scheduleDetailsResult.data||[];
     snapshot.admin_users=adminUsersResult.data||[];
     snapshot.admin_reservations=adminReservationsResult.data||[];
     if (requestedContext!==contextVersion || session?.user?.id !== requestedIdentity || snapshot.profile?.id !== requestedIdentity) throw new Error("AUTH_IDENTITY_CHANGED");
+    const photoError=await photosReady;if(photoError)throw photoError;
+    if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
     lastCompleteBootstrap = snapshot;lastCompleteBootstrapAt=Date.now();
     bootstrapCache = snapshot;
     emit("bootstrap", { bootstrap: snapshot });
@@ -2779,10 +2788,11 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     backendRuntime.mutating=true;
     try {
       document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());
+      // Finish the previous scope before changing the read-only session.
+      if(backendBootstrapPromise)await backendBootstrapPromise.catch(()=>{});
+      window.MarketplaceBackend.unsubscribeRealtime();backendRuntime.realtimeSubscribed=false;
       if(partnerId)await window.MarketplaceBackend.beginPartnerReadonly(partnerId);
       else await window.MarketplaceBackend.endPartnerReadonly();
-      // Aguarda eventual carregamento anterior antes de buscar o novo escopo.
-      if(backendBootstrapPromise)await backendBootstrapPromise.catch(()=>{});
       backendRuntime.bootstrap=null;
       state.activePage.partner="overview";state.ui.partnerAgendaDate="";state.ui.partnerAgendaMonth="";state.ui.selectedAvailabilityKeys=[];
       state.role=partnerId?"partner":"admin";
@@ -4600,16 +4610,24 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     backendBootstrapPromise = (async () => {
       try {
         backendRuntime.session = window.MarketplaceBackend.session;
-        const [bootstrap,initialSlotFlags] = await Promise.all([
-          window.MarketplaceBackend.bootstrap({ force, changes }),
-          window.MarketplaceBackend.rpc("agenda_initial_slot_flags",{})
-        ]);
-        bootstrap.agenda_initial_slots=initialSlotFlags||[];
+        const bootstrap = await window.MarketplaceBackend.bootstrap({ force, changes, onCore:core=>{
+            if(backendRuntime.bootstrap || new URLSearchParams(location.search).get("page")!=="discover"
+              || core?.profile?.status!=="active" || core.profile.id!==requestedIdentity
+              || window.MarketplaceBackend.session?.user?.id!==requestedIdentity
+              || requestedAccessGeneration!==partnerAccessGeneration || window.TamoonMarketplacePilot?.leaving)return;
+            backendRuntime.bootstrap=core;
+            backendRuntime.initialDetailsPending=true;
+            syncStateFromBackend(core);
+            updateBackendRoleAccess();render();
+            window.TamoonMarketplacePilot?.ready();
+          } });
         if (window.MarketplaceBackend.session?.user?.id !== requestedIdentity || bootstrap?.profile?.id !== requestedIdentity) return null;
         if(requestedAccessGeneration!==partnerAccessGeneration)return null;
         if(JSON.stringify(backendRuntime.bootstrap?.partner_memberships||[])!==JSON.stringify(bootstrap?.partner_memberships||[]))closePartnerAccessDialogs();
         const signature=JSON.stringify({...bootstrap,generated_at:undefined});
         changed=signature!==backendRefreshSignature || !backendRuntime.bootstrap || partnerAccessPending;
+        backendRuntime.initialDetailsPending=false;
+        if(window.performance?.getEntriesByName?.('marketplace-entry-start').length && !window.performance.getEntriesByName('marketplace-details-ready').length)window.performance.measure('marketplace-details-ready','marketplace-entry-start');
         backendRuntime.bootstrap = bootstrap || {};
         syncStateFromBackend(backendRuntime.bootstrap);
         window.TamoonMarketplacePilot?.ready();
@@ -4687,7 +4705,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   async function handleBackendStatus(detail = {}) {
-    if (!backendRuntime.enabled) return;
+    if (!backendRuntime.enabled || window.TamoonMarketplacePilot?.leaving) return;
     if (detail.type === "team_access_pending") { showToast("O acesso à equipe aguarda confirmação da Comunidade. Tente recarregar a página em alguns instantes."); return; }
     if (detail.type === "loader_error") {
       backendRuntime.initialized = true;
@@ -7315,7 +7333,17 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     showToast("Arquivo CSV gerado com os dados fictícios atuais.");
   }
 
-  function setRole(role) {
+  async function waitForInitialDetails() {
+    if(window.TamoonMarketplacePilot?.leaving)return false;
+    if(!backendRuntime.initialDetailsPending)return true;
+    showToast("Concluindo a atualização das suas reservas…");
+    try { await backendBootstrapPromise; }
+    catch { return false; }
+    return !backendRuntime.initialDetailsPending && backendIsOnline() && !window.TamoonMarketplacePilot?.leaving;
+  }
+
+  async function setRole(role) {
+    if(!await waitForInitialDetails())return;
     if (backendRuntime.enabled && !backendAllowedRoles().has(role)) {
       showToast("Esta área não está liberada para a conta autenticada.");
       return;
@@ -7329,7 +7357,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if (unread > 0) showToast(`Você tem ${unread} atualização${unread === 1 ? " nova" : "ões novas"}.`);
   }
 
-  function nav(role, page) {
+  async function nav(role, page) {
+    if(!await waitForInitialDetails())return;
     state.activePage[role] = page;
     saveState();
     render();
@@ -8637,12 +8666,15 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     return (state.reservations || []).filter((reservation) => currentUserShare(reservation));
   }
 
+  function userShareIsPending(reservation) {
+    if(!reservation || reservationIsExpired(reservation) || ["cancelled","expired"].includes(reservation.statusKey))return false;
+    if(reservation.monthlyCycleId && monthlyPaymentPresentation(reservation).closed)return false;
+    const share=currentUserShare(reservation);
+    return Boolean(share && !share.paid && Number(share.amount)>0 && ["pending","confirmed"].includes(reservation.statusKey));
+  }
+
   function userPendingSharesCount() {
-    return userShareReservations().filter((reservation) => {
-      if (reservation.monthlyCycleId && monthlyPaymentPresentation(reservation).closed) return false;
-      const share=currentUserShare(reservation);
-      return reservation.statusKey === "pending" && share && !share.paid;
-    }).length;
+    return userShareReservations().filter(userShareIsPending).length;
   }
 
   function reservationUnreadCount(reservations) {
@@ -8659,6 +8691,13 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     return userReservationTabUnread("single") + userReservationTabUnread("monthly");
   }
 
+  function reservationEventSummary(reservation) {
+    const visual=eventPublicationLabel(reservation.eventPublicationStatus);
+    const title=String(reservation.event||"").trim();
+    if(reservation.eventMode==="none" || reservation.eventPublicationStatus==="none")return '<span>Nenhum evento vinculado</span>';
+    return `${title && title!==visual.label?`<span>${esc(title)}</span>`:""}<span class="status ${visual.className}">${visual.label}</span>`;
+  }
+
   function userReservationCard(reservation,{shareView=false}={}) {
     let visual = reservationStatus(reservationDisplayKey(reservation));
     if(reservation.monthlyCycleId && !reservationIsExpired(reservation)){
@@ -8666,11 +8705,11 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       visual={status:view.closed?"status-neutral":view.full?"status-ok":"status-warning",label:view.label};
     }
     const badge = reservationDateBadge(reservation.date);
-    const eventVisual = eventPublicationLabel(reservation.eventPublicationStatus);
     const unread = unreadForReservation(reservation.id,"user");
     const transferUnread=occurrenceTransferUnreadForReservation(reservation);
     const latestTransferNotification=latestOccurrenceTransferNotification(reservation);
     const ownShare=currentUserShare(reservation);
+    const pendingShare=shareView && userShareIsPending(reservation);
     const assignedPayment = shareView && ownShare
       ? `<div class="inline-payment-assignment"><strong>${reservation.monthly?"Sua cota mensal":"Pagamento atribuído a você"}</strong><span>${money(ownShare.amount)} · ${ownShare.paid?"Pagamento confirmado":"Pagamento pendente"}</span></div>`
       : hasSingleCardPaymentResponsible(reservation)
@@ -8693,7 +8732,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const transferNotice=transferUnread&&latestTransferNotification
       ? `<div class="inline-message-notice occurrence-transfer-notice has-unread"><span class="message-badge">${esc(transferUnread)}</span><div><strong>${esc(latestTransferNotification.title)}</strong><span>${esc(latestTransferNotification.body||"Abra os detalhes para visualizar a atualização.")}</span></div></div>`
       : pendingTransfer?`<div class="inline-message-notice occurrence-transfer-notice"><div><strong>${esc(pendingTransfer.statusLabel)}</strong><span>${pendingTransfer.targetDate?`Proposta: ${esc(pendingTransfer.targetDate)} · ${esc(timeRange(pendingTransfer.targetTime,pendingTransfer.targetEndTime))}`:"Abra os detalhes para acompanhar ou decidir."}</span></div></div>`:"";
-    return `<article data-ui-key="reservation-${esc(reservation.id)}" class="reservation-card ${unread||transferUnread ? "has-unread" : ""}"><div class="reservation-date"><strong>${esc(badge.day)}</strong><span>${esc(badge.month)}</span></div><div class="reservation-card-main"><div class="reservation-card-heading"><div><h2>${esc(reservation.venue)}</h2><small class="reservation-public-code">Reserva ${esc(reservation.id)}</small><p>${esc(timeRange(reservation.time,reservation.endTime))} · ${money(reservation.value)}${reservation.monthly ? ` · Mensalista (${esc(reservation.occurrenceCount)} datas)` : ""}${!closedReservationPaymentLabel(reservation)&&!reservation.monthly&&Number(reservation.paymentDue||0)>0 ? ` · Diferença ${money(reservation.paymentDue)}` : ""}${reservation.paymentMethodLabel ? ` · ${esc(reservation.paymentMethodLabel)}` : ""}${splitProgress}</p></div><span class="status ${visual.status}">${visual.label}</span></div><div class="reservation-group-line"><strong>${esc(reservationSubjectLabel(reservation))}</strong><span>${esc(reservation.groupId ? (reservation.groupRole || "") : "Reserva pessoal")}</span></div><div class="reservation-card-meta"><span>${esc(reservation.event || "Evento não informado")}</span><span class="status ${eventVisual.className}">${eventVisual.label}</span></div>${singlePrebookingDeadlineMarkup(reservation)}${assignedPayment}${shareView?"":transferNotice}${!shareView&&unread && reservationBelongsToCurrentUser(reservation) ? `<div class="inline-message-notice"><span class="message-badge">${esc(unread)}</span><strong>${unread === 1 ? "Nova mensagem do parceiro" : `${unread} novas mensagens do parceiro`}</strong></div>` : ""}<div class="reservation-card-actions"><button class="button ghost small" data-action="reservation-details" data-id="${esc(reservation.id)}">${!shareView&&transferUnread?"Ver atualização":"Detalhes"}${!shareView?messageBadge(transferUnread):""}</button>${!shareView&&reservationBelongsToCurrentUser(reservation) ? chatButtonForUser(reservation) : ""}${reservation.pixSplit ? `<button class="button secondary small" data-action="pix-split-details" data-id="${esc(reservation.id)}">${shareView?"Ver minha cota":"Acompanhar rateio"}</button>` : ""}${pendingActions}</div></div></article>`;
+    return `<article data-ui-key="reservation-${esc(reservation.id)}" class="reservation-card ${unread||transferUnread ? "has-unread" : ""} ${pendingShare?"has-pending-share":""}" tabindex="-1"><div class="reservation-date"><strong>${esc(badge.day)}</strong><span>${esc(badge.month)}</span></div><div class="reservation-card-main"><div class="reservation-card-heading"><div><h2>${esc(reservation.venue)}</h2><small class="reservation-public-code">Reserva ${esc(reservation.id)}</small><p>${esc(timeRange(reservation.time,reservation.endTime))} · ${money(reservation.value)}${reservation.monthly ? ` · Mensalista (${esc(reservation.occurrenceCount)} datas)` : ""}${!closedReservationPaymentLabel(reservation)&&!reservation.monthly&&Number(reservation.paymentDue||0)>0 ? ` · Diferença ${money(reservation.paymentDue)}` : ""}${reservation.paymentMethodLabel ? ` · ${esc(reservation.paymentMethodLabel)}` : ""}${splitProgress}</p></div><span class="status ${visual.status}">${visual.label}</span></div><div class="reservation-group-line"><strong>${esc(reservationSubjectLabel(reservation))}</strong><span>${esc(reservation.groupId ? (reservation.groupRole || "") : "Reserva pessoal")}</span></div><div class="reservation-card-meta">${reservationEventSummary(reservation)}</div>${pendingShare?'<div class="pending-share-label" role="status">Pagamento da sua cota pendente</div>':""}${singlePrebookingDeadlineMarkup(reservation)}${assignedPayment}${shareView?"":transferNotice}${!shareView&&unread && reservationBelongsToCurrentUser(reservation) ? `<div class="inline-message-notice"><span class="message-badge">${esc(unread)}</span><strong>${unread === 1 ? "Nova mensagem do parceiro" : `${unread} novas mensagens do parceiro`}</strong></div>` : ""}<div class="reservation-card-actions"><button class="button ghost small" data-action="reservation-details" data-id="${esc(reservation.id)}">${!shareView&&transferUnread?"Ver atualização":"Detalhes"}${!shareView?messageBadge(transferUnread):""}</button>${!shareView&&reservationBelongsToCurrentUser(reservation) ? chatButtonForUser(reservation) : ""}${reservation.pixSplit ? `<button class="button secondary small" data-action="pix-split-details" data-id="${esc(reservation.id)}">${shareView?"Ver minha cota":"Acompanhar rateio"}</button>` : ""}${pendingActions}</div></div></article>`;
   }
 
   function userReservationList(reservations,filterId="userReservationFilter",emptyText="Nenhuma reserva encontrada neste filtro.") {
@@ -8720,15 +8759,15 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const content=tab==="monthly"
       ? `${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Seus horários mensalistas</strong><small>Acompanhe os horários que você administra e as reservas de cada mês. Suas cotas individuais ficam em Minhas cotas.</small></div>`:""}${backendIsOnline()?`<div class="toolbar"><button class="button secondary" data-action="user-initial-agenda">Vincular horário importado</button></div>`:""}${monthlyCustomerUserPanel()||(reservations.length?"":emptyState("↻","Você não possui vínculos mensalistas sob sua gestão."))}<div class="section-heading"><div><h2>Pré-reservas e pagamentos</h2><p>Depois de criar a pré-reserva, defina o pagamento e acompanhe a arrecadação aqui.</p></div></div>${userReservationList(reservations,"userReservationFilter","Nenhuma reserva mensalista encontrada neste filtro.")}`
       : `${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Reservas avulsas sob sua responsabilidade</strong><small>Esta lista considera a autoria da reserva e as permissões atuais de administrador ou organizador do grupo.</small></div>`:""}${transferUnreadTotal?`<div class="message-alert-banner" role="status"><span class="message-alert-icon">●</span><div><strong>${esc(transferUnreadTotal)} atualização${transferUnreadTotal===1?" de remarcação":"ões de remarcação"}</strong><small>As reservas destacadas possuem pedido, proposta ou devolutiva ainda não visualizada.</small></div></div>`:""}${userReservationList(reservations,"userReservationFilter")}`;
-    return `${pageHeader("Área do usuário", "Minhas reservas", "Administre reservas avulsas e mensalistas sem misturar as cotas atribuídas à sua conta.")}${tabs}${content}`;
+    return `<section class="customer-reservation-page">${pageHeader("Área do usuário", "Minhas reservas", "Administre reservas avulsas e mensalistas sem misturar as cotas atribuídas à sua conta.")}${tabs}${content}</section>`;
   }
 
   function userShares() {
     const reservations=userShareReservations();
     const pending=userPendingSharesCount();
-    return `${pageHeader("Área do usuário", "Minhas cotas", "Consulte e pague somente os valores atribuídos à sua conta, mesmo quando outra pessoa administra a reserva.", `<button class="button secondary small" data-nav="reservations">Ver minhas reservas</button>`)}
+    return `<section class="customer-reservation-page">${pageHeader("Área do usuário", "Minhas cotas", "Consulte e pague somente os valores atribuídos à sua conta, mesmo quando outra pessoa administra a reserva.", `<button class="button secondary small" data-nav="reservations">Ver minhas reservas</button>`)}
       ${backendIsOnline()?`<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>${esc(pending)} pagamento${pending===1?" pendente":"s pendentes"}</strong><small>Cotas avulsas e mensalistas aparecem uma única vez por pagador. A reserva pode também constar em Minhas reservas quando você for responsável pela gestão, sem gerar cobrança duplicada.</small></div>`:""}
-      ${userReservationList(reservations,"userShareFilter","Nenhuma cota foi atribuída a esta conta.")}`;
+      ${userReservationList(reservations,"userShareFilter","Nenhuma cota foi atribuída a esta conta.")}</section>`;
   }
 
   function userFavorites() {
@@ -10000,6 +10039,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   function render() {
+    if(window.TamoonMarketplacePilot?.leaving)return;
     capturePartnerInterestDraft();
     const financeScreen=state.activePage?.[state.role]==="finance"?captureFinanceScreen(app.querySelector(".finance-page")):null;
     const preserveFinance=financeScreen&&state.activePage?.[state.role]==="finance"&&financeScreen.identity===financeScreenIdentity();
@@ -10530,6 +10570,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   async function handleAction(button) {
     // Capture the native change before asynchronous authorization/dispatch yields.
     const actionChecked = button.checked;
+    if(!await waitForInitialDetails())return;
     partnerActionContext=state.role==="partner"?window.MarketplacePartnerOperations.actionPermission(button.dataset.action||""):null;
     if(backendRuntime.enabled&&state.role==="partner"&&partnerActionContext&&!hasPartnerPermission(partnerActionContext)){
       showToast("Acesso Restrito. Esta função não está autorizada para sua conta.");return;
@@ -11625,11 +11666,13 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if(!button||!sound)return;
     const online=backendIsOnline();button.hidden=!online;sound.hidden=!online;
     const count=personalNotificationsForRole().filter((row)=>row.status==="unread").length;
-    button.textContent=`Atualizações${count?` (${count})`:""}`;
+    button.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="header-control-label">Atualizações</span>${count?`<span class="header-notification-count">${count>99?"99+":count}</span>`:""}`;
     button.classList.toggle("has-unread",count>0);
     button.setAttribute("aria-label",`Atualizações, ${count} não lidas`);
     const enabled=operationalAlerts.isEnabled();
-    sound.textContent=enabled?"Som: ativado":"Ativar som";
+    sound.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4 5 9H2v6h3l6 5V4Z"/>${enabled?'<path d="M15 8q4 4 0 8m3-11q7 7 0 14"/>':'<path d="m16 9 5 6m0-6-5 6"/>'}</svg><span class="header-control-label">${enabled?"Som ativado":"Ativar som"}</span>`;
+    sound.setAttribute("aria-label",enabled?"Desativar som":"Ativar som");
+    sound.title=enabled?"Desativar som":"Ativar som";
     sound.setAttribute("aria-pressed",String(enabled));
   }
   function openNotificationInbox(){
@@ -11668,6 +11711,15 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const reservationId=row.entity_type==="reservation"?row.entity_id:row.data?.reservation_id||transfer?.reservationBackendId;
     const reservation=state.reservations.find((item)=>item.backendId===reservationId);
     if(reservation){
+      if(["pix_share_pending","monthly_pix_share_pending","card_payment_assigned","monthly_card_payment_assigned"].includes(row.type) && currentUserShare(reservation)){
+        state.role="user";state.activePage.user="shares";state.filters.userShareStatus="Todas";
+        detailDialog.close();saveState();render();
+        const card=[...app.querySelectorAll('[data-ui-key]')].find(node=>node.dataset.uiKey===`reservation-${reservation.id}`);
+        card?.scrollIntoView({block:"center",behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?"auto":"smooth"});
+        card?.focus({preventScroll:true});
+        if(!document.hidden)await readPersonalNotification(id);
+        return;
+      }
       const partnerItem=state.partnerReservations.find((item)=>item.userReservationId===reservation.id);
       const action=/chat/i.test(row.type||"")?"open-reservation-chat":state.role==="partner"&&partnerItem?"partner-reservation-details":"reservation-details";
       detailDialog.close();await handleAction({dataset:{action,id:action==="partner-reservation-details"?partnerItem.id:reservation.id}});
@@ -11681,7 +11733,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const link=event.target.closest?.('[data-asaas-checkout="true"]');
     if(link)rememberAsaasReturn(link.dataset.id);
   },true);
-  document.getElementById("openNotifications")?.addEventListener("click",openNotificationInbox);
+  document.getElementById("openNotifications")?.addEventListener("click",async()=>{if(await waitForInitialDetails())openNotificationInbox();});
   document.getElementById("toggleNotificationSound")?.addEventListener("click",async()=>{
     const enabling=!operationalAlerts.isEnabled();const ready=await operationalAlerts.setEnabled(enabling);
     renderNotificationControls();showToast(!enabling?"Som dos alertas desativado.":ready?"Som ativado para novas atualizações.":"Preferência salva. O som depende da liberação de áudio deste navegador.");

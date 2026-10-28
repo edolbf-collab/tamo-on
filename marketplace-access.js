@@ -77,7 +77,7 @@
     return {check, reset, dispose() { disposed = true; generation++; clearRetry(); }};
   }
   async function preloadMarketplace(fetcher = fetch) {
-    const response = await fetcher('/marketplace/pilot-assets.json?v=166r6', {cache:'no-store'});
+    const response = await fetcher('/marketplace/pilot-assets.json?v=166r7', {cache:'no-store'});
     if (!response.ok) throw new Error('PREFETCH_UNAVAILABLE');
     const files = await response.json();
     await Promise.all(files.filter(path => /^assets\/pilot-[a-f0-9]{12}\.js$/.test(path)).map(path =>

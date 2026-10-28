@@ -204,7 +204,7 @@
       const {data:clients,error:clientsError}=await c.rpc("partner_client_directory",{p_partner_id:snapshot.preview.partner_id});
       if(clientsError)throw clientsError;
       if(requestedContext!==contextVersion || requestedIdentity!==session?.user?.id)throw new Error("PREVIEW_CONTEXT_CHANGED");
-      snapshot.partner_clients=clients||[];
+      snapshot.partner_clients=clients||[];snapshot.agenda_initial_slots=[];
       await warmPhotoUrls(snapshot);
       bootstrapCache=snapshot;emit("bootstrap",{bootstrap:snapshot});return snapshot;
     }
@@ -246,7 +246,7 @@
     if (voucherRefreshError) throw voucherRefreshError;
     const [voucherStateResult, cancellationResult, ledgerResult, financialReconciliationResult, paymentResponsibleDirectoryResult, partnerDocumentsResult, partnerTeamResult, communityNotificationsResult,
       monthlyLinksResult, monthlyLinkDirectoryResult, monthlySplitDirectoryResult, monthlyCyclesResult, monthlyPreReservationsResult, monthlyStagesResult, monthlyEventsResult, monthlyRequestsResult, occurrenceTransfersResult, reservationFinancialStatusResult, partnerOnboardingResult, partnerClientsResult,
-      scheduleDetailsResult, adminUsersResult, adminReservationsResult] = await Promise.all([
+      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult] = await Promise.all([
       c.from("marketplace_voucher_effective_state").select("*").order("created_at", { ascending: false }),
       c.from("cancellation_requests").select("*").order("created_at", { ascending: false }),
       c.from("accounting_ledger").select("*").order("created_at", { ascending: false }),
@@ -269,7 +269,8 @@
       c.rpc("partner_client_directory",{p_partner_id:null}),
       snapshot.partner_memberships?.length ? c.from("schedule_slots").select("id,venue_space_id,series_id,monthly_link_key,starts_at,ends_at,status,blocked_reason,blocked_at") : Promise.resolve({data:[]}),
       snapshot.is_admin===true ? c.rpc("admin_marketplace_users") : Promise.resolve({data:[]}),
-      snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]})
+      snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]}),
+      c.rpc("agenda_initial_slot_flags",{})
     ]);
     if (voucherStateResult.error) throw voucherStateResult.error;
     if (cancellationResult.error) throw cancellationResult.error;
@@ -311,7 +312,8 @@
     snapshot.monthly_link_requests = monthlyRequestsResult.data || [];
     snapshot.occurrence_transfer_requests = occurrenceTransfersResult.data || [];
     snapshot.reservation_financial_status = reservationFinancialStatusResult.data || [];
-    for(const result of [scheduleDetailsResult,adminUsersResult,adminReservationsResult])if(result.error)throw result.error;
+    for(const result of [scheduleDetailsResult,adminUsersResult,adminReservationsResult,initialSlotFlagsResult])if(result.error)throw result.error;
+    snapshot.agenda_initial_slots=initialSlotFlagsResult.data||[];
     snapshot.schedule_details=scheduleDetailsResult.data||[];
     snapshot.admin_users=adminUsersResult.data||[];
     snapshot.admin_reservations=adminReservationsResult.data||[];

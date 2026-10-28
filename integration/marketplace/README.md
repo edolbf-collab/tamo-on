@@ -123,3 +123,11 @@ A suspensão não apaga os jogos de teste já publicados. Para retirar a interfa
 - Validação: 54 testes Node passaram, incluindo catálogo antecipado, bloqueio de ações até completar dados, contas bloqueadas, modo de consulta, troca de identidade durante carregamento, retorno e duplicação de estado. O navegador local permaneceu indisponível; a conferência visual em iPhone físico deve ser feita na revisão publicada.
 
 Esta revisão não altera migrações, pagamentos, sincronização automática, lista de acesso ou `supabase-config.js`. Avaliação e distância continuam adiadas.
+
+## Correções do piloto — 166-R7
+
+A consulta de agenda importada foi incorporada ao bootstrap normal. A visualização somente leitura não executa essa consulta nem sua verificação de escrita, que causava a interrupção apesar de o bootstrap do parceiro responder com sucesso. A troca de contexto aguarda o carregamento anterior e encerra sua assinatura Realtime antes de abrir o novo escopo. As restrições de escrita continuam ativas.
+
+Minhas cotas destaca o saldo próprio pendente com borda e texto, inclusive em reservas já confirmadas cujo rateio ainda tem parcelas em aberto. Cotas pagas, expiradas, canceladas ou de ciclos encerrados não recebem esse destaque. As notificações de atribuição de pagamento abrem Minhas cotas, restauram o filtro Todas e posicionam/focam o cartão correspondente. Ler o aviso não remove o destaque de pagamento pendente.
+
+O botão Voltar mantém o formato retangular e exibe apenas o texto. Validação: 57 testes Node passaram, incluindo isolamento da visualização, manutenção da consulta normal, estados da cota e navegação da notificação ao cartão. Sem mudanças de banco, permissões ou configuração protegida. Conferência física no iPhone pendente.

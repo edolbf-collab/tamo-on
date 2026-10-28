@@ -96,3 +96,7 @@ body:not(.pilot-locked) #pilotGate { display: none; }
   .app-header .header-actions > .marketplace-session-button { flex-basis:80px; width:80px; }
   .reservation-list .reservation-card-heading > .status { max-width:92px; }
 }
+
+.reservation-list .reservation-card.has-pending-share { border:2px solid var(--amber); background:color-mix(in srgb,var(--amber) 9%,var(--surface)); }
+.pending-share-label { color:var(--amber); font-weight:800; font-size:12px; line-height:1.4; }
+.reservation-card:focus-visible { outline:3px solid var(--green); outline-offset:3px; }
