@@ -131,3 +131,11 @@ A consulta de agenda importada foi incorporada ao bootstrap normal. A visualiza�
 Minhas cotas destaca o saldo próprio pendente com borda e texto, inclusive em reservas já confirmadas cujo rateio ainda tem parcelas em aberto. Cotas pagas, expiradas, canceladas ou de ciclos encerrados não recebem esse destaque. As notificações de atribuição de pagamento abrem Minhas cotas, restauram o filtro Todas e posicionam/focam o cartão correspondente. Ler o aviso não remove o destaque de pagamento pendente.
 
 O botão Voltar mantém o formato retangular e exibe apenas o texto. Validação: 57 testes Node passaram, incluindo isolamento da visualização, manutenção da consulta normal, estados da cota e navegação da notificação ao cartão. Sem mudanças de banco, permissões ou configuração protegida. Conferência física no iPhone pendente.
+
+## Fluxo de pagamento Asaas Sandbox — 166-R8
+
+A interface integrada ainda carregava `simulationPayments: true`, embora o servidor já operasse com Asaas Sandbox e recusasse o simulador antigo. Na RES-001069, o serviço Pix respondeu com sucesso e o frontend chamou em seguida `payment-simulator`, que respondeu 403 `SIMULATION_DISABLED`. A sessão aguardava os dados do pagador; nenhuma cobrança Asaas ou confirmação financeira havia sido registrada.
+
+O frontend passa a usar `simulationPayments: false` e `asaasSandboxCheckout: true`. O fluxo existente apresenta os dados do pagador e depois o QR Code/Copia e Cola do Asaas Sandbox. Cartão também segue sua rota Asaas. Uma proteção no cliente impede chamadas diretas ao simulador nessa configuração. Falhas não simulam quitação nem confirmam a reserva.
+
+Validação: 65 testes Node passaram, incluindo a configuração publicada, abertura do formulário, envio de dados para a mesma reserva, apresentação de Pix, rota de cartão, bloqueio do simulador, autorização do pagador, visualização somente leitura, erros e rejeição de checkout de produção. Não foram alterados prazos, valores, reservas, migrações, credenciais, permissões ou `supabase-config.js`. Pagamentos reais permanecem desativados. A geração e o pagamento pelo usuário no iPhone devem ser conferidos após a atualização.

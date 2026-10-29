@@ -632,6 +632,7 @@
   }
 
   async function simulatePayment(reservationId, installmentId = null) {
+    if (cfg.simulationPayments !== true || cfg.asaasSandboxCheckout === true) throw new Error("SIMULATION_DISABLED");
     return invoke(cfg.functions?.paymentSimulator || "payment-simulator", { reservationId, installmentId });
   }
 

@@ -10,7 +10,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   supabaseUrl: "https://owybghlwcohfyapvsfdo.supabase.co",
   supabasePublishableKey: "sb_publishable_wuVVHMVrCI1MplRzcezIfA_HHTXooiE",
   realtime: true,
-  simulationPayments: true,
+  // The server uses Asaas Sandbox; its legacy local payment simulator is disabled.
+  simulationPayments: false,
+  asaasSandboxCheckout: true,
   auth: {
     google: true,
     emailPassword: true

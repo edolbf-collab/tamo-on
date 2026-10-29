@@ -198,7 +198,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   supabaseUrl: "https://owybghlwcohfyapvsfdo.supabase.co",
   supabasePublishableKey: "sb_publishable_wuVVHMVrCI1MplRzcezIfA_HHTXooiE",
   realtime: true,
-  simulationPayments: true,
+  // The server uses Asaas Sandbox; its legacy local payment simulator is disabled.
+  simulationPayments: false,
+  asaasSandboxCheckout: true,
   auth: {
     google: true,
     emailPassword: true
@@ -421,7 +423,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       const {data:clients,error:clientsError}=await c.rpc("partner_client_directory",{p_partner_id:snapshot.preview.partner_id});
       if(clientsError)throw clientsError;
       if(requestedContext!==contextVersion || requestedIdentity!==session?.user?.id)throw new Error("PREVIEW_CONTEXT_CHANGED");
-      snapshot.partner_clients=clients||[];
+      snapshot.partner_clients=clients||[];snapshot.agenda_initial_slots=[];
       await warmPhotoUrls(snapshot);
       bootstrapCache=snapshot;emit("bootstrap",{bootstrap:snapshot});return snapshot;
     }
@@ -463,7 +465,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if (voucherRefreshError) throw voucherRefreshError;
     const [voucherStateResult, cancellationResult, ledgerResult, financialReconciliationResult, paymentResponsibleDirectoryResult, partnerDocumentsResult, partnerTeamResult, communityNotificationsResult,
       monthlyLinksResult, monthlyLinkDirectoryResult, monthlySplitDirectoryResult, monthlyCyclesResult, monthlyPreReservationsResult, monthlyStagesResult, monthlyEventsResult, monthlyRequestsResult, occurrenceTransfersResult, reservationFinancialStatusResult, partnerOnboardingResult, partnerClientsResult,
-      scheduleDetailsResult, adminUsersResult, adminReservationsResult] = await Promise.all([
+      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult] = await Promise.all([
       c.from("marketplace_voucher_effective_state").select("*").order("created_at", { ascending: false }),
       c.from("cancellation_requests").select("*").order("created_at", { ascending: false }),
       c.from("accounting_ledger").select("*").order("created_at", { ascending: false }),
@@ -486,7 +488,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       c.rpc("partner_client_directory",{p_partner_id:null}),
       snapshot.partner_memberships?.length ? c.from("schedule_slots").select("id,venue_space_id,series_id,monthly_link_key,starts_at,ends_at,status,blocked_reason,blocked_at") : Promise.resolve({data:[]}),
       snapshot.is_admin===true ? c.rpc("admin_marketplace_users") : Promise.resolve({data:[]}),
-      snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]})
+      snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]}),
+      c.rpc("agenda_initial_slot_flags",{})
     ]);
     if (voucherStateResult.error) throw voucherStateResult.error;
     if (cancellationResult.error) throw cancellationResult.error;
@@ -528,7 +531,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     snapshot.monthly_link_requests = monthlyRequestsResult.data || [];
     snapshot.occurrence_transfer_requests = occurrenceTransfersResult.data || [];
     snapshot.reservation_financial_status = reservationFinancialStatusResult.data || [];
-    for(const result of [scheduleDetailsResult,adminUsersResult,adminReservationsResult])if(result.error)throw result.error;
+    for(const result of [scheduleDetailsResult,adminUsersResult,adminReservationsResult,initialSlotFlagsResult])if(result.error)throw result.error;
+    snapshot.agenda_initial_slots=initialSlotFlagsResult.data||[];
     snapshot.schedule_details=scheduleDetailsResult.data||[];
     snapshot.admin_users=adminUsersResult.data||[];
     snapshot.admin_reservations=adminReservationsResult.data||[];
@@ -847,6 +851,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   async function simulatePayment(reservationId, installmentId = null) {
+    if (cfg.simulationPayments !== true || cfg.asaasSandboxCheckout === true) throw new Error("SIMULATION_DISABLED");
     return invoke(cfg.functions?.paymentSimulator || "payment-simulator", { reservationId, installmentId });
   }
 
@@ -2786,10 +2791,11 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     backendRuntime.mutating=true;
     try {
       document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());
+      // Finish the previous scope before changing the read-only session.
+      if(backendBootstrapPromise)await backendBootstrapPromise.catch(()=>{});
+      window.MarketplaceBackend.unsubscribeRealtime();backendRuntime.realtimeSubscribed=false;
       if(partnerId)await window.MarketplaceBackend.beginPartnerReadonly(partnerId);
       else await window.MarketplaceBackend.endPartnerReadonly();
-      // Aguarda eventual carregamento anterior antes de buscar o novo escopo.
-      if(backendBootstrapPromise)await backendBootstrapPromise.catch(()=>{});
       backendRuntime.bootstrap=null;
       state.activePage.partner="overview";state.ui.partnerAgendaDate="";state.ui.partnerAgendaMonth="";state.ui.selectedAvailabilityKeys=[];
       state.role=partnerId?"partner":"admin";
@@ -4512,6 +4518,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   function backendErrorMessage(error) {
     if(String(error?.message||error).includes("AGENDA_INITIAL_"))return window.MarketplaceAgendaInitial.errorMessage(error);
     const message = String(error?.message || error || "");
+    if(message==="SIMULATION_DISABLED")return "Esta versão usa o Asaas Sandbox. Atualize o aplicativo e reabra o pagamento em Minhas reservas.";
     if(/PREBOOKING_DETAILS_STALE/.test(message))return "Os dados da reserva mudaram. Feche esta janela e abra novamente para conferir o grupo e os participantes antes de continuar.";
     if(/PREBOOKING_EDIT_PAYMENT_LOCKED/.test(message))return "O pagamento já foi configurado. Os dados da reserva estão bloqueados para alteração.";
     if(/PREBOOKING_EDIT_CLOSED/.test(message))return "Esta pré-reserva não está mais disponível para edição. Confira a situação atual em Minhas reservas.";
@@ -4607,8 +4614,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     backendBootstrapPromise = (async () => {
       try {
         backendRuntime.session = window.MarketplaceBackend.session;
-        const [bootstrap,initialSlotFlags] = await Promise.all([
-          window.MarketplaceBackend.bootstrap({ force, changes, onCore:core=>{
+        const bootstrap = await window.MarketplaceBackend.bootstrap({ force, changes, onCore:core=>{
             if(backendRuntime.bootstrap || new URLSearchParams(location.search).get("page")!=="discover"
               || core?.profile?.status!=="active" || core.profile.id!==requestedIdentity
               || window.MarketplaceBackend.session?.user?.id!==requestedIdentity
@@ -4618,10 +4624,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
             syncStateFromBackend(core);
             updateBackendRoleAccess();render();
             window.TamoonMarketplacePilot?.ready();
-          } }),
-          window.MarketplaceBackend.rpc("agenda_initial_slot_flags",{})
-        ]);
-        bootstrap.agenda_initial_slots=initialSlotFlags||[];
+          } });
         if (window.MarketplaceBackend.session?.user?.id !== requestedIdentity || bootstrap?.profile?.id !== requestedIdentity) return null;
         if(requestedAccessGeneration!==partnerAccessGeneration)return null;
         if(JSON.stringify(backendRuntime.bootstrap?.partner_memberships||[])!==JSON.stringify(bootstrap?.partner_memberships||[]))closePartnerAccessDialogs();
@@ -8667,12 +8670,15 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     return (state.reservations || []).filter((reservation) => currentUserShare(reservation));
   }
 
+  function userShareIsPending(reservation) {
+    if(!reservation || reservationIsExpired(reservation) || ["cancelled","expired"].includes(reservation.statusKey))return false;
+    if(reservation.monthlyCycleId && monthlyPaymentPresentation(reservation).closed)return false;
+    const share=currentUserShare(reservation);
+    return Boolean(share && !share.paid && Number(share.amount)>0 && ["pending","confirmed"].includes(reservation.statusKey));
+  }
+
   function userPendingSharesCount() {
-    return userShareReservations().filter((reservation) => {
-      if (reservation.monthlyCycleId && monthlyPaymentPresentation(reservation).closed) return false;
-      const share=currentUserShare(reservation);
-      return reservation.statusKey === "pending" && share && !share.paid;
-    }).length;
+    return userShareReservations().filter(userShareIsPending).length;
   }
 
   function reservationUnreadCount(reservations) {
@@ -8707,6 +8713,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const transferUnread=occurrenceTransferUnreadForReservation(reservation);
     const latestTransferNotification=latestOccurrenceTransferNotification(reservation);
     const ownShare=currentUserShare(reservation);
+    const pendingShare=shareView && userShareIsPending(reservation);
     const assignedPayment = shareView && ownShare
       ? `<div class="inline-payment-assignment"><strong>${reservation.monthly?"Sua cota mensal":"Pagamento atribuído a você"}</strong><span>${money(ownShare.amount)} · ${ownShare.paid?"Pagamento confirmado":"Pagamento pendente"}</span></div>`
       : hasSingleCardPaymentResponsible(reservation)
@@ -8729,7 +8736,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const transferNotice=transferUnread&&latestTransferNotification
       ? `<div class="inline-message-notice occurrence-transfer-notice has-unread"><span class="message-badge">${esc(transferUnread)}</span><div><strong>${esc(latestTransferNotification.title)}</strong><span>${esc(latestTransferNotification.body||"Abra os detalhes para visualizar a atualização.")}</span></div></div>`
       : pendingTransfer?`<div class="inline-message-notice occurrence-transfer-notice"><div><strong>${esc(pendingTransfer.statusLabel)}</strong><span>${pendingTransfer.targetDate?`Proposta: ${esc(pendingTransfer.targetDate)} · ${esc(timeRange(pendingTransfer.targetTime,pendingTransfer.targetEndTime))}`:"Abra os detalhes para acompanhar ou decidir."}</span></div></div>`:"";
-    return `<article data-ui-key="reservation-${esc(reservation.id)}" class="reservation-card ${unread||transferUnread ? "has-unread" : ""}"><div class="reservation-date"><strong>${esc(badge.day)}</strong><span>${esc(badge.month)}</span></div><div class="reservation-card-main"><div class="reservation-card-heading"><div><h2>${esc(reservation.venue)}</h2><small class="reservation-public-code">Reserva ${esc(reservation.id)}</small><p>${esc(timeRange(reservation.time,reservation.endTime))} · ${money(reservation.value)}${reservation.monthly ? ` · Mensalista (${esc(reservation.occurrenceCount)} datas)` : ""}${!closedReservationPaymentLabel(reservation)&&!reservation.monthly&&Number(reservation.paymentDue||0)>0 ? ` · Diferença ${money(reservation.paymentDue)}` : ""}${reservation.paymentMethodLabel ? ` · ${esc(reservation.paymentMethodLabel)}` : ""}${splitProgress}</p></div><span class="status ${visual.status}">${visual.label}</span></div><div class="reservation-group-line"><strong>${esc(reservationSubjectLabel(reservation))}</strong><span>${esc(reservation.groupId ? (reservation.groupRole || "") : "Reserva pessoal")}</span></div><div class="reservation-card-meta">${reservationEventSummary(reservation)}</div>${singlePrebookingDeadlineMarkup(reservation)}${assignedPayment}${shareView?"":transferNotice}${!shareView&&unread && reservationBelongsToCurrentUser(reservation) ? `<div class="inline-message-notice"><span class="message-badge">${esc(unread)}</span><strong>${unread === 1 ? "Nova mensagem do parceiro" : `${unread} novas mensagens do parceiro`}</strong></div>` : ""}<div class="reservation-card-actions"><button class="button ghost small" data-action="reservation-details" data-id="${esc(reservation.id)}">${!shareView&&transferUnread?"Ver atualização":"Detalhes"}${!shareView?messageBadge(transferUnread):""}</button>${!shareView&&reservationBelongsToCurrentUser(reservation) ? chatButtonForUser(reservation) : ""}${reservation.pixSplit ? `<button class="button secondary small" data-action="pix-split-details" data-id="${esc(reservation.id)}">${shareView?"Ver minha cota":"Acompanhar rateio"}</button>` : ""}${pendingActions}</div></div></article>`;
+    return `<article data-ui-key="reservation-${esc(reservation.id)}" class="reservation-card ${unread||transferUnread ? "has-unread" : ""} ${pendingShare?"has-pending-share":""}" tabindex="-1"><div class="reservation-date"><strong>${esc(badge.day)}</strong><span>${esc(badge.month)}</span></div><div class="reservation-card-main"><div class="reservation-card-heading"><div><h2>${esc(reservation.venue)}</h2><small class="reservation-public-code">Reserva ${esc(reservation.id)}</small><p>${esc(timeRange(reservation.time,reservation.endTime))} · ${money(reservation.value)}${reservation.monthly ? ` · Mensalista (${esc(reservation.occurrenceCount)} datas)` : ""}${!closedReservationPaymentLabel(reservation)&&!reservation.monthly&&Number(reservation.paymentDue||0)>0 ? ` · Diferença ${money(reservation.paymentDue)}` : ""}${reservation.paymentMethodLabel ? ` · ${esc(reservation.paymentMethodLabel)}` : ""}${splitProgress}</p></div><span class="status ${visual.status}">${visual.label}</span></div><div class="reservation-group-line"><strong>${esc(reservationSubjectLabel(reservation))}</strong><span>${esc(reservation.groupId ? (reservation.groupRole || "") : "Reserva pessoal")}</span></div><div class="reservation-card-meta">${reservationEventSummary(reservation)}</div>${pendingShare?'<div class="pending-share-label" role="status">Pagamento da sua cota pendente</div>':""}${singlePrebookingDeadlineMarkup(reservation)}${assignedPayment}${shareView?"":transferNotice}${!shareView&&unread && reservationBelongsToCurrentUser(reservation) ? `<div class="inline-message-notice"><span class="message-badge">${esc(unread)}</span><strong>${unread === 1 ? "Nova mensagem do parceiro" : `${unread} novas mensagens do parceiro`}</strong></div>` : ""}<div class="reservation-card-actions"><button class="button ghost small" data-action="reservation-details" data-id="${esc(reservation.id)}">${!shareView&&transferUnread?"Ver atualização":"Detalhes"}${!shareView?messageBadge(transferUnread):""}</button>${!shareView&&reservationBelongsToCurrentUser(reservation) ? chatButtonForUser(reservation) : ""}${reservation.pixSplit ? `<button class="button secondary small" data-action="pix-split-details" data-id="${esc(reservation.id)}">${shareView?"Ver minha cota":"Acompanhar rateio"}</button>` : ""}${pendingActions}</div></div></article>`;
   }
 
   function userReservationList(reservations,filterId="userReservationFilter",emptyText="Nenhuma reserva encontrada neste filtro.") {
@@ -11708,6 +11715,15 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const reservationId=row.entity_type==="reservation"?row.entity_id:row.data?.reservation_id||transfer?.reservationBackendId;
     const reservation=state.reservations.find((item)=>item.backendId===reservationId);
     if(reservation){
+      if(["pix_share_pending","monthly_pix_share_pending","card_payment_assigned","monthly_card_payment_assigned"].includes(row.type) && currentUserShare(reservation)){
+        state.role="user";state.activePage.user="shares";state.filters.userShareStatus="Todas";
+        detailDialog.close();saveState();render();
+        const card=[...app.querySelectorAll('[data-ui-key]')].find(node=>node.dataset.uiKey===`reservation-${reservation.id}`);
+        card?.scrollIntoView({block:"center",behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?"auto":"smooth"});
+        card?.focus({preventScroll:true});
+        if(!document.hidden)await readPersonalNotification(id);
+        return;
+      }
       const partnerItem=state.partnerReservations.find((item)=>item.userReservationId===reservation.id);
       const action=/chat/i.test(row.type||"")?"open-reservation-chat":state.role==="partner"&&partnerItem?"partner-reservation-details":"reservation-details";
       detailDialog.close();await handleAction({dataset:{action,id:action==="partner-reservation-details"?partnerItem.id:reservation.id}});

@@ -2297,6 +2297,7 @@
   function backendErrorMessage(error) {
     if(String(error?.message||error).includes("AGENDA_INITIAL_"))return window.MarketplaceAgendaInitial.errorMessage(error);
     const message = String(error?.message || error || "");
+    if(message==="SIMULATION_DISABLED")return "Esta versão usa o Asaas Sandbox. Atualize o aplicativo e reabra o pagamento em Minhas reservas.";
     if(/PREBOOKING_DETAILS_STALE/.test(message))return "Os dados da reserva mudaram. Feche esta janela e abra novamente para conferir o grupo e os participantes antes de continuar.";
     if(/PREBOOKING_EDIT_PAYMENT_LOCKED/.test(message))return "O pagamento já foi configurado. Os dados da reserva estão bloqueados para alteração.";
     if(/PREBOOKING_EDIT_CLOSED/.test(message))return "Esta pré-reserva não está mais disponível para edição. Confira a situação atual em Minhas reservas.";

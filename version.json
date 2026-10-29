@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 115,
   "mandatory": false,
-  "notes": "Correção da visualização de parceiro, destaque de cotas pendentes e botão Voltar sem seta.",
+  "notes": "Correção do fluxo de Pix e cartão no Asaas Sandbox, sem chamada ao simulador antigo.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R7"
+  "integration": "166-R8"
 }
