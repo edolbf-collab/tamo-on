@@ -42,12 +42,16 @@
     if(canShowCopy()){button.textContent='Copiar código Pix';code.focus();code.select();copyFeedback.textContent='Não foi possível copiar automaticamente. Copie o código selecionado.';}
    } finally {if(button.isConnected)button.disabled=false;}
   });
-  let lastRefresh=0,expired=false;
+  let lastRefresh=0,expired=false,refreshDelay=8000;
   const tick=()=>{
    if(!current()){stop();return;}
    const ms=deadline-performance.now(),sec=Math.max(0,Math.ceil(ms/1000));clock.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;
    if(ms<=0&&!expired){expired=true;payment.hidden=true;code.value='';status.textContent='O prazo da reserva terminou. Aguarde a atualização da situação do pagamento.';}
-   if(!refreshing&&performance.now()-lastRefresh>=8000){lastRefresh=performance.now();refreshing=true;Promise.resolve(refresh()).catch(()=>{}).finally(()=>{refreshing=false;});}
+   if(!document.hidden&&!refreshing&&performance.now()-lastRefresh>=refreshDelay){
+    lastRefresh=performance.now();refreshing=true;
+    Promise.resolve().then(refresh).then(()=>{refreshDelay=8000;}).catch(()=>{refreshDelay=Math.min(refreshDelay*2,30000);})
+     .finally(()=>{refreshing=false;lastRefresh=performance.now();});
+   }
   };
   interval=setInterval(tick,500);tick();
  }
@@ -59,7 +63,7 @@
 ;/* asaas-communication.js */
 (() => {
   'use strict';
-  let active=null,requestBusy=false;
+  let active=null,requestBusy=false,cancelActive=null;
   const dialog=document.createElement('dialog');
   dialog.id='asaasCommunicationDialog';
   dialog.className='asaas-communication';
@@ -72,17 +76,17 @@
   // A different asynchronous dialog must not make the app interactive mid-request.
   for(const type of ['click','dblclick','pointerdown','submit','keydown']){
     document.addEventListener(type,event=>{
-      if(!active)return;
+      if(!active||window.TamoonMarketplacePilot?.blocked)return;
       event.preventDefault();event.stopImmediatePropagation();
       heading.focus({preventScroll:true});
     },true);
   }
   window.addEventListener('beforeunload',event=>{
-    if(active){event.preventDefault();event.returnValue='';}
+    if(active&&!window.TamoonMarketplacePilot?.blocked){event.preventDefault();event.returnValue='';}
   });
   async function flow(label,operation,{background=false}={}){
     if(active)throw new Error('ASAAS_COMMUNICATION_BUSY');
-    let timeout,slow;
+    let timeout,slow,rejectCancelled;
     const focused=document.activeElement;
     const overflow=document.body.style.overflow;
     let valid=true;
@@ -90,9 +94,18 @@
       isActive:()=>valid&&active===scope,
       assertActive:()=>{if(!valid||active!==scope)throw new Error('ASAAS_COMMUNICATION_TIMEOUT');}
     });
+    const release=()=>{
+      valid=false;clearTimeout(timeout);clearTimeout(slow);
+      if(active!==scope)return;
+      active=null;requestBusy=false;cancelActive=null;
+      if(dialog.open)dialog.close('cancel');
+      document.body.style.overflow=overflow;
+      if(!window.TamoonMarketplacePilot?.blocked&&!document.querySelector?.('dialog[open]')&&focused?.isConnected)focused.focus?.({preventScroll:true});
+    };
     try{
     if(!background){
       active=scope;
+      cancelActive=()=>{release();rejectCancelled?.(new Error('ASAAS_COMMUNICATION_CANCELLED'));};
       message.textContent=label;
       document.body.style.overflow='hidden';
       dialog.showModal();heading.focus({preventScroll:true});
@@ -100,16 +113,14 @@
     }
       return await Promise.race([
         Promise.resolve().then(()=>operation(background?null:scope)),
+        new Promise((_,reject)=>{rejectCancelled=reject;}),
         new Promise((_,reject)=>{timeout=setTimeout(()=>{valid=false;reject(new Error('ASAAS_COMMUNICATION_TIMEOUT'));},65000);})
       ]);
     }finally{
       clearTimeout(timeout);clearTimeout(slow);
       valid=false;
       if(!background){
-        active=null;requestBusy=false;
-        if(dialog.open)dialog.close();
-        document.body.style.overflow=overflow;
-        if(!document.querySelector?.('dialog[open]')&&focused?.isConnected)focused.focus?.({preventScroll:true});
+        release();
       }
     }
   }
@@ -122,7 +133,7 @@
     try{const result=await operation();scope.assertActive();return result;}
     finally{if(active===scope)requestBusy=false;}
   }
-  window.MarketplaceAsaasCommunication={run,flow,isBusy:()=>Boolean(active)};
+  window.MarketplaceAsaasCommunication={run,flow,isBusy:()=>Boolean(active),cancel:()=>cancelActive?.()};
 })();
 
 ;
@@ -198,7 +209,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   supabaseUrl: "https://owybghlwcohfyapvsfdo.supabase.co",
   supabasePublishableKey: "sb_publishable_wuVVHMVrCI1MplRzcezIfA_HHTXooiE",
   realtime: true,
-  simulationPayments: true,
+  // The server uses Asaas Sandbox; its legacy local payment simulator is disabled.
+  simulationPayments: false,
+  asaasSandboxCheckout: true,
   auth: {
     google: true,
     emailPassword: true
@@ -849,6 +862,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   async function simulatePayment(reservationId, installmentId = null) {
+    if (cfg.simulationPayments !== true || cfg.asaasSandboxCheckout === true) throw new Error("SIMULATION_DISABLED");
     return invoke(cfg.functions?.paymentSimulator || "payment-simulator", { reservationId, installmentId });
   }
 
@@ -2713,7 +2727,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       backendRealtimeRefreshTimer=null;
       if(!backendRefreshQueued)return;
       refreshBackendBootstrap(true).catch(()=>{});
-    },180);
+    },750);
   }
 
   function backendSyncStatus() {
@@ -4515,6 +4529,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   function backendErrorMessage(error) {
     if(String(error?.message||error).includes("AGENDA_INITIAL_"))return window.MarketplaceAgendaInitial.errorMessage(error);
     const message = String(error?.message || error || "");
+    if(message==="SIMULATION_DISABLED")return "Esta versão usa o Asaas Sandbox. Atualize o aplicativo e reabra o pagamento em Minhas reservas.";
     if(/PREBOOKING_DETAILS_STALE/.test(message))return "Os dados da reserva mudaram. Feche esta janela e abra novamente para conferir o grupo e os participantes antes de continuar.";
     if(/PREBOOKING_EDIT_PAYMENT_LOCKED/.test(message))return "O pagamento já foi configurado. Os dados da reserva estão bloqueados para alteração.";
     if(/PREBOOKING_EDIT_CLOSED/.test(message))return "Esta pré-reserva não está mais disponível para edição. Confira a situação atual em Minhas reservas.";
@@ -4658,9 +4673,11 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         }
         return bootstrap;
       } catch (error) {
-        window.TamoonMarketplacePilot?.fail();
+        // A transient refresh failure must not invalidate an already verified session.
         if(window.MarketplaceBackend?.session?.user?.id===requestedIdentity){
-          const transient=/failed to fetch|network|timeout|timed out|load failed|fetch failed|temporarily|502|503|504/i.test(String(error?.message||error));
+          if(requestedAccessGeneration!==partnerAccessGeneration)return null;
+          window.TamoonMarketplacePilot?.handleError(error);
+          const transient=window.TamoonMarketplacePilot?.isTransient(error);
           if(!transient || partnerAccessPending)backendRuntime.bootstrap = null;
           backendRuntime.error = backendErrorMessage(error);
           backendRuntime.refreshError = backendRuntime.error;
@@ -4954,7 +4971,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       if(!window.MarketplaceAsaasCommunication?.flow)throw new Error("ASAAS_COMMUNICATION_UNAVAILABLE");
       return await window.MarketplaceAsaasCommunication.flow("Preparando seu pagamento…",operation);
     } catch(error) {
-      if(identity!==backendRuntime.identityId)return false;
+      if(identity!==backendRuntime.identityId || window.TamoonMarketplacePilot?.blocked)return false;
       if(error?.message==="ASAAS_COMMUNICATION_BUSY")showToast("Aguarde a comunicação que está em andamento.");
       else showAsaasCheckoutFailure(reservation,error);
       return false;
@@ -11742,7 +11759,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   document.addEventListener("keydown",()=>operationalAlerts.arm());
   // Recupera avisos perdidos durante desconexao sem depender apenas do Realtime.
   setInterval(()=>{if(backendIsOnline()&&!document.hidden&&!backendRuntime.mutating&&!app.contains(document.activeElement?.closest("input,textarea,select")))refreshBackendBootstrap(true).catch(()=>{});},30000);
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&backendIsOnline())refreshBackendBootstrap(true).catch(()=>{});});
+  document.addEventListener("visibilitychange",()=>{if(!window.TamoonMarketplacePilot&&!document.hidden&&backendIsOnline())refreshBackendBootstrap(true).catch(()=>{});});
+  window.addEventListener('tamoon-marketplace-retry',()=>{if(!window.TamoonMarketplacePilot?.blocked)refreshBackendBootstrap(true).catch(()=>{});});
 
   document.addEventListener("submit",event=>{
     if(partnerReadonlyActive() && event.submitter?.value!=="cancel"){

@@ -3,6 +3,7 @@
   const endpoint = "https://owybghlwcohfyapvsfdo.supabase.co/functions/v1/community-marketplace-session";
   const sdk = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js";
   let community, pendingSession, timer, ownerId, failed = false, leaving = false, syncPromise, canSyncCommunity=false;
+  let opened = false, recoveryTimer = null, recoveryAttempt = 0, validationPromise = null, refreshAfterValidation=false;
   const message = document.getElementById("pilotMessage"), retry = document.getElementById("pilotRetry");
   window.performance?.mark?.('marketplace-entry-start');
   const clearLocal = () => sessionStorage.removeItem("tamo_on_marketplace_0200_local_fallback");
@@ -33,16 +34,50 @@
     })();
     return syncPromise;
   }
+  function closeDialogs() {
+    window.MarketplaceAsaasCommunication?.cancel?.();
+    window.MarketplaceInlinePix?.stop();
+    // display:none does not release a modal's top-layer/inert state on iOS.
+    document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close('cancel'));
+  }
+  function isTransient(error) {
+    const code=String(error?.code||''), status=Number(error?.status||0), text=String(error?.message||error||'');
+    if ([401,403].includes(status) || /^(42501|PGRST30[123])$/.test(code)
+      || /LOGIN_REQUIRED|PILOT_RESTRICTED|LEGAL_ACCEPTANCE_REQUIRED|AUTH_IDENTITY_CHANGED|permission denied|jwt|session.*expired/i.test(text)) return false;
+    return code==='57014' || /^PGRST00[0-3]$/.test(code) || /^08/.test(code) || status===429 || status>=500
+      || error?.name==='AbortError' || /failed to fetch|network|timeout|timed out|load failed|fetch failed|temporarily|conexão/i.test(text);
+  }
+  function handleError(error) {
+    if (failed || leaving) return;
+    if (!opened || !isTransient(error)) { fail(); return; }
+    const status=document.getElementById('backendSyncStatus');
+    status.textContent='Conexão interrompida. Tentando atualizar suas reservas…'; status.hidden=false;
+    if (recoveryTimer!==null) return;
+    recoveryTimer=setTimeout(() => { recoveryTimer=null; revalidate(true); }, Math.min(30000,2000*2**Math.min(recoveryAttempt++,4)));
+  }
+  function revalidate(refresh=false) {
+    if (failed || leaving || document.hidden) return Promise.resolve();
+    refreshAfterValidation ||= refresh;
+    if (validationPromise) return validationPromise;
+    validationPromise=request('status').then(access => {
+      if (failed || leaving) return;
+      canSyncCommunity=access.canSyncCommunity===true;showDiagnostics();
+      if(refreshAfterValidation)window.dispatchEvent(new Event('tamoon-marketplace-retry'));
+    }).catch(handleError).finally(()=>{validationPromise=null;refreshAfterValidation=false;});
+    return validationPromise;
+  }
   function fail(text = "Não foi possível carregar suas quadras e reservas. Confira a conexão e tente novamente.") {
     if (leaving) return;
-    failed = true; clearInterval(timer);
+    failed = true; clearInterval(timer); clearTimeout(recoveryTimer); recoveryTimer=null;
+    closeDialogs();
     document.body.classList.add("pilot-locked");
     document.body.classList.add("pilot-failed");
     message.textContent = text; retry.hidden = false; pendingSession = null; clearLocal();
+    retry.focus?.({preventScroll:true});
   }
   async function leave() {
     if (leaving) return;
-    leaving = true; clearInterval(timer); clearLocal();
+    leaving = true; clearInterval(timer); clearTimeout(recoveryTimer); clearLocal(); closeDialogs();
     message.textContent = "Voltando à Comunidade…";
     retry.hidden = true;
     document.body.classList.add("pilot-locked");
@@ -54,15 +89,17 @@
   }
   window.TamoonMarketplacePilot = Object.freeze({
     get leaving() { return leaving; },
+    get blocked() { return failed || leaving; },
     takeSession() { const session = pendingSession; pendingSession = null; return session; },
     ready() {
       if (!failed && !leaving) {
+        opened=true; recoveryAttempt=0; clearTimeout(recoveryTimer); recoveryTimer=null;
         document.body.classList.remove("pilot-locked");
         if(!window.performance?.getEntriesByName?.('marketplace-entry').length) {
           window.performance?.measure?.('marketplace-entry','marketplace-entry-start');
         }
       }
-    }, fail, leave, sync
+    }, fail, leave, sync, handleError, isTransient
   });
   function script(src) {
     return new Promise((resolve, reject) => {
@@ -78,12 +115,15 @@
       method:"POST", cache:"no-store",headers:{"Content-Type":"application/json", Authorization:`Bearer ${data.session.access_token}`},body:JSON.stringify({action})
     });
     if (response.status === 401 && retryAuth) { await community.auth.refreshSession(); return request(action,false); }
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error === "LEGAL_ACCEPTANCE_REQUIRED" ? result.error : response.status === 403 ? "PILOT_RESTRICTED" : "ACCESS_FAILED");
+    const result = await response.json().catch(()=>({}));
+    if (!response.ok || (action==='status' && result.allowed!==true)) {
+      const error=new Error(result.error === "LEGAL_ACCEPTANCE_REQUIRED" ? result.error : response.status === 401 ? 'LOGIN_REQUIRED' : response.status === 403 || response.ok ? "PILOT_RESTRICTED" : "ACCESS_FAILED");
+      error.status=response.status;throw error;
+    }
     ownerId = data.session.user.id; return result;
   }
   async function loadAssets() {
-    const response = await fetch("pilot-assets.json?v=166r8", {cache:"no-store"});
+    const response = await fetch("pilot-assets.json?v=166r9", {cache:"no-store"});
     if (!response.ok) throw new Error("LOAD_FAILED");
     // The manifest normally contains one immutable bundle; async=false preserves fallback order.
     await Promise.all((await response.json()).map(script));
@@ -104,9 +144,9 @@
       await Promise.all([loadAssets(), canSyncCommunity ? request("import_group") : Promise.resolve()]);
       if(failed || leaving)return;
       await window.MarketplaceBackend.init();
-      const revalidate = () => request("status").then(access => {canSyncCommunity=access.canSyncCommunity===true;showDiagnostics();}).catch(() => fail());
-      timer = setInterval(revalidate, 60000);
-      document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && !failed && !leaving) revalidate(); });
+      timer = setInterval(() => revalidate(recoveryAttempt>0), 60000);
+      document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') revalidate(true); });
+      window.addEventListener('online', () => revalidate(true));
       document.getElementById('pilotSync').addEventListener('click',sync);
     } catch (error) {
       fail(error.message === "LOGIN_REQUIRED" ? "Entre na Comunidade com sua conta autorizada para continuar."
@@ -115,7 +155,9 @@
     }
   }
   retry.addEventListener("click", () => location.reload());
-  window.addEventListener("offline", () => fail("Conecte-se à internet para consultar quadras, reservas e pagamentos."));
+  window.addEventListener("offline", () => handleError(new Error('NETWORK_OFFLINE')));
+  // Late async UI callbacks must not put a hidden modal above the recovery controls.
+  new MutationObserver(() => {if(failed || leaving)closeDialogs();}).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['open']});
   window.addEventListener("pagehide", clearLocal);
   start();
 })();

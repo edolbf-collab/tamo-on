@@ -495,7 +495,7 @@
       backendRealtimeRefreshTimer=null;
       if(!backendRefreshQueued)return;
       refreshBackendBootstrap(true).catch(()=>{});
-    },180);
+    },750);
   }
 
   function backendSyncStatus() {
@@ -2441,9 +2441,11 @@
         }
         return bootstrap;
       } catch (error) {
-        window.TamoonMarketplacePilot?.fail();
+        // A transient refresh failure must not invalidate an already verified session.
         if(window.MarketplaceBackend?.session?.user?.id===requestedIdentity){
-          const transient=/failed to fetch|network|timeout|timed out|load failed|fetch failed|temporarily|502|503|504/i.test(String(error?.message||error));
+          if(requestedAccessGeneration!==partnerAccessGeneration)return null;
+          window.TamoonMarketplacePilot?.handleError(error);
+          const transient=window.TamoonMarketplacePilot?.isTransient(error);
           if(!transient || partnerAccessPending)backendRuntime.bootstrap = null;
           backendRuntime.error = backendErrorMessage(error);
           backendRuntime.refreshError = backendRuntime.error;
@@ -2737,7 +2739,7 @@
       if(!window.MarketplaceAsaasCommunication?.flow)throw new Error("ASAAS_COMMUNICATION_UNAVAILABLE");
       return await window.MarketplaceAsaasCommunication.flow("Preparando seu pagamento…",operation);
     } catch(error) {
-      if(identity!==backendRuntime.identityId)return false;
+      if(identity!==backendRuntime.identityId || window.TamoonMarketplacePilot?.blocked)return false;
       if(error?.message==="ASAAS_COMMUNICATION_BUSY")showToast("Aguarde a comunicação que está em andamento.");
       else showAsaasCheckoutFailure(reservation,error);
       return false;
@@ -9525,7 +9527,8 @@
   document.addEventListener("keydown",()=>operationalAlerts.arm());
   // Recupera avisos perdidos durante desconexao sem depender apenas do Realtime.
   setInterval(()=>{if(backendIsOnline()&&!document.hidden&&!backendRuntime.mutating&&!app.contains(document.activeElement?.closest("input,textarea,select")))refreshBackendBootstrap(true).catch(()=>{});},30000);
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&backendIsOnline())refreshBackendBootstrap(true).catch(()=>{});});
+  document.addEventListener("visibilitychange",()=>{if(!window.TamoonMarketplacePilot&&!document.hidden&&backendIsOnline())refreshBackendBootstrap(true).catch(()=>{});});
+  window.addEventListener('tamoon-marketplace-retry',()=>{if(!window.TamoonMarketplacePilot?.blocked)refreshBackendBootstrap(true).catch(()=>{});});
 
   document.addEventListener("submit",event=>{
     if(partnerReadonlyActive() && event.submitter?.value!=="cancel"){

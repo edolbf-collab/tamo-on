@@ -2,6 +2,8 @@ body.pilot-locked > :not(#pilotGate):not(script) { display: none !important; }
 #pilotGate { max-width: 34rem; margin: 12vh auto; padding: 1.5rem; color: #e7f8ef; background: #10392f; border-radius: 1.2rem; }
 #pilotGate a, .sandbox-ribbon a { color: inherit; text-decoration: underline; }
 #pilotRetry { margin: 1rem 0; padding: .8rem; }
+#detailDialog[data-view="asaas-payment"] > form > .dialog-actions { display:flex; flex-direction:row; justify-content:center; align-items:center; }
+#detailDialog[data-view="asaas-payment"] > form > .dialog-actions > button { flex:0 1 auto; width:auto; min-width:120px; max-width:100%; margin-inline:auto; text-align:center; justify-content:center; }
 #openBackendStatus, #resetPreview { display: none !important; }
 #toggleNotificationSound[aria-pressed="true"] { color: #bff5da; }
 .sandbox-ribbon { padding-top: max(8px, env(safe-area-inset-top)); }

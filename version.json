@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 115,
   "mandatory": false,
-  "notes": "Correção do fluxo de Pix e cartão no Asaas Sandbox, sem chamada ao simulador antigo.",
+  "notes": "Recuperação após falhas temporárias no Pix, liberação dos controles de retorno e botão Fechar centralizado.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R8"
+  "integration": "166-R9"
 }
