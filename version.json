@@ -3,9 +3,9 @@
   "version": "Beta 1.0",
   "build": 166,
   "database": 151,
-  "edge": 115,
+  "edge": 116,
   "mandatory": false,
-  "notes": "Recuperação após falhas temporárias no Pix, liberação dos controles de retorno e botão Fechar centralizado.",
+  "notes": "Remarcação de eventos manuais agendados, com aviso de alteração por push e preservação das presenças.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R9"
+  "integration": "166-R10"
 }

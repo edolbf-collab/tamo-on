@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 166, database: 151, edge: 115, integration: "166-R9" });
-  const APP_ASSET_TOKEN = "beta166r9";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 166, database: 151, edge: 116, integration: "166-R10" });
+  const APP_ASSET_TOKEN = "beta166r10";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -151,7 +151,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta166r9`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta166r10`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -686,7 +686,25 @@
       return data || {};
     }
 
+    async matchEditContext(matchId) {
+      const { data, error } = await this.client.rpc("community_match_edit_context", { p_match_id: matchId });
+      if (error) throw error;
+      return data;
+    }
+
     async updateMatchSettings(matchId, payload) {
+      if (payload.startsAt) {
+        const data = await this.invokeNotification({
+          action: "match-reschedule", groupId: this.state.currentGroupId, matchId,
+          startsAt: payload.startsAt, expectedStartsAt: payload.expectedStartsAt,
+          maxPlayers: Number(payload.maxPlayers), playersPerTeam: payload.playersPerTeam == null ? null : Number(payload.playersPerTeam),
+          durationMinutes: Number(payload.durationMinutes), notes: payload.notes || ""
+        });
+        if (data.saved !== true) throw new Error("Não foi possível confirmar a alteração do evento.");
+        try { await this.loadGroup(this.state.currentGroupId, { subscribe: false }); }
+        catch { data.refreshError = true; }
+        return data;
+      }
       const { data, error } = await this.client.rpc("update_match_settings", {
         p_match_id: matchId,
         p_max_players: Number(payload.maxPlayers),
@@ -1590,7 +1608,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta166r9");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta166r10");
       }, true);
     },
 
@@ -3032,31 +3050,59 @@
       }
     },
 
-    openMatchEditForm(matchId) {
+    async openMatchEditForm(matchId) {
       if (!this.canManageMatches()) return this.toast("Somente administrador e organizador podem editar eventos.", true);
-      const match = this.state.matches.find(item => item.id === matchId);
+      let context;
+      try { context = await this.repo.matchEditContext(matchId); }
+      catch (error) { return this.toast(error?.message || "Não foi possível carregar o evento. Tente novamente.", true); }
+      const match = context?.match;
       if (!match) return this.toast("Evento não encontrado.", true);
-      if (this.isMatchStarted(match)) return this.toast("Eventos já iniciados não podem ser editados.", true);
+      if (this.isMatchStarted(match) || match.status !== "scheduled") return this.toast("Somente eventos agendados e ainda não iniciados podem ser editados.", true);
+      const inputDate = value => { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
+      const originalLocalStart = inputDate(match.starts_at);
+      const scheduleField = context.can_reschedule
+        ? `<div class="field"><label for="matchEditStartsAt">Data e horário</label><input id="matchEditStartsAt" name="starts_at" type="datetime-local" value="${originalLocalStart}" min="${inputDate(new Date())}" required><small>Ao remarcar, os membros receberão um aviso com a data anterior e a nova. As presenças serão mantidas.</small></div>`
+        : '<div class="notice">A data está vinculada a uma reserva. Faça a remarcação pelo Marketplace.</div>';
       const recurring = Number(match.recurrence_total || 1) > 1;
-      this.modal("Editar evento", `<form id="matchEditForm" class="form-grid"><div class="notice"><strong>${escapeHtml(match.title)}</strong><br>${recurring ? "As alterações serão aplicadas somente a esta ocorrência da série." : "Altere os dados operacionais deste evento."}</div><div class="field"><label>Duração do evento</label><input name="duration_minutes" type="number" min="15" max="480" step="15" value="${matchDuration(match)}" required inputmode="numeric"><small>Horário atual: ${escapeHtml(matchSchedule(match))}</small></div><div class="field-row"><div class="field"><label>Máximo de jogadores</label><input name="max_players" type="number" min="4" max="60" value="${Number(match.max_players)}" required></div><div class="field"><label>Jogadores por time <span class="optional-label">opcional</span></label><input name="players_per_team" type="number" min="2" max="11" value="${match.players_per_team == null ? "" : Number(match.players_per_team)}" placeholder="Não definido"></div></div><div class="field-help">A quantidade de times é definida separadamente na aba Times.</div><div class="field"><label>Observações</label><textarea name="notes" placeholder="Uniforme, prazo, regras...">${escapeHtml(match.notes || "")}</textarea></div><button class="btn btn-primary btn-block">Salvar alterações</button></form>`, (root, close) => {
+      this.modal("Editar evento", `<form id="matchEditForm" class="form-grid"><div class="notice"><strong>${escapeHtml(match.title)}</strong><br>${recurring ? "As alterações serão aplicadas somente a esta ocorrência da série." : "Altere os dados operacionais deste evento."}</div>${scheduleField}<div class="field"><label>Duração do evento</label><input name="duration_minutes" type="number" min="15" max="480" step="15" value="${matchDuration(match)}" required inputmode="numeric"><small>Horário atual: ${escapeHtml(matchSchedule(match))}</small></div><div class="field-row"><div class="field"><label>Máximo de jogadores</label><input name="max_players" type="number" min="4" max="60" value="${Number(match.max_players)}" required></div><div class="field"><label>Jogadores por time <span class="optional-label">opcional</span></label><input name="players_per_team" type="number" min="2" max="11" value="${match.players_per_team == null ? "" : Number(match.players_per_team)}" placeholder="Não definido"></div></div><div class="field-help">A quantidade de times é definida separadamente na aba Times.</div><div class="field"><label>Observações</label><textarea name="notes" placeholder="Uniforme, prazo, regras...">${escapeHtml(match.notes || "")}</textarea></div><button class="btn btn-primary btn-block">Salvar alterações</button></form>`, (root, close) => {
         $("#matchEditForm", root).addEventListener("submit", async event => {
           event.preventDefault();
+          const submit = event.submitter || $("button[type=submit], button.btn-primary", event.currentTarget);
+          if (submit.disabled) return;
           const form = new FormData(event.currentTarget);
           const rawPlayersPerTeam = String(form.get("players_per_team") || "").trim();
-          const submit = event.submitter;
+          const localStart = String(form.get("starts_at") || "");
+          const scheduleChanged = context.can_reschedule && localStart !== originalLocalStart;
+          const startsAt = scheduleChanged ? new Date(localStart) : null;
+          if (scheduleChanged && (!localStart || !Number.isFinite(startsAt.getTime()) || startsAt <= new Date())) {
+            return this.toast("Informe uma data e um horário futuros.", true);
+          }
           submit.disabled = true;
           submit.textContent = "Salvando...";
-          await this.repo.updateMatchSettings(matchId, {
-            maxPlayers: Number(form.get("max_players")),
-            playersPerTeam: rawPlayersPerTeam ? Number(rawPlayersPerTeam) : null,
-            durationMinutes: Number(form.get("duration_minutes")),
-            notes: form.get("notes") || ""
-          });
-          this.state = this.repo.state;
-          close();
-          this.render();
-          this.openMatchDetails(matchId);
-          this.toast("Dados do evento atualizados.");
+          try {
+            const result = await this.repo.updateMatchSettings(matchId, {
+              maxPlayers: Number(form.get("max_players")),
+              playersPerTeam: rawPlayersPerTeam ? Number(rawPlayersPerTeam) : null,
+              durationMinutes: Number(form.get("duration_minutes")),
+              notes: form.get("notes") || "",
+              ...(scheduleChanged ? { startsAt: startsAt.toISOString(), expectedStartsAt: match.starts_at } : {})
+            });
+            this.state = this.repo.state;
+            close();
+            this.render();
+            if (!result.refreshError) this.openMatchDetails(matchId);
+            let message = scheduleChanged ? "Data do evento alterada." : "Dados do evento atualizados.";
+            if (scheduleChanged) message += result.notificationError ? " Não foi possível concluir o envio dos avisos."
+              : result.failed > 0 ? " O aviso foi registrado, mas houve falha no push de alguns aparelhos."
+              : result.sent > 0 ? ` Push enviado a ${result.sent} aparelho(s).` : " Nenhum aparelho habilitado recebeu push.";
+            if (result.refreshError) message += " Reabra o evento para carregar os dados atualizados.";
+            this.toast(message, Boolean(result.notificationError || result.failed || result.refreshError));
+          } catch (error) {
+            this.toast(error?.message || "Não foi possível salvar. Confira a conexão e reabra o evento antes de tentar novamente.", true);
+          } finally {
+            submit.disabled = false;
+            submit.textContent = "Salvar alterações";
+          }
         });
       });
     },
@@ -4256,6 +4302,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         announcement: { icon: "📣", label: "Aviso do grupo" },
         "announcement-resend": { icon: "📣", label: "Aviso reenviado" },
         "match-created": { icon: "⚽", label: "Novo evento" },
+        "match-rescheduled": { icon: "📅", label: "Evento remarcado" },
         "attendance-confirmed": { icon: "✓", label: "Presença confirmada" },
         "attendance-declined": { icon: "×", label: "Alteração de presença" },
         "attendance-reminder": { icon: "🔔", label: "Lembrete de confirmação" },
