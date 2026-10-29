@@ -39,12 +39,16 @@
     if(canShowCopy()){button.textContent='Copiar código Pix';code.focus();code.select();copyFeedback.textContent='Não foi possível copiar automaticamente. Copie o código selecionado.';}
    } finally {if(button.isConnected)button.disabled=false;}
   });
-  let lastRefresh=0,expired=false;
+  let lastRefresh=0,expired=false,refreshDelay=8000;
   const tick=()=>{
    if(!current()){stop();return;}
    const ms=deadline-performance.now(),sec=Math.max(0,Math.ceil(ms/1000));clock.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;
    if(ms<=0&&!expired){expired=true;payment.hidden=true;code.value='';status.textContent='O prazo da reserva terminou. Aguarde a atualização da situação do pagamento.';}
-   if(!refreshing&&performance.now()-lastRefresh>=8000){lastRefresh=performance.now();refreshing=true;Promise.resolve(refresh()).catch(()=>{}).finally(()=>{refreshing=false;});}
+   if(!document.hidden&&!refreshing&&performance.now()-lastRefresh>=refreshDelay){
+    lastRefresh=performance.now();refreshing=true;
+    Promise.resolve().then(refresh).then(()=>{refreshDelay=8000;}).catch(()=>{refreshDelay=Math.min(refreshDelay*2,30000);})
+     .finally(()=>{refreshing=false;lastRefresh=performance.now();});
+   }
   };
   interval=setInterval(tick,500);tick();
  }
