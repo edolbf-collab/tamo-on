@@ -42,12 +42,16 @@
     if(canShowCopy()){button.textContent='Copiar código Pix';code.focus();code.select();copyFeedback.textContent='Não foi possível copiar automaticamente. Copie o código selecionado.';}
    } finally {if(button.isConnected)button.disabled=false;}
   });
-  let lastRefresh=0,expired=false;
+  let lastRefresh=0,expired=false,refreshDelay=8000;
   const tick=()=>{
    if(!current()){stop();return;}
    const ms=deadline-performance.now(),sec=Math.max(0,Math.ceil(ms/1000));clock.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;
    if(ms<=0&&!expired){expired=true;payment.hidden=true;code.value='';status.textContent='O prazo da reserva terminou. Aguarde a atualização da situação do pagamento.';}
-   if(!refreshing&&performance.now()-lastRefresh>=8000){lastRefresh=performance.now();refreshing=true;Promise.resolve(refresh()).catch(()=>{}).finally(()=>{refreshing=false;});}
+   if(!document.hidden&&!refreshing&&performance.now()-lastRefresh>=refreshDelay){
+    lastRefresh=performance.now();refreshing=true;
+    Promise.resolve().then(refresh).then(()=>{refreshDelay=8000;}).catch(()=>{refreshDelay=Math.min(refreshDelay*2,30000);})
+     .finally(()=>{refreshing=false;lastRefresh=performance.now();});
+   }
   };
   interval=setInterval(tick,500);tick();
  }
@@ -59,7 +63,7 @@
 ;/* asaas-communication.js */
 (() => {
   'use strict';
-  let active=null,requestBusy=false;
+  let active=null,requestBusy=false,cancelActive=null;
   const dialog=document.createElement('dialog');
   dialog.id='asaasCommunicationDialog';
   dialog.className='asaas-communication';
@@ -72,17 +76,17 @@
   // A different asynchronous dialog must not make the app interactive mid-request.
   for(const type of ['click','dblclick','pointerdown','submit','keydown']){
     document.addEventListener(type,event=>{
-      if(!active)return;
+      if(!active||window.TamoonMarketplacePilot?.blocked)return;
       event.preventDefault();event.stopImmediatePropagation();
       heading.focus({preventScroll:true});
     },true);
   }
   window.addEventListener('beforeunload',event=>{
-    if(active){event.preventDefault();event.returnValue='';}
+    if(active&&!window.TamoonMarketplacePilot?.blocked){event.preventDefault();event.returnValue='';}
   });
   async function flow(label,operation,{background=false}={}){
     if(active)throw new Error('ASAAS_COMMUNICATION_BUSY');
-    let timeout,slow;
+    let timeout,slow,rejectCancelled;
     const focused=document.activeElement;
     const overflow=document.body.style.overflow;
     let valid=true;
@@ -90,9 +94,18 @@
       isActive:()=>valid&&active===scope,
       assertActive:()=>{if(!valid||active!==scope)throw new Error('ASAAS_COMMUNICATION_TIMEOUT');}
     });
+    const release=()=>{
+      valid=false;clearTimeout(timeout);clearTimeout(slow);
+      if(active!==scope)return;
+      active=null;requestBusy=false;cancelActive=null;
+      if(dialog.open)dialog.close('cancel');
+      document.body.style.overflow=overflow;
+      if(!window.TamoonMarketplacePilot?.blocked&&!document.querySelector?.('dialog[open]')&&focused?.isConnected)focused.focus?.({preventScroll:true});
+    };
     try{
     if(!background){
       active=scope;
+      cancelActive=()=>{release();rejectCancelled?.(new Error('ASAAS_COMMUNICATION_CANCELLED'));};
       message.textContent=label;
       document.body.style.overflow='hidden';
       dialog.showModal();heading.focus({preventScroll:true});
@@ -100,16 +113,14 @@
     }
       return await Promise.race([
         Promise.resolve().then(()=>operation(background?null:scope)),
+        new Promise((_,reject)=>{rejectCancelled=reject;}),
         new Promise((_,reject)=>{timeout=setTimeout(()=>{valid=false;reject(new Error('ASAAS_COMMUNICATION_TIMEOUT'));},65000);})
       ]);
     }finally{
       clearTimeout(timeout);clearTimeout(slow);
       valid=false;
       if(!background){
-        active=null;requestBusy=false;
-        if(dialog.open)dialog.close();
-        document.body.style.overflow=overflow;
-        if(!document.querySelector?.('dialog[open]')&&focused?.isConnected)focused.focus?.({preventScroll:true});
+        release();
       }
     }
   }
@@ -122,7 +133,7 @@
     try{const result=await operation();scope.assertActive();return result;}
     finally{if(active===scope)requestBusy=false;}
   }
-  window.MarketplaceAsaasCommunication={run,flow,isBusy:()=>Boolean(active)};
+  window.MarketplaceAsaasCommunication={run,flow,isBusy:()=>Boolean(active),cancel:()=>cancelActive?.()};
 })();
 
 ;
@@ -2716,7 +2727,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       backendRealtimeRefreshTimer=null;
       if(!backendRefreshQueued)return;
       refreshBackendBootstrap(true).catch(()=>{});
-    },180);
+    },750);
   }
 
   function backendSyncStatus() {
@@ -3563,7 +3574,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         issuedAt:backendDateTimeLabel(row.created_at),
         issuedDate:backendVoucherDate(row.created_at),
         expiresAt:backendVoucherDate(row.effective_expires_at || row.expires_at),
-        validityDays:Number(state.settings.voucherValidityDays || 30),
+        cancellationFlowVersion:row.cancellation_flow_version || originals.get(row.id)?.cancellation_flow_version || "",
+        validityDays:(row.cancellation_flow_version || originals.get(row.id)?.cancellation_flow_version)==="marketplace-cancellation-7d-v1"?90:Number(state.settings.voucherValidityDays || 30),
         useType:row.single_use ? "single" : "multiple",
         eligibleBookingMode:row.booking_scope || "any",
         originBookingMode:row.original_booking_mode || "single",
@@ -3835,6 +3847,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         eventPublicationStatus:!reservation.event_id && (reservation.status === "expired" || reservation.event_mode === "none") ? "none" : visual.key === "cancelled" ? (reservation.status === "expired" ? event?.status || reservation.event_publication_status || "standby_payment" : "cancelled") : (event?.status || reservation.event_publication_status || "standby_payment"),
         cancellationPolicyAccepted:Boolean(reservation.cancellation_policy_accepted_at),
         cancellationPolicyAcceptedAt:backendDateTimeLabel(reservation.cancellation_policy_accepted_at),
+        cancellationFlowVersion:reservation.cancellation_flow_version || "",
         cancellationPolicyVersion:reservation.cancellation_policy_version || "marketplace-0.2.0",
         amountPaid:actuallyPaid,
         accountingRecognizedValue:visual.key === "confirmed" ? Number(reservation.net_value || 0) : 0,
@@ -3930,7 +3943,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         voucherId:generatedVoucher?.id || "",
         voucherCode:generatedVoucher?.code || "",
         refundValue:Number(refund?.amount || 0),
-        feeResponsibility:request.resolution === "refund_required" ? request.requester_type : "",
+        feeResponsibility:request.resolution === "refund_required" ? (request.resolution_details?.flow==="cancellation_7d_v1"?"partner":request.requester_type) : "",
         outsideDeadline:request.within_deadline === false,
         slotReleased:true,
         eventId:reservation?.eventId || "",
@@ -4662,9 +4675,11 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         }
         return bootstrap;
       } catch (error) {
-        window.TamoonMarketplacePilot?.fail();
+        // A transient refresh failure must not invalidate an already verified session.
         if(window.MarketplaceBackend?.session?.user?.id===requestedIdentity){
-          const transient=/failed to fetch|network|timeout|timed out|load failed|fetch failed|temporarily|502|503|504/i.test(String(error?.message||error));
+          if(requestedAccessGeneration!==partnerAccessGeneration)return null;
+          window.TamoonMarketplacePilot?.handleError(error);
+          const transient=window.TamoonMarketplacePilot?.isTransient(error);
           if(!transient || partnerAccessPending)backendRuntime.bootstrap = null;
           backendRuntime.error = backendErrorMessage(error);
           backendRuntime.refreshError = backendRuntime.error;
@@ -4958,7 +4973,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       if(!window.MarketplaceAsaasCommunication?.flow)throw new Error("ASAAS_COMMUNICATION_UNAVAILABLE");
       return await window.MarketplaceAsaasCommunication.flow("Preparando seu pagamento…",operation);
     } catch(error) {
-      if(identity!==backendRuntime.identityId)return false;
+      if(identity!==backendRuntime.identityId || window.TamoonMarketplacePilot?.blocked)return false;
       if(error?.message==="ASAAS_COMMUNICATION_BUSY")showToast("Aguarde a comunicação que está em andamento.");
       else showAsaasCheckoutFailure(reservation,error);
       return false;
@@ -6451,7 +6466,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         ? `<strong>Mensalista indisponível</strong><small>Não há continuidade semanal deste espaço e horário até o fim do mês${offer.missingDates.length ? `: ${offer.missingDates.map(esc).join(", ")}` : ""}. Esta data pode ser reservada como avulsa.</small>` : "";
       selectedReservation.reviewSignature = reservationReviewSignature(selectedReservation, false);
       if(outcomeText)outcomeText.textContent="O horário ficará pré-reservado por 30 minutos. Defina e conclua o pagamento em Minhas reservas dentro desse prazo.";
-      if(reservationPolicyText)reservationPolicyText.textContent="Reserva avulsa: a pré-reserva permite pagar em até 30 minutos. Após o pagamento, o usuário pode cancelar em até 24 horas para receber o voucher previsto nas regras. Parceiro ou Tâmo On: reembolso integral. Fora do prazo não há crédito automático." + " " + splitCancellationPolicyText({monthly:false});
+      if(reservationPolicyText)reservationPolicyText.textContent=cancellationContractText();
       updateVoucherPaymentPreview();
       return;
     }
@@ -6460,13 +6475,13 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if (!monthlyReservationToggle.checked) {
       monthlyReservationPreview.innerHTML = `<strong>${money(selectedReservation.slot.monthlyPrice)}</strong><span>${occurrences.length} datas disponíveis · ${timeRange(selectedReservation.time, selectedReservation.endTime)}</span><small>O parceiro já publicou valor e elegibilidade; não é necessário solicitar proposta.</small>`;
       if(outcomeText)outcomeText.textContent="O horário ficará pré-reservado por 30 minutos. Defina e conclua o pagamento em Minhas reservas dentro desse prazo.";
-      if(reservationPolicyText)reservationPolicyText.textContent="Reserva avulsa: a pré-reserva permite pagar em até 30 minutos. Após o pagamento, o usuário pode cancelar em até 24 horas para receber o voucher previsto nas regras. Parceiro ou Tâmo On: reembolso integral. Fora do prazo não há crédito automático." + " " + splitCancellationPolicyText({monthly:false});
+      if(reservationPolicyText)reservationPolicyText.textContent=cancellationContractText();
       updateVoucherPaymentPreview();
       return;
     }
     monthlyReservationPreview.innerHTML = `<div class="monthly-preview-heading"><strong>${money(selectedReservation.slot.monthlyPrice)}</strong><span>${occurrences.length} datas do primeiro ciclo</span></div><p class="monthly-occurrence-text">${occurrences.map((occurrence) => `${esc(dateCompactWeekdayPt(occurrence.date))}, das ${esc(occurrence.time)} às ${esc(occurrence.endTime)}`).join("; ")}.</p><small>A confirmação cria o vínculo protegido diretamente. Após o pagamento, o chat com o parceiro permanece disponível até o fim da última ocorrência do ciclo.</small>`;
     if(outcomeText)outcomeText.textContent="O vínculo e os eventos serão pré-reservados. O pagamento será definido em Minhas reservas; o chat é liberado após a confirmação.";
-    if(reservationPolicyText)reservationPolicyText.textContent="Mensalista: o pagamento antecipado é opcional. A garantia vence 15 minutos antes da primeira ocorrência aplicável; o saldo vence no quinto dia útil, antecipado para 15 minutos antes do primeiro jogo desse dia quando houver." + " " + splitCancellationPolicyText({monthly:true});
+    if(reservationPolicyText)reservationPolicyText.textContent=cancellationContractText();
     updateVoucherPaymentPreview();
   }
 
@@ -6733,6 +6748,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   function splitCancellationPolicyText(reservation = {}) {
+    if(reservation.cancellationFlowVersion==="marketplace-cancellation-7d-v1")return cancellationContractText();
     const deadline=reservation.monthly
       ? `até ${state.settings.cancellationHours} horas antes da primeira ocorrência do mensal`
       : "em até 24 horas do primeiro pagamento enquanto o rateio estiver parcial; após a quitação, em até 24 horas da confirmação da reserva, sempre antes do início";
@@ -6752,8 +6768,105 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     return `<div class="detail-line"><span>Voucher</span><strong>${esc(reservation.voucherGeneratedCode || "Não gerado")}</strong></div>`;
   }
 
+  function cancellationContractText() {
+    return "Cancelamento automático dentro de 7 dias corridos, contados a partir do dia seguinte à contratação, e antes do início do horário reservado. Você também pode solicitar no próprio dia da contratação. Escolha restituição integral ou voucher de uso único, válido por 90 dias, no mesmo parceiro, para reserva de valor igual ou superior. Após o prazo, o voucher deixa de ser utilizável automaticamente. Pedidos fora do fluxo automático são registrados para análise individual, preservados os direitos legais. Em rateios, cada pagador decide sobre seu valor; o organizador não converte o pagamento dos demais em voucher.";
+  }
+
+  function cancellationVoucherChoiceText() {
+    return "Escolho receber meu valor em voucher de uso único, em vez de restituição. O voucher vale por 90 dias no mesmo parceiro e exige reserva de valor igual ou superior, com pagamento da diferença. Após o vencimento, seu uso automático é encerrado. Situações específicas podem ser submetidas ao atendimento, preservados os direitos legais.";
+  }
+
+  function openNewCancellation(reservation,options) {
+    const automatic=options.automatic===true, mine=(options.payments||[]).filter(p=>p.mine), identity=backendRuntime.identityId;
+    const fields=[{name:"summary",type:"custom",full:true,html:`<div class="callout"><strong>${automatic?"Cancelamento e destino dos pagamentos":"Pedido para análise individual"}</strong><p>${automatic?"Os horários futuros serão liberados. Pagamentos de outras pessoas permanecem destinados à restituição até que cada beneficiário escolha seu próprio voucher. Não haverá desconto de tarifa do valor a devolver.":"O envio registra a data do pedido e não cancela a reserva nem confirma uma restituição. A administração analisará os fatos com o parceiro e registrará a resposta."}</p>${options.starts_at?`<p>Início reservado: ${esc(backendDateTimeLabel(options.starts_at))}.</p>`:""}${options.deadline_exclusive?`<p>Janela de sete dias: até ${esc(backendDateTimeLabel(new Date(new Date(options.deadline_exclusive).getTime()-1000).toISOString()))}, observado o início do evento para processamento automático.</p>`:""}<p>O espaço permanece reservado até o final do período, inclusive em caso de atraso ou não comparecimento.</p></div>`},
+      {name:"reason",label:"Motivo do pedido",type:"textarea",required:true,full:true}];
+    if(automatic&&mine.length)fields.push({name:"resolution",label:`Destino do seu pagamento (${money(mine.reduce((a,p)=>a+Number(p.amount),0))})`,type:"select",value:"refund",options:[{value:"refund",label:"Restituição pelo pagamento de origem"},{value:"voucher",label:"Voucher de uso único · 90 dias"}],full:true},
+      {name:"voucherConsent",label:"Escolha do voucher",type:"checkbox-group",full:true,options:[{value:"voucher_accepted",label:cancellationVoucherChoiceText(),checked:false}]});
+    openForm({eyebrow:"Cancelamento",title:reservation.id,description:automatic?"Confira antes de confirmar.":"Registre seu pedido para atendimento.",fields,submitLabel:automatic?"Confirmar cancelamento":"Enviar para análise",
+      onChange:(_event,form)=>{if(automatic&&mine.length)setFormFieldVisible("voucherConsent",form.elements.resolution?.value==="voucher")},
+      onSubmit:async data=>{
+        if(identity!==backendRuntime.identityId)return false;
+        const choice=automatic&&mine.length?data.resolution:"refund";
+        if(choice==="voucher"&&data.voucher_accepted!=="true")return markFormFieldInvalid("voucherConsent","Confirme a escolha do voucher.");
+        const result=await runBackendMutation("",()=>window.MarketplaceBackend.rpc("submit_reservation_cancellation",{p_reservation_id:reservation.backendId,p_reason:String(data.reason||"").trim(),p_resolution:choice,p_preview_token:options.preview_token,p_voucher_accepted:choice==="voucher"&&data.voucher_accepted==="true"}));
+        if(!result)return false;
+        showToast(result.review?"Pedido registrado para análise individual.":"Reserva cancelada. Acompanhe os pagamentos em Cancelamentos e restituições.");
+      }});
+  }
+
+  let cancellationCasesSequence=0;
+  async function openCancellationCases() {
+    const seq=++cancellationCasesSequence,identity=backendRuntime.identityId,role=state.role;
+    try {
+      const cases=await window.MarketplaceBackend.rpc("cancellation_case_directory",{});
+      if(seq!==cancellationCasesSequence||identity!==backendRuntime.identityId||role!==state.role)return;
+      const labels={pending:"Em análise",processed:"Cancelamento processado",rejected:"Pedido não aprovado",approved:"Pedido aprovado"};
+      openDetail({eyebrow:"Atendimento e pagamentos",title:"Cancelamentos e restituições",body:`<div class="cancellation-case-list">${(cases||[]).map(c=>{
+        const history=c.resolution_details?.history||[];
+        c={...c,can_decide:role==="admin"&&c.can_decide,can_comment:role==="partner"&&c.can_comment,can_refund:(role==="admin"||role==="partner")&&c.can_refund};
+        const ownChoices=(c.choices||[]).filter(x=>x.mine&&x.can_choose);
+        return `<article class="card"><h3>${esc(c.public_code)} · ${esc(labels[c.status]||c.status)}</h3><p>Solicitado em ${esc(backendDateTimeLabel(c.created_at))}</p><p>${esc(c.reason)}</p>
+        ${c.status==="pending"?"<p>A reserva permanece inalterada enquanto o pedido é analisado.</p>":""}
+        ${(c.choices||[]).map(x=>`<div class="detail-line"><span>${x.mine?"Seu pagamento":"Pagamento"} · ${x.resolution==="voucher"?"Voucher emitido":Number(x.refunded_amount)>=Number(x.amount)?"Restituição concluída":"Restituição pendente"}</span><strong>${money(x.amount)}</strong></div>${x.cash&&x.resolution==="refund"&&Number(x.refunded_amount)<Number(x.amount)&&c.can_refund?`<button class="button secondary small" data-action="cancellation-cash-refund" data-choice-id="${esc(x.id)}">Registrar devolução em dinheiro</button>`:""}`).join("")}
+        ${ownChoices.length?`<div class="dialog-actions"><button class="button secondary small" data-action="cancellation-choice" data-request-id="${esc(c.id)}" data-resolution="refund">Manter restituição</button><button class="button secondary small" data-action="cancellation-choice" data-request-id="${esc(c.id)}" data-resolution="voucher">Escolher voucher · 90 dias</button></div>`:""}
+        ${c.can_refund&&c.status==="processed"&&(c.choices||[]).some(x=>!x.cash&&x.resolution==="refund"&&Number(x.refunded_amount)<Number(x.amount))?`<button class="button secondary small" data-action="cancellation-refund-process" data-reservation-id="${esc(c.reservation_id)}">Processar restituições</button>`:""}
+        ${history.length?`<details><summary>Manifestações e decisão</summary>${history.map(h=>`<p><strong>${esc(backendDateTimeLabel(h.at))} · ${esc({approve:"Aprovado",deny:"Não aprovado",comment:"Manifestação"}[h.decision]||h.decision)}</strong><br>${esc(h.reason)}</p>`).join("")}</details>`:""}
+        ${c.status==="pending"&&(c.can_decide||c.can_comment)?`<button class="button secondary small" data-action="cancellation-review" data-request-id="${esc(c.id)}" data-can-decide="${c.can_decide}">${c.can_decide?"Analisar pedido":"Registrar manifestação"}</button>`:""}
+        <p class="field-help">Dúvidas ou novos documentos: suporte@tamoon.app.br.</p></article>`;
+      }).join("")||'<p>Nenhum pedido registrado.</p>'}</div>`});
+    }catch(error){if(identity===backendRuntime.identityId)showToast(backendErrorMessage(error));}
+  }
+
+  async function handleCancellationAction(button) {
+    const action=button.dataset.action,identity=backendRuntime.identityId;
+    if(action==="cancellation-cases"){await openCancellationCases();return true;}
+    if(action==="cancellation-refund-process"){await openAsaasCancellationRefund(button.dataset.reservationId);return true;}
+    if(action==="cancellation-choice"){
+      const voucher=button.dataset.resolution==="voucher";
+      openForm({eyebrow:"Seu pagamento",title:voucher?"Escolher voucher":"Manter restituição",description:voucher?cancellationVoucherChoiceText():"A restituição seguirá pelo pagamento de origem, sem desconto de tarifa.",
+        fields:voucher?[{name:"consent",label:"Confirmação",type:"checkbox-group",required:true,full:true,options:[{value:"accepted",label:"Li e escolho o voucher nas condições apresentadas.",checked:false}]}]:[],submitLabel:"Confirmar escolha",
+        onSubmit:async data=>{
+          if(identity!==backendRuntime.identityId)return false;
+          if(voucher&&data.accepted!=="true")return markFormFieldInvalid("consent","Confirme sua escolha.");
+          const result=await runBackendMutation("Escolha registrada.",()=>window.MarketplaceBackend.rpc("choose_cancellation_resolution",{p_request_id:button.dataset.requestId,p_resolution:button.dataset.resolution,p_voucher_accepted:voucher}));
+          if(!result)return false;return {afterClose:openCancellationCases};
+        }});return true;
+    }
+    if(action==="cancellation-review"){
+      const canDecide=button.dataset.canDecide==="true";
+      openForm({eyebrow:"Análise individual",title:"Registrar análise",description:"Considere a data do pedido, a disponibilidade do espaço e os fatos específicos. A resposta será exibida ao solicitante.",
+        fields:[...(canDecide?[{name:"decision",label:"Encaminhamento",type:"select",value:"comment",options:[{value:"comment",label:"Registrar manifestação e continuar análise"},{value:"approve",label:"Aprovar cancelamento e restituição integral"},{value:"deny",label:"Não aprovar, com fundamentação"}]}]:[]),{name:"reason",label:"Fatos analisados e fundamentação",type:"textarea",required:true,full:true}],submitLabel:"Registrar",
+        onSubmit:async data=>{
+          if(identity!==backendRuntime.identityId)return false;
+          const result=await runBackendMutation("Análise registrada.",()=>window.MarketplaceBackend.rpc("review_reservation_cancellation",{p_request_id:button.dataset.requestId,p_decision:canDecide?data.decision:"comment",p_reason:String(data.reason||"").trim()}));
+          if(!result)return false;return {afterClose:openCancellationCases};
+        }});return true;
+    }
+    if(action==="cancellation-cash-refund"){
+      openForm({eyebrow:"Devolução em dinheiro",title:"Registrar devolução realizada",description:"Registre apenas uma devolução já efetuada ao pagador. Pagamentos digitais são conciliados pelo Asaas.",fields:[{name:"reference",label:"Comprovante ou referência",required:true,full:true}],submitLabel:"Confirmar devolução",
+        onSubmit:async data=>{
+          if(identity!==backendRuntime.identityId)return false;
+          const result=await runBackendMutation("Devolução registrada.",()=>window.MarketplaceBackend.rpc("record_cash_cancellation_refund",{p_choice_id:button.dataset.choiceId,p_reference:String(data.reference||"").trim()}));
+          if(!result)return false;return {afterClose:openCancellationCases};
+        }});return true;
+    }
+    return false;
+  }
+
+  async function openAsaasCancellationRefund(reservationId) {
+    await openAsaasRefund(reservationId,"preview");
+  }
+
   let cancellationPreviewSequence=0;
   async function openOfficialReservationCancellation(reservation, actorLabel) {
+    if(reservation?.backendOfficial && actorLabel==="Usuário") {
+      const identity=backendRuntime.identityId;
+      try {
+        const options=await window.MarketplaceBackend.rpc("reservation_cancellation_options",{p_reservation_id:reservation.backendId});
+        if(identity!==backendRuntime.identityId)return;
+        if(!options.legacy || options.review_reason!=="previous_policy")return openNewCancellation(reservation,options);
+      } catch(error){showToast(backendErrorMessage(error));return;}
+    }
     if (!reservation?.backendOfficial || !reservation.backendId || reservation.statusKey === "cancelled") return;
     const sequence=++cancellationPreviewSequence, identity=backendRuntime.identityId;
     let plan;
@@ -7388,6 +7501,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   function pageHeader(eyebrow, title, description, actions = "") {
+    if(backendIsOnline())actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
@@ -7565,6 +7679,10 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   function userCancellationAction(reservation) {
+    if(reservation?.backendOfficial && reservationBelongsToCurrentUser(reservation) && reservation.statusKey!=="cancelled") {
+      const started=parsePtDateTime(firstReservationOccurrence(reservation).date,firstReservationOccurrence(reservation).time).getTime()<=Date.now();
+      return `<button class="button ${started?"ghost":"danger"} small" data-action="cancel-paid-user-reservation" data-id="${esc(reservation.id)}">${started?"Solicitar análise":"Cancelar reserva"}</button>`;
+    }
     if (reservation.statusKey !== "confirmed" || (backendIsOnline() && !reservationBelongsToCurrentUser(reservation))) return "";
     const eligibility = cancellationEligibility(reservation, "user");
     if (reservation.monthly && eligibility.mode === "monthly_locked") return `<button class="button ghost small" type="button" disabled title="O prazo terminou 24 horas antes da primeira ocorrência">Cancelamento encerrado</button>`;
@@ -8504,7 +8622,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         {name:"pixMembers",label:"Pagadores do mês",type:"checkbox-group",full:true,help:"Selecione ao menos dois pagadores. Uma pessoa que arrecada por vários membros pode receber uma cota maior. Cada pagador será cobrado apenas uma vez.",options:members.map((member)=>({value:`payment_share_${member.backendProfileId||member.id}`,label:member.name,help:member.role,checked:true}))},
         {name:"pixSplitAmounts",type:"custom",full:true,html:`<div class="dynamic-pix-split-members">${memberAmountFields.map(({member,name,row})=>`<label class="pix-split-member-row" data-payment-split-row="${esc(row)}"><span><strong>${esc(member.name)}</strong><small>${esc(member.role)}</small></span><span class="pix-split-value"><span>R$</span><input type="number" min="0.01" step="0.01" inputmode="decimal" name="${esc(name)}" data-payment-split-amount value="0.00"></span></label>`).join("")}</div>`},
         {name:"pixSplitSummary",type:"custom",full:true,html:'<div class="pix-split-summary dynamic-pix-split-summary" data-payment-split-summary></div>'},
-        {name:"financialPolicy",label:"Termos financeiros",type:"checkbox-group",required:true,full:true,options:[{value:"financial_policy_accepted",label:"Aceito os prazos e as regras desta reserva",help:(reservation.monthly?"O rateio cobre o mês inteiro em uma única rodada. O mínimo acumulado libera os primeiros horários cobertos e o saldo permanece nas cotas não pagas até o quinto dia útil.":"O pagamento mantém o prazo atual da pré-reserva. Após a confirmação, o cancelamento com voucher pode ser solicitado em até 24 horas.")+" "+splitCancellationPolicyText(reservation),checked:false}]}
+        {name:"financialPolicy",label:"Termos financeiros",type:"checkbox-group",required:true,full:true,options:[{value:"financial_policy_accepted",label:"Aceito os prazos e as regras desta reserva",help:(reservation.monthly?"O rateio cobre o mês inteiro em uma única rodada. O mínimo acumulado libera os primeiros horários cobertos e o saldo permanece nas cotas não pagas até o quinto dia útil.":"O pagamento mantém o prazo atual da pré-reserva. O cancelamento segue as condições aceitas na criação da reserva.")+" "+splitCancellationPolicyText(reservation),checked:false}]}
       ],
       onChange:updatePaymentConfigurationFields,
       onSubmit:async(data,{intent="later"}={})=>{
@@ -8526,7 +8644,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         const payerId=method==="credit_card_asaas"?(data.choose_other_card_payer==="true"?data.cardPayerId:currentProfileId):null;
         const action=paymentConfigurationAction({method,amount,useSplit,split,payerId,ownerId:reservation.userId,currentProfileId});
         if(intent==="now"&&amount>0&&!action.canPayNow)return markFormFieldInvalid("paymentResponsibility","Não há pagamento atribuído à sua conta nesta configuração.");
-        return saveReservationPaymentConfiguration(reservation,{reservationId:reservation.backendId,expectedPrebookingRevision:reservation.prebookingRevision??0,monthly:reservation.monthly,paymentMethod:method,voucherCode:data.voucherCode||null,split,cardPayerId:payerId,prepaymentMode:reservation.monthly?"single_collection":"staged",policyVersion:"marketplace-0.2.0-part-22ar",policyAccepted:true},{intent,amount,currentProfileId});
+        return saveReservationPaymentConfiguration(reservation,{reservationId:reservation.backendId,expectedPrebookingRevision:reservation.prebookingRevision??0,monthly:reservation.monthly,paymentMethod:method,voucherCode:data.voucherCode||null,split,cardPayerId:payerId,prepaymentMode:reservation.monthly?"single_collection":"staged",policyVersion:"marketplace-cancellation-7d-v1",policyAccepted:true},{intent,amount,currentProfileId});
       }
     });
     updatePaymentConfigurationFields();
@@ -8534,6 +8652,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 
   function userPendingCancellationAction(reservation) {
     if (!reservationBelongsToCurrentUser(reservation)) return "";
+    if(reservation.backendOfficial)return userCancellationAction(reservation);
     return `<button class="button danger small" data-action="reservation-status" data-id="${esc(reservation.id)}" data-status="cancelled">Cancelar</button>`;
   }
 
@@ -8725,7 +8844,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       ? `${userPaymentAction(reservation)}${!reservation.backendOfficial && !reservation.pixSplit ? `<button class="button secondary small" data-action="reservation-status" data-id="${esc(reservation.id)}" data-status="confirmed">Simular pagamento</button>` : ""}${shareView?"":userPendingCancellationAction(reservation)}`
       : shareView
         ? ""
-        : reservation.statusKey === "confirmed"
+        : ["confirmed","completed"].includes(reservation.statusKey)
           ? userCancellationAction(reservation)
           : reservation.statusKey === "cancelled" && reservation.outsideDeadline && !reservation.exceptionReviewId && reservationBelongsToCurrentUser(reservation)
             ? `<button class="button ghost small" data-action="request-cancellation-exception" data-id="${esc(reservation.id)}">Solicitar análise excepcional</button>`
@@ -9002,7 +9121,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   function partnerCancellationVouchers() {
     const vouchers=state.cancellationVouchers.filter(voucher=>voucher.venueId===state.partnerProfile.venueId);
     const used=vouchers.filter(window.MarketplacePartnerOperations.voucherUsed),available=vouchers.filter(v=>!window.MarketplacePartnerOperations.voucherUsed(v));
-    const card=(voucher)=>`<article class="card voucher-card"><div class="section-heading"><div><span class="status ${["active", "active_extended"].includes(voucher.status) ? "status-ok" : "status-neutral"}">${esc(voucherStatusLabel(voucher))}</span><h3>${esc(voucher.code)}</h3></div><strong class="voucher-value">${money(voucher.value)}</strong></div><div class="detail-list"><div class="detail-line"><span>Reserva de origem</span><strong>${esc(voucher.sourceReservationId || "—")}</strong></div><div class="detail-line"><span>Validade atual</span><strong>${esc(voucher.expiresAt)}</strong></div><div class="detail-line"><span>Faixa de referência da oferta do parceiro</span><strong>${esc(voucher.compatibilityWindow || "—")} · ${esc(voucher.originalPeriod || "—")}</strong></div><div class="detail-line"><span>Datas ofertadas nessa faixa</span><strong>${esc(voucher.compatibleDatesCount || 0)} de ${esc(voucher.minimumCompatibleDates || state.settings.voucherMinimumCompatibleDates)}</strong></div>${voucher.extensionReason ? `<div class="detail-line"><span>Prorrogação</span><strong>${esc(voucher.extensionReason)}</strong></div>` : ""}</div></article>`;
+    const card=(voucher)=>`<article class="card voucher-card"><div class="section-heading"><div><span class="status ${["active", "active_extended"].includes(voucher.status) ? "status-ok" : "status-neutral"}">${esc(voucherStatusLabel(voucher))}</span><h3>${esc(voucher.code)}</h3></div><strong class="voucher-value">${money(voucher.value)}</strong></div><div class="detail-list"><div class="detail-line"><span>Reserva de origem</span><strong>${esc(voucher.sourceReservationId || "—")}</strong></div><div class="detail-line"><span>Validade atual</span><strong>${esc(voucher.expiresAt)}</strong></div>${voucher.cancellationFlowVersion==="marketplace-cancellation-7d-v1"?`<div class="detail-line"><span>Regra aceita</span><strong>Uso único · 90 dias · sem prorrogação automática</strong></div>`:`<div class="detail-line"><span>Faixa de referência da oferta do parceiro</span><strong>${esc(voucher.compatibilityWindow || "—")} · ${esc(voucher.originalPeriod || "—")}</strong></div><div class="detail-line"><span>Datas ofertadas nessa faixa</span><strong>${esc(voucher.compatibleDatesCount || 0)} de ${esc(voucher.minimumCompatibleDates || state.settings.voucherMinimumCompatibleDates)}</strong></div>`}${voucher.extensionReason ? `<div class="detail-line"><span>Prorrogação</span><strong>${esc(voucher.extensionReason)}</strong></div>` : ""}</div></article>`;
     return `<section class="section"><div class="section-heading"><div><h2>Créditos de cancelamento</h2><p>A faixa de referência avalia sua oferta de datas e a prorrogação da validade. O usuário pode escolher qualquer horário disponível. Esses créditos são uma obrigação de atendimento futuro; não retêm novamente o pagamento original.</p></div></div><div class="grid two">${available.map(card).join("") || emptyState("V","Nenhum crédito pendente de utilização.")}</div>${used.length ? `<details class="card section voucher-history"><summary>Vouchers utilizados (${used.length})</summary><div class="grid two">${used.map(card).join("")}</div></details>` : ""}</section>`;
   }
 
@@ -10013,7 +10132,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const reservationIds=new Set(reservations.flatMap((item)=>[item.id,item.backendId]));
     const cancellations=state.cancellationLog.filter((item)=>selected==="Todos" || reservationIds.has(item.reservationId));
     const vouchers=state.cancellationVouchers.filter(matches);
-    const history=`<section class="card"><div class="section-heading"><div><h2>Vouchers de cancelamento</h2><p>Prazo condicionado à oferta de horários compatíveis e responsabilidade do parceiro.</p></div></div><div class="table-wrap" style="border:0"><table><thead><tr><th>Voucher</th><th>Parceiro</th><th>Valor</th><th>Uso</th><th>Faixa de oferta do parceiro</th><th>Datas ofertadas</th><th>Validade</th><th>Status</th><th>Ação</th></tr></thead><tbody>${vouchers.map((voucher) => `<tr><td>${esc(voucher.code)}</td><td>${esc(voucher.venue)}</td><td>${money(voucher.value)}</td><td>${voucher.eligibleBookingMode === "monthly" ? "Somente mensalista" : "Avulsa ou mensalista"}</td><td>${esc(voucher.originalTime || "—")} · ${esc(voucher.compatibilityWindow || "—")}</td><td>${esc(voucher.compatibleDatesCount || 0)}/${esc(voucher.minimumCompatibleDates || state.settings.voucherMinimumCompatibleDates)}</td><td>${esc(voucher.expiresAt)}</td><td><span class="status ${["active", "active_extended"].includes(voucher.status) ? "status-ok" : voucher.status === "reserved" ? "status-warning" : "status-neutral"}">${esc(voucherStatusLabel(voucher))}</span></td><td>${["active", "active_extended"].includes(voucher.status) ? (voucher.backendOfficial ? "Responsabilidade ativa" : `<button class="button ghost small" data-action="reassign-cancellation-voucher" data-id="${esc(voucher.id)}">Ressarcir e realocar</button>`) : "—"}</td></tr>`).join("") || `<tr><td colspan="9">Nenhum voucher gerado.</td></tr>`}</tbody></table></div></section>
+    const history=`<section class="card"><div class="section-heading"><div><h2>Vouchers de cancelamento</h2><p>Vouchers novos: 90 dias, uso único e sem prorrogação automática. Créditos anteriores mantêm as condições aceitas.</p></div></div><div class="table-wrap" style="border:0"><table><thead><tr><th>Voucher</th><th>Parceiro</th><th>Valor</th><th>Uso</th><th>Faixa de oferta do parceiro</th><th>Datas ofertadas</th><th>Validade</th><th>Status</th><th>Ação</th></tr></thead><tbody>${vouchers.map((voucher) => `<tr><td>${esc(voucher.code)}</td><td>${esc(voucher.venue)}</td><td>${money(voucher.value)}</td><td>${voucher.eligibleBookingMode === "monthly" ? "Somente mensalista" : "Avulsa ou mensalista"}</td><td>${voucher.cancellationFlowVersion==="marketplace-cancellation-7d-v1"?"Qualquer horário disponível":`${esc(voucher.originalTime || "—")} · ${esc(voucher.compatibilityWindow || "—")}`}</td><td>${voucher.cancellationFlowVersion==="marketplace-cancellation-7d-v1"?"Não aplicável":`${esc(voucher.compatibleDatesCount || 0)}/${esc(voucher.minimumCompatibleDates || state.settings.voucherMinimumCompatibleDates)}`}</td><td>${esc(voucher.expiresAt)}</td><td><span class="status ${["active", "active_extended"].includes(voucher.status) ? "status-ok" : voucher.status === "reserved" ? "status-warning" : "status-neutral"}">${esc(voucherStatusLabel(voucher))}</span></td><td>${["active", "active_extended"].includes(voucher.status) ? (voucher.backendOfficial ? "Responsabilidade ativa" : `<button class="button ghost small" data-action="reassign-cancellation-voucher" data-id="${esc(voucher.id)}">Ressarcir e realocar</button>`) : "—"}</td></tr>`).join("") || `<tr><td colspan="9">Nenhum voucher gerado.</td></tr>`}</tbody></table></div></section>
       <section class="card section"><div class="section-heading"><div><h2>Cancelamentos e reembolsos</h2><p>O responsável pelo cancelamento suporta a consequência financeira aplicável.</p></div></div><div class="table-wrap" style="border:0"><table><thead><tr><th>Registro</th><th>Reserva</th><th>Responsável</th><th>Modalidade</th><th>Reembolso</th><th>Taxas</th></tr></thead><tbody>${cancellations.map((item) => `<tr><td>${esc(item.id)}</td><td>${esc(item.reservationId || item.partnerReservationId)}</td><td>${esc(cancellationSourceLabel(item.source))}</td><td>${item.mode === "voucher" ? (item.voucherCount>0?`${item.voucherCount} vouchers individuais · ${money(item.voucherTotal)}`:"Voucher") : item.mode === "refund" ? "Reembolso integral" : "Sem compensação"}</td><td>${money(item.refundValue || 0)}</td><td>${item.feeResponsibility ? esc(cancellationSourceLabel(item.feeResponsibility)) : "Não aplicável"}</td></tr>`).join("") || `<tr><td colspan="6">Nenhum cancelamento processado.</td></tr>`}</tbody></table></div></section>
       <section class="card section"><div class="section-heading"><div><h2>Análises excepcionais</h2><p>Cancelamentos fora do prazo submetidos conjuntamente ao Tâmo On e ao parceiro.</p></div></div><div class="table-wrap" style="border:0"><table><thead><tr><th>Solicitação</th><th>Reserva</th><th>Parceiro</th><th>Status</th><th>Decisões</th></tr></thead><tbody>${(state.cancellationExceptionReviews || []).filter((review)=>selected==="Todos" || reservationIds.has(review.reservationId)).map((review) => `<tr><td>${esc(review.id)}</td><td>${esc(review.reservationId)}</td><td>${esc(review.venue)}</td><td><span class="status status-warning">${esc(review.status)}</span></td><td>Tâmo On: ${esc(review.tamoDecision)} · Parceiro: ${esc(review.partnerDecision)}</td></tr>`).join("") || `<tr><td colspan="5">Nenhuma análise excepcional pendente.</td></tr>`}</tbody></table></div></section>
       <div class="callout section"><strong>Regra contábil simulada</strong><p>O pagamento que originou o voucher permanece no exercício original. Cancelamentos do parceiro ou do Tâmo On geram reembolso integral e os custos ficam com o responsável. Fora do prazo, não há crédito automático.</p></div>`;
@@ -10237,11 +10356,11 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         submitLabel:"Criar pré-reserva",
         fields:[
           {name:"cycleSummary",type:"custom",full:true,html:`<div class="detail-list"><div class="detail-line"><span>Mensalidade</span><strong>${money(cycle.monthlyTotal)}</strong></div><div class="detail-line"><span>Ocorrências protegidas</span><strong>${esc(cycle.occurrenceCount)}</strong></div><div class="detail-line"><span>Mínimo para os primeiros eventos</span><strong>${money(cycle.guaranteeRequired||cycle.initialRequired)} · até ${esc(backendDateTimeLabel(cycle.initialDueAt||cycle.balanceDueAt))}</strong></div><div class="detail-line"><span>Quitação do mês</span><strong>${money(cycle.monthlyTotal)} · até ${esc(backendDateTimeLabel(cycle.balanceDueAt))}</strong></div></div>`},
-          {name:"monthlyPolicy",label:"Regras do ciclo",type:"checkbox-group",required:true,full:true,help:"O mínimo para garantir corresponde ao maior valor entre 30% da mensalidade e o valor das ocorrências protegidas até o quinto dia útil. Esse mínimo vence 15 minutos antes do primeiro evento; depois de atingido, as cotas restantes continuam abertas até o prazo do saldo.",options:[{value:"monthly_policy_accepted",label:"Aceito o valor deste mês, as regras mensalistas e os prazos apresentados",help:"Em Minhas reservas será criado um único rateio do valor mensal, sem segunda cobrança para os mesmos pagadores.",checked:false}]}
+          {name:"monthlyPolicy",label:"Regras do ciclo",type:"checkbox-group",required:true,full:true,help:"O mínimo para garantir corresponde ao maior valor entre 30% da mensalidade e o valor das ocorrências protegidas até o quinto dia útil. Esse mínimo vence 15 minutos antes do primeiro evento; depois de atingido, as cotas restantes continuam abertas até o prazo do saldo.",options:[{value:"monthly_policy_accepted",label:"Aceito o valor deste mês, as regras mensalistas e os prazos apresentados",help:"Em Minhas reservas será criado um único rateio do valor mensal, sem segunda cobrança para os mesmos pagadores. "+cancellationContractText(),checked:false}]}
         ],
         onSubmit:async(data)=>{
           if(data.monthly_policy_accepted!=="true")return markFormFieldInvalid("monthlyPolicy","Campo obrigatório: aceite as regras para criar a pré-reserva.");
-          const result=await runBackendMutation("Pré-reserva mensalista criada. Defina o pagamento em Minhas reservas.",()=>window.MarketplaceBackend.activateMonthlyCyclePrebooking({monthlyCycleId:cycle.id,expectedTotal:reviewedTotal,policyVersion:"marketplace-0.2.0-part-22ar",policyAccepted:true}));
+          const result=await runBackendMutation("Pré-reserva mensalista criada. Defina o pagamento em Minhas reservas.",()=>window.MarketplaceBackend.activateMonthlyCyclePrebooking({monthlyCycleId:cycle.id,expectedTotal:reviewedTotal,policyVersion:"marketplace-cancellation-7d-v1",policyAccepted:true}));
           if(!result)return false;
           state.activePage.user="reservations";
           state.userReservationTab="monthly";
@@ -10344,7 +10463,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if (pixSplitSummary) pixSplitSummary.innerHTML = "";
     if (singlePayerPanel) singlePayerPanel.hidden = true;
     if (singlePayerSelect) singlePayerSelect.innerHTML = "";
-    if (reservationPolicyText) reservationPolicyText.textContent = "Reserva avulsa: a pré-reserva permite pagar em até 30 minutos. Após o pagamento, o usuário pode cancelar em até 24 horas para receber o voucher previsto nas regras. Mensalista: aplica-se o prazo próprio do ciclo. Parceiro ou Tâmo On: reembolso integral. Fora do prazo não há crédito automático." + " " + splitCancellationPolicyText({monthly:false});
+    if(reservationPolicyText)reservationPolicyText.textContent=cancellationContractText();
     populateVoucherOptions();
     updateMonthlyReservationPreview();
     populateReservationGroups();
@@ -10572,6 +10691,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   async function handleAction(button) {
+    if(button?.dataset?.action?.startsWith("cancellation-") && await handleCancellationAction(button))return;
     // Capture the native change before asynchronous authorization/dispatch yields.
     const actionChecked = button.checked;
     if(!await waitForInitialDetails())return;
@@ -11695,6 +11815,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if(!notificationVisibleForRole(row)){
       showToast("Esta atualização de pagamento está disponível na área Usuário.");return;
     }
+    if(row.type==="cancellation_case_updated"){
+      await openCancellationCases();if(!document.hidden)await readPersonalNotification(id);return;
+    }
     if(row.entity_type==="partner_application"){
       if(!(state.partnerApplications||[]).some((item)=>item.id===row.entity_id)){
         try{await refreshBackendBootstrap(true);}catch(error){showToast(backendErrorMessage(error));return;}
@@ -11704,7 +11827,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if(row.entity_type==="occurrence_transfer" && (state.occurrenceTransfers||[]).some(item=>item.id===row.entity_id && (item.canManageAsGroup||item.canManageAsPartner))) {
       await openOccurrenceTransferConversation(row.entity_id);return;
     }
-    if(row.entity_type==="voucher"&&row.type==="cancellation_voucher_issued"){
+    if(row.entity_type==="voucher"&&["cancellation_voucher_issued","cancellation_voucher_reminder"].includes(row.type)){
       state.role="user";state.activePage.user="promotions";detailDialog.close();render();await readPersonalNotification(id);return;
     }
     if(row.entity_type==="monthly_link_request"){
@@ -11746,7 +11869,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   document.addEventListener("keydown",()=>operationalAlerts.arm());
   // Recupera avisos perdidos durante desconexao sem depender apenas do Realtime.
   setInterval(()=>{if(backendIsOnline()&&!document.hidden&&!backendRuntime.mutating&&!app.contains(document.activeElement?.closest("input,textarea,select")))refreshBackendBootstrap(true).catch(()=>{});},30000);
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&backendIsOnline())refreshBackendBootstrap(true).catch(()=>{});});
+  document.addEventListener("visibilitychange",()=>{if(!window.TamoonMarketplacePilot&&!document.hidden&&backendIsOnline())refreshBackendBootstrap(true).catch(()=>{});});
+  window.addEventListener('tamoon-marketplace-retry',()=>{if(!window.TamoonMarketplacePilot?.blocked)refreshBackendBootstrap(true).catch(()=>{});});
 
   document.addEventListener("submit",event=>{
     if(partnerReadonlyActive() && event.submitter?.value!=="cancel"){
@@ -12077,7 +12201,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         return;
       }
       const request = { slotId,groupId,eventId,createEvent:createsNewEvent,
-        policyVersion:"marketplace-0.2.0-part-22ar",policyAccepted:true };
+        policyVersion:"marketplace-cancellation-7d-v1",policyAccepted:true };
       reservationReturnContext = null;
       reservationDialog.close();
       const result = await runBackendMutation("", () => directMonthly

@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 116,
   "mandatory": false,
-  "notes": "Remarcação de eventos manuais agendados, com aviso de alteração por push e preservação das presenças.",
+  "notes": "Cancelamento com escolha de restituição ou voucher de 90 dias, avisos de vencimento e análise individual de exceções.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R10"
+  "integration": "166-R11"
 }
