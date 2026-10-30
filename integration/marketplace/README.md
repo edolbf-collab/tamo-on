@@ -1,4 +1,4 @@
-# Marketplace privado — incremental 166-R17
+# Marketplace privado — incremental 166-R18
 
 Integração da Comunidade build 164 com o Marketplace 0.2.0, base consolidada 22BB-C39-R1. Inclui o piloto 166-R1 e a sincronização com o grupo Teste FC. O motor de reservas, mensalidades, parceiros e financeiro do sandbox foi preservado.
 
@@ -217,3 +217,11 @@ Ajuste visual solicitado a partir da imagem B aprovada. No Financeiro do parceir
 As proteções de dimensionamento do mês para Safari e o texto de 16 px nos campos foram preservados. Sem mudanças em ações, filtros, consultas ou cálculos; o pacote JavaScript permanece o da R16. Identificadores de cache atualizados para R17.
 
 Validação: 96 testes Node passaram. Uma conferência temporária em WebKit renderizou os componentes reais das duas áreas nos modos mensal e Todo o período, em 320, 360, 375, 390, 414, 430 e 700 px (28 combinações). Medições confirmaram alinhamento, altura, texto dos botões dentro dos limites e ausência de excesso lateral nos controles; capturas de 320 e 390 px foram inspecionadas. A conferência no Safari de um iPhone físico continua pendente. Nenhum teste permanente que apenas replique o CSS foi acrescentado.
+
+## Identidade Google/Apple — 166-R18
+
+O frontend da Comunidade passa a oferecer **Meu perfil → Formas de acesso**. O módulo compartilhado está em `auth-access.js`; a ativação Apple e a vinculação permanecem desligadas em `auth-config.js` até a configuração do provedor. O login Google usa o SDK fixado em 2.110.7 e retorno PKCE.
+
+A função `community-marketplace-session` aceita identidades Google ou Apple verificadas pelo Auth, com e-mail confirmado. Mantém a RPC de vínculo, o UUID da Comunidade, a conferência do e-mail principal, a lista privada do piloto, o aceite legal e os papéis atuais. Não cria usuários, não une cadastros e não altera a lista de acesso. Um e-mail de identidade Apple oculto não substitui o e-mail principal da conta nem o UUID já associado ao Marketplace.
+
+A preparação nativa foi atualizada na branch `ios-build-165`, preservando o pacote iOS separado e suas funcionalidades anteriores. A ativação e os cenários de validação estão em [preparação de autenticação](../auth/README.md).

@@ -21,7 +21,7 @@ test('auth failure cannot mint',async()=>{const f=fixture({auth:{error:{message:
 test('non-owner mapping cannot mint',async()=>{const f=fixture({mapping:{error:{code:'PT403'}}});assert.equal((await f.handler(req())).status,403);assert.equal(f.calls.some(c=>c[0]==='mint'),false)});
 test('rate limit cannot mint',async()=>{const f=fixture({mapping:{error:{code:'PT429'}}});assert.equal((await f.handler(req())).status,429)});
 test('email mismatch cannot mint',async()=>{const f=fixture({mapping:{data:{marketplace_id:'market-owner',email:'different@example.test'}}});assert.equal((await f.handler(req())).status,403)});
-test('Google identity and confirmed email required',async()=>{for(const patch of [{identities:[]},{email_confirmed_at:null}]){const f=fixture({auth:{data:{user:{...owner,...patch}}}});assert.equal((await f.handler(req())).status,403)}});
+test('supported identity and confirmed email required',async()=>{for(const patch of [{identities:[]},{email_confirmed_at:null}]){const f=fixture({auth:{data:{user:{...owner,...patch}}}});assert.equal((await f.handler(req())).status,403)}});
 test('legal access required',async()=>{for(const patch of [{legal:false}]){const f=fixture(patch);assert.equal((await f.handler(req())).status,403);assert.equal(f.calls.some(c=>c[0]==='mint'),false)}});
 test('status validates identity without generating session',async()=>{const f=fixture();const r=await f.handler(req('status'));assert.equal(r.status,200);assert.deepEqual(await r.json(),{allowed:true,canSyncCommunity:true,environment:'staging',realMoney:false});assert.equal(f.calls.some(c=>c[0]==='mint'),false);assert.equal(f.calls.find(c=>c[0]==='mapping')[1].p_exchange,false)});
 test('session ignores supplied target and sends no email',async()=>{const f=fixture();const r=await f.handler(req());assert.equal(r.status,200);assert.deepEqual(await r.json(),{session:{access_token:'access',refresh_token:'refresh'},canSyncCommunity:true,environment:'staging',realMoney:false});assert.deepEqual(f.calls.find(c=>c[0]==='mint')[1],{type:'magiclink',email:owner.email});assert.equal(r.headers.get('cache-control'),'no-store')});
@@ -35,3 +35,20 @@ test('allowlisted customer is not required to be a platform admin',async()=>{con
 test('test accounts cannot import the owner group',async()=>{const f=fixture({mapping:{data:{marketplace_id:'market-owner',email:owner.email,can_sync_community:false}}});assert.equal((await f.handler(req('import_group'))).status,403);assert.equal(f.calls.some(c=>c[0]==='import'),false)});
 test('mapping email is supplied from verified Auth identity only',async()=>{const f=fixture();await f.handler(req());assert.equal(f.calls.find(c=>c[0]==='mapping')[1].p_verified_email,owner.email)});
 test('legacy production Pages origin works for installed clients',async()=>{const f=fixture();const r=await f.handler(req('status',{Origin:'https://resenhafc-beta.pages.dev'}));assert.equal(r.status,200);assert.equal(r.headers.get('Access-Control-Allow-Origin'),'https://resenhafc-beta.pages.dev')});
+
+test('Apple identity can reuse the existing allowlisted account without changing permissions',async()=>{
+ const f=fixture({auth:{data:{user:{...owner,identities:[{provider:'apple',identity_data:{email:'hidden@privaterelay.appleid.com'}}]}}},mapping:{data:{marketplace_id:'market-owner',email:owner.email,can_sync_community:false}}});
+ const response=await f.handler(req());assert.equal(response.status,200);assert.equal((await response.json()).canSyncCommunity,false);
+ assert.equal(f.calls.find(c=>c[0]==='mapping')[1].p_community_id,owner.id);
+ assert.equal(f.calls.find(c=>c[0]==='mapping')[1].p_verified_email,owner.email);
+});
+test('Apple does not grant access outside the pilot allowlist',async()=>{
+ const f=fixture({auth:{data:{user:{...owner,identities:[{provider:'apple'}]}}},mapping:{error:{code:'PT403'}}});
+ assert.equal((await f.handler(req())).status,403);assert.equal(f.calls.some(c=>c[0]==='mint'),false);
+});
+test('editable metadata cannot impersonate a verified Apple or Google identity',async()=>{
+ for(const identities of [[],[{provider:'email'}]]){
+  const f=fixture({auth:{data:{user:{...owner,identities,user_metadata:{provider:'apple',providers:['google','apple']}}}}});
+  assert.equal((await f.handler(req())).status,403);assert.equal(f.calls.some(c=>c[0]==='mapping'),false);
+ }
+});

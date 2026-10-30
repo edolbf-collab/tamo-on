@@ -30,7 +30,7 @@ export function createHandler({createClient, env, communityUrl, communityKey}) {
       const {data:identity, error:authError} = await community.auth.getUser(authorization.slice(7));
       if (authError || !identity?.user) return reply(401, {error:"AUTH_REQUIRED"});
       const user = identity.user;
-      if (!user.email_confirmed_at || !user.identities?.some(i => i.provider === "google")) return reply(403, {error:"PILOT_RESTRICTED"});
+      if (!user.email_confirmed_at || !user.identities?.some(i => ["google", "apple"].includes(i.provider))) return reply(403, {error:"PILOT_RESTRICTED"});
       const url = env("SUPABASE_URL");
       const admin = createClient(url, key("SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY"), {auth:{persistSession:false, autoRefreshToken:false}});
       // Service-only allowlist; the email comes from Auth, never from the request body.

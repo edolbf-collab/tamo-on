@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 116,
   "mandatory": false,
-  "notes": "Controles de período do Financeiro agrupados em duas linhas conforme a prévia B.",
+  "notes": "Preparação de login Apple e vinculação Google/Apple na mesma conta; ativação Apple pendente.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R17"
+  "integration": "166-R18"
 }

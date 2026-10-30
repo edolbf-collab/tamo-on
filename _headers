@@ -53,3 +53,10 @@
 
 /marketplace/assets/pilot-*.js
   Cache-Control: public, max-age=31536000, immutable
+
+/auth-config.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/auth-access.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/auth-access.css
+  Cache-Control: no-cache, max-age=0, must-revalidate
