@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 116,
   "mandatory": false,
-  "notes": "Correção da largura nativa dos campos de data e mês no Safari do iPhone.",
+  "notes": "Menu lateral no celular e cabeçalho essencial no Marketplace; som, tema e ajuda no menu.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R15"
+  "integration": "166-R16"
 }

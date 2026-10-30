@@ -9,6 +9,11 @@
   const roleSwitcher = document.getElementById("marketplaceRoleSwitcher");
   const sessionButton = document.getElementById("marketplaceSessionButton");
   const themeButton = document.getElementById("toggleMarketplaceTheme");
+  const mobileNavigation = window.MarketplaceNavigation?.create({onNavigate: async(page) => {
+    if(state.role==="partner"&&!partnerPageAllowed(page)){showToast("Acesso Restrito.");return;}
+    if(!(menus[state.role]||[]).some(([id])=>id===page))return;
+    await nav(state.role,page);
+  }});
   const marketplaceThemeColor = document.getElementById("marketplaceThemeColor");
   const toast = document.getElementById("toast");
   const reservationDialog = document.getElementById("reservationDialog");
@@ -5253,19 +5258,28 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function navigationItems(role) {
+    return (menus[role]||[]).map(([id, icon, label]) => {
+            const unread=navigationUnreadCount(role,id);
+            const restricted=role==="partner"&&!partnerPageAllowed(id);
+            if(restricted)return `<button type="button" data-ui-key="${role}-${id}" class="subnav-button is-restricted" disabled aria-disabled="true"><span class="subnav-icon" aria-hidden="true">${icon}</span><span class="subnav-label">${esc(label)}<small>${partnerAccessPending ? "Atualizando…" : "Acesso Restrito"}</small></span></button>`;
+            const badgeLabel=id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
+            return `<button type="button" data-ui-key="${role}-${id}" class="subnav-button ${state.activePage[role] === id ? "active" : ""} ${unread ? "has-unread" : ""}" data-nav="${id}" ${state.activePage[role]===id?'aria-current="page"':''}><span class="subnav-icon" aria-hidden="true">${icon}</span><span class="subnav-label">${label}</span>${messageBadge(unread,badgeLabel)}</button>`;
+          }).join("");
+  }
+
+  function refreshMarketplaceNavigation() {
+    const allowed=(!backendRuntime.enabled||backendIsOnline())&&backendRuntime.bootstrap?.profile?.status!=="blocked";
+    const heading={user:"Usuário",partner:"Parceiro",admin:"Administração",candidate:"Quero ser parceiro"}[state.role]||"Marketplace";
+    mobileNavigation?.update({heading,allowed,markup:allowed&&app.querySelector('.subnav')?navigationItems(state.role):""});
+  }
+
   function navShell(role, content) {
-    const menu = menus[role];
     return `
       <div class="role-layout">
         <nav class="subnav" aria-label="Menu da área ${role}">
           <div class="subnav-title">Navegação</div>
-          ${menu.map(([id, icon, label]) => {
-            const unread=navigationUnreadCount(role,id);
-            const restricted=role==="partner"&&!partnerPageAllowed(id);
-            if(restricted)return `<button type="button" class="subnav-button is-restricted" disabled aria-disabled="true"><span class="subnav-icon">${icon}</span><span class="subnav-label">${esc(label)}<small>${partnerAccessPending ? "Atualizando…" : "Acesso Restrito"}</small></span></button>`;
-            const badgeLabel=id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
-            return `<button type="button" class="subnav-button ${state.activePage[role] === id ? "active" : ""} ${unread ? "has-unread" : ""}" data-nav="${id}"><span class="subnav-icon">${icon}</span><span class="subnav-label">${label}</span>${messageBadge(unread,badgeLabel)}</button>`;
-          }).join("")}
+          ${navigationItems(role)}
         </nav>
         <section class="content">${content}</section>
       </div>`;
@@ -5927,6 +5941,7 @@
         button.classList.remove("has-unread");
       }
     });
+    refreshMarketplaceNavigation();
   }
 
   function chatMessagesMarkup(thread, viewerRole) {
@@ -7946,7 +7961,7 @@
       [reservationDialog,detailDialog,chatDialog,formDialog].forEach(dialog=>{if(dialog?.open)dialog.close();});
       updateBackendRoleAccess();app.financeMarkup="";app.marketplaceScreenKey="";
       app.innerHTML='<section class="backend-auth-gate"><div class="backend-auth-card"><h1>Conta bloqueada</h1><p>O acesso ao Marketplace foi bloqueado pela Administração. Entre em contato com o suporte.</p><p><a href="mailto:suporte@tamoon.app.br" style="color:inherit;overflow-wrap:anywhere">suporte@tamoon.app.br</a></p></div></section>';
-      app.style.minHeight="";return;
+      app.style.minHeight="";refreshMarketplaceNavigation();return;
     }
     if (backendRuntime.enabled && !backendIsOnline()) {
       updateBackendRoleAccess();
@@ -7955,6 +7970,7 @@
       app.innerHTML = partnerReadonlyBanner() + backendAuthView();
       applyPartnerReadonlyControls();
       if(preserveFinance)app.style.minHeight="";
+      refreshMarketplaceNavigation();
       return;
     }
     if (backendRuntime.enabled && !backendAllowedRoles().has(state.role)) chooseBackendRole(backendRuntime.bootstrap || {});

@@ -1,4 +1,4 @@
-# Marketplace privado — incremental 166-R15
+# Marketplace privado — incremental 166-R16
 
 Integração da Comunidade build 164 com o Marketplace 0.2.0, base consolidada 22BB-C39-R1. Inclui o piloto 166-R1 e a sincronização com o grupo Teste FC. O motor de reservas, mensalidades, parceiros e financeiro do sandbox foi preservado.
 
@@ -199,3 +199,13 @@ A validação do usuário mostrou que a R14 não resolveu o excesso de largura n
 Os controles têm altura mínima e alinhamento do valor vazio ou preenchido; no celular, os filtros usam texto de 16 px para evitar ampliação automática ao receber foco. A organização das linhas da R14 permanece, sem ocultar a rolagem da página ou cortar os campos. Cache atualizado para R15; pacote JavaScript do Marketplace preservado.
 
 Validação: os 93 testes Node existentes passaram e o diff foi conferido. O WebKit local foi baixado, mas não iniciou por falta de bibliotecas do sistema; a instalação dessas dependências também falhou. Portanto não houve validação visual em Safari/iPhone nem Android nesta revisão. A confirmação no aparelho permanece pendente. Nenhuma mudança de banco, pagamentos, permissões ou subcontas.
+
+## Menu lateral e cabeçalho essencial — 166-R16
+
+Implementação da opção B aprovada pelo usuário. Até 980 px, o botão de menu aparece à esquerda da marca e substitui a navegação horizontal. O cabeçalho fica acessível durante a rolagem, com notificações e Voltar à Comunidade. Som, tema e ajuda são movidos para Preferências no menu lateral; são os mesmos elementos e eventos, sem duplicar estado ou preferências. Acima de 980 px, os controles retornam às posições originais e a navegação lateral fixa permanece.
+
+O painel abre abaixo do cabeçalho, sobre o conteúdo, respeita a altura disponível e permite rolagem interna. Fecha por seleção de destino, botão Fechar, toque fora ou Escape. O diálogo nativo contém o foco; o fechamento restaura a posição da página. Ajuda fecha o menu antes de abrir seu próprio diálogo. Alteração de área, perda de acesso, bloqueio ou saída da sessão encerram o painel e liberam a rolagem. A área de candidatura mantém acesso às preferências, sem destinos inventados.
+
+A geração de destinos é compartilhada com o menu do computador: mesmos nomes, badges, página ativa e restrições do parceiro. A nova navegação utiliza os handlers e as verificações existentes, sem mudar permissões, consultas ou operações financeiras. As correções dos campos de data/mês da R15 permanecem. O novo módulo `marketplace-navigation.js` integra o pacote versionado do Marketplace.
+
+Validação: 96 testes Node passaram. A suíte `test:navigation` passou em WebKit com larguras 320, 360, 390, 430, 768 e 980 px, além do retorno a 1280 px. Cobriu alinhamento do cabeçalho, links, perfil do parceiro com destino restrito, candidatura, foco, Escape, toque fora, rolagem, preferências, ajuda e perda de acesso. A suíte completa de entrada `test:browser`, executada com `PILOT_TEST_BROWSER=webkit` e serviços simulados, passou para acesso anônimo, negado, administração e contas comuns. Sua expectativa antiga de Administração invisível foi corrigida para desabilitada, conforme o comportamento já existente. Capturas do aplicativo no WebKit local foram inspecionadas com menu fechado e aberto. WebKit em Linux não substitui Safari em iPhone físico; essa validação continua a cargo do usuário. Não houve migrações nem chamadas reais de pagamento.

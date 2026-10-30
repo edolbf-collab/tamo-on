@@ -1,4 +1,4 @@
-const { chromium } = require('playwright');
+const { chromium, webkit } = require('playwright');
 const fs=require('node:fs'); const assert=require('node:assert/strict'); const path=require('node:path');
 const repo=path.resolve(__dirname,'../../..');
 const communityId='11111111-1111-4111-8111-111111111111', marketId='22222222-2222-4222-8222-222222222222';
@@ -20,7 +20,8 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
    catch{res.writeHead(404);res.end()}
  });
  await new Promise(resolve=>server.listen(8766,'127.0.0.1',resolve));
- const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
+ const engine=process.env.PILOT_TEST_BROWSER==='webkit'?webkit:chromium;
+ const browser=await engine.launch({headless:true,...(engine===chromium&&process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{})});
  try {
  for(const scenario of ['anonymous','denied','owner','customer','partner']) {
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
@@ -53,14 +54,25 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
     assert.equal(await page.evaluate(()=>navigator.serviceWorker.controller),null);
     assert.ok(await page.getByText('Pagamentos simulados',{exact:false}).isVisible());
     if(isOwner) {
+    await page.getByRole('button',{name:'Abrir menu do Marketplace',exact:true}).click();
     await page.getByRole('button',{name:'Ajuda para quadras e reservas',exact:true}).click();
+    assert.equal(await page.locator('#marketplaceMenu').evaluate(node=>node.open),false);
     await page.locator('#pilotDiagnostics summary').click();
     await page.getByRole('button',{name:'Tentar sincronização agora',exact:true}).click();
     await page.getByText('Teste FC atualizado',{exact:false}).waitFor();
     await page.locator('#infoDialog').getByRole('button',{name:'Entendi',exact:true}).click();
     await page.getByRole('button',{name:'Administração',exact:true}).click();
-    } else {assert.equal(await page.locator('.pilot-sync-bar').isVisible(),false);assert.equal(actions.includes('import_group'),false);assert.equal(requests.some(p=>p.includes('marketplace-group-pilot')),false);assert.equal(await page.getByRole('button',{name:'Administração',exact:true}).isVisible(),false);}
-    if(process.env.PILOT_TEST_SCREENSHOT)await page.screenshot({path:process.env.PILOT_TEST_SCREENSHOT,fullPage:true});
+    await page.getByRole('button',{name:'Abrir menu do Marketplace',exact:true}).click();
+    await page.locator('#marketplaceMenu [data-nav="reservations"]').click();
+    await page.locator('#adminReservationDate').waitFor();
+    assert.equal(await page.locator('#marketplaceMenu').evaluate(node=>node.open),false);
+    } else {assert.equal(await page.locator('.pilot-sync-bar').isVisible(),false);assert.equal(actions.includes('import_group'),false);assert.equal(requests.some(p=>p.includes('marketplace-group-pilot')),false);assert.equal(await page.getByRole('button',{name:'Administração',exact:true}).isDisabled(),true);}
+    if(process.env.PILOT_TEST_SCREENSHOT&&isOwner){
+      await page.screenshot({path:process.env.PILOT_TEST_SCREENSHOT,fullPage:true,animations:'disabled'});
+      await page.getByRole('button',{name:'Abrir menu do Marketplace',exact:true}).click();
+      await page.screenshot({path:process.env.PILOT_TEST_SCREENSHOT.replace(/\.png$/,'-menu.png'),fullPage:true,animations:'disabled'});
+      await page.keyboard.press('Escape');
+    }
     await page.evaluate(()=>window.MarketplaceBackend.client.auth.signOut({scope:'local'}));
     assert.ok(await page.locator('#pilotGate').isVisible());
     // A refresh callback after access failure cannot uncover the UI again.

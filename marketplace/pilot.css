@@ -102,3 +102,72 @@ body:not(.pilot-locked) #pilotGate { display: none; }
 .reservation-list .reservation-card.has-pending-share { border:2px solid var(--amber); background:color-mix(in srgb,var(--amber) 9%,var(--surface)); }
 .pending-share-label { color:var(--amber); font-weight:800; font-size:12px; line-height:1.4; }
 .reservation-card:focus-visible { outline:3px solid var(--green); outline-offset:3px; }
+
+/* R16: essential mobile header and a modal drawer using the existing controls. */
+.header-brand { display:flex; align-items:center; gap:10px; min-width:0; }
+.marketplace-menu-toggle, .marketplace-help-label { display:none; }
+.marketplace-menu-toggle svg, .marketplace-menu svg { width:22px; height:22px; flex:0 0 22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.marketplace-menu {
+ position:fixed; inset:var(--marketplace-menu-top,100px) 0 0; margin:0;
+ width:100%; max-width:none; height:calc(100vh - var(--marketplace-menu-top,100px));
+ height:calc(100dvh - var(--marketplace-menu-top,100px)); max-height:none;
+ padding:0; border:0; color:var(--text); background:rgba(0,0,0,.5); overflow:hidden;
+}
+.marketplace-menu::backdrop { background:transparent; }
+.marketplace-menu-panel {
+ width:min(340px,calc(100% - 44px)); height:100%; min-width:0;
+ padding:14px max(14px,env(safe-area-inset-left)) max(18px,env(safe-area-inset-bottom));
+ border:1px solid var(--line-strong); border-left:0; border-radius:0 18px 18px 0;
+ background:var(--surface); overflow-y:auto; overscroll-behavior:contain;
+ -webkit-overflow-scrolling:touch; box-shadow:12px 0 32px rgba(0,0,0,.2);
+}
+.marketplace-menu[open] .marketplace-menu-panel { animation:marketplace-menu-enter .18s ease-out; }
+@keyframes marketplace-menu-enter { from { transform:translateX(-100%); } to { transform:translateX(0); } }
+@media(prefers-reduced-motion:reduce) { .marketplace-menu[open] .marketplace-menu-panel { animation:none; } }
+.marketplace-menu-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
+.marketplace-menu-heading h2 { min-width:0; margin:0; font-size:21px; overflow-wrap:anywhere; }
+.marketplace-menu-heading .icon-button { flex:0 0 44px; width:44px; height:44px; min-height:44px; font-size:26px; }
+#marketplaceMenuLinks { display:grid; gap:5px; }
+.marketplace-menu .subnav-button { width:100%; min-width:0; min-height:46px; padding:12px; font-size:15px; text-align:left; white-space:normal; }
+.marketplace-menu .subnav-label { min-width:0; flex:1; overflow-wrap:anywhere; }
+.marketplace-menu .subnav-icon { flex:0 0 22px; width:22px; font-size:19px; }
+.marketplace-menu .subnav-button.active { color:var(--green-strong); box-shadow:inset 3px 0 0 var(--green); }
+.marketplace-menu .message-badge { flex:0 0 auto; margin-left:auto; }
+.marketplace-menu-preferences { border-top:1px solid var(--line-strong); margin-top:18px; padding-top:12px; }
+.marketplace-menu-preferences h3 { margin:0 12px 8px; color:var(--muted); font-size:12px; font-weight:500; }
+#marketplaceMenuPreferences { display:grid; gap:5px; }
+#marketplaceMenuPreferences > button {
+ display:flex; align-items:center; justify-content:flex-start; gap:12px; width:100%; min-width:0;
+ height:auto; min-height:46px; margin:0; padding:12px; border:1px solid transparent; border-radius:12px;
+ background:transparent; color:var(--text); font-size:15px; font-weight:600; text-align:left; white-space:normal;
+}
+#marketplaceMenuPreferences > button:hover { background:var(--green-soft); }
+#marketplaceMenuPreferences .header-control-label,
+#marketplaceMenuPreferences .theme-button-label,
+#marketplaceMenuPreferences .marketplace-help-label { display:inline; }
+#marketplaceMenuPreferences .theme-button-icon,
+#marketplaceMenuPreferences #openReleaseNotes > span:first-child { flex:0 0 22px; width:22px; text-align:center; font-size:22px; }
+#marketplaceMenuPreferences #toggleNotificationSound::after { content:""; margin-left:auto; flex:0 0 30px; height:18px; border:1px solid var(--line-strong); border-radius:12px; background:radial-gradient(circle at 8px 50%,var(--muted) 5px,transparent 6px) var(--surface-3); }
+#marketplaceMenuPreferences #toggleNotificationSound[aria-pressed="true"]::after { background:radial-gradient(circle at 21px 50%,#fff 5px,transparent 6px) var(--green-strong); }
+@media(max-width:980px) {
+ .marketplace-navigation-ready .app-header { position:sticky; top:var(--marketplace-ribbon-height,30px); z-index:95; min-height:64px; padding-block:8px; flex-wrap:nowrap; gap:8px; background:var(--bg); }
+ .marketplace-navigation-ready .header-brand { flex:1 1 auto; gap:8px; }
+ .marketplace-navigation-ready .marketplace-menu-toggle { display:inline-flex; align-items:center; justify-content:center; flex:0 0 44px; width:44px; height:44px; min-height:44px; padding:0; }
+ .marketplace-navigation-ready .app-header .brand-lockup { min-width:0; gap:6px; }
+ .marketplace-navigation-ready .app-header .brand-symbol { flex:0 0 32px; width:32px; height:32px; border-radius:10px; font-size:21px; }
+ .marketplace-navigation-ready .app-header .brand-name { font-size:16px; }
+ .marketplace-navigation-ready .app-header .brand-subtitle { display:none; }
+ .marketplace-navigation-ready .app-header .header-actions { flex:0 0 auto; width:auto; gap:6px; margin:0; }
+ .marketplace-navigation-ready .app-header .header-actions > button { flex:0 0 44px; width:44px; height:44px; min-height:44px; padding:0; }
+ .marketplace-navigation-ready .app-header .header-actions > .marketplace-session-button { flex-basis:62px; width:62px; font-size:12px; }
+ .marketplace-navigation-ready .app-header .header-control-label { display:none; }
+ .marketplace-navigation-ready .app-header #openNotifications { position:relative; }
+ .marketplace-navigation-ready .app-header .header-notification-count { position:absolute; top:1px; right:1px; font-size:9px; }
+ .marketplace-navigation-ready .role-layout { grid-template-columns:minmax(0,1fr); }
+ .marketplace-navigation-ready .role-layout > .subnav { display:none; }
+}
+@media(max-width:360px) {
+ .marketplace-navigation-ready .header-brand { gap:5px; }
+ .marketplace-navigation-ready .app-header .brand-name { font-size:14px; }
+ .marketplace-navigation-ready .app-header .brand-symbol { flex-basis:28px; width:28px; height:28px; }
+}

@@ -1738,6 +1738,10 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const credit=data.credit_position;
     const creditValue=key=>credit&&Number.isFinite(Number(credit[key]))?m(credit[key]):'A confirmar';
     const card=(label,value,note,highlight=false)=>`<article class="pf-metric ${highlight?'pf-metric-net':''} ${amount(value)<0?'is-negative':''}"><span>${e(label)}</span><strong>${value==null?'—':m(value)}</strong><small>${e(note)}</small></article>`;
+    const estimated=round(receipts.filter(x=>x.fee_source==='estimated').reduce((n,x)=>n+amount(x.asaas_fee_total),0));
+    const feeNote=estimated?`Inclui ${m(estimated)} estimados`:'Taxas vinculadas aos pagamentos';
+    const summary=`<div class="pf-metrics" role="group" aria-label="Resumo financeiro · ${e(periodName)}">${card('Pagamentos recebidos',sum.base,'Cada pagamento contado uma única vez')}${card('Taxas de pagamento',sum.fee,feeNote)}${card('Comissão Tâmo On',sum.commission,'Comissão reconhecida vinculada às entradas',Boolean(model.admin))}${card(model.admin&&!finance.partnerId?'Líquido dos parceiros':'Líquido do parceiro',sum.net,'Valor calculado; veja a disponibilidade abaixo',!model.admin)}</div>`;
+    if(model.summaryOnly)return `<section class="pf-workbench pf-summary">${summary}</section>`;
     const line=(label,value)=>`<div><dt>${e(label)}</dt><dd>${m(value)}</dd></div>`;
     const disclosure=(id,title,note,body)=>`<details class="finance-disclosure pf-reservation" data-finance-detail="pf:${e(id)}"><summary><span><strong>${e(title)}</strong><small>${e(note)}</small></span><span aria-hidden="true">⌄</span></summary><div class="finance-disclosure-body">${body}</div></details>`;
     const code=id=>{const row=receiptGroups.get(id)?.[0]||snapshotMap.get(id)||groups.get(id)?.[0];return (row?.reservation_code||'Reserva sem código')+(model.admin&&row?.partner_name?' · '+row.partner_name:'');};
@@ -1803,11 +1807,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       body+=disclosure('reconciliation','Conferência completa da posição atual','Contratado, recebimentos, canais e ajustes',`<dl class="pf-lines">${line('Contratado original',finance.contractedValue)}${line('Contratado vigente',p.contracted)}${line('Encerrado ou cancelado',finance.cancelledValue)}${line('Recebido bruto',p.received)}${line('Recebido após devoluções',p.receivedNet)}${line('Recebimento fora do contrato vigente',p.outsideContract)}${line('Devoluções concluídas',p.returned)}${line('Valores bloqueados',p.blocked)}${line('Devoluções pendentes',finance.refundPending)}${line('Liquidado',p.liquidated)}${line('Ainda não liquidado',finance.unliquidatedValue)}${line('Pendente de pagamento',p.pending)}${line('Recebido pela instituição',finance.asaasProcessed)}${line('Pix',finance.asaasPixValue)}${line('Cartão',finance.asaasCardValue)}${line('Recebido diretamente',finance.externalReceived)}</dl>`);
     }
     if(active==='payouts'&&model.adminPartners)body+=disclosure('admin-partners','Conciliação por parceiro','Posição atual de todos os meses; sem compensar saldos entre parceiros',model.adminPartners);
-    const estimated=round(receipts.filter(x=>x.fee_source==='estimated').reduce((n,x)=>n+amount(x.asaas_fee_total),0));
-    const feeNote=estimated?`Inclui ${m(estimated)} estimados`:'Taxas vinculadas aos pagamentos';
 
     const alert=(Math.abs(amount(p.channelDifference))>0.009||Math.abs(amount(p.liquidationDifference))>0.009)?'<p class="finance-alert" role="status">Há uma diferença na conciliação atual. Consulte a conferência completa em Créditos e taxas.</p>':'';
-    return `<section class="pf-workbench"><div class="pf-period-heading"><h2>${e(periodName)}</h2><p>Entradas pela data do pagamento. As etapas posteriores atualizam os pagamentos de origem, sem criar uma nova entrada.</p></div><div class="pf-metrics">${card('Pagamentos recebidos',sum.base,'Cada pagamento contado uma única vez')}${card('Taxas de pagamento',sum.fee,feeNote)}${card('Comissão Tâmo On',sum.commission,'Comissão reconhecida vinculada às entradas',Boolean(model.admin))}${card(model.admin&&!finance.partnerId?'Líquido dos parceiros':'Líquido do parceiro',sum.net,'Valor calculado; veja a disponibilidade abaixo',!model.admin)}</div><p class="pf-note">Composição atual das entradas selecionadas: ${m(sum.returned)} devolvidos e ${m(sum.held)} pendentes de conclusão ou devolução. O líquido calculado desconta devoluções, pendências, taxas e comissão; ainda pode aguardar crédito no Asaas.</p>${data.undated_count?`<p class="finance-alert" role="status">${e(data.undated_count)} pagamento(s) sem data confirmada: aparecem somente em Todo o período, até conferência.</p>`:""}${data.allocation_review_count?'<p class="finance-alert" role="status">Há pagamentos cuja distribuição exige conferência.</p>':""}<section class="pf-availability"><div><strong>Créditos no Asaas</strong><small>Todos os períodos · valores líquidos, sem somar novamente aos indicadores</small></div><dl><div class="${model.admin?'':'pf-to-receive'}"><dt>Aguardando crédito · parceiro</dt><dd>${creditValue('pending_partner_net')}</dd></div><div><dt>Crédito confirmado na subconta</dt><dd>${creditValue('credited_subaccount_net')}</dd></div>${model.admin?`<div><dt>Aguardando crédito · comissão Tâmo On</dt><dd>${creditValue('pending_commission')}</dd></div>`:''}</dl><p>A comissão já foi descontada do líquido do parceiro. Créditos confirmados não representam o saldo para saque; consulte movimentações e saldo no Asaas.${credit&&Number(credit.split_review_count)>0?' Há splits que exigem conferência nos detalhes da reserva.':''}</p></section>${alert}<div class="pf-tabs" role="tablist" aria-label="Detalhes financeiros">${tabs.map(([key,label])=>`<button type="button" role="tab" id="pf-tab-${key}" aria-controls="pf-panel" aria-selected="${key===active}" data-action="partner-finance-tab" data-tab="${key}">${e(label)}</button>`).join('')}</div><section id="pf-panel" class="pf-panel" role="tabpanel" aria-labelledby="pf-tab-${active}">${body}</section></section>`;
+    return `<section class="pf-workbench"><div class="pf-period-heading"><h2>${e(periodName)}</h2><p>Entradas pela data do pagamento. As etapas posteriores atualizam os pagamentos de origem, sem criar uma nova entrada.</p></div>${model.omitSummary?"":summary}<p class="pf-note">Composição atual das entradas selecionadas: ${m(sum.returned)} devolvidos e ${m(sum.held)} pendentes de conclusão ou devolução. O líquido calculado desconta devoluções, pendências, taxas e comissão; ainda pode aguardar crédito no Asaas.</p>${data.undated_count?`<p class="finance-alert" role="status">${e(data.undated_count)} pagamento(s) sem data confirmada: aparecem somente em Todo o período, até conferência.</p>`:""}${data.allocation_review_count?'<p class="finance-alert" role="status">Há pagamentos cuja distribuição exige conferência.</p>':""}<section class="pf-availability"><div><strong>Créditos no Asaas</strong><small>Todos os períodos · valores líquidos, sem somar novamente aos indicadores</small></div><dl><div class="${model.admin?'':'pf-to-receive'}"><dt>Aguardando crédito · parceiro</dt><dd>${creditValue('pending_partner_net')}</dd></div><div><dt>Crédito confirmado na subconta</dt><dd>${creditValue('credited_subaccount_net')}</dd></div>${model.admin?`<div><dt>Aguardando crédito · comissão Tâmo On</dt><dd>${creditValue('pending_commission')}</dd></div>`:''}</dl><p>A comissão já foi descontada do líquido do parceiro. Créditos confirmados não representam o saldo para saque; consulte movimentações e saldo no Asaas.${credit&&Number(credit.split_review_count)>0?' Há splits que exigem conferência nos detalhes da reserva.':''}</p></section>${alert}<div class="pf-tabs" role="tablist" aria-label="Detalhes financeiros">${tabs.map(([key,label])=>`<button type="button" role="tab" id="pf-tab-${key}" aria-controls="pf-panel" aria-selected="${key===active}" data-action="partner-finance-tab" data-tab="${key}">${e(label)}</button>`).join('')}</div><section id="pf-panel" class="pf-panel" role="tabpanel" aria-labelledby="pf-tab-${active}">${body}</section></section>`;
   }
   function audit(data,h) {
     const {esc:e,money:m}=h;
@@ -2007,6 +2009,111 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     children(root,template.content);root.marketplaceMarkup=markup;return true;
   }
   window.MarketplaceUI={update};
+})();
+
+;
+
+;/* marketplace-navigation.js */
+(() => {
+  'use strict';
+  // Move the existing preference controls, preserving their handlers and state.
+  function create({onNavigate}) {
+    const button=document.getElementById('openMarketplaceMenu');
+    const dialog=document.getElementById('marketplaceMenu');
+    const links=document.getElementById('marketplaceMenuLinks');
+    const title=document.getElementById('marketplaceMenuTitle');
+    const preferences=document.getElementById('marketplaceMenuPreferences');
+    const closeButton=document.getElementById('closeMarketplaceMenu');
+    const header=document.querySelector('.app-header');
+    const ribbon=document.querySelector('.sandbox-ribbon');
+    const mobile=window.matchMedia('(max-width: 980px)');
+    if(!button||!dialog||!links||!preferences||!header)return {update(){}};
+    const controls=['toggleNotificationSound','toggleMarketplaceTheme','openReleaseNotes'].map(id=>{
+      const element=document.getElementById(id);
+      if(!element)return null;
+      const anchor=document.createComment('Header control: '+id);
+      element.before(anchor);
+      return {element,anchor};
+    }).filter(Boolean);
+    let enabled=false, currentTitle='', scrollState=null;
+    const available=()=>enabled&&!document.body.classList.contains('pilot-locked')&&!document.body.classList.contains('pilot-leaving');
+    function measure() {
+      document.documentElement.style.setProperty('--marketplace-ribbon-height',(ribbon?.getBoundingClientRect().height||0)+'px');
+      if(!scrollState)dialog.style.setProperty('--marketplace-menu-top',Math.max(0,header.getBoundingClientRect().bottom)+'px');
+    }
+    function release(restoreFocus=true) {
+      if(!scrollState)return;
+      const previous=scrollState;scrollState=null;
+      for(const [name,value] of Object.entries(previous.styles))document.body.style[name]=value;
+      const root=document.documentElement, behavior=root.style.scrollBehavior;
+      root.style.scrollBehavior='auto';window.scrollTo(previous.x,previous.y);root.style.scrollBehavior=behavior;
+      button.setAttribute('aria-expanded','false');
+      if(restoreFocus&&mobile.matches&&available()&&!document.querySelector('dialog[open]'))button.focus({preventScroll:true});
+    }
+    function close(restoreFocus=true) {
+      if(dialog.open)dialog.close();
+      release(restoreFocus);
+    }
+    function open() {
+      if(!mobile.matches||!available()||dialog.open||document.querySelector('dialog[open]'))return;
+      measure();
+      const styles={};
+      for(const name of ['position','top','left','right','width','overflow'])styles[name]=document.body.style[name];
+      scrollState={x:window.scrollX,y:window.scrollY,styles};
+      Object.assign(document.body.style,{position:'fixed',top:-scrollState.y+'px',left:'0',right:'0',width:'100%',overflow:'hidden'});
+      try{dialog.showModal();}catch(error){release();throw error;}
+      button.setAttribute('aria-expanded','true');
+      closeButton.focus({preventScroll:true});
+    }
+    function syncViewport() {
+      const wasOpen=dialog.open;
+      if(!mobile.matches)close(false);
+      for(const {element,anchor} of controls){
+        if(mobile.matches){if(element.parentElement!==preferences)preferences.append(element);}
+        else if(element.previousSibling!==anchor)anchor.after(element);
+      }
+      measure();
+      if(wasOpen&&!mobile.matches)document.getElementById('app')?.focus({preventScroll:true});
+    }
+    function syncAccess() {
+      button.disabled=!available();
+      if(!available())close(false);
+    }
+    function update({heading,markup='',allowed=true}) {
+      enabled=allowed;
+      if(currentTitle!==heading)close(false);
+      currentTitle=heading;title.textContent=heading;
+      links.setAttribute('aria-label','Menu da área '+heading);
+      if(window.MarketplaceUI)window.MarketplaceUI.update(links,markup);
+      else if(links.innerHTML!==markup)links.innerHTML=markup;
+      links.hidden=!markup;
+      syncAccess();
+    }
+    button.addEventListener('click',()=>dialog.open?close():open());
+    closeButton.addEventListener('click',()=>close());
+    dialog.addEventListener('click',event=>{if(event.target===dialog)close();});
+    dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
+    dialog.addEventListener('close',()=>{if(!dialog.open)release();});
+    links.addEventListener('click',async event=>{
+      const target=event.target.closest('[data-nav]');
+      if(!target||target.disabled||!available())return;
+      event.preventDefault();close(false);
+      await onNavigate(target.dataset.nav);
+      if(available()&&!document.querySelector('dialog[open]'))document.getElementById('app')?.focus({preventScroll:true});
+    });
+    // Help opens its own dialog; restore scrolling before handing over focus.
+    preferences.addEventListener('click',event=>{if(event.target.closest('#openReleaseNotes'))close(false);},true);
+    mobile.addEventListener('change',syncViewport);
+    window.addEventListener('resize',measure);
+    window.addEventListener('pagehide',()=>close(false));
+    if(window.ResizeObserver&&ribbon)new ResizeObserver(measure).observe(ribbon);
+    new MutationObserver(syncAccess).observe(document.body,{attributes:true,attributeFilter:['class']});
+    button.hidden=false;
+    document.body.classList.add('marketplace-navigation-ready');
+    syncViewport();syncAccess();
+    return {update,close};
+  }
+  window.MarketplaceNavigation={create};
 })();
 
 ;
@@ -2241,6 +2348,11 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   const roleSwitcher = document.getElementById("marketplaceRoleSwitcher");
   const sessionButton = document.getElementById("marketplaceSessionButton");
   const themeButton = document.getElementById("toggleMarketplaceTheme");
+  const mobileNavigation = window.MarketplaceNavigation?.create({onNavigate: async(page) => {
+    if(state.role==="partner"&&!partnerPageAllowed(page)){showToast("Acesso Restrito.");return;}
+    if(!(menus[state.role]||[]).some(([id])=>id===page))return;
+    await nav(state.role,page);
+  }});
   const marketplaceThemeColor = document.getElementById("marketplaceThemeColor");
   const toast = document.getElementById("toast");
   const reservationDialog = document.getElementById("reservationDialog");
@@ -7485,27 +7597,36 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function navigationItems(role) {
+    return (menus[role]||[]).map(([id, icon, label]) => {
+            const unread=navigationUnreadCount(role,id);
+            const restricted=role==="partner"&&!partnerPageAllowed(id);
+            if(restricted)return `<button type="button" data-ui-key="${role}-${id}" class="subnav-button is-restricted" disabled aria-disabled="true"><span class="subnav-icon" aria-hidden="true">${icon}</span><span class="subnav-label">${esc(label)}<small>${partnerAccessPending ? "Atualizando…" : "Acesso Restrito"}</small></span></button>`;
+            const badgeLabel=id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
+            return `<button type="button" data-ui-key="${role}-${id}" class="subnav-button ${state.activePage[role] === id ? "active" : ""} ${unread ? "has-unread" : ""}" data-nav="${id}" ${state.activePage[role]===id?'aria-current="page"':''}><span class="subnav-icon" aria-hidden="true">${icon}</span><span class="subnav-label">${label}</span>${messageBadge(unread,badgeLabel)}</button>`;
+          }).join("");
+  }
+
+  function refreshMarketplaceNavigation() {
+    const allowed=(!backendRuntime.enabled||backendIsOnline())&&backendRuntime.bootstrap?.profile?.status!=="blocked";
+    const heading={user:"Usuário",partner:"Parceiro",admin:"Administração",candidate:"Quero ser parceiro"}[state.role]||"Marketplace";
+    mobileNavigation?.update({heading,allowed,markup:allowed&&app.querySelector('.subnav')?navigationItems(state.role):""});
+  }
+
   function navShell(role, content) {
-    const menu = menus[role];
     return `
       <div class="role-layout">
         <nav class="subnav" aria-label="Menu da área ${role}">
           <div class="subnav-title">Navegação</div>
-          ${menu.map(([id, icon, label]) => {
-            const unread=navigationUnreadCount(role,id);
-            const restricted=role==="partner"&&!partnerPageAllowed(id);
-            if(restricted)return `<button type="button" class="subnav-button is-restricted" disabled aria-disabled="true"><span class="subnav-icon">${icon}</span><span class="subnav-label">${esc(label)}<small>${partnerAccessPending ? "Atualizando…" : "Acesso Restrito"}</small></span></button>`;
-            const badgeLabel=id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
-            return `<button type="button" class="subnav-button ${state.activePage[role] === id ? "active" : ""} ${unread ? "has-unread" : ""}" data-nav="${id}"><span class="subnav-icon">${icon}</span><span class="subnav-label">${label}</span>${messageBadge(unread,badgeLabel)}</button>`;
-          }).join("")}
+          ${navigationItems(role)}
         </nav>
         <section class="content">${content}</section>
       </div>`;
   }
 
-  function pageHeader(eyebrow, title, description, actions = "") {
+  function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
     if(backendIsOnline())actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
-    return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
+    return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
   function stat(value, label, note = "") {
@@ -8159,6 +8280,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         button.classList.remove("has-unread");
       }
     });
+    refreshMarketplaceNavigation();
   }
 
   function chatMessagesMarkup(thread, viewerRole) {
@@ -9234,7 +9356,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 
   function financeStableMarkup(markup) {
     // Movement content has its own renderer and must not invalidate the rest of the page.
-    return markup.replace('<div id="financeMovementsHost">'+financialPeriodPanel()+'</div>','<div id="financeMovementsHost"></div>');
+    return markup.replace('<div id="financeMovementsHost">'+financialPeriodPanel()+'</div>','<div id="financeMovementsHost"></div>')
+      .replace('<div id="financeSummaryHost">'+financialPeriodPanel(true)+'</div>','<div id="financeSummaryHost"></div>');
   }
 
   function captureFinanceScreen(root) {
@@ -9258,11 +9381,13 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const host=document.getElementById("financeMovementsHost");
     if(!host||state.activePage?.[state.role]!=="finance")return;
     const markup=financialPeriodPanel();
-    if(host.financeMarkup===markup)return;
+    const summaryHost=document.getElementById("financeSummaryHost"),summaryMarkup=financialPeriodPanel(true);
+    if(host.financeMarkup===markup&&(!summaryHost||summaryHost.financeMarkup===summaryMarkup))return;
     const root=host.closest('.finance-page'),previous=captureFinanceScreen(root);
     const height=root.getBoundingClientRect().height;
     root.style.minHeight=height+'px';
-    host.innerHTML=markup;host.financeMarkup=markup;
+    if(host.financeMarkup!==markup){host.innerHTML=markup;host.financeMarkup=markup;}
+    if(summaryHost&&summaryHost.financeMarkup!==summaryMarkup){summaryHost.innerHTML=summaryMarkup;summaryHost.financeMarkup=summaryMarkup;}
     restoreFinanceScreen(root,previous);
     root.style.minHeight='';
   }
@@ -9333,13 +9458,14 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       ||(participant.profile_id===backendRuntime.identityId?bootstrap?.profile?.display_name:"")||"";
   }
 
-  function financialPeriodPanel() {
+  function financialPeriodPanel(summaryOnly = false) {
     const all=financePeriodSelection()==="all";
     if(financialPeriodRuntime.key!==financePeriodKey()){
+      if(summaryOnly)return "";
       queueMicrotask(()=>loadFinancialPeriod());
       return `<section class="finance-loading ${all?"":"is-monthly"}" role="status" aria-live="polite"><span>Carregando pagamentos do período…</span></section>`;
     }
-    if(financialPeriodRuntime.error)return `<section class="card section finance-loading ${all?"":"is-monthly"}" role="alert"><strong>Consulta mensal indisponível</strong><p>${esc(financialPeriodRuntime.error)}</p><button class="button ghost small" data-action="finance-period-retry">Tentar novamente</button></section>`;
+    if(financialPeriodRuntime.error)return summaryOnly?"":`<section class="card section finance-loading ${all?"":"is-monthly"}" role="alert"><strong>Consulta mensal indisponível</strong><p>${esc(financialPeriodRuntime.error)}</p><button class="button ghost small" data-action="finance-period-retry">Tentar novamente</button></section>`;
     const data=financialPeriodRuntime.data,helper=window.MarketplaceFinancePeriod,t=helper.total(data.rows);
     if(state.role==="partner"||state.role==="admin") {
       const admin=state.role==="admin",rows=admin?adminFinancialRows():[];
@@ -9347,9 +9473,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         reservationBreakdown:rows.flatMap(row=>(row.reservationBreakdown||[]).map(item=>({...item,partner_id:row.partnerId,partner_name:row.partnerName})))}:currentPartnerFinancialSummary();
       const tab=state.ui?.[admin?"adminFinanceTab":"partnerFinanceTab"]||"reservations";
       return window.PartnerFinanceView.render({finance,data,period:financePeriodSelection(),position:helper.position(finance),
-        tab,reservations:state.reservations,admin,
-        adminHistory:admin&&tab==="returns"?adminFinancialHistory():"",
-        adminPartners:admin&&tab==="payouts"?adminFinancialPartnerTable(rows):"",
+        tab,reservations:state.reservations,admin,summaryOnly,omitSummary:!summaryOnly,
+        adminHistory:!summaryOnly&&admin&&tab==="returns"?adminFinancialHistory():"",
+        adminPartners:!summaryOnly&&admin&&tab==="payouts"?adminFinancialPartnerTable(rows):"",
         helpers:{esc,money,periodLabel:helper.label,dateLabel:helper.dateLabel,evidenceLabel:helper.evidenceLabel,
           kindLabel:helper.kindLabel,channelLabel:helper.channelLabel,holds:helper.holds,statusLabel:financialStatusLabel,payerName:financialPaymentPayerName,
           refundAction:asaasRefundButton,feeReference:`Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%`}});
@@ -9554,7 +9680,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   function partnerFinance() {
-    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>')}
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
       ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
 
@@ -10144,7 +10270,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 
   function adminFinance() {
     const selected=state.filters.adminFinancePartner || "Todos";
-    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>')}
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
       <div class="toolbar"><label class="field"><span>Parceiro</span><select class="filter-select" id="adminFinancePartner"><option value="Todos">Todos os parceiros — consolidado</option>${state.adminPartners.map(partner=>`<option value="${esc(partner.backendPartnerId||partner.id)}" ${String(partner.backendPartnerId||partner.id)===selected?'selected':''}>${esc(partner.tradeName)}</option>`).join('')}</select></label></div>
       ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
@@ -10174,7 +10300,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       [reservationDialog,detailDialog,chatDialog,formDialog].forEach(dialog=>{if(dialog?.open)dialog.close();});
       updateBackendRoleAccess();app.financeMarkup="";app.marketplaceScreenKey="";
       app.innerHTML='<section class="backend-auth-gate"><div class="backend-auth-card"><h1>Conta bloqueada</h1><p>O acesso ao Marketplace foi bloqueado pela Administração. Entre em contato com o suporte.</p><p><a href="mailto:suporte@tamoon.app.br" style="color:inherit;overflow-wrap:anywhere">suporte@tamoon.app.br</a></p></div></section>';
-      app.style.minHeight="";return;
+      app.style.minHeight="";refreshMarketplaceNavigation();return;
     }
     if (backendRuntime.enabled && !backendIsOnline()) {
       updateBackendRoleAccess();
@@ -10183,6 +10309,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       app.innerHTML = partnerReadonlyBanner() + backendAuthView();
       applyPartnerReadonlyControls();
       if(preserveFinance)app.style.minHeight="";
+      refreshMarketplaceNavigation();
       return;
     }
     if (backendRuntime.enabled && !backendAllowedRoles().has(state.role)) chooseBackendRole(backendRuntime.bootstrap || {});
@@ -10212,6 +10339,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if(!canKeepFinance||changedFinance){
       const host=document.getElementById("financeMovementsHost");
       if(host)host.financeMarkup=financialPeriodPanel();
+      const summaryHost=document.getElementById("financeSummaryHost");
+      if(summaryHost)summaryHost.financeMarkup=financialPeriodPanel(true);
     }
     applyPartnerReadonlyControls();
     window.MarketplaceAgendaNavigation.showSelected(app);
