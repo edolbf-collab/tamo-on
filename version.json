@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 116,
   "mandatory": false,
-  "notes": "Filtros de data e período ajustados à largura do celular em Reservas e Financeiro.",
+  "notes": "Correção da largura nativa dos campos de data e mês no Safari do iPhone.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R14"
+  "integration": "166-R15"
 }

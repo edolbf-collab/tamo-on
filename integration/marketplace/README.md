@@ -1,4 +1,4 @@
-# Marketplace privado — incremental 166-R14
+# Marketplace privado — incremental 166-R15
 
 Integração da Comunidade build 164 com o Marketplace 0.2.0, base consolidada 22BB-C39-R1. Inclui o piloto 166-R1 e a sincronização com o grupo Teste FC. O motor de reservas, mensalidades, parceiros e financeiro do sandbox foi preservado.
 
@@ -191,3 +191,11 @@ Validação: 93 testes Node passaram. Os novos casos cobrem ordem dos indicadore
 O filtro Data de Reservas usa uma coluna com mínimo zero e limita o campo nativo à largura disponível. Os filtros administrativos passam a uma coluna no celular. O Financeiro usa colunas que podem encolher, retirando o recuo genérico de 49 px aplicado às ações. Até 430 px, Período e Mês e ano ficam um abaixo do outro; a navegação por mês ocupa uma linha de três botões e Exportar pagamentos ocupa a linha seguinte. Os controles mantêm as mesmas ações e valores. A correção atua no dimensionamento dos componentes, sem adicionar corte de conteúdo ou desativar a seleção nativa de datas.
 
 Revisão exclusivamente de apresentação, com atualização dos identificadores de cache. O pacote JavaScript do Marketplace permanece o da R13, pois seu conteúdo não mudou. Os 93 testes existentes passaram; não foram adicionados testes que apenas repetem as regras CSS. A conferência visual no aparelho ainda depende da validação do usuário, pois o navegador local continua indisponível. Sem mudanças em pagamentos, banco ou permissões.
+
+## Largura nativa no iPhone — 166-R15
+
+A validação do usuário mostrou que a R14 não resolveu o excesso de largura no iPhone. A nova revisão trata a aparência nativa dos campos Data de Reservas e Mês e ano do Financeiro: `appearance: none` (com prefixo WebKit) e `box-sizing: border-box` evitam o ajuste de largura do tema iOS. O problema documentado em https://bugs.webkit.org/show_bug.cgi?id=301648 soma o espaçamento interno à largura percentual desses tipos de campo. Apenas limitar `width` e `min-width`, como na R14, não tratava esse comportamento. Os tipos `date`/`month`, valores, eventos e seletores nativos continuam os mesmos.
+
+Os controles têm altura mínima e alinhamento do valor vazio ou preenchido; no celular, os filtros usam texto de 16 px para evitar ampliação automática ao receber foco. A organização das linhas da R14 permanece, sem ocultar a rolagem da página ou cortar os campos. Cache atualizado para R15; pacote JavaScript do Marketplace preservado.
+
+Validação: os 93 testes Node existentes passaram e o diff foi conferido. O WebKit local foi baixado, mas não iniciou por falta de bibliotecas do sistema; a instalação dessas dependências também falhou. Portanto não houve validação visual em Safari/iPhone nem Android nesta revisão. A confirmação no aparelho permanece pendente. Nenhuma mudança de banco, pagamentos, permissões ou subcontas.
