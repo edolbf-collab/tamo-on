@@ -1,4 +1,4 @@
-# Marketplace privado — incremental 166-R12
+# Marketplace privado — incremental 166-R13
 
 Integração da Comunidade build 164 com o Marketplace 0.2.0, base consolidada 22BB-C39-R1. Inclui o piloto 166-R1 e a sincronização com o grupo Teste FC. O motor de reservas, mensalidades, parceiros e financeiro do sandbox foi preservado.
 
@@ -173,3 +173,14 @@ O prazo efetivo do Pix acompanha a garantia inicial e, quando ela é atingida, o
 Validação: 88 testes Node passaram, incluindo abertura mensal, reutilização, bloqueios de prazo/escopo, fluxo avulso e mensagens. Os testes SQL com rollback usaram a configuração da RES-001066 para cota única e duas cotas, pagamento antecipado, titularidade, conta emissora, garantia, saldo, comissão, webhook repetido e permissões. Também verificaram que um Pix aberto antes da garantia continua sendo a mesma cobrança após ela. Nenhuma chamada de pagamento ao Asaas foi feita nesses testes e nenhum pagamento ou checkout sintético foi mantido. A geração e confirmação ponta a ponta pelo usuário e a conferência visual no celular permanecem pendentes.
 
 As RPCs financeiras continuam exclusivas de serviço, sem execução por `anon` ou `authenticated`. A nova função privada fixa `search_path` e não tem acesso por clientes. Os advisors mantêm os avisos anteriores; não foi identificada nova exposição nas funções alteradas. As três contas do piloto e o bloqueio de dinheiro real foram preservados.
+
+
+## Apresentação financeira e rodapés — 166-R13
+
+Os controles do cabeçalho móvel compartilham uma linha com a marca em todas as áreas do Marketplace. Notificações, som, Voltar, tema e ajuda mantêm seus rótulos acessíveis e comportamentos. Os ícones passam a 32 × 36 px, Voltar a 52 × 36 px e a marca é reduzida proporcionalmente. A área administrativa e a do parceiro usam os mesmos componentes.
+
+Os quatro indicadores financeiros passam para logo abaixo do título e descrição, antes das exportações, seleção de parceiro e filtros de período. No celular continuam em duas colunas, com espaçamento e tipografia menores, preservando as notas sobre taxas estimadas e disponibilidade dos valores. Os cálculos, permissões, exportações, abas e consultas não foram alterados. O resumo usa o mesmo snapshot e escopo da consulta atual; fica vazio durante mudança de contexto ou falha, sem apresentar valores antigos. Atualizações preservam foco, posição de rolagem e detalhes abertos.
+
+A varredura de componentes encontrou o fechamento inferior desalinhado no diálogo compartilhado de detalhes (inclui cotas, reservas, pagamentos, vouchers e consultas) e na galeria. Ambos agora usam `dialog-actions-close`, centralizado em todas as larguras. Rodapés com ações de formulário e confirmação também têm alinhamento central. Ajuda e comunicação Asaas já tinham ação centralizada ou de largura total. Os diálogos da Comunidade usam fechamento no cabeçalho e ações de largura total; não tinham o mesmo rodapé Fechar. Ícones de fechar no canto, navegação, filtros e ações vinculadas a linhas mantêm seus posicionamentos próprios.
+
+Validação: 93 testes Node passaram. Os novos casos cobrem ordem dos indicadores nas duas áreas, escopo por parceiro, taxas estimadas, manutenção das abas/ações, ausência de duplicação, retirada de dados antigos durante carregamento/erro e atualização independente do resumo. Sintaxe JavaScript e diff conferidos. A imagem gerada na conversa é somente uma ilustração da proposta. O download do navegador local falhou; a conferência visual e de toques no celular permanece pendente. Não houve migração, alteração de pagamentos ou cadastro de subconta para o parceiro 2.

@@ -2,8 +2,9 @@ body.pilot-locked > :not(#pilotGate):not(script) { display: none !important; }
 #pilotGate { max-width: 34rem; margin: 12vh auto; padding: 1.5rem; color: #e7f8ef; background: #10392f; border-radius: 1.2rem; }
 #pilotGate a, .sandbox-ribbon a { color: inherit; text-decoration: underline; }
 #pilotRetry { margin: 1rem 0; padding: .8rem; }
-#detailDialog[data-view="asaas-payment"] > form > .dialog-actions { display:flex; flex-direction:row; justify-content:center; align-items:center; }
-#detailDialog[data-view="asaas-payment"] > form > .dialog-actions > button { flex:0 1 auto; width:auto; min-width:120px; max-width:100%; margin-inline:auto; text-align:center; justify-content:center; }
+.dialog .dialog-actions { justify-content:center; }
+.dialog > form > .dialog-actions-close { display:flex; flex-direction:row; justify-content:center; align-items:center; }
+.dialog > form > .dialog-actions-close > button { flex:0 1 auto; width:auto; min-width:120px; max-width:100%; margin-inline:auto; text-align:center; justify-content:center; }
 #openBackendStatus, #resetPreview { display: none !important; }
 #toggleNotificationSound[aria-pressed="true"] { color: #bff5da; }
 .sandbox-ribbon { padding-top: max(8px, env(safe-area-inset-top)); }
@@ -13,11 +14,6 @@ body.pilot-locked > :not(#pilotGate):not(script) { display: none !important; }
 .pilot-locked #pilotGate { display: block; }
 body:not(.pilot-locked) #pilotGate { display: none; }
 @media(max-width: 600px) { #pilotGate { margin: 10vh 1rem; } }
-@media(max-width: 600px) {
-  .app-header { flex-wrap: wrap; gap: 12px; }
-  .header-actions { width: 100%; display: flex; flex-wrap: wrap; justify-content: flex-start; }
-  #openNotifications, #toggleNotificationSound { width: auto; min-width: fit-content; flex: 0 0 auto; padding: 0 12px; white-space: nowrap; }
-}
 
 /* One navigation vocabulary and safe bounds shared by every Marketplace dialog. */
 .marketplace-session-label { display:inline !important; }
@@ -53,7 +49,7 @@ body:not(.pilot-locked) #pilotGate { display: none; }
   .dialog .dialog-header { flex-shrink:0; }
 }
 
-/* 166-R6: header controls stay inside one row; return is always rectangular. */
+/* Compact controls alongside the brand, shared across all Marketplace roles. */
 .app-header .marketplace-session-button { width:auto; min-width:80px; border-radius:10px; padding:8px 12px; justify-content:center; white-space:nowrap; }
 .header-actions svg { width:18px; height:18px; flex:0 0 18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 #openNotifications, #toggleNotificationSound { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
@@ -61,9 +57,15 @@ body:not(.pilot-locked) #pilotGate { display: none; }
 .header-notification-count { font-size:10px; line-height:1; border-radius:7px; padding:3px; background:var(--green); color:var(--bg); }
 .pilot-leaving #pilotGate a { display:none; }
 @media (max-width:700px) {
-  .app-header .header-actions { display:flex; flex:1 1 100%; width:100%; min-width:0; flex-wrap:nowrap; gap:5px; justify-content:flex-end; margin:0; }
-  .app-header .header-actions > button { position:relative; box-sizing:border-box; flex:0 0 38px; width:38px; min-width:0; max-width:100%; height:38px; min-height:38px; padding:0; border-radius:10px; overflow:hidden; }
-  .app-header .header-actions > .marketplace-session-button { flex-basis:84px; width:84px; padding:0 8px; gap:5px; font-size:12px; }
+  .app-header { flex-wrap:nowrap; gap:6px; min-height:56px; padding-block:8px; }
+  .app-header .brand-lockup { flex:0 1 auto; gap:5px; min-width:0; }
+  .app-header .brand-symbol { flex:0 0 28px; width:28px; height:28px; border-radius:9px; font-size:19px; }
+  .app-header .brand-name { font-size:14px; }
+  .app-header .brand-subtitle { display:none; }
+  .app-header .header-actions { display:flex; flex:0 0 auto; width:auto; min-width:0; flex-wrap:nowrap; gap:3px; justify-content:flex-end; margin:0; }
+  .app-header .header-actions > button { position:relative; box-sizing:border-box; flex:0 0 32px; width:32px; min-width:0; max-width:100%; height:36px; min-height:36px; padding:0; border-radius:9px; overflow:hidden; }
+  .app-header .header-actions > .marketplace-session-button { flex-basis:52px; width:52px; padding:0 4px; gap:3px; font-size:11px; }
+  .app-header #openNotifications, .app-header #toggleNotificationSound { padding:0; }
   .app-header .header-control-label, .app-header .theme-button-label { display:none; }
   .app-header .header-notification-count { position:absolute; right:1px; top:1px; max-width:26px; font-size:9px; }
   .app-header .theme-button-icon { font-size:18px; }
@@ -93,9 +95,7 @@ body:not(.pilot-locked) #pilotGate { display: none; }
   .customer-reservation-page .backend-domain-note small { font-size:11px; line-height:1.4; }
 }
 @media (max-width:360px) {
-  .app-header .header-actions { gap:4px; }
-  .app-header .header-actions > button { flex-basis:36px; width:36px; }
-  .app-header .header-actions > .marketplace-session-button { flex-basis:80px; width:80px; }
+  .app-header .brand-name { font-size:13px; }
   .reservation-list .reservation-card-heading > .status { max-width:92px; }
 }
 

@@ -259,7 +259,7 @@ tr:last-child td { border-bottom: 0; }
 .field-help { color: var(--muted); font-size: 8px; line-height: 1.4; }
 .payment-preview { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 0; padding: 13px; border: 1px dashed var(--line-strong); border-radius: 14px; }
 .payment-preview p { margin: 3px 0 0; color: var(--muted); font-size: 9px; }
-.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.dialog-actions { display: flex; justify-content: center; gap: 8px; margin-top: 18px; }
 .detail-body { display: grid; gap: 12px; }
 .plain-list { padding-left: 18px; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .toast {

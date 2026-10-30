@@ -5271,9 +5271,9 @@
       </div>`;
   }
 
-  function pageHeader(eyebrow, title, description, actions = "") {
+  function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
     if(backendIsOnline())actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
-    return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
+    return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
   function stat(value, label, note = "") {
@@ -7002,7 +7002,8 @@
 
   function financeStableMarkup(markup) {
     // Movement content has its own renderer and must not invalidate the rest of the page.
-    return markup.replace('<div id="financeMovementsHost">'+financialPeriodPanel()+'</div>','<div id="financeMovementsHost"></div>');
+    return markup.replace('<div id="financeMovementsHost">'+financialPeriodPanel()+'</div>','<div id="financeMovementsHost"></div>')
+      .replace('<div id="financeSummaryHost">'+financialPeriodPanel(true)+'</div>','<div id="financeSummaryHost"></div>');
   }
 
   function captureFinanceScreen(root) {
@@ -7026,11 +7027,13 @@
     const host=document.getElementById("financeMovementsHost");
     if(!host||state.activePage?.[state.role]!=="finance")return;
     const markup=financialPeriodPanel();
-    if(host.financeMarkup===markup)return;
+    const summaryHost=document.getElementById("financeSummaryHost"),summaryMarkup=financialPeriodPanel(true);
+    if(host.financeMarkup===markup&&(!summaryHost||summaryHost.financeMarkup===summaryMarkup))return;
     const root=host.closest('.finance-page'),previous=captureFinanceScreen(root);
     const height=root.getBoundingClientRect().height;
     root.style.minHeight=height+'px';
-    host.innerHTML=markup;host.financeMarkup=markup;
+    if(host.financeMarkup!==markup){host.innerHTML=markup;host.financeMarkup=markup;}
+    if(summaryHost&&summaryHost.financeMarkup!==summaryMarkup){summaryHost.innerHTML=summaryMarkup;summaryHost.financeMarkup=summaryMarkup;}
     restoreFinanceScreen(root,previous);
     root.style.minHeight='';
   }
@@ -7101,13 +7104,14 @@
       ||(participant.profile_id===backendRuntime.identityId?bootstrap?.profile?.display_name:"")||"";
   }
 
-  function financialPeriodPanel() {
+  function financialPeriodPanel(summaryOnly = false) {
     const all=financePeriodSelection()==="all";
     if(financialPeriodRuntime.key!==financePeriodKey()){
+      if(summaryOnly)return "";
       queueMicrotask(()=>loadFinancialPeriod());
       return `<section class="finance-loading ${all?"":"is-monthly"}" role="status" aria-live="polite"><span>Carregando pagamentos do período…</span></section>`;
     }
-    if(financialPeriodRuntime.error)return `<section class="card section finance-loading ${all?"":"is-monthly"}" role="alert"><strong>Consulta mensal indisponível</strong><p>${esc(financialPeriodRuntime.error)}</p><button class="button ghost small" data-action="finance-period-retry">Tentar novamente</button></section>`;
+    if(financialPeriodRuntime.error)return summaryOnly?"":`<section class="card section finance-loading ${all?"":"is-monthly"}" role="alert"><strong>Consulta mensal indisponível</strong><p>${esc(financialPeriodRuntime.error)}</p><button class="button ghost small" data-action="finance-period-retry">Tentar novamente</button></section>`;
     const data=financialPeriodRuntime.data,helper=window.MarketplaceFinancePeriod,t=helper.total(data.rows);
     if(state.role==="partner"||state.role==="admin") {
       const admin=state.role==="admin",rows=admin?adminFinancialRows():[];
@@ -7115,9 +7119,9 @@
         reservationBreakdown:rows.flatMap(row=>(row.reservationBreakdown||[]).map(item=>({...item,partner_id:row.partnerId,partner_name:row.partnerName})))}:currentPartnerFinancialSummary();
       const tab=state.ui?.[admin?"adminFinanceTab":"partnerFinanceTab"]||"reservations";
       return window.PartnerFinanceView.render({finance,data,period:financePeriodSelection(),position:helper.position(finance),
-        tab,reservations:state.reservations,admin,
-        adminHistory:admin&&tab==="returns"?adminFinancialHistory():"",
-        adminPartners:admin&&tab==="payouts"?adminFinancialPartnerTable(rows):"",
+        tab,reservations:state.reservations,admin,summaryOnly,omitSummary:!summaryOnly,
+        adminHistory:!summaryOnly&&admin&&tab==="returns"?adminFinancialHistory():"",
+        adminPartners:!summaryOnly&&admin&&tab==="payouts"?adminFinancialPartnerTable(rows):"",
         helpers:{esc,money,periodLabel:helper.label,dateLabel:helper.dateLabel,evidenceLabel:helper.evidenceLabel,
           kindLabel:helper.kindLabel,channelLabel:helper.channelLabel,holds:helper.holds,statusLabel:financialStatusLabel,payerName:financialPaymentPayerName,
           refundAction:asaasRefundButton,feeReference:`Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%`}});
@@ -7322,7 +7326,7 @@
   }
 
   function partnerFinance() {
-    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>')}
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
       ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
 
@@ -7912,7 +7916,7 @@
 
   function adminFinance() {
     const selected=state.filters.adminFinancePartner || "Todos";
-    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>')}
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
       <div class="toolbar"><label class="field"><span>Parceiro</span><select class="filter-select" id="adminFinancePartner"><option value="Todos">Todos os parceiros — consolidado</option>${state.adminPartners.map(partner=>`<option value="${esc(partner.backendPartnerId||partner.id)}" ${String(partner.backendPartnerId||partner.id)===selected?'selected':''}>${esc(partner.tradeName)}</option>`).join('')}</select></label></div>
       ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
@@ -7980,6 +7984,8 @@
     if(!canKeepFinance||changedFinance){
       const host=document.getElementById("financeMovementsHost");
       if(host)host.financeMarkup=financialPeriodPanel();
+      const summaryHost=document.getElementById("financeSummaryHost");
+      if(summaryHost)summaryHost.financeMarkup=financialPeriodPanel(true);
     }
     applyPartnerReadonlyControls();
     window.MarketplaceAgendaNavigation.showSelected(app);

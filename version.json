@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 116,
   "mandatory": false,
-  "notes": "Pix mensalista com cobrança única por pagador, conciliação da garantia e quitação do mês.",
+  "notes": "Cabeçalho compacto, indicadores financeiros no topo e ações dos diálogos centralizadas.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R12"
+  "integration": "166-R13"
 }

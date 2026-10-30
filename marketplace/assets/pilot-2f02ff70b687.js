@@ -1738,6 +1738,10 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const credit=data.credit_position;
     const creditValue=key=>credit&&Number.isFinite(Number(credit[key]))?m(credit[key]):'A confirmar';
     const card=(label,value,note,highlight=false)=>`<article class="pf-metric ${highlight?'pf-metric-net':''} ${amount(value)<0?'is-negative':''}"><span>${e(label)}</span><strong>${value==null?'—':m(value)}</strong><small>${e(note)}</small></article>`;
+    const estimated=round(receipts.filter(x=>x.fee_source==='estimated').reduce((n,x)=>n+amount(x.asaas_fee_total),0));
+    const feeNote=estimated?`Inclui ${m(estimated)} estimados`:'Taxas vinculadas aos pagamentos';
+    const summary=`<div class="pf-metrics" role="group" aria-label="Resumo financeiro · ${e(periodName)}">${card('Pagamentos recebidos',sum.base,'Cada pagamento contado uma única vez')}${card('Taxas de pagamento',sum.fee,feeNote)}${card('Comissão Tâmo On',sum.commission,'Comissão reconhecida vinculada às entradas',Boolean(model.admin))}${card(model.admin&&!finance.partnerId?'Líquido dos parceiros':'Líquido do parceiro',sum.net,'Valor calculado; veja a disponibilidade abaixo',!model.admin)}</div>`;
+    if(model.summaryOnly)return `<section class="pf-workbench pf-summary">${summary}</section>`;
     const line=(label,value)=>`<div><dt>${e(label)}</dt><dd>${m(value)}</dd></div>`;
     const disclosure=(id,title,note,body)=>`<details class="finance-disclosure pf-reservation" data-finance-detail="pf:${e(id)}"><summary><span><strong>${e(title)}</strong><small>${e(note)}</small></span><span aria-hidden="true">⌄</span></summary><div class="finance-disclosure-body">${body}</div></details>`;
     const code=id=>{const row=receiptGroups.get(id)?.[0]||snapshotMap.get(id)||groups.get(id)?.[0];return (row?.reservation_code||'Reserva sem código')+(model.admin&&row?.partner_name?' · '+row.partner_name:'');};
@@ -1803,11 +1807,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       body+=disclosure('reconciliation','Conferência completa da posição atual','Contratado, recebimentos, canais e ajustes',`<dl class="pf-lines">${line('Contratado original',finance.contractedValue)}${line('Contratado vigente',p.contracted)}${line('Encerrado ou cancelado',finance.cancelledValue)}${line('Recebido bruto',p.received)}${line('Recebido após devoluções',p.receivedNet)}${line('Recebimento fora do contrato vigente',p.outsideContract)}${line('Devoluções concluídas',p.returned)}${line('Valores bloqueados',p.blocked)}${line('Devoluções pendentes',finance.refundPending)}${line('Liquidado',p.liquidated)}${line('Ainda não liquidado',finance.unliquidatedValue)}${line('Pendente de pagamento',p.pending)}${line('Recebido pela instituição',finance.asaasProcessed)}${line('Pix',finance.asaasPixValue)}${line('Cartão',finance.asaasCardValue)}${line('Recebido diretamente',finance.externalReceived)}</dl>`);
     }
     if(active==='payouts'&&model.adminPartners)body+=disclosure('admin-partners','Conciliação por parceiro','Posição atual de todos os meses; sem compensar saldos entre parceiros',model.adminPartners);
-    const estimated=round(receipts.filter(x=>x.fee_source==='estimated').reduce((n,x)=>n+amount(x.asaas_fee_total),0));
-    const feeNote=estimated?`Inclui ${m(estimated)} estimados`:'Taxas vinculadas aos pagamentos';
 
     const alert=(Math.abs(amount(p.channelDifference))>0.009||Math.abs(amount(p.liquidationDifference))>0.009)?'<p class="finance-alert" role="status">Há uma diferença na conciliação atual. Consulte a conferência completa em Créditos e taxas.</p>':'';
-    return `<section class="pf-workbench"><div class="pf-period-heading"><h2>${e(periodName)}</h2><p>Entradas pela data do pagamento. As etapas posteriores atualizam os pagamentos de origem, sem criar uma nova entrada.</p></div><div class="pf-metrics">${card('Pagamentos recebidos',sum.base,'Cada pagamento contado uma única vez')}${card('Taxas de pagamento',sum.fee,feeNote)}${card('Comissão Tâmo On',sum.commission,'Comissão reconhecida vinculada às entradas',Boolean(model.admin))}${card(model.admin&&!finance.partnerId?'Líquido dos parceiros':'Líquido do parceiro',sum.net,'Valor calculado; veja a disponibilidade abaixo',!model.admin)}</div><p class="pf-note">Composição atual das entradas selecionadas: ${m(sum.returned)} devolvidos e ${m(sum.held)} pendentes de conclusão ou devolução. O líquido calculado desconta devoluções, pendências, taxas e comissão; ainda pode aguardar crédito no Asaas.</p>${data.undated_count?`<p class="finance-alert" role="status">${e(data.undated_count)} pagamento(s) sem data confirmada: aparecem somente em Todo o período, até conferência.</p>`:""}${data.allocation_review_count?'<p class="finance-alert" role="status">Há pagamentos cuja distribuição exige conferência.</p>':""}<section class="pf-availability"><div><strong>Créditos no Asaas</strong><small>Todos os períodos · valores líquidos, sem somar novamente aos indicadores</small></div><dl><div class="${model.admin?'':'pf-to-receive'}"><dt>Aguardando crédito · parceiro</dt><dd>${creditValue('pending_partner_net')}</dd></div><div><dt>Crédito confirmado na subconta</dt><dd>${creditValue('credited_subaccount_net')}</dd></div>${model.admin?`<div><dt>Aguardando crédito · comissão Tâmo On</dt><dd>${creditValue('pending_commission')}</dd></div>`:''}</dl><p>A comissão já foi descontada do líquido do parceiro. Créditos confirmados não representam o saldo para saque; consulte movimentações e saldo no Asaas.${credit&&Number(credit.split_review_count)>0?' Há splits que exigem conferência nos detalhes da reserva.':''}</p></section>${alert}<div class="pf-tabs" role="tablist" aria-label="Detalhes financeiros">${tabs.map(([key,label])=>`<button type="button" role="tab" id="pf-tab-${key}" aria-controls="pf-panel" aria-selected="${key===active}" data-action="partner-finance-tab" data-tab="${key}">${e(label)}</button>`).join('')}</div><section id="pf-panel" class="pf-panel" role="tabpanel" aria-labelledby="pf-tab-${active}">${body}</section></section>`;
+    return `<section class="pf-workbench"><div class="pf-period-heading"><h2>${e(periodName)}</h2><p>Entradas pela data do pagamento. As etapas posteriores atualizam os pagamentos de origem, sem criar uma nova entrada.</p></div>${model.omitSummary?"":summary}<p class="pf-note">Composição atual das entradas selecionadas: ${m(sum.returned)} devolvidos e ${m(sum.held)} pendentes de conclusão ou devolução. O líquido calculado desconta devoluções, pendências, taxas e comissão; ainda pode aguardar crédito no Asaas.</p>${data.undated_count?`<p class="finance-alert" role="status">${e(data.undated_count)} pagamento(s) sem data confirmada: aparecem somente em Todo o período, até conferência.</p>`:""}${data.allocation_review_count?'<p class="finance-alert" role="status">Há pagamentos cuja distribuição exige conferência.</p>':""}<section class="pf-availability"><div><strong>Créditos no Asaas</strong><small>Todos os períodos · valores líquidos, sem somar novamente aos indicadores</small></div><dl><div class="${model.admin?'':'pf-to-receive'}"><dt>Aguardando crédito · parceiro</dt><dd>${creditValue('pending_partner_net')}</dd></div><div><dt>Crédito confirmado na subconta</dt><dd>${creditValue('credited_subaccount_net')}</dd></div>${model.admin?`<div><dt>Aguardando crédito · comissão Tâmo On</dt><dd>${creditValue('pending_commission')}</dd></div>`:''}</dl><p>A comissão já foi descontada do líquido do parceiro. Créditos confirmados não representam o saldo para saque; consulte movimentações e saldo no Asaas.${credit&&Number(credit.split_review_count)>0?' Há splits que exigem conferência nos detalhes da reserva.':''}</p></section>${alert}<div class="pf-tabs" role="tablist" aria-label="Detalhes financeiros">${tabs.map(([key,label])=>`<button type="button" role="tab" id="pf-tab-${key}" aria-controls="pf-panel" aria-selected="${key===active}" data-action="partner-finance-tab" data-tab="${key}">${e(label)}</button>`).join('')}</div><section id="pf-panel" class="pf-panel" role="tabpanel" aria-labelledby="pf-tab-${active}">${body}</section></section>`;
   }
   function audit(data,h) {
     const {esc:e,money:m}=h;
@@ -4559,7 +4561,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if (/Cancele a cobranca online|Cobranca emitida exige cancelamento/.test(message)) return "Já existe uma cobrança emitida no Asaas. Cancele-a e aguarde a confirmação antes de registrar o pagamento externo.";
     if (/ASAAS_PARTNER_ACCOUNT_REQUIRED|ASAAS_ISSUER_KEY_REQUIRED|ASAAS_ACCOUNTS_INVALID|ASAAS_PARTNER_ACCOUNT_MISMATCH|ASAAS_PARTNER_KEY_MISMATCH|ASAAS_COMMISSION_WALLET_MISMATCH/.test(message)) return "A conta de recebimento do parceiro precisa ser configurada ou conferida pela administração.";
     if (/ASAAS_SANDBOX_DISABLED|ASAAS_NOT_CONFIGURED|ASAAS_MODE_CONFLICT/.test(message)) return "O Sandbox de pagamentos ainda não foi configurado. Avise a administração.";
-    if (/ASAAS_FIRST_TEST_SCOPE|ASAAS_CHECKOUT_SCOPE/.test(message)) return "Esta etapa do Sandbox aceita reservas avulsas com cartão integral, Pix integral ou Pix por cotas. Mensalistas serão habilitados em uma próxima etapa.";
+    if (/ASAAS_MONTHLY_PIX_SCOPE/.test(message)) return "A configuração desta mensalidade precisa ser conferida pela administração para habilitar o Pix. Sua reserva e os valores foram preservados.";
+    if (/ASAAS_FIRST_TEST_SCOPE|ASAAS_CHECKOUT_SCOPE/.test(message)) return "O Sandbox aceita Pix em reservas avulsas e mensalidades com cobrança única por pagador. Cartão está disponível para reservas avulsas com pagamento integral.";
     if (/CHECKOUT_CONFIGURATION_LOCKED/.test(message)) return "Já existe uma cobrança iniciada para esta reserva. A forma de pagamento e as cotas ficam preservadas até a conferência dessa cobrança.";
     if (/CHECKOUT_BINDING_MISMATCH/.test(message)) return "A cobrança precisa de conferência antes de continuar. Nenhum novo pagamento foi emitido.";
     if (/CHECKOUT_MINIMUM_WINDOW/.test(message)) return "Não há tempo suficiente para abrir um novo checkout. Este teste exige mais de 10 minutos restantes no prazo da pré-reserva.";
@@ -4920,6 +4923,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   function officialAsaasPaymentMessage(reservation) {
     if(!reservation?.backendOfficial)return "";
     if(reservation.pixSplit && currentUserPixShareState(reservation)?.paid){
+      if(reservation.monthly && ["confirmed","completed"].includes(reservation.backendStatus) && reservation.paymentConfirmedAtIso)
+        return `Reserva ${reservation.id}: sua cota mensal foi paga e a mensalidade está quitada.`;
       return officialSinglePaymentConfirmed(reservation)
         ? `Reserva ${reservation.id}: sua cota foi paga e a reserva está confirmada.`
         : reservation.backendStatus==="pending_payment"
@@ -7500,9 +7505,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       </div>`;
   }
 
-  function pageHeader(eyebrow, title, description, actions = "") {
+  function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
     if(backendIsOnline())actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
-    return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
+    return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
   function stat(value, label, note = "") {
@@ -9231,7 +9236,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 
   function financeStableMarkup(markup) {
     // Movement content has its own renderer and must not invalidate the rest of the page.
-    return markup.replace('<div id="financeMovementsHost">'+financialPeriodPanel()+'</div>','<div id="financeMovementsHost"></div>');
+    return markup.replace('<div id="financeMovementsHost">'+financialPeriodPanel()+'</div>','<div id="financeMovementsHost"></div>')
+      .replace('<div id="financeSummaryHost">'+financialPeriodPanel(true)+'</div>','<div id="financeSummaryHost"></div>');
   }
 
   function captureFinanceScreen(root) {
@@ -9255,11 +9261,13 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const host=document.getElementById("financeMovementsHost");
     if(!host||state.activePage?.[state.role]!=="finance")return;
     const markup=financialPeriodPanel();
-    if(host.financeMarkup===markup)return;
+    const summaryHost=document.getElementById("financeSummaryHost"),summaryMarkup=financialPeriodPanel(true);
+    if(host.financeMarkup===markup&&(!summaryHost||summaryHost.financeMarkup===summaryMarkup))return;
     const root=host.closest('.finance-page'),previous=captureFinanceScreen(root);
     const height=root.getBoundingClientRect().height;
     root.style.minHeight=height+'px';
-    host.innerHTML=markup;host.financeMarkup=markup;
+    if(host.financeMarkup!==markup){host.innerHTML=markup;host.financeMarkup=markup;}
+    if(summaryHost&&summaryHost.financeMarkup!==summaryMarkup){summaryHost.innerHTML=summaryMarkup;summaryHost.financeMarkup=summaryMarkup;}
     restoreFinanceScreen(root,previous);
     root.style.minHeight='';
   }
@@ -9330,13 +9338,14 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       ||(participant.profile_id===backendRuntime.identityId?bootstrap?.profile?.display_name:"")||"";
   }
 
-  function financialPeriodPanel() {
+  function financialPeriodPanel(summaryOnly = false) {
     const all=financePeriodSelection()==="all";
     if(financialPeriodRuntime.key!==financePeriodKey()){
+      if(summaryOnly)return "";
       queueMicrotask(()=>loadFinancialPeriod());
       return `<section class="finance-loading ${all?"":"is-monthly"}" role="status" aria-live="polite"><span>Carregando pagamentos do período…</span></section>`;
     }
-    if(financialPeriodRuntime.error)return `<section class="card section finance-loading ${all?"":"is-monthly"}" role="alert"><strong>Consulta mensal indisponível</strong><p>${esc(financialPeriodRuntime.error)}</p><button class="button ghost small" data-action="finance-period-retry">Tentar novamente</button></section>`;
+    if(financialPeriodRuntime.error)return summaryOnly?"":`<section class="card section finance-loading ${all?"":"is-monthly"}" role="alert"><strong>Consulta mensal indisponível</strong><p>${esc(financialPeriodRuntime.error)}</p><button class="button ghost small" data-action="finance-period-retry">Tentar novamente</button></section>`;
     const data=financialPeriodRuntime.data,helper=window.MarketplaceFinancePeriod,t=helper.total(data.rows);
     if(state.role==="partner"||state.role==="admin") {
       const admin=state.role==="admin",rows=admin?adminFinancialRows():[];
@@ -9344,9 +9353,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         reservationBreakdown:rows.flatMap(row=>(row.reservationBreakdown||[]).map(item=>({...item,partner_id:row.partnerId,partner_name:row.partnerName})))}:currentPartnerFinancialSummary();
       const tab=state.ui?.[admin?"adminFinanceTab":"partnerFinanceTab"]||"reservations";
       return window.PartnerFinanceView.render({finance,data,period:financePeriodSelection(),position:helper.position(finance),
-        tab,reservations:state.reservations,admin,
-        adminHistory:admin&&tab==="returns"?adminFinancialHistory():"",
-        adminPartners:admin&&tab==="payouts"?adminFinancialPartnerTable(rows):"",
+        tab,reservations:state.reservations,admin,summaryOnly,omitSummary:!summaryOnly,
+        adminHistory:!summaryOnly&&admin&&tab==="returns"?adminFinancialHistory():"",
+        adminPartners:!summaryOnly&&admin&&tab==="payouts"?adminFinancialPartnerTable(rows):"",
         helpers:{esc,money,periodLabel:helper.label,dateLabel:helper.dateLabel,evidenceLabel:helper.evidenceLabel,
           kindLabel:helper.kindLabel,channelLabel:helper.channelLabel,holds:helper.holds,statusLabel:financialStatusLabel,payerName:financialPaymentPayerName,
           refundAction:asaasRefundButton,feeReference:`Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%`}});
@@ -9551,7 +9560,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   function partnerFinance() {
-    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>')}
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
       ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
 
@@ -10141,7 +10150,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 
   function adminFinance() {
     const selected=state.filters.adminFinancePartner || "Todos";
-    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>')}
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
       <div class="toolbar"><label class="field"><span>Parceiro</span><select class="filter-select" id="adminFinancePartner"><option value="Todos">Todos os parceiros — consolidado</option>${state.adminPartners.map(partner=>`<option value="${esc(partner.backendPartnerId||partner.id)}" ${String(partner.backendPartnerId||partner.id)===selected?'selected':''}>${esc(partner.tradeName)}</option>`).join('')}</select></label></div>
       ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
@@ -10209,6 +10218,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if(!canKeepFinance||changedFinance){
       const host=document.getElementById("financeMovementsHost");
       if(host)host.financeMarkup=financialPeriodPanel();
+      const summaryHost=document.getElementById("financeSummaryHost");
+      if(summaryHost)summaryHost.financeMarkup=financialPeriodPanel(true);
     }
     applyPartnerReadonlyControls();
     window.MarketplaceAgendaNavigation.showSelected(app);
