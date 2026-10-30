@@ -2,7 +2,7 @@
   "use strict";
 
   const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 165, database: 152, edge: 115 });
-  const APP_ASSET_TOKEN = "beta165r1";
+  const APP_ASSET_TOKEN = "beta165r2";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -151,7 +151,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta165r1`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta165r2`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -232,7 +232,7 @@
     constructor(config) {
       this.config = config;
       this.client = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !window.TamoonNative?.isIOS, ...(window.TamoonNative?.isIOS ? {flowType: "pkce", storage: window.TamoonNative.storage} : {}) },
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !window.TamoonNative?.isIOS, flowType: "pkce", ...(window.TamoonNative?.isIOS ? {storage: window.TamoonNative.storage} : {}) },
         global: { fetch: async (...args) => {
           const response = await fetch(...args);
           if (response.status === 403) {
@@ -242,6 +242,7 @@
           return response;
         } }
       });
+      this.access = window.TamoonAuth.create({client:this.client, config, flags:window.TAMOON_AUTH_CONFIG, native:window.TamoonNative});
       this.state = createEmptyState();
       this.channel = null;
       this.notificationChannel = null;
@@ -300,6 +301,7 @@
     }
 
     async signOut() {
+      this.access.removePending();
       clearTimeout(this.reloadTimer);
       clearTimeout(this.notificationReloadTimer);
       if (this.channel) {
@@ -1332,6 +1334,7 @@
       this.repo = new SupabaseRepository(config);
       try {
         await window.TamoonNative?.checkAppleCredential(this.repo.client);
+        this.authLinkResult = await this.repo.access.completePendingLink() || this.authLinkResult;
         const loadedState = await this.repo.init(this.launchGroupId || localStorage.getItem("tamoon-current-group") || null);
         if (!loadedState) {
           this.cancelBootFeedback();
@@ -1354,7 +1357,10 @@
         if (this.pendingNotificationUrl) await this.drainNotificationOpen();
         else if (this.pendingInvite) setTimeout(() => this.openJoinGroupModal(this.pendingInvite), 80);
         else if (this.launchAction === "rsvp") setTimeout(() => this.openRsvp(this.nextMatch()?.id), 80);
-        else setTimeout(() => this.maybeShowNotificationOnboarding(), 650);
+        else if (this.authLinkResult) {
+          const notice = this.authLinkResult; this.authLinkResult = null;
+          window.TamoonAuth.openMethods(this, notice).catch(() => this.toast(notice.message, !notice.ok));
+        } else setTimeout(() => this.maybeShowNotificationOnboarding(), 650);
       } catch (error) {
         this.cancelBootFeedback();
         console.error(error);
@@ -1540,7 +1546,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta165r1");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta165r2");
       }, true);
     },
 
@@ -2331,6 +2337,7 @@
           "account-delete": () => window.TamoonDeletion.open(this),
           "deletion-admin": () => window.TamoonDeletion.admin(this),
           profile: () => this.openProfileModal(),
+          "access-methods": () => this.openAccessMethods(),
           export: () => this.exportData(),
           "report-problem": () => this.openProblemReport(),
           "about-diagnostics": () => this.openDiagnostics(),
@@ -2400,44 +2407,22 @@
     },
 
     renderAuth() {
-      const error = oauthErrorFromLocation();
+      const callbackError = window.TamoonAuth.callbackError(location);
+      const error = this.authLinkResult?.message || (callbackError ? window.TamoonAuth.errorMessage(callbackError) : "");
       document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel"><div class="auth-stadium"><div class="auth-lights"></div><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><span class="auth-kicker">SUA PELADA. SEU GRUPO. SEU APP.</span></div><div class="auth-copy"><h1>Entre em campo</h1><p>Presença, times equilibrados, membros, caixa e churrasco em um único lugar.</p>${error ? `<div class="notice auth-error"><strong>Falha no login</strong><br>${escapeHtml(error)}</div>` : ""}<div class="google-card"><button id="googleLoginButton" class="google-oauth-button" type="button" aria-label="Continuar com Google"><svg class="google-g" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.23c1.89-1.74 2.99-4.3 2.99-7.41Z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.61-2.36l-3.23-2.54c-.9.6-2.04.96-3.38.96-2.6 0-4.81-1.76-5.6-4.13H3.07v2.62A9.99 9.99 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 13.93A6.02 6.02 0 0 1 6.08 12c0-.67.12-1.32.32-1.93V7.45H3.07A10 10 0 0 0 2 12c0 1.61.38 3.14 1.07 4.55l3.33-2.62Z"/><path fill="#EA4335" d="M12 5.94c1.47 0 2.79.51 3.83 1.5l2.87-2.88A9.64 9.64 0 0 0 12 2a9.99 9.99 0 0 0-8.93 5.45l3.33 2.62C7.19 7.7 9.4 5.94 12 5.94Z"/></svg><span>Continuar com Google</span><span class="google-login-spinner" aria-hidden="true"></span></button><p id="googleLoginMessage">Use sua conta Google para continuar. Não há cadastro por e-mail ou senha.</p></div><div class="auth-features"><span>✓ Acesso seguro</span><span>✓ Dados em nuvem</span><span>✓ Sincronização entre celulares</span></div></div></section></main><div id="toastRoot" class="toast-root"></div>`;
       $(".auth-copy")?.insertAdjacentHTML("beforeend", '<p class="legal-auth-links"><strong>Disponível apenas para pessoas com 18 anos completos ou mais.</strong><br><a href="/legal/">Termos de Uso, Privacidade e Código de Conduta</a></p>');
       this.setupGoogleLogin();
-      window.TamoonNative?.mountAppleLogin(this);
       const receipt=localStorage.getItem("tamoon-deletion-receipt");
       if(receipt && /^[a-f0-9-]{36}$/i.test(receipt)) $(".auth-copy")?.insertAdjacentHTML("beforeend", `<p><a href="https://app.tamoon.app.br/legal/protocolo-exclusao.html#${encodeURIComponent(receipt)}" target="_blank" rel="noopener">Consultar meu pedido de exclusão</a></p>`);
       if (error && history.replaceState) history.replaceState({}, document.title, location.pathname);
     },
 
     setupGoogleLogin() {
-      const button = $("#googleLoginButton");
-      const message = $("#googleLoginMessage");
-      if (!button) return;
+      window.TamoonAuth.mountLogin(this);
+    },
 
-      button.addEventListener("click", async () => {
-        if (button.disabled) return;
-        button.disabled = true;
-        button.classList.add("is-loading");
-        message.textContent = "Abrindo o acesso seguro do Google…";
-        message.classList.remove("error-text");
-
-        try {
-          const { data, error } = await this.repo.signInWithGoogleOAuth();
-          if (error) throw error;
-          if (!data?.url) throw new Error("O endereço de autenticação não foi gerado.");
-          if (window.TamoonNative?.isIOS) {
-            await window.TamoonNative.finishGoogleLogin(this.repo.client, data.url);
-            location.reload();
-          } else window.location.assign(data.url);
-        } catch (error) {
-          console.error(error);
-          button.disabled = false;
-          button.classList.remove("is-loading");
-          message.textContent = error?.message || "Não foi possível iniciar o login Google.";
-          message.classList.add("error-text");
-        }
-      });
+    async openAccessMethods() {
+      return window.TamoonAuth.openMethods(this);
     },
 
     renderConfigurationError() {
@@ -2698,7 +2683,7 @@
       const profile = this.state.profile || {};
       const player = this.myPlayer();
       const photo = safeImageUrl(profile.avatar_url);
-      this.modal("Meu perfil", `<div class="profile-summary">${photo ? `<img class="profile-photo" src="${escapeHtml(photo)}" alt="" referrerpolicy="no-referrer">` : `<div class="profile-photo profile-initials">${initials(profile.name)}</div>`}<div><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.email)}</small><span class="role-pill ${roleClass(this.currentRole())}">${roleLabels[this.currentRole()]}</span></div></div><p><button type="button" id="profileLegalButton" class="btn btn-secondary btn-block">Documentos e privacidade</button></p><form id="profileForm" class="form-grid"><div class="field"><label>Nome</label><input name="name" value="${escapeHtml(profile.name || "")}" required></div>${player ? `<div class="field"><label>Apelido no grupo</label><input name="nickname" value="${escapeHtml(player.nickname || "")}" placeholder="Como aparece na escalação"></div><div class="field-row"><div class="field"><label>Posição principal</label><select name="primary_position">${positionOptions.map(position => `<option ${position === player.primary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div><div class="field"><label>Posição secundária</label><select name="secondary_position"><option value="">Nenhuma</option>${positionOptions.map(position => `<option ${position === player.secondary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div></div><label class="check-row"><input name="goalkeeper" type="checkbox" ${player.goalkeeper ? "checked" : ""}> Também posso jogar no gol</label>` : ""}<button class="btn btn-primary btn-block">Salvar perfil</button></form><div class="account-separator"></div><button class="btn btn-danger btn-block" id="profileLogoutButton">Sair da conta</button>`, (root, close) => {
+      this.modal("Meu perfil", `<div class="profile-summary">${photo ? `<img class="profile-photo" src="${escapeHtml(photo)}" alt="" referrerpolicy="no-referrer">` : `<div class="profile-photo profile-initials">${initials(profile.name)}</div>`}<div><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.email)}</small><span class="role-pill ${roleClass(this.currentRole())}">${roleLabels[this.currentRole()]}</span></div></div><p><button type="button" id="profileAccessButton" class="btn btn-secondary btn-block">Formas de acesso</button></p><p><button type="button" id="profileLegalButton" class="btn btn-secondary btn-block">Documentos e privacidade</button></p><form id="profileForm" class="form-grid"><div class="field"><label>Nome</label><input name="name" value="${escapeHtml(profile.name || "")}" required></div>${player ? `<div class="field"><label>Apelido no grupo</label><input name="nickname" value="${escapeHtml(player.nickname || "")}" placeholder="Como aparece na escalação"></div><div class="field-row"><div class="field"><label>Posição principal</label><select name="primary_position">${positionOptions.map(position => `<option ${position === player.primary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div><div class="field"><label>Posição secundária</label><select name="secondary_position"><option value="">Nenhuma</option>${positionOptions.map(position => `<option ${position === player.secondary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div></div><label class="check-row"><input name="goalkeeper" type="checkbox" ${player.goalkeeper ? "checked" : ""}> Também posso jogar no gol</label>` : ""}<button class="btn btn-primary btn-block">Salvar perfil</button></form><div class="account-separator"></div><button class="btn btn-danger btn-block" id="profileLogoutButton">Sair da conta</button>`, (root, close) => {
         $("#profileForm", root).addEventListener("submit", async event => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
@@ -2714,6 +2699,7 @@
           this.render();
           this.toast("Perfil atualizado.");
         });
+        $("#profileAccessButton", root)?.addEventListener("click", () => this.openAccessMethods().catch(error => this.toast(window.TamoonAuth.errorMessage(error), true)));
         $("#profileLegalButton", root)?.addEventListener("click", async () => {
           try { await window.TamoonLegal.openCenter(this); } catch (error) { this.toast(error.message, true); }
         });
@@ -4655,7 +4641,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     if (cloudConfigured && !window.supabase) {
       await new Promise((resolve, reject) => {
         const script = document.createElement("script");
-        script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+        script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7/dist/umd/supabase.min.js";
         script.onload = resolve;
         script.onerror = () => reject(new Error("Não foi possível carregar o cliente de nuvem."));
         document.head.appendChild(script);

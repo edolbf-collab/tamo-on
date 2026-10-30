@@ -97,8 +97,11 @@ public class TamoonNativePlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationCon
 
     @objc func authenticate(_ call: CAPPluginCall) {
         guard let text = call.getString("url"), let url = URL(string: text),
-              url.scheme == "https", url.host == "xvwgrpnioaqyijhzqxqh.supabase.co",
-              url.path == "/auth/v1/authorize" else { call.reject("Endereço de autenticação inválido."); return }
+              url.scheme == "https", url.user == nil, url.password == nil else { call.reject("Endereço de autenticação inválido."); return }
+        let supabaseLogin = url.host == "xvwgrpnioaqyijhzqxqh.supabase.co" && url.path == "/auth/v1/authorize"
+        // linkIdentity returns the provider URL after its authenticated request to Supabase.
+        let googleLink = url.host == "accounts.google.com" && ["/o/oauth2/v2/auth", "/o/oauth2/auth"].contains(url.path)
+        guard supabaseLogin || googleLink else { call.reject("Endereço de autenticação inválido."); return }
         DispatchQueue.main.async {
             guard self.webSession == nil, self.appleCall == nil else { call.reject("Já existe um login em andamento.", "BUSY"); return }
             let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "br.app.tamoon") { result, error in
@@ -107,7 +110,7 @@ public class TamoonNativePlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationCon
                     call.resolve(["url": url.absoluteString])
                 } else if (error as NSError?)?.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
                     call.reject("Login cancelado.", "CANCELLED")
-                } else { call.reject("Não foi possível concluir o login Google.") }
+                } else { call.reject("Não foi possível concluir a autenticação.") }
             }
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = true

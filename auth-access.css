@@ -1,0 +1,14 @@
+.apple-login-button{appearance:none;-webkit-appearance:none;display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:54px;margin-top:12px;padding:11px 18px;border:1px solid #fff;border-radius:999px;background:#fff;color:#111;font:600 15px/1.4 system-ui,sans-serif;cursor:pointer;touch-action:manipulation}
+.apple-login-button svg{width:23px;height:27px;fill:currentColor;flex-shrink:0}
+.apple-login-button:disabled{opacity:.65;cursor:wait}
+.apple-login-button:focus-visible,.other-login summary:focus-visible{outline:3px solid var(--primary);outline-offset:4px}
+.other-login{margin-top:10px}
+.other-login summary{display:list-item;width:fit-content;min-height:44px;align-content:center;margin:auto;padding:8px;color:var(--muted);font-size:12px;cursor:pointer}
+.google-card .account-link-help{margin-top:16px;font-size:11px;line-height:1.6}
+.access-methods{display:grid;gap:10px;margin:16px 0}
+.access-method{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px;border:1px solid var(--line);border-radius:14px;min-width:0}
+.access-method .btn{min-height:44px;white-space:normal}
+.access-connected{color:var(--primary);font-size:12px;font-weight:700}
+.access-pending{color:var(--muted);font-size:11px;text-align:right}
+.access-help{color:var(--muted);font-size:12px;line-height:1.6}
+.access-close{display:flex;justify-content:center;margin-top:18px}

@@ -5,10 +5,11 @@
   "database": 152,
   "edge": 115,
   "mandatory": false,
-  "notes": "Preparação iOS, login Apple e solicitação de exclusão dentro do app.",
+  "notes": "Preparação iOS atualizada: vinculação Google/Apple na mesma conta, ativação Apple pendente.",
   "label": "Tâmo On Beta 1.0 Build 165 — preparação iOS",
   "components": {
     "delete_beta_user": 107,
-    "apple_sign_in": 1
-  }
+    "apple_sign_in": 2
+  },
+  "auth_preparation": "166-R18"
 }

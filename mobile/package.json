@@ -3,12 +3,15 @@
   "private": true,
   "version": "1.0.165",
   "type": "module",
-  "engines": {"node": ">=22"},
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "sync": "npm run build && cap sync ios",
     "open": "cap open ios",
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "test:auth": "node --test ../tests/ios-preparation/identity-linking.test.mjs"
   },
   "dependencies": {
     "@capacitor/core": "8.5.3",

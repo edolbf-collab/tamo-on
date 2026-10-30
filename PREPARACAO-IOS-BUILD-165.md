@@ -1,3 +1,5 @@
+> Atualização de autenticação 166-R18 (30/10/2026): esta branch conserva a preparação nativa 165 e recebeu o mesmo módulo de login/vinculação da base integrada. Apple e vinculação permanecem desativadas até a configuração real. Para web/Android, agora é necessário Services ID associado ao App ID nativo. Consulte `PREPARACAO-LOGIN-APPLE-R18.md`; ela atualiza as instruções de login abaixo. As demais pendências da preparação iOS continuam aplicáveis.
+
 # Tâmo On — preparação para iPhone / Build 165
 
 Preparado em 27/10/2026 sobre o commit `704a625b1e297599b64dee61c6c544099a700a52` do repositório `edolbf-collab/tamo-on`.
