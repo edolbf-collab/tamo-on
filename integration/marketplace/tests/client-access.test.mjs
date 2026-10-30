@@ -48,7 +48,7 @@ test('signed out and revoked identities stay locked',async()=>{
 test('prefetch accepts only the hashed public bundle and omits credentials',async()=>{
  const calls=[];const manifest=['assets/pilot-a123456789ab.js','../supabase-config.js','https://untrusted.test/script.js','assets/../../secret.js','assets/pilot-not-a-hash.js'];
  await access.preloadMarketplace(async(url,options)=>{calls.push({url,options});return response(200,url.includes('pilot-assets.json')?manifest:{});});
- assert.deepEqual(calls.map(c=>c.url),['/marketplace/pilot-assets.json?v=166r11','/marketplace/assets/pilot-a123456789ab.js']);
+ assert.deepEqual(calls.map(c=>c.url),['/marketplace/pilot-assets.json?v=166r12','/marketplace/assets/pilot-a123456789ab.js']);
  assert.equal(calls[1].options.credentials,'omit');assert.equal(calls[1].options.cache,'force-cache');
 });
 test('failed prefetch rejects so a later entry can retry',async()=>{

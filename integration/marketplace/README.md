@@ -1,4 +1,4 @@
-# Marketplace privado — incremental 166-R6
+# Marketplace privado — incremental 166-R12
 
 Integração da Comunidade build 164 com o Marketplace 0.2.0, base consolidada 22BB-C39-R1. Inclui o piloto 166-R1 e a sincronização com o grupo Teste FC. O motor de reservas, mensalidades, parceiros e financeiro do sandbox foi preservado.
 
@@ -161,3 +161,15 @@ O voucher escolhido vale 90 dias, é pessoal, integral e de uso único, no mesmo
 A nova tela **Cancelamentos e restituições** reúne pedidos, escolhas por pagador, pagamentos e fundamentos da decisão. O parceiro pode registrar manifestação; a administração aprova ou nega com justificativa individual. Não existe indeferimento automático. Pedidos após o início não alteram a reserva durante a análise e a ocorrência em andamento permanece protegida até seu término, inclusive no não comparecimento. Casos com crédito já consumido, devolução anterior ou pagador ambíguo seguem para conferência financeira. Reservas e vouchers anteriores preservam as condições aceitas. Cancelamentos pelo parceiro/Tâmo On mantêm o fluxo próprio.
 
 Validação: 81 testes Node; testes SQL transacionais com rollback para contagem de prazo, imutabilidade, consentimento inclusive parâmetros nulos, titularidade, rateio misto, restituição externa e Asaas, idempotência de claim/webhook, conciliação mensalista, resgate integral, vencimento, avisos, proteção do horário e decisões fundamentadas. Não houve chamadas ao provedor ou movimentação de dinheiro nos testes SQL. As tabelas privadas têm RLS e sem acesso direto por clientes; RPCs autenticadas verificam autorização no servidor. O linter mantém os avisos informativos esperados sobre tabelas privadas sem políticas e RPCs `SECURITY DEFINER`; não foi exposta função nova ao papel anônimo. Pendentes: conferência visual/toques em celular e validação ponta a ponta pelo usuário com Asaas Sandbox. As três contas autorizadas e o bloqueio de dinheiro real foram preservados.
+
+## Pix mensalista — 166-R12
+
+A RES-001066 tem uma cota mensal de R$ 1.360,00 no modelo `single_monthly_pool`. Os bloqueios de escopo no Pix inline e na função de criação da sessão ainda aceitavam somente reservas avulsas. Esta revisão libera mensalidades desse modelo, com uma cobrança por pagador, e mantém cartão mensal e modelos antigos por etapas fora do escopo. A configuração existente da reserva não precisa ser refeita.
+
+A migração `20261030020201_monthly_inline_pix.sql` foi aplicada somente no Marketplace staging. A função Edge `pix-charge-router` passou da versão 29 para 30. Seu snapshot completo está em `asaas/functions`, separado das funções da Comunidade; a alteração funcional está em `_shared/asaas-inline-pix.mjs`. A autenticação existente dentro da função foi preservada.
+
+O prazo efetivo do Pix acompanha a garantia inicial e, quando ela é atingida, o saldo mensal. O vencimento de calendário enviado ao Asaas acompanha o saldo, permitindo reutilizar a mesma cobrança; a apresentação do QR, a criação e a rotina de encerramento aplicam o prazo efetivo no servidor. A comissão considera as cotas da mesma etapa mensal e mantém o arredondamento por centavos. A confirmação usa a conciliação mensal existente, sem criar uma segunda cobrança de garantia/saldo. A interface distingue uma cota paga da mensalidade totalmente quitada.
+
+Validação: 88 testes Node passaram, incluindo abertura mensal, reutilização, bloqueios de prazo/escopo, fluxo avulso e mensagens. Os testes SQL com rollback usaram a configuração da RES-001066 para cota única e duas cotas, pagamento antecipado, titularidade, conta emissora, garantia, saldo, comissão, webhook repetido e permissões. Também verificaram que um Pix aberto antes da garantia continua sendo a mesma cobrança após ela. Nenhuma chamada de pagamento ao Asaas foi feita nesses testes e nenhum pagamento ou checkout sintético foi mantido. A geração e confirmação ponta a ponta pelo usuário e a conferência visual no celular permanecem pendentes.
+
+As RPCs financeiras continuam exclusivas de serviço, sem execução por `anon` ou `authenticated`. A nova função privada fixa `search_path` e não tem acesso por clientes. Os advisors mantêm os avisos anteriores; não foi identificada nova exposição nas funções alteradas. As três contas do piloto e o bloqueio de dinheiro real foram preservados.

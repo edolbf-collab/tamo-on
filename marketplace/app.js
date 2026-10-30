@@ -2327,7 +2327,8 @@
     if (/Cancele a cobranca online|Cobranca emitida exige cancelamento/.test(message)) return "Já existe uma cobrança emitida no Asaas. Cancele-a e aguarde a confirmação antes de registrar o pagamento externo.";
     if (/ASAAS_PARTNER_ACCOUNT_REQUIRED|ASAAS_ISSUER_KEY_REQUIRED|ASAAS_ACCOUNTS_INVALID|ASAAS_PARTNER_ACCOUNT_MISMATCH|ASAAS_PARTNER_KEY_MISMATCH|ASAAS_COMMISSION_WALLET_MISMATCH/.test(message)) return "A conta de recebimento do parceiro precisa ser configurada ou conferida pela administração.";
     if (/ASAAS_SANDBOX_DISABLED|ASAAS_NOT_CONFIGURED|ASAAS_MODE_CONFLICT/.test(message)) return "O Sandbox de pagamentos ainda não foi configurado. Avise a administração.";
-    if (/ASAAS_FIRST_TEST_SCOPE|ASAAS_CHECKOUT_SCOPE/.test(message)) return "Esta etapa do Sandbox aceita reservas avulsas com cartão integral, Pix integral ou Pix por cotas. Mensalistas serão habilitados em uma próxima etapa.";
+    if (/ASAAS_MONTHLY_PIX_SCOPE/.test(message)) return "A configuração desta mensalidade precisa ser conferida pela administração para habilitar o Pix. Sua reserva e os valores foram preservados.";
+    if (/ASAAS_FIRST_TEST_SCOPE|ASAAS_CHECKOUT_SCOPE/.test(message)) return "O Sandbox aceita Pix em reservas avulsas e mensalidades com cobrança única por pagador. Cartão está disponível para reservas avulsas com pagamento integral.";
     if (/CHECKOUT_CONFIGURATION_LOCKED/.test(message)) return "Já existe uma cobrança iniciada para esta reserva. A forma de pagamento e as cotas ficam preservadas até a conferência dessa cobrança.";
     if (/CHECKOUT_BINDING_MISMATCH/.test(message)) return "A cobrança precisa de conferência antes de continuar. Nenhum novo pagamento foi emitido.";
     if (/CHECKOUT_MINIMUM_WINDOW/.test(message)) return "Não há tempo suficiente para abrir um novo checkout. Este teste exige mais de 10 minutos restantes no prazo da pré-reserva.";
@@ -2688,6 +2689,8 @@
   function officialAsaasPaymentMessage(reservation) {
     if(!reservation?.backendOfficial)return "";
     if(reservation.pixSplit && currentUserPixShareState(reservation)?.paid){
+      if(reservation.monthly && ["confirmed","completed"].includes(reservation.backendStatus) && reservation.paymentConfirmedAtIso)
+        return `Reserva ${reservation.id}: sua cota mensal foi paga e a mensalidade está quitada.`;
       return officialSinglePaymentConfirmed(reservation)
         ? `Reserva ${reservation.id}: sua cota foi paga e a reserva está confirmada.`
         : reservation.backendStatus==="pending_payment"

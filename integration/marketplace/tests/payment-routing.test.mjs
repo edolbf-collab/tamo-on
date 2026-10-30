@@ -91,3 +91,12 @@ test('production checkout URLs remain rejected',async()=>{
  await f.sandbox.requestOfficialStagingPaymentConfirmation({...reservation,paymentMethod:'credit_card_asaas'});
  assert.deepEqual(f.failures,['Endereço de pagamento inválido.']);assert.equal(f.details.length,0);
 });
+
+test('a single monthly quota opens the inline Pix flow for its assigned payer',async()=>{
+ const f=await fixture({response:{mode:'asaas_pix',status:'pending',amount:1360,payload:'test',encodedImage:'test'}});
+ const monthly={...reservation,id:'RES-001066',monthly:true,pixSplit:true,paymentDue:1360,
+  paymentParticipants:[{profileId:'owner',status:'pending',amountDue:1360}]};
+ await f.sandbox.requestOfficialStagingPaymentConfirmation(monthly);
+ assert.deepEqual(f.calls.filter(x=>x.name).map(x=>x.name),['pix-charge-router']);
+ assert.equal(f.mounts.length,1);assert.equal(f.details[0].title,'Pagar minha cota Pix');assert.deepEqual(f.failures,[]);
+});

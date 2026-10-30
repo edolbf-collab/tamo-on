@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 116,
   "mandatory": false,
-  "notes": "Cancelamento com escolha de restituição ou voucher de 90 dias, avisos de vencimento e análise individual de exceções.",
+  "notes": "Pix mensalista com cobrança única por pagador, conciliação da garantia e quitação do mês.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R11"
+  "integration": "166-R12"
 }

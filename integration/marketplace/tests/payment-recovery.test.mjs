@@ -63,3 +63,13 @@ test('cancelling communication releases modal and capture handlers before networ
  events.click({preventDefault(){assert.fail('recovery click blocked')},stopImmediatePropagation(){}});
  finish();await Promise.resolve();
 });
+
+test('monthly payment feedback distinguishes a paid quota from a fully paid monthly reservation',()=>{
+ const c={currentUserPixShareState:()=>({paid:true})};vm.createContext(c);
+ vm.runInContext(between('  function officialSinglePaymentConfirmed(', '  function asaasReturnBelongsToCurrentUser('),c);
+ const r={id:'RES-001066',backendOfficial:true,monthly:true,pixSplit:true,backendStatus:'pending_payment'};
+ assert.match(c.officialAsaasPaymentMessage(r),/aguarda as demais cotas/);
+ r.backendStatus='confirmed';r.paymentConfirmedAtIso='2026-10-30T02:00:00Z';
+ assert.match(c.officialAsaasPaymentMessage(r),/mensalidade está quitada/);
+ assert.equal(c.officialSinglePaymentConfirmed(r),false);
+});
