@@ -1,4 +1,4 @@
-# Marketplace privado — incremental 166-R13
+# Marketplace privado — incremental 166-R14
 
 Integração da Comunidade build 164 com o Marketplace 0.2.0, base consolidada 22BB-C39-R1. Inclui o piloto 166-R1 e a sincronização com o grupo Teste FC. O motor de reservas, mensalidades, parceiros e financeiro do sandbox foi preservado.
 
@@ -184,3 +184,10 @@ Os quatro indicadores financeiros passam para logo abaixo do título e descriç�
 A varredura de componentes encontrou o fechamento inferior desalinhado no diálogo compartilhado de detalhes (inclui cotas, reservas, pagamentos, vouchers e consultas) e na galeria. Ambos agora usam `dialog-actions-close`, centralizado em todas as larguras. Rodapés com ações de formulário e confirmação também têm alinhamento central. Ajuda e comunicação Asaas já tinham ação centralizada ou de largura total. Os diálogos da Comunidade usam fechamento no cabeçalho e ações de largura total; não tinham o mesmo rodapé Fechar. Ícones de fechar no canto, navegação, filtros e ações vinculadas a linhas mantêm seus posicionamentos próprios.
 
 Validação: 93 testes Node passaram. Os novos casos cobrem ordem dos indicadores nas duas áreas, escopo por parceiro, taxas estimadas, manutenção das abas/ações, ausência de duplicação, retirada de dados antigos durante carregamento/erro e atualização independente do resumo. Sintaxe JavaScript e diff conferidos. A imagem gerada na conversa é somente uma ilustração da proposta. O download do navegador local falhou; a conferência visual e de toques no celular permanece pendente. Não houve migração, alteração de pagamentos ou cadastro de subconta para o parceiro 2.
+
+
+## Largura dos filtros no celular — 166-R14
+
+O filtro Data de Reservas usa uma coluna com mínimo zero e limita o campo nativo à largura disponível. Os filtros administrativos passam a uma coluna no celular. O Financeiro usa colunas que podem encolher, retirando o recuo genérico de 49 px aplicado às ações. Até 430 px, Período e Mês e ano ficam um abaixo do outro; a navegação por mês ocupa uma linha de três botões e Exportar pagamentos ocupa a linha seguinte. Os controles mantêm as mesmas ações e valores. A correção atua no dimensionamento dos componentes, sem adicionar corte de conteúdo ou desativar a seleção nativa de datas.
+
+Revisão exclusivamente de apresentação, com atualização dos identificadores de cache. O pacote JavaScript do Marketplace permanece o da R13, pois seu conteúdo não mudou. Os 93 testes existentes passaram; não foram adicionados testes que apenas repetem as regras CSS. A conferência visual no aparelho ainda depende da validação do usuário, pois o navegador local continua indisponível. Sem mudanças em pagamentos, banco ou permissões.

@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 116,
   "mandatory": false,
-  "notes": "Cabeçalho compacto, indicadores financeiros no topo e ações dos diálogos centralizadas.",
+  "notes": "Filtros de data e período ajustados à largura do celular em Reservas e Financeiro.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R13"
+  "integration": "166-R14"
 }
