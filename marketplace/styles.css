@@ -2722,16 +2722,19 @@ html[data-theme="light"] .partner-application-row.has-unread { background:#E8FFF
  .admin-reservation-filters > * { width:100%; min-width:0; max-width:100%; }
  .finance-period-toolbar { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; width:100%; min-width:0; }
  .finance-period-toolbar > .field { width:100%; }
- .finance-period-toolbar > .item-actions { display:grid; grid-template-columns:44px minmax(0,1fr) 44px; grid-column:1/-1; gap:7px; width:100%; min-width:0; max-width:100%; padding:0; margin:0; }
- .finance-period-toolbar .item-actions > .button { width:100%; min-width:0; max-width:100%; min-height:44px; white-space:normal; overflow-wrap:anywhere; }
- .finance-period-toolbar [data-action="export-finance-movements"] { grid-column:1/-1; }
+ .finance-period-toolbar > .item-actions { display:grid; grid-template-columns:44px minmax(68px,.7fr) 44px minmax(0,1.3fr); grid-column:1/-1; gap:6px; width:100%; min-width:0; max-width:100%; padding:0; margin:0; }
+ .finance-period-toolbar .item-actions > .button { width:100%; min-width:0; max-width:100%; min-height:44px; padding:7px 6px; font-size:11px; line-height:1.3; white-space:normal; overflow-wrap:anywhere; }
+ .finance-period-toolbar input[type="month"],
+ .finance-period-toolbar select { padding-inline:8px; height:44px; min-height:44px; }
+ .finance-period-toolbar select {
+  -webkit-appearance:none; appearance:none; padding:8px 22px 8px 6px; line-height:1.5;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 12px) 50%,calc(100% - 8px) 50%; background-size:4px 4px; background-repeat:no-repeat;
+ }
  .admin-reservation-filters input,
  .admin-reservation-filters select,
  .finance-period-toolbar input[type="month"],
  .finance-period-toolbar select { min-width:0; max-width:100%; font-size:16px; }
-}
-@media(max-width:430px) {
- .finance-period-toolbar { grid-template-columns:minmax(0,1fr); }
 }
 
 /* Parte 22AE: composição financeira e atualização estável. */

@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 116,
   "mandatory": false,
-  "notes": "Menu lateral no celular e cabeçalho essencial no Marketplace; som, tema e ajuda no menu.",
+  "notes": "Controles de período do Financeiro agrupados em duas linhas conforme a prévia B.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R16"
+  "integration": "166-R17"
 }

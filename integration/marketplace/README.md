@@ -1,4 +1,4 @@
-# Marketplace privado — incremental 166-R16
+# Marketplace privado — incremental 166-R17
 
 Integração da Comunidade build 164 com o Marketplace 0.2.0, base consolidada 22BB-C39-R1. Inclui o piloto 166-R1 e a sincronização com o grupo Teste FC. O motor de reservas, mensalidades, parceiros e financeiro do sandbox foi preservado.
 
@@ -209,3 +209,11 @@ O painel abre abaixo do cabeçalho, sobre o conteúdo, respeita a altura dispon�
 A geração de destinos é compartilhada com o menu do computador: mesmos nomes, badges, página ativa e restrições do parceiro. A nova navegação utiliza os handlers e as verificações existentes, sem mudar permissões, consultas ou operações financeiras. As correções dos campos de data/mês da R15 permanecem. O novo módulo `marketplace-navigation.js` integra o pacote versionado do Marketplace.
 
 Validação: 96 testes Node passaram. A suíte `test:navigation` passou em WebKit com larguras 320, 360, 390, 430, 768 e 980 px, além do retorno a 1280 px. Cobriu alinhamento do cabeçalho, links, perfil do parceiro com destino restrito, candidatura, foco, Escape, toque fora, rolagem, preferências, ajuda e perda de acesso. A suíte completa de entrada `test:browser`, executada com `PILOT_TEST_BROWSER=webkit` e serviços simulados, passou para acesso anônimo, negado, administração e contas comuns. Sua expectativa antiga de Administração invisível foi corrigida para desabilitada, conforme o comportamento já existente. Capturas do aplicativo no WebKit local foram inspecionadas com menu fechado e aberto. WebKit em Linux não substitui Safari em iPhone físico; essa validação continua a cargo do usuário. Não houve migrações nem chamadas reais de pagamento.
+
+## Agrupamento do período financeiro — 166-R17
+
+Ajuste visual solicitado a partir da imagem B aprovada. No Financeiro do parceiro e da administração, os campos Período e Mês e ano ficam lado a lado no celular. A linha seguinte reúne, nesta ordem, Mês anterior, Mês atual, Próximo mês e Exportar pagamentos. Foi removido o empilhamento até 430 px e a linha exclusiva da exportação introduzidos na R14. As colunas flexíveis e os espaçamentos menores mantêm o conjunto dentro da largura disponível, com controles de pelo menos 44 px de altura. O seletor Período recebe aparência CSS e seta própria para manter o texto legível e a mesma altura do campo de mês; a seleção continua nativa.
+
+As proteções de dimensionamento do mês para Safari e o texto de 16 px nos campos foram preservados. Sem mudanças em ações, filtros, consultas ou cálculos; o pacote JavaScript permanece o da R16. Identificadores de cache atualizados para R17.
+
+Validação: 96 testes Node passaram. Uma conferência temporária em WebKit renderizou os componentes reais das duas áreas nos modos mensal e Todo o período, em 320, 360, 375, 390, 414, 430 e 700 px (28 combinações). Medições confirmaram alinhamento, altura, texto dos botões dentro dos limites e ausência de excesso lateral nos controles; capturas de 320 e 390 px foram inspecionadas. A conferência no Safari de um iPhone físico continua pendente. Nenhum teste permanente que apenas replique o CSS foi acrescentado.
