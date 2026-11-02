@@ -881,3 +881,33 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .safety-evidence pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; max-height: 260px; overflow-y: auto; }
 .safety-error { color: #b32828; font-size: 14px; }
 #safetyReportForm select, #safetyReportForm textarea, #safetyReviewForm select, #safetyReviewForm textarea, #safetyNotification, #safetyPlayer { font-size: 16px; }
+
+/* Fixed controls need their own safe bounds when the browser draws edge to edge. */
+@media (max-width:699px), (max-height:500px) and (pointer:coarse) {
+  body {
+    padding-left:env(safe-area-inset-left, 0px);
+    padding-right:env(safe-area-inset-right, 0px);
+  }
+  .auth-screen {
+    padding-block:env(safe-area-inset-top, 0px) env(safe-area-inset-bottom, 0px);
+  }
+  .auth-screen, .app-shell { min-height:100dvh; }
+  .auth-panel {
+    min-height:calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    min-height:calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+  .bottom-nav {
+    left:env(safe-area-inset-left, 0px);
+    right:env(safe-area-inset-right, 0px);
+    width:auto; max-width:860px; margin-inline:auto; transform:none;
+  }
+  .modal-backdrop {
+    padding-top:env(safe-area-inset-top, 0px);
+    padding-left:env(safe-area-inset-left, 0px);
+    padding-right:env(safe-area-inset-right, 0px);
+  }
+  .modal {
+    max-height:min(92vh, 100%);
+    max-height:min(92dvh, 100%);
+  }
+}

@@ -116,7 +116,7 @@ body:not(.pilot-locked) #pilotGate { display: none; }
 .marketplace-menu::backdrop { background:transparent; }
 .marketplace-menu-panel {
  width:min(340px,calc(100% - 44px)); height:100%; min-width:0;
- padding:14px max(14px,env(safe-area-inset-left)) max(18px,env(safe-area-inset-bottom));
+ padding:14px max(14px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
  border:1px solid var(--line-strong); border-left:0; border-radius:0 18px 18px 0;
  background:var(--surface); overflow-y:auto; overscroll-behavior:contain;
  -webkit-overflow-scrolling:touch; box-shadow:12px 0 32px rgba(0,0,0,.2);
@@ -150,6 +150,10 @@ body:not(.pilot-locked) #pilotGate { display: none; }
 #marketplaceMenuPreferences #toggleNotificationSound::after { content:""; margin-left:auto; flex:0 0 30px; height:18px; border:1px solid var(--line-strong); border-radius:12px; background:radial-gradient(circle at 8px 50%,var(--muted) 5px,transparent 6px) var(--surface-3); }
 #marketplaceMenuPreferences #toggleNotificationSound[aria-pressed="true"]::after { background:radial-gradient(circle at 21px 50%,#fff 5px,transparent 6px) var(--green-strong); }
 @media(max-width:980px) {
+ body {
+   padding-left:env(safe-area-inset-left, 0px);
+   padding-right:env(safe-area-inset-right, 0px);
+ }
  .marketplace-navigation-ready .app-header { position:sticky; top:var(--marketplace-ribbon-height,30px); z-index:95; min-height:64px; padding-block:8px; flex-wrap:nowrap; gap:8px; background:var(--bg); }
  .marketplace-navigation-ready .header-brand { flex:1 1 auto; gap:8px; }
  .marketplace-navigation-ready .marketplace-menu-toggle { display:inline-flex; align-items:center; justify-content:center; flex:0 0 44px; width:44px; height:44px; min-height:44px; padding:0; }

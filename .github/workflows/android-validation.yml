@@ -1,0 +1,53 @@
+name: Android package validation
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-validation.yml'
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install compile SDK
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Compile optimized release with a disposable test key
+        working-directory: android
+        env:
+          TAMOON_STORE_PASSWORD: local-ci-testing
+          TAMOON_KEY_PASSWORD: local-ci-testing
+        run: |
+          export TAMOON_KEYSTORE="$RUNNER_TEMP/test-upload.jks"
+          keytool -genkeypair -keystore "$TAMOON_KEYSTORE" -alias tamoon-upload \
+            -storepass "$TAMOON_STORE_PASSWORD" -keypass "$TAMOON_KEY_PASSWORD" \
+            -storetype JKS -keyalg RSA -keysize 2048 -validity 2 -dname CN=CI
+          ./gradlew --no-daemon :app:bundleRelease :app:assembleRelease
+          bundle=app/build/outputs/bundle/release/app-release.aab
+          unzip -tq "$bundle"
+          unzip -p "$bundle" BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map > "$RUNNER_TEMP/mapping.txt"
+          test -s "$RUNNER_TEMP/mapping.txt"
+          config=app/build/outputs/mapping/release/configuration.txt
+          test -s "$config"
+          if grep -Eq '^-(dontoptimize|dontshrink|dontobfuscate)([[:space:]]|$)' "$config"; then
+            echo "Unexpected global R8 optimization opt-out" >&2
+            exit 1
+          fi
+          # Check the R8 mapping before class-name obfuscation or method inlining.
+          if awk '
+            /^[^ #].* -> .*:$/ { compat = ($1 == "androidx.core.view.WindowCompat") }
+            /androidx\.core\.view\.WindowCompat\.enableEdgeToEdge\(/ { found = 1 }
+            compat && / void enableEdgeToEdge\(android\.view\.Window\)/ { found = 1 }
+            END { exit !found }
+          ' "$RUNNER_TEMP/mapping.txt"; then
+            echo "Legacy edge-to-edge implementation is still reachable" >&2
+            exit 1
+          fi
