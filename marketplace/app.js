@@ -491,6 +491,7 @@
   let backendRefreshQueued = false;
   let backendRefreshTables = new Set();
   let backendRefreshSignature = "";
+  let lastBackendRefreshAt = 0;
 
   function scheduleBackendRefresh(table = "") {
     backendRefreshQueued=true;
@@ -508,8 +509,8 @@
     if(!element)return;
     const message=backendRuntime.mutating ? (window.MarketplaceAsaasCommunication?.isBusy()
       ? "Processando solicitação… Aguarde a conclusão." : "Salvando alteração… Você pode continuar navegando.")
-      : backendRuntime.refreshError ? "Não foi possível atualizar agora. Confira sua conexão."
-      : backendRuntime.refreshing ? "Atualizando informações…" : "";
+      : backendRuntime.refreshError ? backendRuntime.refreshError
+      : backendRuntime.refreshing && (!backendIsOnline() || backendRuntime.initialDetailsPending) ? "Atualizando informações…" : "";
     element.textContent=message;element.hidden=!message;
   }
 
@@ -627,6 +628,12 @@
     if (!photo?.storage_path) return "";
     try { return window.MarketplaceBackend?.publicVenuePhotoUrl(photo.storage_path) || ""; }
     catch (_error) { return ""; }
+  }
+
+  function venuePhotoAttributes(src, storagePath) {
+    if (!storagePath) return `src="${esc(src || "assets/preview-icon.svg")}"`;
+    const url = window.MarketplaceBackend.publicVenuePhotoUrl(storagePath);
+    return `data-market-photo="${esc(storagePath)}" src="${esc(url)}"`;
   }
 
   function mapBackendPhoto(photo) {
@@ -1087,6 +1094,7 @@
         address:[venue.street, venue.street_number, venue.neighborhood, venue.city, venue.zip].filter(Boolean).join(", "),
         zip:venue.zip || "",
         facadeImage:favorite?.src || "assets/preview-icon.svg",
+        facadePhotoPath:favorite?.storagePath || "",
         facadeSource:favorite ? "supabase_storage" : "partner_upload_pending",
         facadeTone:favorite?.tone || "dark",
         facadeLuminance:favorite?.luminance ?? null,
@@ -1904,6 +1912,7 @@
         address: [venue.street, venue.street_number, venue.neighborhood, venue.city, venue.zip].filter(Boolean).join(", "),
         zip: venue.zip || "",
         facadeImage: favorite?.src || "assets/preview-icon.svg",
+        facadePhotoPath:favorite?.storagePath || "",
         facadeSource: favorite ? "supabase_storage" : "partner_upload_pending",
         facadeTone: favorite?.tone || "dark",
         facadeLuminance: favorite?.luminance ?? null,
@@ -2401,7 +2410,14 @@
     backendBootstrapPromise = (async () => {
       try {
         backendRuntime.session = window.MarketplaceBackend.session;
-        const bootstrap = await window.MarketplaceBackend.bootstrap({ force, changes, onCore:core=>{
+        const bootstrap = await window.MarketplaceBackend.bootstrap({ force, changes, onPhotos:()=>{
+            if(requestedAccessGeneration!==partnerAccessGeneration || window.TamoonMarketplacePilot?.blocked || !backendIsOnline() ||
+               window.MarketplaceBackend.session?.user?.id!==requestedIdentity)return;
+            for(const img of document.querySelectorAll("img[data-market-photo]")){
+              const url=window.MarketplaceBackend.publicVenuePhotoUrl(img.dataset.marketPhoto);
+              if(img.getAttribute("src")!==url)img.setAttribute("src",url);
+            }
+          }, onCore:core=>{
             if(backendRuntime.bootstrap || new URLSearchParams(location.search).get("page")!=="discover"
               || core?.profile?.status!=="active" || core.profile.id!==requestedIdentity
               || window.MarketplaceBackend.session?.user?.id!==requestedIdentity
@@ -2422,7 +2438,7 @@
         backendRuntime.bootstrap = bootstrap || {};
         syncStateFromBackend(backendRuntime.bootstrap);
         window.TamoonMarketplacePilot?.ready();
-        backendRefreshSignature=signature;applied=true;
+        backendRefreshSignature=signature;lastBackendRefreshAt=Date.now();applied=true;
         partnerAccessPending=false;
         clearTimeout(partnerAccessRetryTimer);partnerAccessRetryTimer=null;partnerAccessRetryAttempt=0;
         if (!backendRuntime.realtimeSubscribed) {
@@ -2456,7 +2472,8 @@
           const transient=window.TamoonMarketplacePilot?.isTransient(error);
           if(!transient || partnerAccessPending)backendRuntime.bootstrap = null;
           backendRuntime.error = backendErrorMessage(error);
-          backendRuntime.refreshError = backendRuntime.error;
+          backendRuntime.refreshError = error?.code==="57014" || /statement timeout/i.test(String(error?.message))
+            ? "A atualização demorou. Tentaremos novamente em instantes." : backendRuntime.error;
         }
         throw error;
       } finally {
@@ -3040,6 +3057,7 @@
       const favoritePhoto = (profile.photos || []).find((photo) => photo.id === profile.favoritePhotoId) || (profile.photos || []).find((photo) => photo.favorite);
       if (favoritePhoto?.src) {
         venue.facadeImage = favoritePhoto.src;
+        venue.facadePhotoPath = favoritePhoto.storagePath || "";
         venue.facadeSource = "partner_upload";
         venue.facadeTone = favoritePhoto.tone === "light" ? "light" : "dark";
         venue.facadeLuminance = Number.isFinite(Number(favoritePhoto.luminance)) ? Number(favoritePhoto.luminance) : null;
@@ -4209,7 +4227,7 @@
     const complement = Math.max(0, total - Number(voucher.amount || 0));
     const occurrences = isMonthlySelection() ? monthlyOccurrencesForSelection(selectedReservation) : [{ date: selectedReservation.day.date }];
     const modeLabel = isMonthlySelection() ? `Mensalista · ${occurrences.length} data(s)` : "Reserva avulsa";
-    reservationSummaryHead.innerHTML = `<div class="reservation-summary-venue"><img src="${esc(selectedReservation.venue.facadeImage || "assets/preview-icon.svg")}" alt="${esc(selectedReservation.venue.name)}"><div class="payment-summary-title"><div><strong>${esc(selectedReservation.venue.name)}</strong><small>${esc(normalizedSlotSpace(selectedReservation.slot))} · ${esc(selectedReservation.day.date)} · ${esc(timeRange(selectedReservation.time, slotEndTime(selectedReservation.slot)))}</small></div><span class="status ${isMonthlySelection() ? "status-ok" : "status-neutral"}">${modeLabel}</span></div></div>`;
+    reservationSummaryHead.innerHTML = `<div class="reservation-summary-venue"><img ${venuePhotoAttributes(selectedReservation.venue.facadeImage, selectedReservation.venue.facadePhotoPath)} alt="${esc(selectedReservation.venue.name)}"><div class="payment-summary-title"><div><strong>${esc(selectedReservation.venue.name)}</strong><small>${esc(normalizedSlotSpace(selectedReservation.slot))} · ${esc(selectedReservation.day.date)} · ${esc(timeRange(selectedReservation.time, slotEndTime(selectedReservation.slot)))}</small></div><span class="status ${isMonthlySelection() ? "status-ok" : "status-neutral"}">${modeLabel}</span></div></div>`;
     reservationSummaryTotal.innerHTML = `<div class="reservation-total-line"><span>${voucher.amount > 0 ? `Valor ${money(total)} · voucher −${money(voucher.amount)}` : "Valor total"}</span><strong>${money(complement)}</strong></div>`;
   }
 
@@ -5353,7 +5371,9 @@
   function venueGalleryPhotos(venue) {
     if (!venue) return [];
     let photos = [];
-    if (state.partnerProfile?.venueId === venue.id && Array.isArray(state.partnerProfile.photos)) {
+    if (venue.backendVenueId && Array.isArray(venue.gallery)) {
+      photos = venue.gallery;
+    } else if (state.partnerProfile?.venueId === venue.id && Array.isArray(state.partnerProfile.photos)) {
       photos = state.partnerProfile.photos;
     } else if (Array.isArray(venue.photos)) {
       photos = venue.photos;
@@ -5362,12 +5382,13 @@
       id: photo.id || `VENUE-PHOTO-${index + 1}`,
       name: photo.name || `Foto ${index + 1}`,
       src: photo.src,
+      storagePath: photo.storagePath,
       favorite: Boolean(photo.favorite || (state.partnerProfile?.venueId === venue.id && photo.id === state.partnerProfile.favoritePhotoId)),
       tone: photo.tone === "light" ? "light" : photo.tone === "dark" ? "dark" : "",
       luminance: Number.isFinite(Number(photo.luminance)) ? Number(photo.luminance) : null
     }));
     if (!normalized.length && venue.facadeImage) {
-      normalized.push({ id:`${venue.id}-facade`, name:"Fachada", src:venue.facadeImage, favorite:true, tone:venue.facadeTone || "dark", luminance:Number.isFinite(Number(venue.facadeLuminance)) ? Number(venue.facadeLuminance) : null });
+      normalized.push({ id:`${venue.id}-facade`, name:"Fachada", src:venue.facadeImage, storagePath:venue.facadePhotoPath, favorite:true, tone:venue.facadeTone || "dark", luminance:Number.isFinite(Number(venue.facadeLuminance)) ? Number(venue.facadeLuminance) : null });
     }
     normalized.sort((a,b) => Number(b.favorite) - Number(a.favorite));
     return normalized;
@@ -5416,7 +5437,7 @@
     const photos = venueGalleryPhotos(venue);
     galleryTitle.textContent = venue.name;
     galleryBody.innerHTML = photos.length
-      ? `<div class="venue-gallery-grid">${photos.map((photo) => `<figure class="venue-gallery-item ${photo.favorite ? "is-favorite" : ""}"><div class="venue-gallery-image-wrap"><img src="${esc(photo.src)}" alt="${esc(photo.favorite ? `Foto principal de ${venue.name}` : `Foto do estabelecimento ${venue.name}`)}" loading="lazy">${photo.favorite ? `<span class="venue-gallery-favorite">Foto principal</span>` : ""}</div></figure>`).join("")}</div>`
+      ? `<div class="venue-gallery-grid">${photos.map((photo) => `<figure class="venue-gallery-item ${photo.favorite ? "is-favorite" : ""}"><div class="venue-gallery-image-wrap"><img ${venuePhotoAttributes(photo.src, photo.storagePath)} alt="${esc(photo.favorite ? `Foto principal de ${venue.name}` : `Foto do estabelecimento ${venue.name}`)}" loading="lazy">${photo.favorite ? `<span class="venue-gallery-favorite">Foto principal</span>` : ""}</div></figure>`).join("")}</div>`
       : emptyState("▧", "Este parceiro ainda não publicou fotos do estabelecimento.");
     if (!galleryDialog.open) {
       galleryDialog.showModal();
@@ -5437,7 +5458,7 @@
     const photoTone = venuePhotoTone(venue);
     return `<article class="venue-card compact-venue-card photo-tone-${esc(photoTone)}">
       <div class="venue-card-media">
-        <img class="venue-card-photo" src="${esc(venue.facadeImage)}" alt="Fachada de ${esc(venue.name)}" loading="lazy">
+        <img class="venue-card-photo" ${venuePhotoAttributes(venue.facadeImage, venue.facadePhotoPath)} alt="Fachada de ${esc(venue.name)}" loading="lazy">
         <div class="venue-card-shade"></div>
         <div class="venue-card-top">
           <div class="venue-card-top-text">
@@ -7373,7 +7394,7 @@
       ${backendMode ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>Empresa, responsável, endereço, espaços, fotos e documentos usam a fonte oficial protegida.</small></div>` : ""}
       ${profileAllowed ? `<section class="card partner-photo-manager">
         <div class="section-heading"><div><h2>Fotos do estabelecimento</h2><p>A foto favorita é usada no card do marketplace e no resumo da reserva.</p></div><div class="item-actions"><input id="partnerPhotoUpload" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><button class="button primary small" data-action="upload-partner-photos">Carregar fotos</button></div></div>
-        <div class="partner-photo-grid">${(p.photos || []).map((photo) => `<article class="partner-photo-item ${photo.id === p.favoritePhotoId ? "is-favorite" : ""}"><img src="${esc(photo.src || "assets/preview-icon.svg")}" alt="${esc(photo.name || "Foto do estabelecimento")}"><div class="partner-photo-copy"><strong>${esc(photo.name || "Foto do estabelecimento")}</strong><small>${photo.id === p.favoritePhotoId ? "Favorita · visível no marketplace" : esc(photo.uploadedAt || "")}${photo.tone ? ` · fundo ${photo.tone === "light" ? "claro" : "escuro"}` : ""}</small></div><div class="partner-photo-actions">${photo.id === p.favoritePhotoId ? `<span class="status status-ok">Favorita</span>` : `<button class="button secondary small" data-action="set-partner-favorite-photo" data-id="${esc(photo.id)}">Usar no card</button>`}<button class="button ghost small" data-action="remove-partner-photo" data-id="${esc(photo.id)}" ${photo.id === p.favoritePhotoId && (p.photos || []).length === 1 ? "disabled" : ""}>Remover</button></div></article>`).join("") || emptyState("▧", "Nenhuma foto carregada.")}</div>
+        <div class="partner-photo-grid">${(p.photos || []).map((photo) => `<article class="partner-photo-item ${photo.id === p.favoritePhotoId ? "is-favorite" : ""}"><img ${venuePhotoAttributes(photo.src, photo.storagePath)} alt="${esc(photo.name || "Foto do estabelecimento")}"><div class="partner-photo-copy"><strong>${esc(photo.name || "Foto do estabelecimento")}</strong><small>${photo.id === p.favoritePhotoId ? "Favorita · visível no marketplace" : esc(photo.uploadedAt || "")}${photo.tone ? ` · fundo ${photo.tone === "light" ? "claro" : "escuro"}` : ""}</small></div><div class="partner-photo-actions">${photo.id === p.favoritePhotoId ? `<span class="status status-ok">Favorita</span>` : `<button class="button secondary small" data-action="set-partner-favorite-photo" data-id="${esc(photo.id)}">Usar no card</button>`}<button class="button ghost small" data-action="remove-partner-photo" data-id="${esc(photo.id)}" ${photo.id === p.favoritePhotoId && (p.photos || []).length === 1 ? "disabled" : ""}>Remover</button></div></article>`).join("") || emptyState("▧", "Nenhuma foto carregada.")}</div>
         <small class="field-help">Até 6 fotos JPEG, PNG ou WebP. ${backendMode ? "As imagens são reduzidas no navegador e enviadas ao Storage protegido do staging." : "No fallback local, as imagens permanecem somente neste navegador."}</small>
       </section>
       <section class="details-grid">
@@ -8050,14 +8071,14 @@
     const photoTone = venuePhotoTone(venue);
     if (!publicDays.length) {
       selectedVenueSchedule = { venueId: venue.id, shortDate: "" };
-      return `<div class="venue-detail-cover photo-tone-${esc(photoTone)}"><img class="venue-detail-image" src="${esc(venue.facadeImage)}" alt="Fachada de ${esc(venue.name)}">${galleryButton}<div class="venue-detail-overlay"><span class="rating-badge">${venueRatingMarkup(venue)}</span><div><strong>${esc(address)}</strong></div></div></div>
+      return `<div class="venue-detail-cover photo-tone-${esc(photoTone)}"><img class="venue-detail-image" ${venuePhotoAttributes(venue.facadeImage, venue.facadePhotoPath)} alt="Fachada de ${esc(venue.name)}">${galleryButton}<div class="venue-detail-overlay"><span class="rating-badge">${venueRatingMarkup(venue)}</span><div><strong>${esc(address)}</strong></div></div></div>
         ${venueDetailSummary(venue)}
         <section class="schedule-section">${emptyState("▦", "Não há horários atuais ou futuros publicados para reserva.")}</section>`;
     }
     const day = publicDays.find((item) => item.shortDate === selectedDate) || publicDays[0];
     const publicSlots = publicSlotsForDay(day);
     selectedVenueSchedule = { venueId: venue.id, shortDate: day.shortDate };
-    return `<div class="venue-detail-cover photo-tone-${esc(photoTone)}"><img class="venue-detail-image" src="${esc(venue.facadeImage)}" alt="Fachada de ${esc(venue.name)}">${galleryButton}<div class="venue-detail-overlay"><span class="rating-badge">${venueRatingMarkup(venue)}</span><div><strong>${esc(address)}</strong></div></div></div>
+    return `<div class="venue-detail-cover photo-tone-${esc(photoTone)}"><img class="venue-detail-image" ${venuePhotoAttributes(venue.facadeImage, venue.facadePhotoPath)} alt="Fachada de ${esc(venue.name)}">${galleryButton}<div class="venue-detail-overlay"><span class="rating-badge">${venueRatingMarkup(venue)}</span><div><strong>${esc(address)}</strong></div></div></div>
       ${venueDetailSummary(venue)}
       <section class="schedule-section"><div class="section-heading"><div><h2>Agenda do parceiro</h2><p>Somente o dia atual e as próximas datas ficam disponíveis para novas reservas.</p></div></div>
       <div class="schedule-days" aria-label="Dias atuais e futuros com agenda">${publicDays.map((item) => `<button type="button" class="schedule-day ${item.shortDate === day.shortDate ? "active" : ""}" data-action="venue-schedule-day" data-id="${esc(venue.id)}" data-date="${esc(item.shortDate)}"><small>${esc(item.weekday)}</small><strong>${esc(item.dayLabel)}</strong></button>`).join("")}</div>
@@ -9661,7 +9682,7 @@
   document.addEventListener("pointerdown",()=>operationalAlerts.arm(),{passive:true});
   document.addEventListener("keydown",()=>operationalAlerts.arm());
   // Recupera avisos perdidos durante desconexao sem depender apenas do Realtime.
-  setInterval(()=>{if(backendIsOnline()&&!document.hidden&&!backendRuntime.mutating&&!app.contains(document.activeElement?.closest("input,textarea,select")))refreshBackendBootstrap(true).catch(()=>{});},30000);
+  setInterval(()=>{if(backendIsOnline()&&Date.now()-lastBackendRefreshAt>=90000&&!document.hidden&&!backendRuntime.mutating&&!app.contains(document.activeElement?.closest("input,textarea,select")))refreshBackendBootstrap(true).catch(()=>{});},30000);
   document.addEventListener("visibilitychange",()=>{if(!window.TamoonMarketplacePilot&&!document.hidden&&backendIsOnline())refreshBackendBootstrap(true).catch(()=>{});});
   window.addEventListener('tamoon-marketplace-retry',()=>{if(!window.TamoonMarketplacePilot?.blocked)refreshBackendBootstrap(true).catch(()=>{});});
 

@@ -306,7 +306,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       session = data.session || null;
       client.auth.onAuthStateChange(async (event, nextSession) => {
         if (session?.user?.id !== nextSession?.user?.id) unsubscribeRealtime();
-        if (session?.user?.id !== nextSession?.user?.id) { readonlyState={active:false,available:false}; contextVersion++;lastCompleteBootstrap=null; }
+        if (session?.user?.id !== nextSession?.user?.id) { readonlyState={active:false,available:false}; contextVersion++;lastCompleteBootstrap=null;photoUrls.clear(); }
         session = nextSession || null;
         bootstrapCache = null;
         emit("auth", { authEvent: event });
@@ -371,7 +371,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   async function beginPartnerReadonly(partnerId) {
-    contextVersion++;lastCompleteBootstrap=null;
+    contextVersion++;lastCompleteBootstrap=null;photoUrls.clear();
     const {data,error}=await requireClient().rpc("begin_partner_readonly",{p_partner_id:partnerId});
     if(error) throw error;
     readonlyState=data;bootstrapCache=null;
@@ -379,7 +379,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   async function endPartnerReadonly() {
-    contextVersion++;lastCompleteBootstrap=null;
+    contextVersion++;lastCompleteBootstrap=null;photoUrls.clear();
     const {data,error}=await requireClient().rpc("end_partner_readonly");
     if(error) throw error;
     readonlyState=data;bootstrapCache=null;
@@ -417,7 +417,26 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     return data;
   }
 
-  async function bootstrap({ force = false, changes = [], onCore } = {}) {
+  // Keep the database pool available for other clients during a full refresh.
+  async function readDirectories(readers) {
+    const results = [];
+    let next = 0, failure;
+    async function read() {
+      while (!failure && next < readers.length) {
+        const index = next++;
+        try {
+          const result = await readers[index]();
+          if (result.error) throw result.error;
+          results[index] = result;
+        } catch (error) { failure = error; }
+      }
+    }
+    await Promise.all(Array.from({length:4}, read));
+    if (failure) throw failure;
+    return results;
+  }
+
+  async function bootstrap({ force = false, changes = [], onCore, onPhotos } = {}) {
     const requestedIdentity = session?.user?.id;
     const requestedContext = contextVersion;
     if (!requestedIdentity) throw new Error("AUTH_REQUIRED");
@@ -435,7 +454,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       if(clientsError)throw clientsError;
       if(requestedContext!==contextVersion || requestedIdentity!==session?.user?.id)throw new Error("PREVIEW_CONTEXT_CHANGED");
       snapshot.partner_clients=clients||[];snapshot.agenda_initial_slots=[];
-      await warmPhotoUrls(snapshot);
+      await warmPhotoUrls(snapshot, requestedContext, onPhotos);
+      if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
       bootstrapCache=snapshot;emit("bootstrap",{bootstrap:snapshot});return snapshot;
     }
     if (!force && !bootstrapCache?.preview?.active && bootstrapCache?.profile?.id === requestedIdentity) return bootstrapCache;
@@ -458,7 +478,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity || snapshot.profile?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
     // Discovery needs the verified catalog, not financial/admin directories.
     onCore?.(snapshot);
-    const photosReady=warmPhotoUrls(snapshot).then(()=>null,error=>error);
+    const photosReady=warmPhotoUrls(snapshot, requestedContext, onPhotos);
     // Notification/chat-only events can reuse extra directories only when every other
     // core field (including financial rows and permissions) is identical to the last full read.
     const coreKeys=Object.keys(snapshot).filter(key=>!["generated_at","notifications","chats","chat_effective_state","chat_messages","chat_unread"].includes(key));
@@ -467,7 +487,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       && coreKeys.every(key=>JSON.stringify(snapshot[key])===JSON.stringify(lastCompleteBootstrap[key]));
     if(canReuse){
       if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity || snapshot.profile?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
-      const photoError=await photosReady;if(photoError)throw photoError;
+      await photosReady;
       if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
       const merged={...lastCompleteBootstrap,...snapshot};
       bootstrapCache=merged;emit("bootstrap",{bootstrap:merged});return merged;
@@ -476,60 +496,40 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if (voucherRefreshError) throw voucherRefreshError;
     const [voucherStateResult, cancellationResult, ledgerResult, financialReconciliationResult, paymentResponsibleDirectoryResult, partnerDocumentsResult, partnerTeamResult, communityNotificationsResult,
       monthlyLinksResult, monthlyLinkDirectoryResult, monthlySplitDirectoryResult, monthlyCyclesResult, monthlyPreReservationsResult, monthlyStagesResult, monthlyEventsResult, monthlyRequestsResult, occurrenceTransfersResult, reservationFinancialStatusResult, partnerOnboardingResult, partnerClientsResult,
-      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult] = await Promise.all([
-      c.from("marketplace_voucher_effective_state").select("*").order("created_at", { ascending: false }),
-      c.from("cancellation_requests").select("*").order("created_at", { ascending: false }),
-      c.from("accounting_ledger").select("*").order("created_at", { ascending: false }),
-      c.rpc("marketplace_financial_reconciliation"),
-      c.rpc("reservation_payment_responsible_directory"),
-      c.from("partner_documents").select("*").order("created_at", { ascending: false }),
-      c.rpc("partner_team_directory", { p_partner_id:null }),
-      c.rpc("community_marketplace_notifications", { p_group_id:null }),
-      c.from("monthly_customer_links").select("id,partner_id,venue_id,venue_space_id,group_id,customer_profile_id,weekday,start_time,end_time,monthly_price,initial_guarantee_percent,start_month,end_month,origin,status,accepted_at,require_renewal_confirmation,suspension_reason").order("start_month", { ascending:false }),
-      c.rpc("monthly_customer_link_directory"),
-      c.rpc("monthly_reservation_split_directory"),
-      c.from("monthly_cycles").select("id,monthly_link_id,service_month,status,reservation_id,payment_available_at,first_occurrence_at,initial_due_at,balance_due_at,monthly_total,initial_required,balance_required,initial_paid,balance_paid,collection_mode,guarantee_required,guarantee_paid,total_paid,guarantee_reached_at,occurrence_count,renewal_confirmed_at").order("service_month", { ascending:false }),
-      c.from("monthly_pre_reservation_slots").select("id,monthly_cycle_id,schedule_slot_id,status").order("id", { ascending:false }),
-      c.from("monthly_payment_stages").select("id,monthly_cycle_id,reservation_id,stage,status,available_from,due_at,amount_required,amount_paid").order("due_at", { ascending:true }),
-      c.from("monthly_cycle_events").select("monthly_cycle_id,reservation_occurrence_id,marketplace_event_id,financial_status"),
-      c.rpc("monthly_link_request_directory"),
-      c.rpc("occurrence_transfer_directory_v2"),
-      c.rpc("reservation_financial_status_directory"),
-      c.rpc("partner_onboarding_directory"),
-      c.rpc("partner_client_directory",{p_partner_id:null}),
-      snapshot.partner_memberships?.length ? c.from("schedule_slots").select("id,venue_space_id,series_id,monthly_link_key,starts_at,ends_at,status,blocked_reason,blocked_at") : Promise.resolve({data:[]}),
-      snapshot.is_admin===true ? c.rpc("admin_marketplace_users") : Promise.resolve({data:[]}),
-      snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]}),
-      c.rpc("agenda_initial_slot_flags",{})
+      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult] = await readDirectories([
+      () => c.from("marketplace_voucher_effective_state").select("*").order("created_at", { ascending: false }),
+      () => c.from("cancellation_requests").select("*").order("created_at", { ascending: false }),
+      () => c.from("accounting_ledger").select("*").order("created_at", { ascending: false }),
+      () => c.rpc("marketplace_financial_reconciliation"),
+      () => c.rpc("reservation_payment_responsible_directory"),
+      () => c.from("partner_documents").select("*").order("created_at", { ascending: false }),
+      () => c.rpc("partner_team_directory", { p_partner_id:null }),
+      () => c.rpc("community_marketplace_notifications", { p_group_id:null }),
+      () => c.from("monthly_customer_links").select("id,partner_id,venue_id,venue_space_id,group_id,customer_profile_id,weekday,start_time,end_time,monthly_price,initial_guarantee_percent,start_month,end_month,origin,status,accepted_at,require_renewal_confirmation,suspension_reason").order("start_month", { ascending:false }),
+      () => c.rpc("monthly_customer_link_directory"),
+      () => c.rpc("monthly_reservation_split_directory"),
+      () => c.from("monthly_cycles").select("id,monthly_link_id,service_month,status,reservation_id,payment_available_at,first_occurrence_at,initial_due_at,balance_due_at,monthly_total,initial_required,balance_required,initial_paid,balance_paid,collection_mode,guarantee_required,guarantee_paid,total_paid,guarantee_reached_at,occurrence_count,renewal_confirmed_at").order("service_month", { ascending:false }),
+      () => c.from("monthly_pre_reservation_slots").select("id,monthly_cycle_id,schedule_slot_id,status").order("id", { ascending:false }),
+      () => c.from("monthly_payment_stages").select("id,monthly_cycle_id,reservation_id,stage,status,available_from,due_at,amount_required,amount_paid").order("due_at", { ascending:true }),
+      () => c.from("monthly_cycle_events").select("monthly_cycle_id,reservation_occurrence_id,marketplace_event_id,financial_status"),
+      () => c.rpc("monthly_link_request_directory"),
+      () => c.rpc("occurrence_transfer_directory_v2"),
+      () => c.rpc("reservation_financial_status_directory"),
+      () => c.rpc("partner_onboarding_directory"),
+      () => c.rpc("partner_client_directory",{p_partner_id:null}),
+      () => snapshot.partner_memberships?.length ? c.from("schedule_slots").select("id,venue_space_id,series_id,monthly_link_key,starts_at,ends_at,status,blocked_reason,blocked_at") : Promise.resolve({data:[]}),
+      () => snapshot.is_admin===true ? c.rpc("admin_marketplace_users") : Promise.resolve({data:[]}),
+      () => snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]}),
+      () => c.rpc("agenda_initial_slot_flags",{})
     ]);
-    if (voucherStateResult.error) throw voucherStateResult.error;
-    if (cancellationResult.error) throw cancellationResult.error;
-    if (ledgerResult.error) throw ledgerResult.error;
-    if (financialReconciliationResult.error) throw financialReconciliationResult.error;
-    if (paymentResponsibleDirectoryResult.error) throw paymentResponsibleDirectoryResult.error;
-    if (partnerDocumentsResult.error) throw partnerDocumentsResult.error;
-    if (partnerTeamResult.error) throw partnerTeamResult.error;
-    if (communityNotificationsResult.error) throw communityNotificationsResult.error;
-    if (monthlyLinksResult.error) throw monthlyLinksResult.error;
-    if (monthlyLinkDirectoryResult.error) throw monthlyLinkDirectoryResult.error;
-    if (monthlySplitDirectoryResult.error) throw monthlySplitDirectoryResult.error;
-    if (monthlyCyclesResult.error) throw monthlyCyclesResult.error;
-    if (monthlyPreReservationsResult.error) throw monthlyPreReservationsResult.error;
-    if (monthlyStagesResult.error) throw monthlyStagesResult.error;
-    if (monthlyEventsResult.error) throw monthlyEventsResult.error;
-    if (monthlyRequestsResult.error) throw monthlyRequestsResult.error;
-    if (occurrenceTransfersResult.error) throw occurrenceTransfersResult.error;
-    if (reservationFinancialStatusResult.error) throw reservationFinancialStatusResult.error;
     snapshot.voucher_effective_state = voucherStateResult.data || [];
     snapshot.cancellation_requests = cancellationResult.data || [];
     snapshot.accounting_ledger = ledgerResult.data || [];
     snapshot.financial_reconciliation = financialReconciliationResult.data || [];
     snapshot.payment_responsible_directory = paymentResponsibleDirectoryResult.data || [];
-    if (partnerOnboardingResult.error) throw partnerOnboardingResult.error;
     snapshot.partner_onboarding = partnerOnboardingResult.data || [];
     snapshot.partner_documents = partnerDocumentsResult.data || [];
     snapshot.partner_team_directory = partnerTeamResult.data || [];
-    if (partnerClientsResult.error) throw partnerClientsResult.error;
     snapshot.partner_clients = partnerClientsResult.data || [];
     snapshot.community_marketplace_notifications = communityNotificationsResult.data || [];
     snapshot.monthly_customer_links = monthlyLinksResult.data || [];
@@ -542,13 +542,12 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     snapshot.monthly_link_requests = monthlyRequestsResult.data || [];
     snapshot.occurrence_transfer_requests = occurrenceTransfersResult.data || [];
     snapshot.reservation_financial_status = reservationFinancialStatusResult.data || [];
-    for(const result of [scheduleDetailsResult,adminUsersResult,adminReservationsResult,initialSlotFlagsResult])if(result.error)throw result.error;
     snapshot.agenda_initial_slots=initialSlotFlagsResult.data||[];
     snapshot.schedule_details=scheduleDetailsResult.data||[];
     snapshot.admin_users=adminUsersResult.data||[];
     snapshot.admin_reservations=adminReservationsResult.data||[];
     if (requestedContext!==contextVersion || session?.user?.id !== requestedIdentity || snapshot.profile?.id !== requestedIdentity) throw new Error("AUTH_IDENTITY_CHANGED");
-    const photoError=await photosReady;if(photoError)throw photoError;
+    await photosReady;
     if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
     lastCompleteBootstrap = snapshot;lastCompleteBootstrapAt=Date.now();
     bootstrapCache = snapshot;
@@ -1192,17 +1191,28 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     return data;
   }
 
-  async function warmPhotoUrls(snapshot) {
+  async function warmPhotoUrls(snapshot, requestedContext, onPhotos) {
     const paths = [...new Set((snapshot.venue_photos || []).map(p => p.storage_path).filter(Boolean))];
-    const needed = paths.filter(p => !photoUrls.has(p) || photoUrls.get(p).expires < Date.now() + 120000);
+    const needed = paths.filter(path => (photoUrls.get(path)?.expires || 0) < Date.now() + 120000);
     if (!needed.length) return;
-    const { data, error } = await requireClient().storage.from("marketplace-venue-photos").createSignedUrls(needed, 600);
-    if (error) throw error;
-    for (const item of data || []) if (item.signedUrl) photoUrls.set(item.path, {url:item.signedUrl, expires:Date.now()+600000});
+    let response;
+    try {
+      response = await requireClient().storage.from("marketplace-venue-photos").createSignedUrls(needed, 600);
+    } catch { return; } // A photo can retry on the next refresh without blocking reservations.
+    if (response.error || requestedContext !== contextVersion || snapshot.profile?.id !== session?.user?.id) return;
+    let updated = false;
+    for (const item of response.data || []) {
+      if (!item.error && item.signedUrl && needed.includes(item.path)) {
+        photoUrls.set(item.path, {url:item.signedUrl, expires:Date.now()+600000});
+        updated = true;
+      }
+    }
+    if (updated) onPhotos?.();
   }
 
   function publicVenuePhotoUrl(storagePath) {
-    return photoUrls.get(storagePath)?.url || "assets/preview-icon.svg";
+    const photo = photoUrls.get(storagePath);
+    return photo && photo.expires > Date.now() ? photo.url : "assets/preview-icon.svg";
   }
 
   async function adminReservationFilters({ partnerId = null, userId = null, date = null, status = null } = {}) {
@@ -2013,6 +2023,111 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 
 ;
 
+;/* marketplace-navigation.js */
+(() => {
+  'use strict';
+  // Move the existing preference controls, preserving their handlers and state.
+  function create({onNavigate}) {
+    const button=document.getElementById('openMarketplaceMenu');
+    const dialog=document.getElementById('marketplaceMenu');
+    const links=document.getElementById('marketplaceMenuLinks');
+    const title=document.getElementById('marketplaceMenuTitle');
+    const preferences=document.getElementById('marketplaceMenuPreferences');
+    const closeButton=document.getElementById('closeMarketplaceMenu');
+    const header=document.querySelector('.app-header');
+    const ribbon=document.querySelector('.sandbox-ribbon');
+    const mobile=window.matchMedia('(max-width: 980px)');
+    if(!button||!dialog||!links||!preferences||!header)return {update(){}};
+    const controls=['toggleNotificationSound','toggleMarketplaceTheme','openReleaseNotes'].map(id=>{
+      const element=document.getElementById(id);
+      if(!element)return null;
+      const anchor=document.createComment('Header control: '+id);
+      element.before(anchor);
+      return {element,anchor};
+    }).filter(Boolean);
+    let enabled=false, currentTitle='', scrollState=null;
+    const available=()=>enabled&&!document.body.classList.contains('pilot-locked')&&!document.body.classList.contains('pilot-leaving');
+    function measure() {
+      document.documentElement.style.setProperty('--marketplace-ribbon-height',(ribbon?.getBoundingClientRect().height||0)+'px');
+      if(!scrollState)dialog.style.setProperty('--marketplace-menu-top',Math.max(0,header.getBoundingClientRect().bottom)+'px');
+    }
+    function release(restoreFocus=true) {
+      if(!scrollState)return;
+      const previous=scrollState;scrollState=null;
+      for(const [name,value] of Object.entries(previous.styles))document.body.style[name]=value;
+      const root=document.documentElement, behavior=root.style.scrollBehavior;
+      root.style.scrollBehavior='auto';window.scrollTo(previous.x,previous.y);root.style.scrollBehavior=behavior;
+      button.setAttribute('aria-expanded','false');
+      if(restoreFocus&&mobile.matches&&available()&&!document.querySelector('dialog[open]'))button.focus({preventScroll:true});
+    }
+    function close(restoreFocus=true) {
+      if(dialog.open)dialog.close();
+      release(restoreFocus);
+    }
+    function open() {
+      if(!mobile.matches||!available()||dialog.open||document.querySelector('dialog[open]'))return;
+      measure();
+      const styles={};
+      for(const name of ['position','top','left','right','width','overflow'])styles[name]=document.body.style[name];
+      scrollState={x:window.scrollX,y:window.scrollY,styles};
+      Object.assign(document.body.style,{position:'fixed',top:-scrollState.y+'px',left:'0',right:'0',width:'100%',overflow:'hidden'});
+      try{dialog.showModal();}catch(error){release();throw error;}
+      button.setAttribute('aria-expanded','true');
+      closeButton.focus({preventScroll:true});
+    }
+    function syncViewport() {
+      const wasOpen=dialog.open;
+      if(!mobile.matches)close(false);
+      for(const {element,anchor} of controls){
+        if(mobile.matches){if(element.parentElement!==preferences)preferences.append(element);}
+        else if(element.previousSibling!==anchor)anchor.after(element);
+      }
+      measure();
+      if(wasOpen&&!mobile.matches)document.getElementById('app')?.focus({preventScroll:true});
+    }
+    function syncAccess() {
+      button.disabled=!available();
+      if(!available())close(false);
+    }
+    function update({heading,markup='',allowed=true}) {
+      enabled=allowed;
+      if(currentTitle!==heading)close(false);
+      currentTitle=heading;title.textContent=heading;
+      links.setAttribute('aria-label','Menu da área '+heading);
+      if(window.MarketplaceUI)window.MarketplaceUI.update(links,markup);
+      else if(links.innerHTML!==markup)links.innerHTML=markup;
+      links.hidden=!markup;
+      syncAccess();
+    }
+    button.addEventListener('click',()=>dialog.open?close():open());
+    closeButton.addEventListener('click',()=>close());
+    dialog.addEventListener('click',event=>{if(event.target===dialog)close();});
+    dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
+    dialog.addEventListener('close',()=>{if(!dialog.open)release();});
+    links.addEventListener('click',async event=>{
+      const target=event.target.closest('[data-nav]');
+      if(!target||target.disabled||!available())return;
+      event.preventDefault();close(false);
+      await onNavigate(target.dataset.nav);
+      if(available()&&!document.querySelector('dialog[open]'))document.getElementById('app')?.focus({preventScroll:true});
+    });
+    // Help opens its own dialog; restore scrolling before handing over focus.
+    preferences.addEventListener('click',event=>{if(event.target.closest('#openReleaseNotes'))close(false);},true);
+    mobile.addEventListener('change',syncViewport);
+    window.addEventListener('resize',measure);
+    window.addEventListener('pagehide',()=>close(false));
+    if(window.ResizeObserver&&ribbon)new ResizeObserver(measure).observe(ribbon);
+    new MutationObserver(syncAccess).observe(document.body,{attributes:true,attributeFilter:['class']});
+    button.hidden=false;
+    document.body.classList.add('marketplace-navigation-ready');
+    syncViewport();syncAccess();
+    return {update,close};
+  }
+  window.MarketplaceNavigation={create};
+})();
+
+;
+
 ;/* agenda-navigation.js */
 /* Partner agenda uses full calendar dates. This module never changes schedule data. */
 (() => {
@@ -2243,6 +2358,11 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   const roleSwitcher = document.getElementById("marketplaceRoleSwitcher");
   const sessionButton = document.getElementById("marketplaceSessionButton");
   const themeButton = document.getElementById("toggleMarketplaceTheme");
+  const mobileNavigation = window.MarketplaceNavigation?.create({onNavigate: async(page) => {
+    if(state.role==="partner"&&!partnerPageAllowed(page)){showToast("Acesso Restrito.");return;}
+    if(!(menus[state.role]||[]).some(([id])=>id===page))return;
+    await nav(state.role,page);
+  }});
   const marketplaceThemeColor = document.getElementById("marketplaceThemeColor");
   const toast = document.getElementById("toast");
   const reservationDialog = document.getElementById("reservationDialog");
@@ -2720,6 +2840,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   let backendRefreshQueued = false;
   let backendRefreshTables = new Set();
   let backendRefreshSignature = "";
+  let lastBackendRefreshAt = 0;
 
   function scheduleBackendRefresh(table = "") {
     backendRefreshQueued=true;
@@ -2737,8 +2858,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if(!element)return;
     const message=backendRuntime.mutating ? (window.MarketplaceAsaasCommunication?.isBusy()
       ? "Processando solicitação… Aguarde a conclusão." : "Salvando alteração… Você pode continuar navegando.")
-      : backendRuntime.refreshError ? "Não foi possível atualizar agora. Confira sua conexão."
-      : backendRuntime.refreshing ? "Atualizando informações…" : "";
+      : backendRuntime.refreshError ? backendRuntime.refreshError
+      : backendRuntime.refreshing && (!backendIsOnline() || backendRuntime.initialDetailsPending) ? "Atualizando informações…" : "";
     element.textContent=message;element.hidden=!message;
   }
 
@@ -2856,6 +2977,12 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if (!photo?.storage_path) return "";
     try { return window.MarketplaceBackend?.publicVenuePhotoUrl(photo.storage_path) || ""; }
     catch (_error) { return ""; }
+  }
+
+  function venuePhotoAttributes(src, storagePath) {
+    if (!storagePath) return `src="${esc(src || "assets/preview-icon.svg")}"`;
+    const url = window.MarketplaceBackend.publicVenuePhotoUrl(storagePath);
+    return `data-market-photo="${esc(storagePath)}" src="${esc(url)}"`;
   }
 
   function mapBackendPhoto(photo) {
@@ -3316,6 +3443,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         address:[venue.street, venue.street_number, venue.neighborhood, venue.city, venue.zip].filter(Boolean).join(", "),
         zip:venue.zip || "",
         facadeImage:favorite?.src || "assets/preview-icon.svg",
+        facadePhotoPath:favorite?.storagePath || "",
         facadeSource:favorite ? "supabase_storage" : "partner_upload_pending",
         facadeTone:favorite?.tone || "dark",
         facadeLuminance:favorite?.luminance ?? null,
@@ -4133,6 +4261,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         address: [venue.street, venue.street_number, venue.neighborhood, venue.city, venue.zip].filter(Boolean).join(", "),
         zip: venue.zip || "",
         facadeImage: favorite?.src || "assets/preview-icon.svg",
+        facadePhotoPath:favorite?.storagePath || "",
         facadeSource: favorite ? "supabase_storage" : "partner_upload_pending",
         facadeTone: favorite?.tone || "dark",
         facadeLuminance: favorite?.luminance ?? null,
@@ -4630,7 +4759,14 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     backendBootstrapPromise = (async () => {
       try {
         backendRuntime.session = window.MarketplaceBackend.session;
-        const bootstrap = await window.MarketplaceBackend.bootstrap({ force, changes, onCore:core=>{
+        const bootstrap = await window.MarketplaceBackend.bootstrap({ force, changes, onPhotos:()=>{
+            if(requestedAccessGeneration!==partnerAccessGeneration || window.TamoonMarketplacePilot?.blocked || !backendIsOnline() ||
+               window.MarketplaceBackend.session?.user?.id!==requestedIdentity)return;
+            for(const img of document.querySelectorAll("img[data-market-photo]")){
+              const url=window.MarketplaceBackend.publicVenuePhotoUrl(img.dataset.marketPhoto);
+              if(img.getAttribute("src")!==url)img.setAttribute("src",url);
+            }
+          }, onCore:core=>{
             if(backendRuntime.bootstrap || new URLSearchParams(location.search).get("page")!=="discover"
               || core?.profile?.status!=="active" || core.profile.id!==requestedIdentity
               || window.MarketplaceBackend.session?.user?.id!==requestedIdentity
@@ -4651,7 +4787,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         backendRuntime.bootstrap = bootstrap || {};
         syncStateFromBackend(backendRuntime.bootstrap);
         window.TamoonMarketplacePilot?.ready();
-        backendRefreshSignature=signature;applied=true;
+        backendRefreshSignature=signature;lastBackendRefreshAt=Date.now();applied=true;
         partnerAccessPending=false;
         clearTimeout(partnerAccessRetryTimer);partnerAccessRetryTimer=null;partnerAccessRetryAttempt=0;
         if (!backendRuntime.realtimeSubscribed) {
@@ -4685,7 +4821,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
           const transient=window.TamoonMarketplacePilot?.isTransient(error);
           if(!transient || partnerAccessPending)backendRuntime.bootstrap = null;
           backendRuntime.error = backendErrorMessage(error);
-          backendRuntime.refreshError = backendRuntime.error;
+          backendRuntime.refreshError = error?.code==="57014" || /statement timeout/i.test(String(error?.message))
+            ? "A atualização demorou. Tentaremos novamente em instantes." : backendRuntime.error;
         }
         throw error;
       } finally {
@@ -5269,6 +5406,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       const favoritePhoto = (profile.photos || []).find((photo) => photo.id === profile.favoritePhotoId) || (profile.photos || []).find((photo) => photo.favorite);
       if (favoritePhoto?.src) {
         venue.facadeImage = favoritePhoto.src;
+        venue.facadePhotoPath = favoritePhoto.storagePath || "";
         venue.facadeSource = "partner_upload";
         venue.facadeTone = favoritePhoto.tone === "light" ? "light" : "dark";
         venue.facadeLuminance = Number.isFinite(Number(favoritePhoto.luminance)) ? Number(favoritePhoto.luminance) : null;
@@ -6438,7 +6576,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const complement = Math.max(0, total - Number(voucher.amount || 0));
     const occurrences = isMonthlySelection() ? monthlyOccurrencesForSelection(selectedReservation) : [{ date: selectedReservation.day.date }];
     const modeLabel = isMonthlySelection() ? `Mensalista · ${occurrences.length} data(s)` : "Reserva avulsa";
-    reservationSummaryHead.innerHTML = `<div class="reservation-summary-venue"><img src="${esc(selectedReservation.venue.facadeImage || "assets/preview-icon.svg")}" alt="${esc(selectedReservation.venue.name)}"><div class="payment-summary-title"><div><strong>${esc(selectedReservation.venue.name)}</strong><small>${esc(normalizedSlotSpace(selectedReservation.slot))} · ${esc(selectedReservation.day.date)} · ${esc(timeRange(selectedReservation.time, slotEndTime(selectedReservation.slot)))}</small></div><span class="status ${isMonthlySelection() ? "status-ok" : "status-neutral"}">${modeLabel}</span></div></div>`;
+    reservationSummaryHead.innerHTML = `<div class="reservation-summary-venue"><img ${venuePhotoAttributes(selectedReservation.venue.facadeImage, selectedReservation.venue.facadePhotoPath)} alt="${esc(selectedReservation.venue.name)}"><div class="payment-summary-title"><div><strong>${esc(selectedReservation.venue.name)}</strong><small>${esc(normalizedSlotSpace(selectedReservation.slot))} · ${esc(selectedReservation.day.date)} · ${esc(timeRange(selectedReservation.time, slotEndTime(selectedReservation.slot)))}</small></div><span class="status ${isMonthlySelection() ? "status-ok" : "status-neutral"}">${modeLabel}</span></div></div>`;
     reservationSummaryTotal.innerHTML = `<div class="reservation-total-line"><span>${voucher.amount > 0 ? `Valor ${money(total)} · voucher −${money(voucher.amount)}` : "Valor total"}</span><strong>${money(complement)}</strong></div>`;
   }
 
@@ -7487,19 +7625,28 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function navigationItems(role) {
+    return (menus[role]||[]).map(([id, icon, label]) => {
+            const unread=navigationUnreadCount(role,id);
+            const restricted=role==="partner"&&!partnerPageAllowed(id);
+            if(restricted)return `<button type="button" data-ui-key="${role}-${id}" class="subnav-button is-restricted" disabled aria-disabled="true"><span class="subnav-icon" aria-hidden="true">${icon}</span><span class="subnav-label">${esc(label)}<small>${partnerAccessPending ? "Atualizando…" : "Acesso Restrito"}</small></span></button>`;
+            const badgeLabel=id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
+            return `<button type="button" data-ui-key="${role}-${id}" class="subnav-button ${state.activePage[role] === id ? "active" : ""} ${unread ? "has-unread" : ""}" data-nav="${id}" ${state.activePage[role]===id?'aria-current="page"':''}><span class="subnav-icon" aria-hidden="true">${icon}</span><span class="subnav-label">${label}</span>${messageBadge(unread,badgeLabel)}</button>`;
+          }).join("");
+  }
+
+  function refreshMarketplaceNavigation() {
+    const allowed=(!backendRuntime.enabled||backendIsOnline())&&backendRuntime.bootstrap?.profile?.status!=="blocked";
+    const heading={user:"Usuário",partner:"Parceiro",admin:"Administração",candidate:"Quero ser parceiro"}[state.role]||"Marketplace";
+    mobileNavigation?.update({heading,allowed,markup:allowed&&app.querySelector('.subnav')?navigationItems(state.role):""});
+  }
+
   function navShell(role, content) {
-    const menu = menus[role];
     return `
       <div class="role-layout">
         <nav class="subnav" aria-label="Menu da área ${role}">
           <div class="subnav-title">Navegação</div>
-          ${menu.map(([id, icon, label]) => {
-            const unread=navigationUnreadCount(role,id);
-            const restricted=role==="partner"&&!partnerPageAllowed(id);
-            if(restricted)return `<button type="button" class="subnav-button is-restricted" disabled aria-disabled="true"><span class="subnav-icon">${icon}</span><span class="subnav-label">${esc(label)}<small>${partnerAccessPending ? "Atualizando…" : "Acesso Restrito"}</small></span></button>`;
-            const badgeLabel=id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
-            return `<button type="button" class="subnav-button ${state.activePage[role] === id ? "active" : ""} ${unread ? "has-unread" : ""}" data-nav="${id}"><span class="subnav-icon">${icon}</span><span class="subnav-label">${label}</span>${messageBadge(unread,badgeLabel)}</button>`;
-          }).join("")}
+          ${navigationItems(role)}
         </nav>
         <section class="content">${content}</section>
       </div>`;
@@ -7573,7 +7720,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   function venueGalleryPhotos(venue) {
     if (!venue) return [];
     let photos = [];
-    if (state.partnerProfile?.venueId === venue.id && Array.isArray(state.partnerProfile.photos)) {
+    if (venue.backendVenueId && Array.isArray(venue.gallery)) {
+      photos = venue.gallery;
+    } else if (state.partnerProfile?.venueId === venue.id && Array.isArray(state.partnerProfile.photos)) {
       photos = state.partnerProfile.photos;
     } else if (Array.isArray(venue.photos)) {
       photos = venue.photos;
@@ -7582,12 +7731,13 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       id: photo.id || `VENUE-PHOTO-${index + 1}`,
       name: photo.name || `Foto ${index + 1}`,
       src: photo.src,
+      storagePath: photo.storagePath,
       favorite: Boolean(photo.favorite || (state.partnerProfile?.venueId === venue.id && photo.id === state.partnerProfile.favoritePhotoId)),
       tone: photo.tone === "light" ? "light" : photo.tone === "dark" ? "dark" : "",
       luminance: Number.isFinite(Number(photo.luminance)) ? Number(photo.luminance) : null
     }));
     if (!normalized.length && venue.facadeImage) {
-      normalized.push({ id:`${venue.id}-facade`, name:"Fachada", src:venue.facadeImage, favorite:true, tone:venue.facadeTone || "dark", luminance:Number.isFinite(Number(venue.facadeLuminance)) ? Number(venue.facadeLuminance) : null });
+      normalized.push({ id:`${venue.id}-facade`, name:"Fachada", src:venue.facadeImage, storagePath:venue.facadePhotoPath, favorite:true, tone:venue.facadeTone || "dark", luminance:Number.isFinite(Number(venue.facadeLuminance)) ? Number(venue.facadeLuminance) : null });
     }
     normalized.sort((a,b) => Number(b.favorite) - Number(a.favorite));
     return normalized;
@@ -7636,7 +7786,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const photos = venueGalleryPhotos(venue);
     galleryTitle.textContent = venue.name;
     galleryBody.innerHTML = photos.length
-      ? `<div class="venue-gallery-grid">${photos.map((photo) => `<figure class="venue-gallery-item ${photo.favorite ? "is-favorite" : ""}"><div class="venue-gallery-image-wrap"><img src="${esc(photo.src)}" alt="${esc(photo.favorite ? `Foto principal de ${venue.name}` : `Foto do estabelecimento ${venue.name}`)}" loading="lazy">${photo.favorite ? `<span class="venue-gallery-favorite">Foto principal</span>` : ""}</div></figure>`).join("")}</div>`
+      ? `<div class="venue-gallery-grid">${photos.map((photo) => `<figure class="venue-gallery-item ${photo.favorite ? "is-favorite" : ""}"><div class="venue-gallery-image-wrap"><img ${venuePhotoAttributes(photo.src, photo.storagePath)} alt="${esc(photo.favorite ? `Foto principal de ${venue.name}` : `Foto do estabelecimento ${venue.name}`)}" loading="lazy">${photo.favorite ? `<span class="venue-gallery-favorite">Foto principal</span>` : ""}</div></figure>`).join("")}</div>`
       : emptyState("▧", "Este parceiro ainda não publicou fotos do estabelecimento.");
     if (!galleryDialog.open) {
       galleryDialog.showModal();
@@ -7657,7 +7807,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const photoTone = venuePhotoTone(venue);
     return `<article class="venue-card compact-venue-card photo-tone-${esc(photoTone)}">
       <div class="venue-card-media">
-        <img class="venue-card-photo" src="${esc(venue.facadeImage)}" alt="Fachada de ${esc(venue.name)}" loading="lazy">
+        <img class="venue-card-photo" ${venuePhotoAttributes(venue.facadeImage, venue.facadePhotoPath)} alt="Fachada de ${esc(venue.name)}" loading="lazy">
         <div class="venue-card-shade"></div>
         <div class="venue-card-top">
           <div class="venue-card-top-text">
@@ -8161,6 +8311,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         button.classList.remove("has-unread");
       }
     });
+    refreshMarketplaceNavigation();
   }
 
   function chatMessagesMarkup(thread, viewerRole) {
@@ -9592,7 +9743,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       ${backendMode ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>Empresa, responsável, endereço, espaços, fotos e documentos usam a fonte oficial protegida.</small></div>` : ""}
       ${profileAllowed ? `<section class="card partner-photo-manager">
         <div class="section-heading"><div><h2>Fotos do estabelecimento</h2><p>A foto favorita é usada no card do marketplace e no resumo da reserva.</p></div><div class="item-actions"><input id="partnerPhotoUpload" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><button class="button primary small" data-action="upload-partner-photos">Carregar fotos</button></div></div>
-        <div class="partner-photo-grid">${(p.photos || []).map((photo) => `<article class="partner-photo-item ${photo.id === p.favoritePhotoId ? "is-favorite" : ""}"><img src="${esc(photo.src || "assets/preview-icon.svg")}" alt="${esc(photo.name || "Foto do estabelecimento")}"><div class="partner-photo-copy"><strong>${esc(photo.name || "Foto do estabelecimento")}</strong><small>${photo.id === p.favoritePhotoId ? "Favorita · visível no marketplace" : esc(photo.uploadedAt || "")}${photo.tone ? ` · fundo ${photo.tone === "light" ? "claro" : "escuro"}` : ""}</small></div><div class="partner-photo-actions">${photo.id === p.favoritePhotoId ? `<span class="status status-ok">Favorita</span>` : `<button class="button secondary small" data-action="set-partner-favorite-photo" data-id="${esc(photo.id)}">Usar no card</button>`}<button class="button ghost small" data-action="remove-partner-photo" data-id="${esc(photo.id)}" ${photo.id === p.favoritePhotoId && (p.photos || []).length === 1 ? "disabled" : ""}>Remover</button></div></article>`).join("") || emptyState("▧", "Nenhuma foto carregada.")}</div>
+        <div class="partner-photo-grid">${(p.photos || []).map((photo) => `<article class="partner-photo-item ${photo.id === p.favoritePhotoId ? "is-favorite" : ""}"><img ${venuePhotoAttributes(photo.src, photo.storagePath)} alt="${esc(photo.name || "Foto do estabelecimento")}"><div class="partner-photo-copy"><strong>${esc(photo.name || "Foto do estabelecimento")}</strong><small>${photo.id === p.favoritePhotoId ? "Favorita · visível no marketplace" : esc(photo.uploadedAt || "")}${photo.tone ? ` · fundo ${photo.tone === "light" ? "claro" : "escuro"}` : ""}</small></div><div class="partner-photo-actions">${photo.id === p.favoritePhotoId ? `<span class="status status-ok">Favorita</span>` : `<button class="button secondary small" data-action="set-partner-favorite-photo" data-id="${esc(photo.id)}">Usar no card</button>`}<button class="button ghost small" data-action="remove-partner-photo" data-id="${esc(photo.id)}" ${photo.id === p.favoritePhotoId && (p.photos || []).length === 1 ? "disabled" : ""}>Remover</button></div></article>`).join("") || emptyState("▧", "Nenhuma foto carregada.")}</div>
         <small class="field-help">Até 6 fotos JPEG, PNG ou WebP. ${backendMode ? "As imagens são reduzidas no navegador e enviadas ao Storage protegido do staging." : "No fallback local, as imagens permanecem somente neste navegador."}</small>
       </section>
       <section class="details-grid">
@@ -10180,7 +10331,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       [reservationDialog,detailDialog,chatDialog,formDialog].forEach(dialog=>{if(dialog?.open)dialog.close();});
       updateBackendRoleAccess();app.financeMarkup="";app.marketplaceScreenKey="";
       app.innerHTML='<section class="backend-auth-gate"><div class="backend-auth-card"><h1>Conta bloqueada</h1><p>O acesso ao Marketplace foi bloqueado pela Administração. Entre em contato com o suporte.</p><p><a href="mailto:suporte@tamoon.app.br" style="color:inherit;overflow-wrap:anywhere">suporte@tamoon.app.br</a></p></div></section>';
-      app.style.minHeight="";return;
+      app.style.minHeight="";refreshMarketplaceNavigation();return;
     }
     if (backendRuntime.enabled && !backendIsOnline()) {
       updateBackendRoleAccess();
@@ -10189,6 +10340,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       app.innerHTML = partnerReadonlyBanner() + backendAuthView();
       applyPartnerReadonlyControls();
       if(preserveFinance)app.style.minHeight="";
+      refreshMarketplaceNavigation();
       return;
     }
     if (backendRuntime.enabled && !backendAllowedRoles().has(state.role)) chooseBackendRole(backendRuntime.bootstrap || {});
@@ -10268,14 +10420,14 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     const photoTone = venuePhotoTone(venue);
     if (!publicDays.length) {
       selectedVenueSchedule = { venueId: venue.id, shortDate: "" };
-      return `<div class="venue-detail-cover photo-tone-${esc(photoTone)}"><img class="venue-detail-image" src="${esc(venue.facadeImage)}" alt="Fachada de ${esc(venue.name)}">${galleryButton}<div class="venue-detail-overlay"><span class="rating-badge">${venueRatingMarkup(venue)}</span><div><strong>${esc(address)}</strong></div></div></div>
+      return `<div class="venue-detail-cover photo-tone-${esc(photoTone)}"><img class="venue-detail-image" ${venuePhotoAttributes(venue.facadeImage, venue.facadePhotoPath)} alt="Fachada de ${esc(venue.name)}">${galleryButton}<div class="venue-detail-overlay"><span class="rating-badge">${venueRatingMarkup(venue)}</span><div><strong>${esc(address)}</strong></div></div></div>
         ${venueDetailSummary(venue)}
         <section class="schedule-section">${emptyState("▦", "Não há horários atuais ou futuros publicados para reserva.")}</section>`;
     }
     const day = publicDays.find((item) => item.shortDate === selectedDate) || publicDays[0];
     const publicSlots = publicSlotsForDay(day);
     selectedVenueSchedule = { venueId: venue.id, shortDate: day.shortDate };
-    return `<div class="venue-detail-cover photo-tone-${esc(photoTone)}"><img class="venue-detail-image" src="${esc(venue.facadeImage)}" alt="Fachada de ${esc(venue.name)}">${galleryButton}<div class="venue-detail-overlay"><span class="rating-badge">${venueRatingMarkup(venue)}</span><div><strong>${esc(address)}</strong></div></div></div>
+    return `<div class="venue-detail-cover photo-tone-${esc(photoTone)}"><img class="venue-detail-image" ${venuePhotoAttributes(venue.facadeImage, venue.facadePhotoPath)} alt="Fachada de ${esc(venue.name)}">${galleryButton}<div class="venue-detail-overlay"><span class="rating-badge">${venueRatingMarkup(venue)}</span><div><strong>${esc(address)}</strong></div></div></div>
       ${venueDetailSummary(venue)}
       <section class="schedule-section"><div class="section-heading"><div><h2>Agenda do parceiro</h2><p>Somente o dia atual e as próximas datas ficam disponíveis para novas reservas.</p></div></div>
       <div class="schedule-days" aria-label="Dias atuais e futuros com agenda">${publicDays.map((item) => `<button type="button" class="schedule-day ${item.shortDate === day.shortDate ? "active" : ""}" data-action="venue-schedule-day" data-id="${esc(venue.id)}" data-date="${esc(item.shortDate)}"><small>${esc(item.weekday)}</small><strong>${esc(item.dayLabel)}</strong></button>`).join("")}</div>
@@ -11879,7 +12031,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   document.addEventListener("pointerdown",()=>operationalAlerts.arm(),{passive:true});
   document.addEventListener("keydown",()=>operationalAlerts.arm());
   // Recupera avisos perdidos durante desconexao sem depender apenas do Realtime.
-  setInterval(()=>{if(backendIsOnline()&&!document.hidden&&!backendRuntime.mutating&&!app.contains(document.activeElement?.closest("input,textarea,select")))refreshBackendBootstrap(true).catch(()=>{});},30000);
+  setInterval(()=>{if(backendIsOnline()&&Date.now()-lastBackendRefreshAt>=90000&&!document.hidden&&!backendRuntime.mutating&&!app.contains(document.activeElement?.closest("input,textarea,select")))refreshBackendBootstrap(true).catch(()=>{});},30000);
   document.addEventListener("visibilitychange",()=>{if(!window.TamoonMarketplacePilot&&!document.hidden&&backendIsOnline())refreshBackendBootstrap(true).catch(()=>{});});
   window.addEventListener('tamoon-marketplace-retry',()=>{if(!window.TamoonMarketplacePilot?.blocked)refreshBackendBootstrap(true).catch(()=>{});});
 
