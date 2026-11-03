@@ -266,7 +266,7 @@
     if (voucherRefreshError) throw voucherRefreshError;
     const [voucherStateResult, cancellationResult, ledgerResult, financialReconciliationResult, paymentResponsibleDirectoryResult, partnerDocumentsResult, partnerTeamResult, communityNotificationsResult,
       monthlyLinksResult, monthlyLinkDirectoryResult, monthlySplitDirectoryResult, monthlyCyclesResult, monthlyPreReservationsResult, monthlyStagesResult, monthlyEventsResult, monthlyRequestsResult, occurrenceTransfersResult, reservationFinancialStatusResult, partnerOnboardingResult, partnerClientsResult,
-      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult] = await readDirectories([
+      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult, voucherRestitutionResult] = await readDirectories([
       () => c.from("marketplace_voucher_effective_state").select("*").order("created_at", { ascending: false }),
       () => c.from("cancellation_requests").select("*").order("created_at", { ascending: false }),
       () => c.from("accounting_ledger").select("*").order("created_at", { ascending: false }),
@@ -290,8 +290,10 @@
       () => snapshot.partner_memberships?.length ? c.from("schedule_slots").select("id,venue_space_id,series_id,monthly_link_key,starts_at,ends_at,status,blocked_reason,blocked_at") : Promise.resolve({data:[]}),
       () => snapshot.is_admin===true ? c.rpc("admin_marketplace_users") : Promise.resolve({data:[]}),
       () => snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]}),
-      () => c.rpc("agenda_initial_slot_flags",{})
+      () => c.rpc("agenda_initial_slot_flags",{}),
+      () => c.rpc("voucher_restitution_directory",{})
     ]);
+    snapshot.voucher_restitutions = voucherRestitutionResult.data || [];
     snapshot.voucher_effective_state = voucherStateResult.data || [];
     snapshot.cancellation_requests = cancellationResult.data || [];
     snapshot.accounting_ledger = ledgerResult.data || [];

@@ -33,7 +33,7 @@ test('identity changes cannot submit a dialog belonging to the previous payer',a
  assert.equal(await f.forms[0].onSubmit({reason:'cancel'}),false);assert.equal(f.calls.length,0);
 });
 test('a late case directory response cannot show another identity data',async()=>{
- const f=fixture();let done;f.c.window.MarketplaceBackend.rpc=()=>new Promise(r=>done=r);
+ const f=fixture();let done;f.c.window.MarketplaceBackend.rpc=name=>name==='voucher_restitution_directory'?Promise.resolve([]):new Promise(r=>done=r);
  const pending=f.c.openCancellationCases();f.c.backendRuntime.identityId='other';done([{id:'private'}]);await pending;assert.equal(f.details.length,0);
 });
 test('case history is escaped and administrative decisions are hidden in the user view',async()=>{
@@ -48,4 +48,23 @@ test('paid and pending official bookings use the same server-authoritative cance
  vm.createContext(c);vm.runInContext(section('  function userCancellationAction(', '  function pixCollectionForReservation(')+section('  function userPendingCancellationAction(', '  function canManageMonthlyGroup('),c);
  assert.match(c.userPendingCancellationAction({id:'R1',backendOfficial:true,statusKey:'pending'}),/cancel-paid-user-reservation/);
  c.parsePtDateTime=()=>new Date(Date.now()-3600000);assert.match(c.userCancellationAction({id:'R1',backendOfficial:true,statusKey:'confirmed'}),/Solicitar análise/);
+});
+
+test('expired voucher CTA uses the exclusive Brasilia deadline and preserves a receipt',()=>{
+ const f=fixture(), c=f.c;
+ vm.runInContext(section('  function voucherSupportLink(', '  function userPromotions()'),c);
+ const now=Date.parse('2027-02-08T02:59:59Z');
+ c.Date=class extends Date {static now(){return now}};
+ const item={mine:true,unused:true,expires_at:'2027-01-31T15:38:00Z',deadline:'2027-02-08T03:00:00Z'};
+ const voucher={backendId:'v',code:'VC',restitution:item};
+ assert.match(c.voucherRestitutionActions(voucher),/Solicitar restituição/);
+ assert.match(c.voucherRestitutionActions(voucher),/07\/02\/2027/);
+ c.Date=class extends Date {static now(){return now+1000}};
+ assert.match(c.voucherRestitutionActions(voucher),/Falar com o suporte/);
+ item.requested_at='2027-02-07';item.choice_id='protocol';
+ assert.match(c.voucherRestitutionActions(voucher),/Pedido em análise/);
+ assert.doesNotMatch(c.voucherRestitutionActions(voucher),/data-action=/);
+ item.decision='approved'; assert.match(c.voucherRestitutionActions(voucher),/aguardando devolução/);
+ item.refunded=true; assert.match(c.voucherRestitutionActions(voucher),/Restituição concluída/);
+ assert.equal(c.voucherRestitutionActions({}), '');
 });
