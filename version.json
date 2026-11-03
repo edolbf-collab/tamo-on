@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 116,
   "mandatory": false,
-  "notes": "Preparação de login Apple e vinculação Google/Apple na mesma conta; ativação Apple pendente.",
+  "notes": "Correções da atualização do Marketplace, fotos dos parceiros e Pix de cota mensal.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R18"
+  "integration": "166-R19"
 }

@@ -51,7 +51,10 @@
     if (failed || leaving) return;
     if (!opened || !isTransient(error)) { fail(); return; }
     const status=document.getElementById('backendSyncStatus');
-    status.textContent='Conexão interrompida. Tentando atualizar suas reservas…'; status.hidden=false;
+    status.textContent=error?.code==='57014' || /statement timeout/i.test(String(error?.message))
+      ? 'A atualização demorou. Tentaremos novamente em instantes.'
+      : 'Não foi possível atualizar suas reservas. Tentando novamente…';
+    status.hidden=false;
     if (recoveryTimer!==null) return;
     recoveryTimer=setTimeout(() => { recoveryTimer=null; revalidate(true); }, Math.min(30000,2000*2**Math.min(recoveryAttempt++,4)));
   }
@@ -123,7 +126,7 @@
     ownerId = data.session.user.id; return result;
   }
   async function loadAssets() {
-    const response = await fetch("pilot-assets.json?v=166r18", {cache:"no-store"});
+    const response = await fetch("pilot-assets.json?v=166r19", {cache:"no-store"});
     if (!response.ok) throw new Error("LOAD_FAILED");
     // The manifest normally contains one immutable bundle; async=false preserves fallback order.
     await Promise.all((await response.json()).map(script));
