@@ -90,3 +90,29 @@ test('payment notification opens and focuses its own share despite a previous fi
  vm.createContext(context);vm.runInContext(appSource.slice(start,end),context);await context.openPersonalNotification('N1');
  assert.equal(context.state.activePage.user,'shares');assert.equal(context.state.filters.userShareStatus,'Todas');assert.ok(focused&&scrolled&&read);
 });
+
+test('a failed photo request leaves the verified reservation data available', async()=>{
+ const f=await fixture({delayPhotos:true});
+ const ready=f.backend.bootstrap({force:true});
+ f.extra.resolve({data:[]});f.photos.resolve({error:{status:503}});
+ assert.equal((await ready).profile.id,'owner');
+ assert.equal(f.backend.publicVenuePhotoUrl('photo.jpg'),'assets/preview-icon.svg');
+});
+
+test('a signed photo is usable while slower directories are pending and is discarded at sign out',async()=>{
+ const f=await fixture({delayPhotos:true});let notified=0;
+ const full=f.backend.bootstrap({force:true,onPhotos:()=>notified++});
+ f.photos.resolve({data:[{path:'photo.jpg',signedUrl:'https://example.test/photo'}]});
+ await tick();assert.equal(notified,1);assert.equal(f.backend.publicVenuePhotoUrl('photo.jpg'),'https://example.test/photo');
+ f.extra.resolve({data:[]});await full;f.authChanged('SIGNED_OUT',null);
+ assert.equal(f.backend.publicVenuePhotoUrl('photo.jpg'),'assets/preview-icon.svg');
+});
+
+test('the public gallery shows all catalog photos, with the favorite first',()=>{
+ const context={state:{partnerProfile:{venueId:'another'}}};vm.createContext(context);
+ vm.runInContext(extract('venueGalleryPhotos','venuePublicAddress'),context);
+ const photos=context.venueGalleryPhotos({id:'venue',backendVenueId:'venue',gallery:[
+  {id:'a',src:'a.jpg',storagePath:'a'}, {id:'b',src:'b.jpg',storagePath:'b',favorite:true}
+ ]});
+ assert.deepEqual(Array.from(photos,p=>p.storagePath),['b','a']);
+});

@@ -22,6 +22,10 @@ export function checkoutDiagnostic(status: number | null, payload: any = null, f
       category = 'callback';
       field = ['successurl','cancelurl','expiredurl'].find(key => text.includes(key)) || 'callback';
     } else if (/chave.{0,25}pix|pix.{0,25}key|pix.{0,25}chave/.test(text) || providerCodes.some(code => /pix_key/.test(code))) category = 'pix_configuration';
+    else if ((status === 400 || status === 422) && providerCodes.includes('invalid_action') && /limite (?:atual )?(?:de |para )?emissao de cobrancas/.test(text)) {category = 'account_configuration'; field = 'issuanceLimit';}
+    else if (/vencimento|due.?date/.test(text)) {category = 'request_data'; field = 'dueDate';}
+    else if (/split|wallet.?id|carteira de destino/.test(text)) {category = 'account_configuration'; field = 'split';}
+    else if (/limite.{0,40}(valor|cobranca|transacao)|valor.{0,40}(maximo|limite)/.test(text)) {category = 'request_data'; field = 'amountLimit';}
     else if (/minutes.?to.?expire|expiracao|expiration/.test(text)) {category = 'expiration'; field = 'minutesToExpire';}
     else if (/customer|cliente|cpf|cnpj/.test(text)) {category = 'customer'; field = 'customerData';}
     else if (/billingtypes|chargetypes|items|quantidade|quantity|valor|value/.test(text)) category = 'request_data';

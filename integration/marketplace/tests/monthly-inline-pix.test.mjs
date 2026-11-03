@@ -28,7 +28,7 @@ function fixture({mode='monthly',claimed=true,claimError=null,startError=null}={
    const result=url.endsWith('/pixQrCode')?{encodedImage:'iVBORtest==',payload:'000201test'}:payment;
    return {ok:true,status:200,json:async()=>result};
   }};
- return {admin,deps,calls,requests};
+ return {admin,deps,calls,requests,claim:c};
 }
 
 test('monthly Pix keeps the provider due date at the balance cutoff and the app deadline at the guarantee cutoff',()=>{
@@ -58,4 +58,42 @@ test('unsupported monthly stages and an elapsed guarantee stop before contacting
  }
  const f=fixture({startError:'PIX_PAYMENT_WINDOW_TOO_SHORT'}),r=await openInlinePix(f.admin,'reservation','owner',f.deps);
  assert.equal(r.body.error,'PIX_PAYMENT_WINDOW_TOO_SHORT');assert.deepEqual(f.requests,[]);
+});
+
+test('Asaas refusal exposes a safe diagnostic while an uncertain response stays non-retryable',async()=>{
+ for(const [status,code,field,outcome] of [[400,'ASAAS_CHECKOUT_ERROR','dueDate','rejected'],[503,'CHECKOUT_RESULT_UNKNOWN',null,'unknown']]){
+  const f=fixture();
+  f.deps.fetchImpl=async()=>({ok:false,status,json:async()=>({errors:[{code:'invalid_object',description:'Vencimento incorreto, dado-pessoal-de-teste'}]})});
+  const result=await openInlinePix(f.admin,'reservation','owner',f.deps);
+  assert.equal(result.body.error,code);
+  assert.equal(result.body.diagnostic.field,field);
+  assert.equal(result.body.diagnostic.providerStatus,status);
+  assert.match(result.body.diagnostic.diagnosticId,/^[0-9a-f-]{36}$/i);
+  assert.ok(!JSON.stringify(result.body).includes('dado-pessoal-de-teste'));
+  assert.equal(f.calls.at(-1).name,'finish_asaas_inline_pix_attempt');
+  assert.equal(f.calls.at(-1).args.p_outcome,outcome);
+ }
+});
+
+test('an issuer limit refusal is remembered per Pix attempt without exposing account limits', async()=>{
+ const f=fixture();
+ f.deps.fetchImpl=async()=>({ok:false,status:400,json:async()=>({errors:[{code:'invalid_action',
+  description:'Seu limite atual de emissão de cobranças é de R$305,00/R$2.000,00.'}]})});
+ const result=await openInlinePix(f.admin,'reservation','owner',f.deps);
+ assert.equal(result.body.diagnostic.field,'issuanceLimit');
+ assert.equal(f.calls.at(-1).args.p_outcome,'rejected_issuance_limit');
+ assert.ok(!JSON.stringify(result.body).includes('305'));
+});
+
+test('opening a declined Pix explains the last issuer refusal without contacting Asaas', async()=>{
+ const f=fixture({claimed:false});
+ Object.assign(f.claim,{status:'failed',provider_payment_id:null,retry_outcome:'rejected',retry_issuance_limited:true,retry_allowed:true,retry_token:context.claim_token});
+ const result=await openInlinePix(f.admin,'reservation','owner',f.deps);
+ assert.equal(result.body.diagnostic.field,'issuanceLimit');
+ assert.equal(result.body.error,'ASAAS_CHECKOUT_ERROR');
+ assert.equal(result.body.retryToken,context.claim_token);
+ f.claim.retry_issuance_limited=false;
+ const other=await openInlinePix(f.admin,'reservation','owner',f.deps);
+ assert.equal(other.body.error,'CHECKOUT_RETRY_AVAILABLE');
+ assert.deepEqual(f.requests,[]);
 });

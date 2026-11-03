@@ -76,7 +76,7 @@
       session = data.session || null;
       client.auth.onAuthStateChange(async (event, nextSession) => {
         if (session?.user?.id !== nextSession?.user?.id) unsubscribeRealtime();
-        if (session?.user?.id !== nextSession?.user?.id) { readonlyState={active:false,available:false}; contextVersion++;lastCompleteBootstrap=null; }
+        if (session?.user?.id !== nextSession?.user?.id) { readonlyState={active:false,available:false}; contextVersion++;lastCompleteBootstrap=null;photoUrls.clear(); }
         session = nextSession || null;
         bootstrapCache = null;
         emit("auth", { authEvent: event });
@@ -141,7 +141,7 @@
   }
 
   async function beginPartnerReadonly(partnerId) {
-    contextVersion++;lastCompleteBootstrap=null;
+    contextVersion++;lastCompleteBootstrap=null;photoUrls.clear();
     const {data,error}=await requireClient().rpc("begin_partner_readonly",{p_partner_id:partnerId});
     if(error) throw error;
     readonlyState=data;bootstrapCache=null;
@@ -149,7 +149,7 @@
   }
 
   async function endPartnerReadonly() {
-    contextVersion++;lastCompleteBootstrap=null;
+    contextVersion++;lastCompleteBootstrap=null;photoUrls.clear();
     const {data,error}=await requireClient().rpc("end_partner_readonly");
     if(error) throw error;
     readonlyState=data;bootstrapCache=null;
@@ -187,7 +187,26 @@
     return data;
   }
 
-  async function bootstrap({ force = false, changes = [], onCore } = {}) {
+  // Keep the database pool available for other clients during a full refresh.
+  async function readDirectories(readers) {
+    const results = [];
+    let next = 0, failure;
+    async function read() {
+      while (!failure && next < readers.length) {
+        const index = next++;
+        try {
+          const result = await readers[index]();
+          if (result.error) throw result.error;
+          results[index] = result;
+        } catch (error) { failure = error; }
+      }
+    }
+    await Promise.all(Array.from({length:4}, read));
+    if (failure) throw failure;
+    return results;
+  }
+
+  async function bootstrap({ force = false, changes = [], onCore, onPhotos } = {}) {
     const requestedIdentity = session?.user?.id;
     const requestedContext = contextVersion;
     if (!requestedIdentity) throw new Error("AUTH_REQUIRED");
@@ -205,7 +224,8 @@
       if(clientsError)throw clientsError;
       if(requestedContext!==contextVersion || requestedIdentity!==session?.user?.id)throw new Error("PREVIEW_CONTEXT_CHANGED");
       snapshot.partner_clients=clients||[];snapshot.agenda_initial_slots=[];
-      await warmPhotoUrls(snapshot);
+      await warmPhotoUrls(snapshot, requestedContext, onPhotos);
+      if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
       bootstrapCache=snapshot;emit("bootstrap",{bootstrap:snapshot});return snapshot;
     }
     if (!force && !bootstrapCache?.preview?.active && bootstrapCache?.profile?.id === requestedIdentity) return bootstrapCache;
@@ -228,7 +248,7 @@
     if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity || snapshot.profile?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
     // Discovery needs the verified catalog, not financial/admin directories.
     onCore?.(snapshot);
-    const photosReady=warmPhotoUrls(snapshot).then(()=>null,error=>error);
+    const photosReady=warmPhotoUrls(snapshot, requestedContext, onPhotos);
     // Notification/chat-only events can reuse extra directories only when every other
     // core field (including financial rows and permissions) is identical to the last full read.
     const coreKeys=Object.keys(snapshot).filter(key=>!["generated_at","notifications","chats","chat_effective_state","chat_messages","chat_unread"].includes(key));
@@ -237,7 +257,7 @@
       && coreKeys.every(key=>JSON.stringify(snapshot[key])===JSON.stringify(lastCompleteBootstrap[key]));
     if(canReuse){
       if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity || snapshot.profile?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
-      const photoError=await photosReady;if(photoError)throw photoError;
+      await photosReady;
       if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
       const merged={...lastCompleteBootstrap,...snapshot};
       bootstrapCache=merged;emit("bootstrap",{bootstrap:merged});return merged;
@@ -246,60 +266,40 @@
     if (voucherRefreshError) throw voucherRefreshError;
     const [voucherStateResult, cancellationResult, ledgerResult, financialReconciliationResult, paymentResponsibleDirectoryResult, partnerDocumentsResult, partnerTeamResult, communityNotificationsResult,
       monthlyLinksResult, monthlyLinkDirectoryResult, monthlySplitDirectoryResult, monthlyCyclesResult, monthlyPreReservationsResult, monthlyStagesResult, monthlyEventsResult, monthlyRequestsResult, occurrenceTransfersResult, reservationFinancialStatusResult, partnerOnboardingResult, partnerClientsResult,
-      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult] = await Promise.all([
-      c.from("marketplace_voucher_effective_state").select("*").order("created_at", { ascending: false }),
-      c.from("cancellation_requests").select("*").order("created_at", { ascending: false }),
-      c.from("accounting_ledger").select("*").order("created_at", { ascending: false }),
-      c.rpc("marketplace_financial_reconciliation"),
-      c.rpc("reservation_payment_responsible_directory"),
-      c.from("partner_documents").select("*").order("created_at", { ascending: false }),
-      c.rpc("partner_team_directory", { p_partner_id:null }),
-      c.rpc("community_marketplace_notifications", { p_group_id:null }),
-      c.from("monthly_customer_links").select("id,partner_id,venue_id,venue_space_id,group_id,customer_profile_id,weekday,start_time,end_time,monthly_price,initial_guarantee_percent,start_month,end_month,origin,status,accepted_at,require_renewal_confirmation,suspension_reason").order("start_month", { ascending:false }),
-      c.rpc("monthly_customer_link_directory"),
-      c.rpc("monthly_reservation_split_directory"),
-      c.from("monthly_cycles").select("id,monthly_link_id,service_month,status,reservation_id,payment_available_at,first_occurrence_at,initial_due_at,balance_due_at,monthly_total,initial_required,balance_required,initial_paid,balance_paid,collection_mode,guarantee_required,guarantee_paid,total_paid,guarantee_reached_at,occurrence_count,renewal_confirmed_at").order("service_month", { ascending:false }),
-      c.from("monthly_pre_reservation_slots").select("id,monthly_cycle_id,schedule_slot_id,status").order("id", { ascending:false }),
-      c.from("monthly_payment_stages").select("id,monthly_cycle_id,reservation_id,stage,status,available_from,due_at,amount_required,amount_paid").order("due_at", { ascending:true }),
-      c.from("monthly_cycle_events").select("monthly_cycle_id,reservation_occurrence_id,marketplace_event_id,financial_status"),
-      c.rpc("monthly_link_request_directory"),
-      c.rpc("occurrence_transfer_directory_v2"),
-      c.rpc("reservation_financial_status_directory"),
-      c.rpc("partner_onboarding_directory"),
-      c.rpc("partner_client_directory",{p_partner_id:null}),
-      snapshot.partner_memberships?.length ? c.from("schedule_slots").select("id,venue_space_id,series_id,monthly_link_key,starts_at,ends_at,status,blocked_reason,blocked_at") : Promise.resolve({data:[]}),
-      snapshot.is_admin===true ? c.rpc("admin_marketplace_users") : Promise.resolve({data:[]}),
-      snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]}),
-      c.rpc("agenda_initial_slot_flags",{})
+      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult] = await readDirectories([
+      () => c.from("marketplace_voucher_effective_state").select("*").order("created_at", { ascending: false }),
+      () => c.from("cancellation_requests").select("*").order("created_at", { ascending: false }),
+      () => c.from("accounting_ledger").select("*").order("created_at", { ascending: false }),
+      () => c.rpc("marketplace_financial_reconciliation"),
+      () => c.rpc("reservation_payment_responsible_directory"),
+      () => c.from("partner_documents").select("*").order("created_at", { ascending: false }),
+      () => c.rpc("partner_team_directory", { p_partner_id:null }),
+      () => c.rpc("community_marketplace_notifications", { p_group_id:null }),
+      () => c.from("monthly_customer_links").select("id,partner_id,venue_id,venue_space_id,group_id,customer_profile_id,weekday,start_time,end_time,monthly_price,initial_guarantee_percent,start_month,end_month,origin,status,accepted_at,require_renewal_confirmation,suspension_reason").order("start_month", { ascending:false }),
+      () => c.rpc("monthly_customer_link_directory"),
+      () => c.rpc("monthly_reservation_split_directory"),
+      () => c.from("monthly_cycles").select("id,monthly_link_id,service_month,status,reservation_id,payment_available_at,first_occurrence_at,initial_due_at,balance_due_at,monthly_total,initial_required,balance_required,initial_paid,balance_paid,collection_mode,guarantee_required,guarantee_paid,total_paid,guarantee_reached_at,occurrence_count,renewal_confirmed_at").order("service_month", { ascending:false }),
+      () => c.from("monthly_pre_reservation_slots").select("id,monthly_cycle_id,schedule_slot_id,status").order("id", { ascending:false }),
+      () => c.from("monthly_payment_stages").select("id,monthly_cycle_id,reservation_id,stage,status,available_from,due_at,amount_required,amount_paid").order("due_at", { ascending:true }),
+      () => c.from("monthly_cycle_events").select("monthly_cycle_id,reservation_occurrence_id,marketplace_event_id,financial_status"),
+      () => c.rpc("monthly_link_request_directory"),
+      () => c.rpc("occurrence_transfer_directory_v2"),
+      () => c.rpc("reservation_financial_status_directory"),
+      () => c.rpc("partner_onboarding_directory"),
+      () => c.rpc("partner_client_directory",{p_partner_id:null}),
+      () => snapshot.partner_memberships?.length ? c.from("schedule_slots").select("id,venue_space_id,series_id,monthly_link_key,starts_at,ends_at,status,blocked_reason,blocked_at") : Promise.resolve({data:[]}),
+      () => snapshot.is_admin===true ? c.rpc("admin_marketplace_users") : Promise.resolve({data:[]}),
+      () => snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]}),
+      () => c.rpc("agenda_initial_slot_flags",{})
     ]);
-    if (voucherStateResult.error) throw voucherStateResult.error;
-    if (cancellationResult.error) throw cancellationResult.error;
-    if (ledgerResult.error) throw ledgerResult.error;
-    if (financialReconciliationResult.error) throw financialReconciliationResult.error;
-    if (paymentResponsibleDirectoryResult.error) throw paymentResponsibleDirectoryResult.error;
-    if (partnerDocumentsResult.error) throw partnerDocumentsResult.error;
-    if (partnerTeamResult.error) throw partnerTeamResult.error;
-    if (communityNotificationsResult.error) throw communityNotificationsResult.error;
-    if (monthlyLinksResult.error) throw monthlyLinksResult.error;
-    if (monthlyLinkDirectoryResult.error) throw monthlyLinkDirectoryResult.error;
-    if (monthlySplitDirectoryResult.error) throw monthlySplitDirectoryResult.error;
-    if (monthlyCyclesResult.error) throw monthlyCyclesResult.error;
-    if (monthlyPreReservationsResult.error) throw monthlyPreReservationsResult.error;
-    if (monthlyStagesResult.error) throw monthlyStagesResult.error;
-    if (monthlyEventsResult.error) throw monthlyEventsResult.error;
-    if (monthlyRequestsResult.error) throw monthlyRequestsResult.error;
-    if (occurrenceTransfersResult.error) throw occurrenceTransfersResult.error;
-    if (reservationFinancialStatusResult.error) throw reservationFinancialStatusResult.error;
     snapshot.voucher_effective_state = voucherStateResult.data || [];
     snapshot.cancellation_requests = cancellationResult.data || [];
     snapshot.accounting_ledger = ledgerResult.data || [];
     snapshot.financial_reconciliation = financialReconciliationResult.data || [];
     snapshot.payment_responsible_directory = paymentResponsibleDirectoryResult.data || [];
-    if (partnerOnboardingResult.error) throw partnerOnboardingResult.error;
     snapshot.partner_onboarding = partnerOnboardingResult.data || [];
     snapshot.partner_documents = partnerDocumentsResult.data || [];
     snapshot.partner_team_directory = partnerTeamResult.data || [];
-    if (partnerClientsResult.error) throw partnerClientsResult.error;
     snapshot.partner_clients = partnerClientsResult.data || [];
     snapshot.community_marketplace_notifications = communityNotificationsResult.data || [];
     snapshot.monthly_customer_links = monthlyLinksResult.data || [];
@@ -312,13 +312,12 @@
     snapshot.monthly_link_requests = monthlyRequestsResult.data || [];
     snapshot.occurrence_transfer_requests = occurrenceTransfersResult.data || [];
     snapshot.reservation_financial_status = reservationFinancialStatusResult.data || [];
-    for(const result of [scheduleDetailsResult,adminUsersResult,adminReservationsResult,initialSlotFlagsResult])if(result.error)throw result.error;
     snapshot.agenda_initial_slots=initialSlotFlagsResult.data||[];
     snapshot.schedule_details=scheduleDetailsResult.data||[];
     snapshot.admin_users=adminUsersResult.data||[];
     snapshot.admin_reservations=adminReservationsResult.data||[];
     if (requestedContext!==contextVersion || session?.user?.id !== requestedIdentity || snapshot.profile?.id !== requestedIdentity) throw new Error("AUTH_IDENTITY_CHANGED");
-    const photoError=await photosReady;if(photoError)throw photoError;
+    await photosReady;
     if(requestedContext!==contextVersion || session?.user?.id!==requestedIdentity)throw new Error("AUTH_IDENTITY_CHANGED");
     lastCompleteBootstrap = snapshot;lastCompleteBootstrapAt=Date.now();
     bootstrapCache = snapshot;
@@ -962,17 +961,28 @@
     return data;
   }
 
-  async function warmPhotoUrls(snapshot) {
+  async function warmPhotoUrls(snapshot, requestedContext, onPhotos) {
     const paths = [...new Set((snapshot.venue_photos || []).map(p => p.storage_path).filter(Boolean))];
-    const needed = paths.filter(p => !photoUrls.has(p) || photoUrls.get(p).expires < Date.now() + 120000);
+    const needed = paths.filter(path => (photoUrls.get(path)?.expires || 0) < Date.now() + 120000);
     if (!needed.length) return;
-    const { data, error } = await requireClient().storage.from("marketplace-venue-photos").createSignedUrls(needed, 600);
-    if (error) throw error;
-    for (const item of data || []) if (item.signedUrl) photoUrls.set(item.path, {url:item.signedUrl, expires:Date.now()+600000});
+    let response;
+    try {
+      response = await requireClient().storage.from("marketplace-venue-photos").createSignedUrls(needed, 600);
+    } catch { return; } // A photo can retry on the next refresh without blocking reservations.
+    if (response.error || requestedContext !== contextVersion || snapshot.profile?.id !== session?.user?.id) return;
+    let updated = false;
+    for (const item of response.data || []) {
+      if (!item.error && item.signedUrl && needed.includes(item.path)) {
+        photoUrls.set(item.path, {url:item.signedUrl, expires:Date.now()+600000});
+        updated = true;
+      }
+    }
+    if (updated) onPhotos?.();
   }
 
   function publicVenuePhotoUrl(storagePath) {
-    return photoUrls.get(storagePath)?.url || "assets/preview-icon.svg";
+    const photo = photoUrls.get(storagePath);
+    return photo && photo.expires > Date.now() ? photo.url : "assets/preview-icon.svg";
   }
 
   async function adminReservationFilters({ partnerId = null, userId = null, date = null, status = null } = {}) {

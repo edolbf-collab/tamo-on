@@ -51,7 +51,10 @@
     if (failed || leaving) return;
     if (!opened || !isTransient(error)) { fail(); return; }
     const status=document.getElementById('backendSyncStatus');
-    status.textContent='Conexão interrompida. Tentando atualizar suas reservas…'; status.hidden=false;
+    status.textContent=error?.code==='57014' || /statement timeout/i.test(String(error?.message))
+      ? 'A atualização demorou. Tentaremos novamente em instantes.'
+      : 'Não foi possível atualizar suas reservas. Tentando novamente…';
+    status.hidden=false;
     if (recoveryTimer!==null) return;
     recoveryTimer=setTimeout(() => { recoveryTimer=null; revalidate(true); }, Math.min(30000,2000*2**Math.min(recoveryAttempt++,4)));
   }
