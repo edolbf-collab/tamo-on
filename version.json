@@ -5,7 +5,7 @@
   "database": 151,
   "edge": 116,
   "mandatory": false,
-  "notes": "Correções da atualização do Marketplace, fotos dos parceiros e Pix de cota mensal.",
+  "notes": "Aba Mais disponível para contas ativas com ou sem grupo na Comunidade.",
   "label": "Tâmo On Beta 1.0 Build 166",
-  "integration": "166-R19"
+  "integration": "166-R20"
 }
