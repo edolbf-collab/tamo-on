@@ -2672,6 +2672,7 @@
   }
 
   function asaasCheckoutFailureMessage(error) {
+    if(error?.paymentDiagnostic?.field==="issuanceLimit")return "O Asaas recusou a cobrança porque o limite de emissão da conta do parceiro é insuficiente para este valor. Aguarde a liberação do limite antes de tentar novamente.";
     const reasons = {
       authentication:"O Asaas recusou a autenticação da integração. A administração precisa conferir a chave do Sandbox.",
       access_denied:"O Asaas não autorizou esta operação. A administração precisa conferir as permissões da integração.",
