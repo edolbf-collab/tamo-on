@@ -89,6 +89,25 @@ const financial='<header class="page-header"><div><span class="eyebrow">Administ
   await page.waitForFunction(()=>!document.getElementById('marketplaceMenu').open);
   assert.equal(await page.evaluate(()=>document.body.style.position),'');
   assert.deepEqual(errors,[]);console.log('access revocation and session failure release the modal: PASS');
+  c.backendIsOnline=()=>true;
+  vm.runInContext(source.slice(source.indexOf('  function pageHeader('),source.indexOf('  function stat(')),c);
+  await page.evaluate(()=>document.body.classList.remove('pilot-locked'));
+  for(const width of [390,1200]){
+   await page.setViewportSize({width,height:844});
+   for(const [role,destinations] of Object.entries({user:['discover','reservations','shares','promotions','favorites','profile'],partner:['finance'],admin:['finance']})){
+    for(const destination of destinations){
+     c.state.role=role;c.state.activePage[role]=destination;
+     const extra=destination==='shares'?'<button data-nav="reservations">Ver minhas reservas</button>':'';
+     const html=c.navShell(role,c.pageHeader('',destination,'',extra));
+     await page.locator('#app').evaluate((app,markup)=>{app.innerHTML=markup;},html);
+     const visible=role!=='user'||destination==='reservations';
+     assert.equal(await page.locator('#app [data-action="cancellation-cases"]').isVisible(),visible,role+'/'+destination);
+     assert.equal(await page.locator('#app .page-actions').isVisible(),visible||Boolean(extra));
+     if(extra)assert.ok(await page.getByRole('button',{name:'Ver minhas reservas'}).isVisible());
+    }
+   }
+  }
+  console.log('cancellation directory in customer reservations and staff views on mobile and desktop: PASS');
   await context.close();
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
