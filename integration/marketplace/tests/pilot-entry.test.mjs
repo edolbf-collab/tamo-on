@@ -16,8 +16,8 @@ async function start(scenario,options={}) {
   setTimeout:(fn,delay)=>{timeouts.set(++sequence,{fn,delay});return sequence},clearTimeout:id=>timeouts.delete(id),setInterval:()=>1,clearInterval(){},
   sessionStorage:{removeItem(){}},location:{assign:path=>navigations.push(path),reload(){navigations.push('reload')}},
   document:{hidden:false,visibilityState:'visible',getElementById:node,querySelector:()=>node('syncBar'),querySelectorAll:()=>dialogs.filter(x=>x.open),createElement:()=>({}),addEventListener:(event,fn)=>{documentEvents[event]=fn},
-   body:{classList:{add:c=>{classes.add(c);ready()},remove:c=>{classes.delete(c);ready()}},append:tag=>queueMicrotask(()=>tag.onload())}},
-  fetch:async url=>{requests.push(url);if(options.logoutDuringAssets)authChanged('SIGNED_OUT',null);return new Response('[]',{status:200})},
+   body:{classList:{add:c=>{classes.add(c);ready()},remove:c=>{classes.delete(c);ready()}},append:tag=>queueMicrotask(()=>options.rejectScript?.(tag.src)?tag.onerror():tag.onload())}},
+  fetch:async url=>{requests.push(url);if(options.logoutDuringAssets)authChanged('SIGNED_OUT',null);return new Response(JSON.stringify(options.assets ?? []),{status:200})},
   window:{addEventListener:(event,fn)=>{windowEvents[event]=fn},dispatchEvent:event=>emitted.push(event.type),supabase:{createClient:()=>community},TAMOON_CONFIG:{supabaseUrl:'https://community.test',supabasePublishableKey:'public'},
    TamoonPilotAccess:{...access,fetchWithTimeout:async(url,requestOptions)=>{
     requests.push(url);const action=JSON.parse(requestOptions.body).action;actions.push(action);
@@ -47,6 +47,21 @@ test('owner imports the group, while manual sync is only diagnostic',async()=>{
 for(const scenario of ['anonymous','denied'])test(`${scenario} stays locked before loading marketplace assets`,async()=>{
  const f=await start(scenario);assert.equal(f.classes.has('pilot-locked'),true);
  assert.equal(f.requests.some(x=>x.includes('pilot-assets.json')),false);
+});
+
+test('a stale cached bundle retries once and opens only after a successful load',async()=>{
+ const bundle='assets/pilot-a123456789ab.js';
+ for(const retrySucceeds of [true,false]){
+  const attempts=[];
+  const result=await start('customer',{assets:[bundle],rejectScript(src){
+   if(!src.startsWith(bundle))return false;
+   attempts.push(src);
+   return src===bundle || !retrySucceeds;
+  }});
+  assert.deepEqual(attempts,[bundle,bundle+'?retry=1']);
+  assert.equal(result.initialized,retrySucceeds);
+  assert.equal(result.classes.has('pilot-locked'),!retrySucceeds);
+ }
 });
 
 test('return clears only the Marketplace session and navigates to Community',async()=>{

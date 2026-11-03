@@ -128,8 +128,14 @@
   async function loadAssets() {
     const response = await fetch("pilot-assets.json?v=167r1", {cache:"no-store"});
     if (!response.ok) throw new Error("LOAD_FAILED");
-    // The manifest normally contains one immutable bundle; async=false preserves fallback order.
-    await Promise.all((await response.json()).map(script));
+    const files = await response.json();
+    if (files.length === 1 && /^assets\/pilot-[a-f0-9]{12}\.js$/.test(files[0])) {
+      // An edge can cache the HTML fallback if this URL is requested before deployment.
+      const [bundle] = files;
+      await script(bundle).catch(() => script(bundle + '?retry=1'));
+      return;
+    }
+    await Promise.all(files.map(script));
   }
   async function start() {
     try {
