@@ -14,7 +14,15 @@
  * limitations under the License.
  */
 
+import com.android.build.api.instrumentation.AsmClassVisitorFactory
+import com.android.build.api.instrumentation.ClassContext
+import com.android.build.api.instrumentation.ClassData
+import com.android.build.api.instrumentation.InstrumentationParameters
+import com.android.build.api.instrumentation.InstrumentationScope
 import groovy.xml.MarkupBuilder
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
 
 plugins {
     id 'com.android.application'
@@ -56,13 +64,14 @@ def twaManifest = [
 ]
 
 android {
-    compileSdkVersion 36
+    compileSdk 36
+    buildFeatures { resValues = true }
     buildToolsVersion '36.0.0'
     namespace "br.app.tamoon"
     defaultConfig {
         applicationId "br.app.tamoon"
-        minSdkVersion 24
-        targetSdkVersion 36
+        minSdk 24
+        targetSdk 36
         versionCode androidReleaseCode
         versionName "1.0.${androidReleaseCode}"
 
@@ -159,15 +168,17 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            minifyEnabled true
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
         }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-    lintOptions {
-        checkReleaseBuilds false
+    lint {
+        checkReleaseBuilds = false
     }
 }
 
@@ -233,7 +244,52 @@ repositories {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    
-        implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
-    
+    implementation 'androidx.core:core:1.17.0'
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
+}
+
+// Browser Helper 2.7.4 invokes WindowCompat.enableEdgeToEdge before creating the splash.
+// Change only that call, retaining the upstream launch, intent validation and fallback paths.
+abstract class TwaLaunchWindowVisitor implements AsmClassVisitorFactory<InstrumentationParameters.None> {
+    @Override
+    boolean isInstrumentable(ClassData data) {
+        return data.className == 'com.google.androidbrowserhelper.trusted.LauncherActivity'
+    }
+
+    @Override
+    ClassVisitor createClassVisitor(ClassContext context, ClassVisitor nextVisitor) {
+        return new ClassVisitor(Opcodes.ASM9, nextVisitor) {
+            @Override
+            MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
+                MethodVisitor downstream = super.visitMethod(access, name, desc, signature, exceptions)
+                if (name != 'onCreate' || desc != '(Landroid/os/Bundle;)V') return downstream
+                return new MethodVisitor(Opcodes.ASM9, downstream) {
+                    int replacements = 0
+
+                    @Override
+                    void visitMethodInsn(int opcode, String owner, String method, String descriptor, boolean isInterface) {
+                        if (opcode == Opcodes.INVOKESTATIC && owner == 'androidx/core/view/WindowCompat' &&
+                                method == 'enableEdgeToEdge' && descriptor == '(Landroid/view/Window;)V') {
+                            super.visitMethodInsn(opcode, 'br/app/tamoon/LaunchWindow', 'configure', descriptor, false)
+                            replacements++
+                        } else {
+                            super.visitMethodInsn(opcode, owner, method, descriptor, isInterface)
+                        }
+                    }
+
+                    @Override
+                    void visitEnd() {
+                        if (replacements != 1) throw new GradleException('Recheck the Browser Helper launch-window integration')
+                        super.visitEnd()
+                    }
+                }
+            }
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.instrumentation.transformClassesWith(TwaLaunchWindowVisitor, InstrumentationScope.ALL) {}
+    }
 }

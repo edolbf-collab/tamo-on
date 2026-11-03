@@ -16,7 +16,7 @@ A TWA usa a aplicação web hospedada, sem copiar o Marketplace para dentro do A
 
 ## Compilar
 
-Requisitos: JDK 17 completo (incluindo `javac`), Android SDK Platform 36, Build Tools 36.0.0. Gradle 8.11.1 é baixado pelo wrapper e verificado por checksum. Android Gradle Plugin 8.9.1 e Browser Helper 2.7.4 estão fixados.
+Requisitos: JDK 17 completo (incluindo `javac`), Android SDK Platform 36, Build Tools 36.0.0. Gradle 9.1.0 é baixado pelo wrapper e verificado por checksum. Android Gradle Plugin 9.0.1 e Browser Helper 2.7.4 estão fixados.
 
 Configure `ANDROID_HOME` ou `local.properties` apontando para o SDK. Forneça as variáveis abaixo ao processo de compilação; seus valores não devem ser incluídos no repositório:
 
@@ -29,6 +29,12 @@ Alias existente: `tamoon-upload`. Reutilize a assinatura da build 164. Não gere
 Na pasta `android/`, execute `./gradlew bundleRelease assembleRelease` (Linux/macOS) ou `gradlew.bat bundleRelease assembleRelease` (Windows). AAB: `app/build/outputs/bundle/release/app-release.aab`. APK de teste: `app/build/outputs/apk/release/app-release.apk`.
 
 Valide o pacote, versão, SDK, assinatura e domínio antes de enviar. A validação prática de login Google, notificações e Marketplace continua necessária em aparelho Android. O APK local usa a chave de upload; a instalação distribuída pelo Google pode usar a chave de assinatura do Play, preservada no Digital Asset Links.
+
+## Janela de abertura e validação Android
+
+A atividade nativa usa o tema `TamoOnLaunchTheme` antes de transferir o controle ao navegador. No Android 15 ou superior o sistema cuida das barras transparentes. Em versões anteriores as cores são declaradas no tema. O Browser Helper 2.7.4 chama diretamente a implementação antiga do AndroidX. A instrumentação no Gradle substitui somente essa chamada por `LaunchWindow.configure`. Ao atualizar a biblioteca, confira se essa adaptação ainda é necessária.
+
+O workflow de pull request compila o release com uma chave descartável e confere o mapeamento do R8. Para homologação visual, abra a Comunidade e o Marketplace no Android 15 e 16, em retrato e paisagem, com navegação por gestos e por três botões. Confira o primeiro acesso, os controles inferiores e o fechamento das janelas de Pix e cotas.
 
 ## Preparação do Console para a build 166
 

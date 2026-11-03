@@ -126,7 +126,7 @@
     ownerId = data.session.user.id; return result;
   }
   async function loadAssets() {
-    const response = await fetch("pilot-assets.json?v=166r19", {cache:"no-store"});
+    const response = await fetch("pilot-assets.json?v=167r1", {cache:"no-store"});
     if (!response.ok) throw new Error("LOAD_FAILED");
     // The manifest normally contains one immutable bundle; async=false preserves fallback order.
     await Promise.all((await response.json()).map(script));
