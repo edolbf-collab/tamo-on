@@ -108,15 +108,22 @@ export async function openInlinePix(admin,reservationId,profileId,deps,retryToke
    }
    if(!response.ok){
     const rejected=definitiveCheckoutRejection(response.status,response.result);
-    const retry=await rpc('finish_asaas_inline_pix_attempt',{p_session_key:c.session_key,p_claim_token:c.claim_token,p_outcome:rejected?'rejected':'unknown',p_provider_status:response.status});
     const diagnostic=reportCheckoutDiagnostic(c,checkoutDiagnostic(response.status,response.result),rejected?'failed':'unknown');
+    let outcome=rejected?'rejected':'unknown';
+    if(rejected && diagnostic.field==='issuanceLimit') outcome='rejected_issuance_limit';
+    const retry=await rpc('finish_asaas_inline_pix_attempt',{p_session_key:c.session_key,p_claim_token:c.claim_token,p_outcome:outcome,p_provider_status:response.status});
     // These codes also let the published client distinguish a refusal from an uncertain result.
     return respond({error:rejected?'ASAAS_CHECKOUT_ERROR':'CHECKOUT_RESULT_UNKNOWN',diagnostic,...retry},502);
    }
    try{payment=validatePixPayment(response.result,c);await rpc('bind_asaas_inline_pix',{p_session_key:c.session_key,p_payment:payment});}
    catch{return respond({error:'CHECKOUT_AWAITING_RECONCILIATION'},502);}
   }else{
-   if(c.status==='failed')return respond({error:'CHECKOUT_RETRY_AVAILABLE',retryAllowed:c.retry_allowed===true,retryToken:c.retry_allowed?c.retry_token:null},409);
+   if(c.status==='failed'){
+    const retry={retryAllowed:c.retry_allowed===true,retryToken:c.retry_allowed?c.retry_token:null};
+    if(c.retry_outcome==='rejected' && c.retry_issuance_limited===true)
+     return respond({error:'ASAAS_CHECKOUT_ERROR',diagnostic:{category:'account_configuration',field:'issuanceLimit'},...retry},409);
+    return respond({error:'CHECKOUT_RETRY_AVAILABLE',...retry},409);
+   }
    payment=await findPayment(c,deps);
    if(!payment)return respond({error:'CHECKOUT_AWAITING_RECONCILIATION'},409);
    await rpc('bind_asaas_inline_pix',{p_session_key:c.session_key,p_payment:payment});
