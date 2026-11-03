@@ -2562,7 +2562,7 @@
     return refreshBackendBootstrap(true);
   }
 
-  async function runBackendMutation(successMessage, operation) {
+  async function runBackendMutation(successMessage, operation, refreshOnSuccess = () => true) {
     if(partnerReadonlyActive()){showToast("Somente leitura. Volte à administração para sair da visualização.");return null;}
     if (!backendIsOnline()) return null;
     if(backendRuntime.mutating){showToast("Uma alteração está em andamento. Aguarde a conclusão antes de enviar outra.");return null;}
@@ -2571,7 +2571,7 @@
     backendSyncStatus();
     try {
       const result = await operation();
-      await refreshBackendAfterMutation();
+      if (refreshOnSuccess(result)) await refreshBackendAfterMutation();
       if(mutationIdentity!==backendRuntime.identityId)return null;
       if (successMessage) showToast(successMessage);
       return result;
@@ -2785,15 +2785,17 @@
         ?window.MarketplaceBackend.createPixCharges(reservation.backendId,retryToken,communicationScope,payer):window.MarketplaceBackend.routePayment(reservation.backendId,retryToken,communicationScope));
         pixReceivedAt=performance.now();return paymentResult; }
       catch(error){checkoutError=error;throw error;}
-    });
+    }, payment => payment?.mode !== "asaas_pix" && payment?.mode !== "asaas_pix_payer_required");
     communicationScope.assertActive();
-    if(identity!==backendRuntime.identityId)return;
+    if(identity!==backendRuntime.identityId || identity!==window.MarketplaceBackend?.session?.user?.id ||
+       window.TamoonMarketplacePilot?.blocked || !backendIsOnline() || state.role!=="user")return;
     if(!result){if(checkoutError)showAsaasCheckoutFailure(reservation,checkoutError);return;}
     if(reservation.paymentMethod==="pix_direct_partner"&&["asaas_pix","asaas_pix_payer_required"].includes(result.mode)){
       if(result.status==="paid"){
         if(detailDialog.open&&detailDialog.dataset.paymentIdentity===identity)detailDialog.close();
         const updated=(state.reservations||[]).find(item=>item.backendId===reservation.backendId);
         showToast(officialAsaasPaymentMessage(updated)||"Pagamento recebido. Atualizando a situação da reserva.");
+        refreshBackendAfterMutation().catch(()=>{});
         return;
       }
       openDetail({eyebrow:"Pagamento por Pix",title:result.mode==="asaas_pix_payer_required"?"Dados do pagador":reservation.pixSplit?"Pagar minha cota Pix":"Pagar com Pix",body:""});

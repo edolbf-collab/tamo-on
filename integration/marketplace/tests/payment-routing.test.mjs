@@ -100,3 +100,25 @@ test('a single monthly quota opens the inline Pix flow for its assigned payer',a
  assert.deepEqual(f.calls.filter(x=>x.name).map(x=>x.name),['pix-charge-router']);
  assert.equal(f.mounts.length,1);assert.equal(f.details[0].title,'Pagar minha cota Pix');assert.deepEqual(f.failures,[]);
 });
+
+test('an accepted Pix remains available when the Marketplace refresh fails',async()=>{
+ const serverNow=new Date().toISOString(), dueAt=new Date(Date.now()+600000).toISOString();
+ const response={mode:'asaas_pix',status:'pending',amount:1360,payload:'000201test',encodedImage:'iVBORtest',serverNow,dueAt};
+ const f=await fixture({response});
+ const timeout=Object.assign(new Error('statement timeout'),{code:'57014'});
+ let refreshes=0;
+ Object.assign(f.sandbox,{
+  partnerReadonlyActive:()=>false, backendSyncStatus(){}, backendErrorMessage:e=>e.message,
+  refreshBackendAfterMutation:async()=>{refreshes++;throw timeout;},
+  refreshBackendBootstrap:async()=>{throw timeout;}
+ });
+ vm.runInContext(slice('  async function runBackendMutation(', '  function currentUserPixShareState('),f.sandbox);
+ await f.sandbox.requestOfficialStagingPaymentConfirmation(reservation);
+ assert.equal(f.mounts.length,1);
+ assert.equal(f.mounts[0].result.payload,response.payload);
+ await assert.rejects(f.mounts[0].refresh(),error=>error===timeout);
+ assert.equal(refreshes,0);
+ assert.equal(f.calls.filter(call=>call.name==='pix-charge-router').length,1);
+ assert.equal(f.sandbox.backendRuntime.mutating,false);
+ assert.deepEqual(f.failures,[]);
+});
