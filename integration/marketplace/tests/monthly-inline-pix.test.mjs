@@ -59,3 +59,18 @@ test('unsupported monthly stages and an elapsed guarantee stop before contacting
  const f=fixture({startError:'PIX_PAYMENT_WINDOW_TOO_SHORT'}),r=await openInlinePix(f.admin,'reservation','owner',f.deps);
  assert.equal(r.body.error,'PIX_PAYMENT_WINDOW_TOO_SHORT');assert.deepEqual(f.requests,[]);
 });
+
+test('Asaas refusal exposes a safe diagnostic while an uncertain response stays non-retryable',async()=>{
+ for(const [status,code,field,outcome] of [[400,'ASAAS_CHECKOUT_ERROR','dueDate','rejected'],[503,'CHECKOUT_RESULT_UNKNOWN',null,'unknown']]){
+  const f=fixture();
+  f.deps.fetchImpl=async()=>({ok:false,status,json:async()=>({errors:[{code:'invalid_object',description:'Vencimento incorreto, dado-pessoal-de-teste'}]})});
+  const result=await openInlinePix(f.admin,'reservation','owner',f.deps);
+  assert.equal(result.body.error,code);
+  assert.equal(result.body.diagnostic.field,field);
+  assert.equal(result.body.diagnostic.providerStatus,status);
+  assert.match(result.body.diagnostic.diagnosticId,/^[0-9a-f-]{36}$/i);
+  assert.ok(!JSON.stringify(result.body).includes('dado-pessoal-de-teste'));
+  assert.equal(f.calls.at(-1).name,'finish_asaas_inline_pix_attempt');
+  assert.equal(f.calls.at(-1).args.p_outcome,outcome);
+ }
+});

@@ -1,5 +1,6 @@
 import {ASAAS_SANDBOX,requireSandbox,accountRegistry,accountKey,publicAccount,verifyPartnerAccount} from './asaas-accounts.mjs';
 import {definitiveCheckoutRejection,sandboxCheckoutUrl} from './asaas-checkout-core.mjs';
+import {checkoutDiagnostic,reportCheckoutDiagnostic} from './asaas-diagnostics.ts';
 const UUID=/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const PAYMENT=/^pay_[A-Za-z0-9_-]+$/,CUSTOMER=/^cus_[A-Za-z0-9_-]+$/;
 export function validTaxId(value){
@@ -45,7 +46,9 @@ export function inlinePixPayload(c,customerId,at=Date.now()){
    ||!Number.isFinite(Number(c.amount))||Number(c.amount)<=0||Math.abs(Number(c.amount)*100-Math.round(Number(c.amount)*100))>0.000001
    ||!Number.isFinite(Date.parse(c.due_at))||Date.parse(c.due_at)-at<30000)throw new Error('PIX_PAYMENT_WINDOW_TOO_SHORT');
  // dueDate is only a calendar date. The server worker enforces the reservation deadline.
- const dueDate=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(c.provider_due_at||c.due_at));
+ const parts=new Intl.DateTimeFormat('en',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(c.provider_due_at||c.due_at));
+ const {year,month,day}=Object.fromEntries(parts.map(part=>[part.type,part.value]));
+ const dueDate=`${year}-${month}-${day}`;
  return {customer:customerId,billingType:'PIX',value:Number(c.amount),dueDate,externalReference:c.external_reference,
   description:`${c.participant_id?'Cota da reserva':'Reserva'} ${c.reservation_code} - Tâmo On Sandbox`,
   ...(Number(c.split_commission_amount)>0?{split:[{walletId:c.split_wallet_id,fixedValue:Number(c.split_commission_amount)}]}:{})};
@@ -106,7 +109,9 @@ export async function openInlinePix(admin,reservationId,profileId,deps,retryToke
    if(!response.ok){
     const rejected=definitiveCheckoutRejection(response.status,response.result);
     const retry=await rpc('finish_asaas_inline_pix_attempt',{p_session_key:c.session_key,p_claim_token:c.claim_token,p_outcome:rejected?'rejected':'unknown',p_provider_status:response.status});
-    return respond({error:'ASAAS_PIX_PAYMENT_ERROR',...retry},502);
+    const diagnostic=reportCheckoutDiagnostic(c,checkoutDiagnostic(response.status,response.result),rejected?'failed':'unknown');
+    // These codes also let the published client distinguish a refusal from an uncertain result.
+    return respond({error:rejected?'ASAAS_CHECKOUT_ERROR':'CHECKOUT_RESULT_UNKNOWN',diagnostic,...retry},502);
    }
    try{payment=validatePixPayment(response.result,c);await rpc('bind_asaas_inline_pix',{p_session_key:c.session_key,p_payment:payment});}
    catch{return respond({error:'CHECKOUT_AWAITING_RECONCILIATION'},502);}
