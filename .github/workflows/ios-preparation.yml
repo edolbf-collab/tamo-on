@@ -49,9 +49,12 @@ jobs:
           test "$(xcodebuild -version | head -1)" = 'Xcode 26.3'
           major=$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)
           test "$major" -ge 26
-      - name: Iniciar simulador durante a compilação
+      - name: Iniciar simulador iOS 26.2 durante a compilação
         run: |
-          simulator_id=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; devices=json.load(sys.stdin)["devices"]; print(next(d["udid"] for runtime,rows in devices.items() if "iOS" in runtime for d in rows if d["name"].startswith("iPhone")))')
+          set -euo pipefail
+          # iOS 18.5 has a known libswiftWebKit loader issue; use the Xcode 26.3 runtime.
+          simulator_id=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; devices=json.load(sys.stdin)["devices"]; runtime="com.apple.CoreSimulator.SimRuntime.iOS-26-2"; matches=[d for d in devices.get(runtime,[]) if d["name"].startswith("iPhone")]; assert matches, "iOS 26.2 iPhone simulator unavailable"; print(matches[0]["udid"])')
+          echo "Simulador iOS 26.2: $simulator_id"
           echo "TAMOON_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
           xcrun simctl boot "$simulator_id"
       - run: npm ci
