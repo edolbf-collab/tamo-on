@@ -1,0 +1,11 @@
+.finance-transaction-table td {
+  vertical-align: top;
+}
+
+.finance-transaction-table td > small.field-help {
+  display: block;
+  margin-top: 0.35rem;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

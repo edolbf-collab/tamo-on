@@ -1,15 +1,11 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 165,
-  "database": 152,
-  "edge": 115,
+  "build": 167,
+  "database": 151,
+  "edge": 116,
   "mandatory": false,
-  "notes": "Preparação iOS atualizada: vinculação Google/Apple na mesma conta, ativação Apple pendente.",
-  "label": "Tâmo On Beta 1.0 Build 165 — preparação iOS",
-  "components": {
-    "delete_beta_user": 107,
-    "apple_sign_in": 2
-  },
-  "auth_preparation": "166-R18"
+  "notes": "Ajustes de tela de ponta a ponta e otimização do pacote Android.",
+  "label": "Tâmo On Beta 1.0 Build 167",
+  "integration": "167-R1"
 }

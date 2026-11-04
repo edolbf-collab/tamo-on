@@ -1,0 +1,103 @@
+name: Android package validation
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'styles.css'
+      - 'index.html'
+      - 'marketplace/index.html'
+      - 'marketplace/pilot.css'
+      - 'integration/marketplace/tests/edge-to-edge-browser.cjs'
+      - '.github/workflows/android-validation.yml'
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install compile SDK
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Compile optimized release with a disposable test key
+        working-directory: android
+        env:
+          TAMOON_STORE_PASSWORD: local-ci-testing
+          TAMOON_KEY_PASSWORD: local-ci-testing
+        run: |
+          export TAMOON_KEYSTORE="$RUNNER_TEMP/test-upload.jks"
+          keytool -genkeypair -keystore "$TAMOON_KEYSTORE" -alias tamoon-upload \
+            -storepass "$TAMOON_STORE_PASSWORD" -keypass "$TAMOON_KEY_PASSWORD" \
+            -storetype JKS -keyalg RSA -keysize 2048 -validity 2 -dname CN=CI
+          ./gradlew --no-daemon :app:bundleRelease :app:assembleRelease
+          bundle=app/build/outputs/bundle/release/app-release.aab
+          unzip -tq "$bundle"
+          unzip -p "$bundle" BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map > "$RUNNER_TEMP/mapping.txt"
+          test -s "$RUNNER_TEMP/mapping.txt"
+          config=app/build/outputs/mapping/release/configuration.txt
+          test -s "$config"
+          if grep -Eq '^-(dontoptimize|dontshrink|dontobfuscate)([[:space:]]|$)' "$config"; then
+            echo "Unexpected global R8 optimization opt-out" >&2
+            exit 1
+          fi
+          # Check the R8 mapping before class-name obfuscation or method inlining.
+          if awk '
+            /^[^ #].* -> .*:$/ { compat = ($1 == "androidx.core.view.WindowCompat") }
+            /androidx\.core\.view\.WindowCompat\.enableEdgeToEdge\(/ { found = 1 }
+            compat && / void enableEdgeToEdge\(android\.view\.Window\)/ { found = 1 }
+            END { exit !found }
+          ' "$RUNNER_TEMP/mapping.txt"; then
+            echo "Legacy edge-to-edge implementation is still reachable" >&2
+            exit 1
+          fi
+      - name: Verify package identity and retain the test build
+        id: package
+        run: |
+          build=$(jq -er '.build' version.json)
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          build_tools="$ANDROID_HOME/build-tools/36.0.0"
+          "$build_tools/apksigner" verify "$apk"
+          "$build_tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/badging.txt"
+          grep -F "package: name='br.app.tamoon' versionCode='$build' versionName='1.0.$build'" "$RUNNER_TEMP/badging.txt"
+          grep -F "targetSdkVersion:'36'" "$RUNNER_TEMP/badging.txt"
+          mkdir -p test-packages
+          cp "$aab" "test-packages/Tamo-On-$build-teste.aab"
+          cp "$apk" "test-packages/Tamo-On-$build-teste.apk"
+          (cd test-packages && sha256sum *.aab *.apk > SHA256SUMS)
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "AAB: $(stat -c '%s' "$aab") bytes. APK: $(stat -c '%s' "$apk") bytes." >> "$GITHUB_STEP_SUMMARY"
+          wc -c test-packages/*.aab test-packages/*.apk
+      - name: Upload packages signed with the temporary test key
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tamo-On-${{ steps.package.outputs.build }}-teste
+          path: test-packages/
+          if-no-files-found: error
+          retention-days: 7
+  mobile-layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: integration/marketplace
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install the browser specified by the existing test suite
+        run: |
+          npm install --ignore-scripts --no-package-lock --no-audit --no-fund
+          npx --no-install playwright install --with-deps chromium
+      - name: Validate mobile navigation and nonzero safe-area insets
+        env:
+          PILOT_TEST_BROWSER: chromium
+        run: |
+          node tests/navigation-browser.cjs
+          node tests/edge-to-edge-browser.cjs

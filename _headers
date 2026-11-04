@@ -3,7 +3,7 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://accounts.google.com https://static.cloudflareinsights.com/beacon.min.js; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://cloudflareinsights.com; img-src 'self' data: blob: https://*.googleusercontent.com https://*.ggpht.com; frame-src https://accounts.google.com; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://accounts.google.com https://static.cloudflareinsights.com/beacon.min.js; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://accounts.google.com https://cloudflareinsights.com; img-src 'self' data: blob: https://*.supabase.co https://*.googleusercontent.com https://*.ggpht.com; frame-src https://accounts.google.com; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
 
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate
@@ -39,3 +39,24 @@
 /.well-known/assetlinks.json
   Content-Type: application/json
   Cache-Control: public, max-age=300
+
+/marketplace/*
+  X-Robots-Tag: noindex, nofollow
+/marketplace/
+  Cache-Control: no-store
+/marketplace/index.html
+  Cache-Control: no-store
+/marketplace/pilot-assets.json
+  Cache-Control: no-store
+/marketplace/pilot-entry.js
+  Cache-Control: no-cache, max-age=0, must-revalidate
+
+/marketplace/assets/pilot-*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/auth-config.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/auth-access.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/auth-access.css
+  Cache-Control: no-cache, max-age=0, must-revalidate

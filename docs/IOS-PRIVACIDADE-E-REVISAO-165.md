@@ -1,3 +1,5 @@
+> Estado atualizado em 4/11/2026: consulte [Ativação Apple e preparação iOS](IOS-ATIVACAO-2026-11-04.md). As instruções abaixo são históricas e devem ser conciliadas com a build 167 e o Marketplace.
+
 # Preparação da privacidade e revisão — iOS 165
 
 Documento de trabalho, não publicado. Não altera a vigência, o texto ou os aceites da versão 1.2.

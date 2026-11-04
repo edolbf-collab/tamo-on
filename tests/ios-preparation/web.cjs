@@ -16,11 +16,13 @@ await page.setContent('<html lang="pt-BR"><head><meta name="viewport" content="w
 const appSource=fs.readFileSync(path.join(root,'app.js'),'utf8').replace('document.addEventListener("DOMContentLoaded", boot);','window.TestRepository=SupabaseRepository;');
 await page.addScriptTag({content:appSource});
 await page.addScriptTag({path:path.join(root,'account-deletion.js')});
+await page.addScriptTag({path:path.join(root,'auth-access.js')});
 await page.addScriptTag({path:path.join(root,'legal/acceptance.js')});
 await page.evaluate(()=>{
  window.calls=[];window.submitFailure=true;
  window.receipt={id:'55555555-5555-4555-8555-555555555555',status:'requested',requested_at:'2026-10-27T12:00:00Z',due_at:'2026-11-26T12:00:00Z',completed_at:null};
  App.repo={client:{rpc:async(name,args)=>{calls.push({name,args});if(name==='get_my_account_deletion_request')return {data:null};if(name==='request_my_account_deletion')return submitFailure?{error:{message:'Falha simulada. Tente novamente.'}}:{data:receipt};return {error:{message:'Offline'}};}},state:{profile:{email:'ficticio@example.test'}}};
+ App.repo.access={enabled:provider=>provider==='google'};
  App.state={is_platform_admin:false};
 });
 await page.evaluate(()=>TamoonLegal.openCenter(App));
@@ -56,19 +58,19 @@ await page.addScriptTag({content:native});
 const outcomes=await page.evaluate(async()=>{
  const client={auth:{exchangeCodeForSession:async code=>{window.exchangedCode=code;return {};}}};
  const valid='https://xvwgrpnioaqyijhzqxqh.supabase.co/auth/v1/authorize?provider=google';
- window.callbackURL='br.app.tamoon://auth/callback?code=valid-code';await TamoonNative.finishGoogleLogin(client,valid);
+ window.callbackURL='br.app.tamoon://auth/callback?code=valid-code';await TamoonNative.finishOAuth(client,valid,'google',false);
  const ok=window.exchangedCode;
  let foreign=false,path=false,error=false;
- try{await TamoonNative.finishGoogleLogin(client,'https://example.test/auth/v1/authorize');}catch{foreign=true;}
- window.callbackURL='br.app.tamoon://evil/callback?code=stolen';try{await TamoonNative.finishGoogleLogin(client,valid);}catch{path=true;}
- window.callbackURL='br.app.tamoon://auth/callback?error=denied';try{await TamoonNative.finishGoogleLogin(client,valid);}catch{error=true;}
+ try{await TamoonNative.finishOAuth(client,'https://example.test/auth/v1/authorize','google',false);}catch{foreign=true;}
+ window.callbackURL='br.app.tamoon://evil/callback?code=stolen';try{await TamoonNative.finishOAuth(client,valid,'google',false);}catch{path=true;}
+ window.callbackURL='br.app.tamoon://auth/callback?error=denied';try{await TamoonNative.finishOAuth(client,valid,'google',false);}catch{error=true;}
  return {ok,foreign,path,error,stored:await TamoonNative.storage.getItem('session')};
 });
 check(outcomes.ok==='valid-code','Native Google callback exchanges PKCE code');check(outcomes.foreign,'Foreign authorization URL rejected');check(outcomes.path,'Wrong callback rejected');check(outcomes.error,'Provider denial handled');check(outcomes.stored==='secure','Native session adapter reads Keychain bridge');
-await page.evaluate(()=>{App.repo.client.functions={invoke:async()=>({error:{message:'simulated'}})};TamoonNative.mountAppleLogin(App);});
+await page.evaluate(()=>{App.repo.client.functions={invoke:async()=>({error:{message:'simulated'}})};App.repo.access=TamoonAuth.create({client:App.repo.client,config:TAMOON_CONFIG,flags:{appleEnabled:true},native:TamoonNative});App.renderAuth();});
 check(await page.locator('#appleLoginButton').count()===1,'Native Apple and Google offered together');
 await page.screenshot({path:path.join(__dirname,'ios-login-preview.png')});
-await page.locator('#appleLoginButton').click();await page.getByText('Não foi possível concluir o acesso Apple. Tente novamente.',{exact:true}).waitFor();
+await page.locator('#appleLoginButton').click();await page.locator('#googleLoginMessage.error-text').waitFor();
 check(await page.locator('#appleLoginButton').isEnabled()&&await page.locator('#googleLoginButton').isEnabled(),'Apple failure restores both login controls');
 await browser.close();fs.writeFileSync(path.join(__dirname,'web-results.json'),JSON.stringify({passed:checks.length,checks},null,2));console.log(`${checks.length} browser checks passed`);
 })().catch(error=>{console.error(error);process.exit(1);});

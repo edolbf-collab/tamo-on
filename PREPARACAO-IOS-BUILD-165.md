@@ -1,3 +1,5 @@
+> Estado atualizado em 4/11/2026: consulte [Ativação Apple e preparação iOS](docs/IOS-ATIVACAO-2026-11-04.md). As instruções abaixo são históricas e devem ser conciliadas com a build 167 e o Marketplace.
+
 > Atualização de autenticação 166-R18 (30/10/2026): esta branch conserva a preparação nativa 165 e recebeu o mesmo módulo de login/vinculação da base integrada. Apple e vinculação permanecem desativadas até a configuração real. Para web/Android, agora é necessário Services ID associado ao App ID nativo. Consulte `PREPARACAO-LOGIN-APPLE-R18.md`; ela atualiza as instruções de login abaixo. As demais pendências da preparação iOS continuam aplicáveis.
 
 # Tâmo On — preparação para iPhone / Build 165

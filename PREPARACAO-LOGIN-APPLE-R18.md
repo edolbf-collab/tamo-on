@@ -1,3 +1,5 @@
+> Estado atualizado em 4/11/2026: consulte [Ativação Apple e preparação iOS](docs/IOS-ATIVACAO-2026-11-04.md). As instruções abaixo são históricas e devem ser conciliadas com a build 167 e o Marketplace.
+
 # Login e vinculação Google/Apple — preparação 166-R18
 
 O código web/Android está na `main`. A preparação nativa foi atualizada em `ios-build-165`, sobre a preparação iOS já existente, sem substituir a base integrada 166. `auth-config.js`, `auth-access.js` e `auth-access.css` são idênticos nas duas branches. Ao preparar o próximo iOS com a build integrada mais recente, preservar o adaptador `mobile/src/native.js`, o plugin Swift e as funcionalidades nativas anteriores. Não distribuir a antiga interface 165 como se fosse a última build 166.

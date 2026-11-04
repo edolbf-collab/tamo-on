@@ -1,0 +1,177 @@
+body.pilot-locked > :not(#pilotGate):not(script) { display: none !important; }
+#pilotGate { max-width: 34rem; margin: 12vh auto; padding: 1.5rem; color: #e7f8ef; background: #10392f; border-radius: 1.2rem; }
+#pilotGate a, .sandbox-ribbon a { color: inherit; text-decoration: underline; }
+#pilotRetry { margin: 1rem 0; padding: .8rem; }
+.dialog .dialog-actions { justify-content:center; }
+.dialog > form > .dialog-actions-close { display:flex; flex-direction:row; justify-content:center; align-items:center; }
+.dialog > form > .dialog-actions-close > button { flex:0 1 auto; width:auto; min-width:120px; max-width:100%; margin-inline:auto; text-align:center; justify-content:center; }
+#openBackendStatus, #resetPreview { display: none !important; }
+#toggleNotificationSound[aria-pressed="true"] { color: #bff5da; }
+.sandbox-ribbon { padding-top: max(8px, env(safe-area-inset-top)); }
+.pilot-sync-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:12px 0; font-size:13px; }
+.pilot-sync-bar a { color:inherit; text-decoration:underline; }
+.pilot-sync-bar[hidden] { display:none !important; }
+.pilot-locked #pilotGate { display: block; }
+body:not(.pilot-locked) #pilotGate { display: none; }
+@media(max-width: 600px) { #pilotGate { margin: 10vh 1rem; } }
+
+/* One navigation vocabulary and safe bounds shared by every Marketplace dialog. */
+.marketplace-session-label { display:inline !important; }
+.marketplace-session-avatar { font-size:1.2rem; }
+.marketplace-help h3 { margin:18px 0 6px; font-size:16px; }
+.marketplace-help p { line-height:1.55; color:var(--muted); }
+#pilotDiagnostics { margin:20px 0; padding-top:12px; border-top:1px solid var(--line); }
+#pilotDiagnostics[hidden] { display:none !important; }
+#pilotDiagnostics summary { cursor:pointer; }
+.pilot-loader { display:block; width:28px; height:28px; border:3px solid #ffffff30; border-top-color:#1ed17a; border-radius:50%; animation:pilot-spin .8s linear infinite; }
+.pilot-failed .pilot-loader { display:none; }
+@keyframes pilot-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .pilot-loader { animation:none; } }
+:root { --market-dialog-height:calc(100vh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 18px); }
+@supports (height:100dvh) { :root { --market-dialog-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 18px); } }
+@media (max-width:700px), (max-height:500px) and (pointer:coarse) {
+  .dialog, .dialog.compact, .dialog.form-dialog, .dialog.detail-dialog,
+  .dialog.cancellation-dialog, .dialog.gallery-dialog, .dialog.chat-dialog,
+  .dialog.detail-dialog:has(.agenda-initial) {
+    position:fixed;
+    top:calc(env(safe-area-inset-top,0px) + 8px);
+    right:calc(env(safe-area-inset-right,0px) + 8px);
+    left:calc(env(safe-area-inset-left,0px) + 8px);
+    bottom:auto; margin:0; width:auto; max-width:none;
+    max-height:var(--market-dialog-height); box-sizing:border-box; overflow:hidden;
+  }
+  .dialog > form, .dialog.detail-dialog > form, .dialog.chat-dialog > .chat-form {
+    min-height:0; max-height:calc(var(--market-dialog-height) - 2px);
+    box-sizing:border-box; overflow-x:hidden; overflow-y:auto;
+    overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  }
+  .dialog.chat-dialog > .chat-form { height:calc(var(--market-dialog-height) - 2px); overflow:hidden !important; }
+  .dialog .dialog-header { flex-shrink:0; }
+}
+
+/* Compact controls alongside the brand, shared across all Marketplace roles. */
+.app-header .marketplace-session-button { width:auto; min-width:80px; border-radius:10px; padding:8px 12px; justify-content:center; white-space:nowrap; }
+.header-actions svg { width:18px; height:18px; flex:0 0 18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+#openNotifications, #toggleNotificationSound { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+#openNotifications[hidden], #toggleNotificationSound[hidden] { display:none !important; }
+.header-notification-count { font-size:10px; line-height:1; border-radius:7px; padding:3px; background:var(--green); color:var(--bg); }
+.pilot-leaving #pilotGate a { display:none; }
+@media (max-width:700px) {
+  .app-header { flex-wrap:nowrap; gap:6px; min-height:56px; padding-block:8px; }
+  .app-header .brand-lockup { flex:0 1 auto; gap:5px; min-width:0; }
+  .app-header .brand-symbol { flex:0 0 28px; width:28px; height:28px; border-radius:9px; font-size:19px; }
+  .app-header .brand-name { font-size:14px; }
+  .app-header .brand-subtitle { display:none; }
+  .app-header .header-actions { display:flex; flex:0 0 auto; width:auto; min-width:0; flex-wrap:nowrap; gap:3px; justify-content:flex-end; margin:0; }
+  .app-header .header-actions > button { position:relative; box-sizing:border-box; flex:0 0 32px; width:32px; min-width:0; max-width:100%; height:36px; min-height:36px; padding:0; border-radius:9px; overflow:hidden; }
+  .app-header .header-actions > .marketplace-session-button { flex-basis:52px; width:52px; padding:0 4px; gap:3px; font-size:11px; }
+  .app-header #openNotifications, .app-header #toggleNotificationSound { padding:0; }
+  .app-header .header-control-label, .app-header .theme-button-label { display:none; }
+  .app-header .header-notification-count { position:absolute; right:1px; top:1px; max-width:26px; font-size:9px; }
+  .app-header .theme-button-icon { font-size:18px; }
+  .reservation-list { gap:8px; }
+  .reservation-list .reservation-card { grid-template-columns:36px minmax(0,1fr); gap:7px 8px; padding:10px; border-radius:12px; min-width:0; }
+  .reservation-list .reservation-card-main { display:contents; }
+  .reservation-list .reservation-date { min-height:44px; border-radius:8px; }
+  .reservation-list .reservation-date strong { font-size:16px; }
+  .reservation-list .reservation-card-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px; align-items:start; }
+  .reservation-list .reservation-card-heading h2 { font-size:14px; overflow-wrap:anywhere; }
+  .reservation-list .reservation-card-heading > .status { max-width:110px; white-space:normal; overflow-wrap:anywhere; line-height:1.25; font-size:10px; padding:4px 6px; }
+  .reservation-list .reservation-card-heading p { font-size:11px; line-height:1.4; }
+  .reservation-list .reservation-public-code { font-size:10px; }
+  .reservation-list .reservation-card-main > :not(.reservation-card-heading) { grid-column:1 / -1; min-width:0; max-width:100%; overflow-wrap:anywhere; }
+  .reservation-list .reservation-group-line { flex-wrap:wrap; gap:3px 8px; font-size:11px; }
+  .reservation-list .reservation-group-line strong { font-size:11px; }
+  .reservation-list .reservation-group-line span { flex-shrink:1; }
+  .reservation-list .reservation-card-meta { flex-direction:row; flex-wrap:wrap; justify-content:flex-start; align-items:center; gap:4px 8px; font-size:11px; }
+  .reservation-list .prebooking-deadline, .reservation-list .inline-payment-assignment { margin:0; padding:7px 8px; border-radius:8px; gap:3px; font-size:11px; }
+  .reservation-list .prebooking-deadline small { line-height:1.3; }
+  .reservation-list .reservation-card-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; }
+  .reservation-list .reservation-card-actions .button { min-width:0; width:100%; min-height:36px; padding:6px; white-space:normal; overflow-wrap:anywhere; font-size:11px; line-height:1.25; }
+  .customer-reservation-page .page-header { margin-bottom:10px; gap:8px; }
+  .customer-reservation-page .page-header h1 { font-size:26px; }
+  .customer-reservation-page .page-header p { font-size:12px; line-height:1.4; }
+  .customer-reservation-page .backend-domain-note { margin:8px 0; padding:9px 10px; gap:5px 8px; }
+  .customer-reservation-page .backend-domain-note small { font-size:11px; line-height:1.4; }
+}
+@media (max-width:360px) {
+  .app-header .brand-name { font-size:13px; }
+  .reservation-list .reservation-card-heading > .status { max-width:92px; }
+}
+
+.reservation-list .reservation-card.has-pending-share { border:2px solid var(--amber); background:color-mix(in srgb,var(--amber) 9%,var(--surface)); }
+.pending-share-label { color:var(--amber); font-weight:800; font-size:12px; line-height:1.4; }
+.reservation-card:focus-visible { outline:3px solid var(--green); outline-offset:3px; }
+
+/* R16: essential mobile header and a modal drawer using the existing controls. */
+.header-brand { display:flex; align-items:center; gap:10px; min-width:0; }
+.marketplace-menu-toggle, .marketplace-help-label { display:none; }
+.marketplace-menu-toggle svg, .marketplace-menu svg { width:22px; height:22px; flex:0 0 22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.marketplace-menu {
+ position:fixed; inset:var(--marketplace-menu-top,100px) 0 0; margin:0;
+ width:100%; max-width:none; height:calc(100vh - var(--marketplace-menu-top,100px));
+ height:calc(100dvh - var(--marketplace-menu-top,100px)); max-height:none;
+ padding:0; border:0; color:var(--text); background:rgba(0,0,0,.5); overflow:hidden;
+}
+.marketplace-menu::backdrop { background:transparent; }
+.marketplace-menu-panel {
+ width:min(340px,calc(100% - 44px)); height:100%; min-width:0;
+ padding:14px max(14px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+ border:1px solid var(--line-strong); border-left:0; border-radius:0 18px 18px 0;
+ background:var(--surface); overflow-y:auto; overscroll-behavior:contain;
+ -webkit-overflow-scrolling:touch; box-shadow:12px 0 32px rgba(0,0,0,.2);
+}
+.marketplace-menu[open] .marketplace-menu-panel { animation:marketplace-menu-enter .18s ease-out; }
+@keyframes marketplace-menu-enter { from { transform:translateX(-100%); } to { transform:translateX(0); } }
+@media(prefers-reduced-motion:reduce) { .marketplace-menu[open] .marketplace-menu-panel { animation:none; } }
+.marketplace-menu-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
+.marketplace-menu-heading h2 { min-width:0; margin:0; font-size:21px; overflow-wrap:anywhere; }
+.marketplace-menu-heading .icon-button { flex:0 0 44px; width:44px; height:44px; min-height:44px; font-size:26px; }
+#marketplaceMenuLinks { display:grid; gap:5px; }
+.marketplace-menu .subnav-button { width:100%; min-width:0; min-height:46px; padding:12px; font-size:15px; text-align:left; white-space:normal; }
+.marketplace-menu .subnav-label { min-width:0; flex:1; overflow-wrap:anywhere; }
+.marketplace-menu .subnav-icon { flex:0 0 22px; width:22px; font-size:19px; }
+.marketplace-menu .subnav-button.active { color:var(--green-strong); box-shadow:inset 3px 0 0 var(--green); }
+.marketplace-menu .message-badge { flex:0 0 auto; margin-left:auto; }
+.marketplace-menu-preferences { border-top:1px solid var(--line-strong); margin-top:18px; padding-top:12px; }
+.marketplace-menu-preferences h3 { margin:0 12px 8px; color:var(--muted); font-size:12px; font-weight:500; }
+#marketplaceMenuPreferences { display:grid; gap:5px; }
+#marketplaceMenuPreferences > button {
+ display:flex; align-items:center; justify-content:flex-start; gap:12px; width:100%; min-width:0;
+ height:auto; min-height:46px; margin:0; padding:12px; border:1px solid transparent; border-radius:12px;
+ background:transparent; color:var(--text); font-size:15px; font-weight:600; text-align:left; white-space:normal;
+}
+#marketplaceMenuPreferences > button:hover { background:var(--green-soft); }
+#marketplaceMenuPreferences .header-control-label,
+#marketplaceMenuPreferences .theme-button-label,
+#marketplaceMenuPreferences .marketplace-help-label { display:inline; }
+#marketplaceMenuPreferences .theme-button-icon,
+#marketplaceMenuPreferences #openReleaseNotes > span:first-child { flex:0 0 22px; width:22px; text-align:center; font-size:22px; }
+#marketplaceMenuPreferences #toggleNotificationSound::after { content:""; margin-left:auto; flex:0 0 30px; height:18px; border:1px solid var(--line-strong); border-radius:12px; background:radial-gradient(circle at 8px 50%,var(--muted) 5px,transparent 6px) var(--surface-3); }
+#marketplaceMenuPreferences #toggleNotificationSound[aria-pressed="true"]::after { background:radial-gradient(circle at 21px 50%,#fff 5px,transparent 6px) var(--green-strong); }
+@media(max-width:980px) {
+ body {
+   padding-left:env(safe-area-inset-left, 0px);
+   padding-right:env(safe-area-inset-right, 0px);
+ }
+ .marketplace-navigation-ready .app-header { position:sticky; top:var(--marketplace-ribbon-height,30px); z-index:95; min-height:64px; padding-block:8px; flex-wrap:nowrap; gap:8px; background:var(--bg); }
+ .marketplace-navigation-ready .header-brand { flex:1 1 auto; gap:8px; }
+ .marketplace-navigation-ready .marketplace-menu-toggle { display:inline-flex; align-items:center; justify-content:center; flex:0 0 44px; width:44px; height:44px; min-height:44px; padding:0; }
+ .marketplace-navigation-ready .app-header .brand-lockup { min-width:0; gap:6px; }
+ .marketplace-navigation-ready .app-header .brand-symbol { flex:0 0 32px; width:32px; height:32px; border-radius:10px; font-size:21px; }
+ .marketplace-navigation-ready .app-header .brand-name { font-size:16px; }
+ .marketplace-navigation-ready .app-header .brand-subtitle { display:none; }
+ .marketplace-navigation-ready .app-header .header-actions { flex:0 0 auto; width:auto; gap:6px; margin:0; }
+ .marketplace-navigation-ready .app-header .header-actions > button { flex:0 0 44px; width:44px; height:44px; min-height:44px; padding:0; }
+ .marketplace-navigation-ready .app-header .header-actions > .marketplace-session-button { flex-basis:62px; width:62px; font-size:12px; }
+ .marketplace-navigation-ready .app-header .header-control-label { display:none; }
+ .marketplace-navigation-ready .app-header #openNotifications { position:relative; }
+ .marketplace-navigation-ready .app-header .header-notification-count { position:absolute; top:1px; right:1px; font-size:9px; }
+ .marketplace-navigation-ready .role-layout { grid-template-columns:minmax(0,1fr); }
+ .marketplace-navigation-ready .role-layout > .subnav { display:none; }
+}
+@media(max-width:360px) {
+ .marketplace-navigation-ready .header-brand { gap:5px; }
+ .marketplace-navigation-ready .app-header .brand-name { font-size:14px; }
+ .marketplace-navigation-ready .app-header .brand-symbol { flex-basis:28px; width:28px; height:28px; }
+}

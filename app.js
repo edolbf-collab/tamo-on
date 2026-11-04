@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 165, database: 152, edge: 115 });
-  const APP_ASSET_TOKEN = "beta165r2";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 167, database: 151, edge: 116, integration: "167-R1" });
+  const APP_ASSET_TOKEN = "beta167r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -151,7 +151,7 @@
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
     const normalized = avatarKey(key);
-    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta165r2`);
+    return window.TAMOON_GROUP_AVATARS?.[normalized] || assetUrl(`assets/group-avatars-build-142/${normalized}.png?v=beta167r1`);
   };
   const positionOptions = ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Atacante", "Coringa"];
   const isPrimaryGoalkeeper = player => String(player?.primary_position || "") === "Goleiro";
@@ -688,7 +688,25 @@
       return data || {};
     }
 
+    async matchEditContext(matchId) {
+      const { data, error } = await this.client.rpc("community_match_edit_context", { p_match_id: matchId });
+      if (error) throw error;
+      return data;
+    }
+
     async updateMatchSettings(matchId, payload) {
+      if (payload.startsAt) {
+        const data = await this.invokeNotification({
+          action: "match-reschedule", groupId: this.state.currentGroupId, matchId,
+          startsAt: payload.startsAt, expectedStartsAt: payload.expectedStartsAt,
+          maxPlayers: Number(payload.maxPlayers), playersPerTeam: payload.playersPerTeam == null ? null : Number(payload.playersPerTeam),
+          durationMinutes: Number(payload.durationMinutes), notes: payload.notes || ""
+        });
+        if (data.saved !== true) throw new Error("Não foi possível confirmar a alteração do evento.");
+        try { await this.loadGroup(this.state.currentGroupId, { subscribe: false }); }
+        catch { data.refreshError = true; }
+        return data;
+      }
       const { data, error } = await this.client.rpc("update_match_settings", {
         p_match_id: matchId,
         p_max_players: Number(payload.maxPlayers),
@@ -1315,6 +1333,44 @@
       return false;
     },
 
+    async openMarketplacePilotOverview() {
+      try {
+        const {data,error}=await this.repo.client.rpc("community_marketplace_pilot_overview");
+        if(error)throw error;
+        const labels={standby_payment:"Aguardando pagamento simulado",published:"Pagamento simulado confirmado",cancelled:"Reserva cancelada"};
+        const rows=(data.events||[]).map(e=>`<article class="card"><strong>${escapeHtml(e.code||"Reserva")}</strong><p>${escapeHtml(labels[e.state]||e.state)}</p><p>${escapeHtml(new Date(e.starts_at).toLocaleString("pt-BR"))} · ${Number(e.amount||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})} (simulado)</p>${e.match_id?`<button class="btn btn-secondary" data-pilot-match="${escapeHtml(e.match_id)}">Abrir jogo</button>`:"<small>O jogo novo será publicado depois da confirmação do sandbox.</small>"}</article>`).join("");
+        this.modal(`Reservas de teste — ${data.name}`,`<p>Valores de sandbox, sem lançamento no caixa do grupo.</p>${rows||"<p>Nenhuma reserva sincronizada.</p>"}<a class="btn btn-primary" href="/marketplace/?page=reservations">Ver minhas reservas</a>`,(root,close)=>{
+          root.querySelectorAll("[data-pilot-match]").forEach(button=>button.addEventListener("click",async()=>{
+            close();this.state=await this.repo.init(data.group_id);this.render();this.openRsvp(button.dataset.pilotMatch);
+          }));
+        });
+      } catch {this.toast("Não foi possível consultar as reservas de teste. Abra o marketplace e sincronize novamente.");}
+    },
+
+    async refreshMarketplacePilot() {
+      if (!this.repo || !this.ready || !window.TamoonPilotAccess) return;
+      if (!this.pilotAccessMonitor) this.pilotAccessMonitor = window.TamoonPilotAccess.createMonitor({
+        getSession:() => this.repo.session(),
+        refreshSession:() => this.repo.client.auth.refreshSession(),
+        onChange:access => {
+          Object.assign(this.repo.state, {marketplace_pilot:access.allowed, marketplace_sync:access.canSyncCommunity});
+          Object.assign(this.state, {marketplace_pilot:access.allowed, marketplace_sync:access.canSyncCommunity});
+          this.pilotAccessStatus = access.status;
+          if (access.allowed && !this.pilotAssetsPreloaded && !navigator.connection?.saveData) {
+            this.pilotAssetsPreloaded = true;
+            const warm = () => window.TamoonPilotAccess.preloadMarketplace().catch(() => { this.pilotAssetsPreloaded = false; });
+            if (window.requestIdleCallback) window.requestIdleCallback(warm, {timeout:3000});
+            else setTimeout(warm, 1000);
+          }
+          if (this.route === "home" || !this.currentGroup()) this.render();
+          if (access.canSyncCommunity && new URLSearchParams(location.search).get("pilot") === "reservas" && !this.pilotOverviewOpened) {
+            this.pilotOverviewOpened = true; this.openMarketplacePilotOverview();
+          }
+        }
+      });
+      return this.pilotAccessMonitor.check();
+    },
+
     async init() {
       this.bindGlobal();
       migrateClientKeys();
@@ -1332,6 +1388,16 @@
       }
 
       this.repo = new SupabaseRepository(config);
+      this.pilotAccessMonitor?.dispose();
+      this.pilotAccessMonitor = null;
+      this.pilotAuthSubscription?.unsubscribe();
+      this.pilotAuthSubscription = this.repo.client.auth.onAuthStateChange((event, session) => {
+        // Supabase auth callbacks must return before requesting another session.
+        setTimeout(() => {
+          if (!session || session.user.id !== this.state.profile?.id) this.pilotAccessMonitor?.reset();
+          this.refreshMarketplacePilot();
+        }, 0);
+      }).data.subscription;
       try {
         await window.TamoonNative?.checkAppleCredential(this.repo.client);
         this.authLinkResult = await this.repo.access.completePendingLink() || this.authLinkResult;
@@ -1345,6 +1411,7 @@
         this.finishBootFeedback();
         this.render();
         this.startAccessMonitor();
+        this.refreshMarketplacePilot();
         await this.registerServiceWorker();
         this.repo.logEvent("app_open", {
           groups: Array.isArray(this.state?.groups) ? this.state.groups.length : 0,
@@ -1507,9 +1574,11 @@
       $("#notificationButton")?.addEventListener("click", () => this.openNotificationCenter());
       $("#profileButton")?.addEventListener("click", () => this.openProfileModal());
       document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") this.verifyBetaAccess();
+        if (document.visibilityState === "visible") { this.verifyBetaAccess(); this.refreshMarketplacePilot(); }
       });
-      window.addEventListener("focus", () => this.verifyBetaAccess());
+      window.addEventListener("focus", () => { this.verifyBetaAccess(); this.refreshMarketplacePilot(); });
+      window.addEventListener("pageshow", () => this.refreshMarketplacePilot());
+      window.addEventListener("online", () => { this.pilotAccessMonitor?.reset(); this.refreshMarketplacePilot(); });
       window.addEventListener("error", event => {
         if (!this.repo || !event.error) return;
         this.repo.logEvent("frontend_error", {
@@ -1546,7 +1615,7 @@
         if (!(image instanceof HTMLImageElement) || !image.matches("[data-group-avatar]")) return;
         if (image.dataset.fallbackApplied === "true") return;
         image.dataset.fallbackApplied = "true";
-        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta165r2");
+        image.src = window.TAMOON_GROUP_AVATARS?.["badge-01"] || assetUrl("assets/group-avatars-build-142/badge-01.png?v=beta167r1");
       }, true);
     },
 
@@ -1579,7 +1648,7 @@
         const response = await fetch(`version.json?t=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw new Error("Não foi possível consultar a versão publicada.");
         const release = await response.json();
-        if (Number(release.build || 0) > APP_RELEASE.build) {
+        if (Number(release.build || 0) > APP_RELEASE.build || (Number(release.build) === APP_RELEASE.build && release.integration && release.integration !== APP_RELEASE.integration)) {
           this.updateAvailable = release;
           this.renderUpdateBanner();
           return true;
@@ -1926,7 +1995,7 @@
       $("#mainContent")?.classList.toggle("home-compact", compactHome);
       $(".app-shell")?.classList.toggle("home-shell", compactHome);
 
-      if (!group) {
+      if (!group && this.route !== "more") {
         $("#mainContent").innerHTML = this.emptyGroupPage();
         return;
       }
@@ -1943,7 +2012,7 @@
     },
 
     emptyGroupPage() {
-      return `<section class="welcome-field"><div class="welcome-overlay"><img src="brand/tamo-on-logo-horizontal-negative.svg" alt="" class="welcome-mark"><span class="eyebrow">CONTA CONECTADA</span><h1>Monte seu grupo</h1><p>Crie um grupo com escudo próprio ou entre usando um código de convite.</p><div class="welcome-actions"><button class="btn btn-primary btn-small" data-action="create-group">+ Criar grupo</button><button class="btn btn-secondary btn-small" data-action="join-group">Inserir código</button><button class="btn btn-secondary btn-small" data-action="community-safety">Segurança e convivência</button><button class="btn btn-secondary btn-small" data-action="account-delete">Excluir minha conta</button></div></div></section>`;
+      return `<section class="welcome-field"><div class="welcome-overlay"><img src="brand/tamo-on-logo-horizontal-negative.svg" alt="" class="welcome-mark"><span class="eyebrow">CONTA TÂMO ON CONECTADA</span><h1>Monte seu grupo</h1><p>Crie um grupo com escudo próprio ou entre usando um código de convite.</p><div class="welcome-actions"><button class="btn btn-primary btn-small" data-action="create-group">+ Criar grupo</button><button class="btn btn-secondary btn-small" data-action="join-group">Inserir código</button><button class="btn btn-secondary btn-small" data-action="community-safety">Segurança e convivência</button>${this.state.marketplace_pilot ? `<button class="btn btn-primary btn-small" data-action="playing-spaces">Onde jogar, quadras e reservas</button>` : ""}<button class="btn btn-secondary btn-small" data-action="account-delete">Excluir minha conta</button></div></div></section>`;
     },
 
     homePage() {
@@ -1977,7 +2046,7 @@
         </section>
         ${notice ? `<button class="home-notice" data-action="announcement-center" data-id="${notice.id}"><span>📣</span><div><strong>${escapeHtml(notice.title)}</strong><small>${escapeHtml(notice.body)}</small></div><b>›</b></button>` : ""}
         <div class="home-quick-grid">
-          <button class="quick-card quick-card-coming-soon" data-action="playing-spaces"><span class="quick-icon">⌖</span><span><strong>Onde jogar</strong><small>Em construção</small></span></button>
+          <button class="quick-card ${this.state.marketplace_pilot ? "" : "quick-card-coming-soon"}" data-action="playing-spaces"><span class="quick-icon">⌖</span><span><strong>Onde jogar, quadras e reservas</strong><small>${this.state.marketplace_pilot ? "Teste privado" : "Em construção"}</small></span></button>
           <button class="quick-card" data-route="teams"><span class="quick-icon">⇄</span><span><strong>Times</strong><small>Equilíbrio do elenco</small></span></button>
           <button class="quick-card" data-action="players"><span class="quick-icon">＋</span><span><strong>Convidados</strong><small>Incluir no evento</small></span></button>
           <button class="quick-card" data-action="invite"><span class="quick-icon">↗</span><span><strong>Convidar</strong><small>WhatsApp e código</small></span></button>
@@ -2291,8 +2360,37 @@
       const group = this.currentGroup();
       const pushConfigured = Boolean(String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim());
       const pushText = window.TamoonNative?.isIOS ? "Consulte os avisos na central do aplicativo." : !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
-      const adminTools = this.state.is_platform_admin ? '<div class="section-title"><h2>Operação do beta</h2><small>Acesso exclusivo da plataforma.</small></div><button class="card menu-row admin-menu-row" data-action="deletion-admin"><span class="menu-icon">§</span><div class="list-main"><strong>Pedidos de exclusão</strong><small>Solicitações e prazos de atendimento.</small></div><strong>›</strong></button><button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel Beta</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button><button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : "";
-      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list"><button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>Meu perfil de jogador</strong><small>Nome, apelido e posição.</small></div><strong>›</strong></button><button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button><button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button><button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>${this.canManageGroup() ? '<button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button><button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>' : ""}${this.canManageMatches() ? '<button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button><button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>' : ""}<button class="card menu-row" data-action="community-safety"><span class="menu-icon">🛡</span><div class="list-main"><strong>Segurança e convivência</strong><small>${this.state.is_platform_admin && this.state.safety?.pending_reports ? `${Number(this.state.safety.pending_reports)} denúncia(s) aguardando análise.` : "Denúncias e participantes bloqueados."}</small></div><strong>›</strong></button><button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Documentos, aceites e exclusão da conta.</small></div><strong>›</strong></button><div class="section-title"><h2>Suporte do beta</h2></div><button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button><button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>${adminTools}<button class="card menu-row danger-row" data-action="account-delete"><span class="menu-icon">×</span><div class="list-main"><strong>Excluir minha conta</strong><small>Solicitar exclusão permanente e acompanhar o pedido.</small></div><strong>›</strong></button><button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar deste aparelho.</small></div><strong>›</strong></button></div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta aberto</div>`;
+      const groupTools = group ? `
+        <button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button>
+        <button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>
+        ${this.canManageGroup() ? `
+        <button class="card menu-row" data-action="group-settings"><span class="menu-icon">🛡</span><div class="list-main"><strong>Personalizar grupo</strong><small>Nome, escudo e administração.</small></div><strong>›</strong></button>
+        <button class="card menu-row" data-action="manage-roles"><span class="menu-icon">♟</span><div class="list-main"><strong>Gerenciar funções</strong><small>Administrador, organizador e tesoureiro.</small></div><strong>›</strong></button>
+        ` : ""}
+        ${this.canManageMatches() ? `
+        <button class="card menu-row" data-action="announcement"><span class="menu-icon">!</span><div class="list-main"><strong>Publicar aviso</strong><small>Enviar comunicado e notificação ao elenco.</small></div><strong>›</strong></button>
+        <button class="card menu-row" data-action="players"><span class="menu-icon">+</span><div class="list-main"><strong>Convidados</strong><small>Incluir no evento, reutilizar cadastro e consultar o histórico.</small></div><strong>›</strong></button>
+        ` : ""}
+      ` : "";
+      const adminTools = this.state.is_platform_admin ? `
+        <div class="section-title"><h2>Operação do beta</h2><small>Acesso exclusivo da plataforma.</small></div>
+        <button class="card menu-row admin-menu-row" data-action="deletion-admin"><span class="menu-icon">§</span><div class="list-main"><strong>Pedidos de exclusão</strong><small>Solicitações e prazos de atendimento.</small></div><strong>›</strong></button>
+        <button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel Beta</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button>
+        ${group ? '<button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : ""}
+      ` : "";
+      return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list">
+        <button class="card menu-row" data-action="profile"><span class="menu-icon">⚽</span><div class="list-main"><strong>${group ? "Meu perfil de jogador" : "Meu perfil"}</strong><small>${group ? "Nome, apelido e posição." : "Nome e formas de acesso à conta."}</small></div><strong>›</strong></button>
+        <button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button>
+        ${groupTools}
+        <button class="card menu-row" data-action="community-safety"><span class="menu-icon">🛡</span><div class="list-main"><strong>Segurança e convivência</strong><small>${this.state.is_platform_admin && this.state.safety?.pending_reports ? `${Number(this.state.safety.pending_reports)} denúncia(s) aguardando análise.` : "Denúncias e participantes bloqueados."}</small></div><strong>›</strong></button>
+        <button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Documentos, aceites e exclusão da conta.</small></div><strong>›</strong></button>
+        <div class="section-title"><h2>Suporte do beta</h2></div>
+        <button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button>
+        <button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>
+        ${adminTools}
+        <button class="card menu-row danger-row" data-action="account-delete"><span class="menu-icon">×</span><div class="list-main"><strong>Excluir minha conta</strong><small>Solicitar exclusão permanente e acompanhar o pedido.</small></div><strong>›</strong></button>
+        <button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar deste aparelho.</small></div><strong>›</strong></button>
+      </div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta aberto</div>`;
     },
 
     async handleAction(action, data) {
@@ -2303,7 +2401,7 @@
           rsvp: () => this.openRsvp(data.id || this.nextMatch()?.id),
           "home-game-response": () => this.setHomeGameResponse(data.id, data.value),
           "home-bbq-response": () => this.setHomeBbqResponse(data.id, data.value),
-          "playing-spaces": () => this.toast("Onde jogar está em construção. O acesso será liberado quando a Comunidade for conectada aos espaços parceiros."),
+          "playing-spaces": () => this.state.marketplace_pilot ? location.assign("/marketplace/?page=discover") : this.toast("Onde jogar está em construção. O acesso será liberado quando a Comunidade for conectada aos espaços parceiros."),
           "draw-teams": () => this.openTeamsForMatch(data.id),
           "configure-teams": () => this.drawTeams(data.id, Number($("#teamCountSelect")?.value || 2)),
           "clear-teams": () => this.undoTeamSeparation(data.id),
@@ -2681,9 +2779,10 @@
 
     openProfileModal() {
       const profile = this.state.profile || {};
-      const player = this.myPlayer();
+      const group = this.currentGroup();
+      const player = group ? this.myPlayer() : null;
       const photo = safeImageUrl(profile.avatar_url);
-      this.modal("Meu perfil", `<div class="profile-summary">${photo ? `<img class="profile-photo" src="${escapeHtml(photo)}" alt="" referrerpolicy="no-referrer">` : `<div class="profile-photo profile-initials">${initials(profile.name)}</div>`}<div><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.email)}</small><span class="role-pill ${roleClass(this.currentRole())}">${roleLabels[this.currentRole()]}</span></div></div><p><button type="button" id="profileAccessButton" class="btn btn-secondary btn-block">Formas de acesso</button></p><p><button type="button" id="profileLegalButton" class="btn btn-secondary btn-block">Documentos e privacidade</button></p><form id="profileForm" class="form-grid"><div class="field"><label>Nome</label><input name="name" value="${escapeHtml(profile.name || "")}" required></div>${player ? `<div class="field"><label>Apelido no grupo</label><input name="nickname" value="${escapeHtml(player.nickname || "")}" placeholder="Como aparece na escalação"></div><div class="field-row"><div class="field"><label>Posição principal</label><select name="primary_position">${positionOptions.map(position => `<option ${position === player.primary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div><div class="field"><label>Posição secundária</label><select name="secondary_position"><option value="">Nenhuma</option>${positionOptions.map(position => `<option ${position === player.secondary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div></div><label class="check-row"><input name="goalkeeper" type="checkbox" ${player.goalkeeper ? "checked" : ""}> Também posso jogar no gol</label>` : ""}<button class="btn btn-primary btn-block">Salvar perfil</button></form><div class="account-separator"></div><button class="btn btn-danger btn-block" id="profileLogoutButton">Sair da conta</button>`, (root, close) => {
+      this.modal("Meu perfil", `<div class="profile-summary">${photo ? `<img class="profile-photo" src="${escapeHtml(photo)}" alt="" referrerpolicy="no-referrer">` : `<div class="profile-photo profile-initials">${initials(profile.name)}</div>`}<div><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.email)}</small>${group ? `<span class="role-pill ${roleClass(this.currentRole())}">${roleLabels[this.currentRole()]}</span>` : ""}</div></div><p><button type="button" id="profileAccessButton" class="btn btn-secondary btn-block">Formas de acesso</button></p><p><button type="button" id="profileLegalButton" class="btn btn-secondary btn-block">Documentos e privacidade</button></p><form id="profileForm" class="form-grid"><div class="field"><label>Nome</label><input name="name" value="${escapeHtml(profile.name || "")}" required></div>${player ? `<div class="field"><label>Apelido no grupo</label><input name="nickname" value="${escapeHtml(player.nickname || "")}" placeholder="Como aparece na escalação"></div><div class="field-row"><div class="field"><label>Posição principal</label><select name="primary_position">${positionOptions.map(position => `<option ${position === player.primary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div><div class="field"><label>Posição secundária</label><select name="secondary_position"><option value="">Nenhuma</option>${positionOptions.map(position => `<option ${position === player.secondary_position ? "selected" : ""}>${position}</option>`).join("")}</select></div></div><label class="check-row"><input name="goalkeeper" type="checkbox" ${player.goalkeeper ? "checked" : ""}> Também posso jogar no gol</label>` : ""}<button class="btn btn-primary btn-block">Salvar perfil</button></form><div class="account-separator"></div><button class="btn btn-danger btn-block" id="profileLogoutButton">Sair da conta</button>`, (root, close) => {
         $("#profileForm", root).addEventListener("submit", async event => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
@@ -2978,31 +3077,59 @@
       }
     },
 
-    openMatchEditForm(matchId) {
+    async openMatchEditForm(matchId) {
       if (!this.canManageMatches()) return this.toast("Somente administrador e organizador podem editar eventos.", true);
-      const match = this.state.matches.find(item => item.id === matchId);
+      let context;
+      try { context = await this.repo.matchEditContext(matchId); }
+      catch (error) { return this.toast(error?.message || "Não foi possível carregar o evento. Tente novamente.", true); }
+      const match = context?.match;
       if (!match) return this.toast("Evento não encontrado.", true);
-      if (this.isMatchStarted(match)) return this.toast("Eventos já iniciados não podem ser editados.", true);
+      if (this.isMatchStarted(match) || match.status !== "scheduled") return this.toast("Somente eventos agendados e ainda não iniciados podem ser editados.", true);
+      const inputDate = value => { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
+      const originalLocalStart = inputDate(match.starts_at);
+      const scheduleField = context.can_reschedule
+        ? `<div class="field"><label for="matchEditStartsAt">Data e horário</label><input id="matchEditStartsAt" name="starts_at" type="datetime-local" value="${originalLocalStart}" min="${inputDate(new Date())}" required><small>Ao remarcar, os membros receberão um aviso com a data anterior e a nova. As presenças serão mantidas.</small></div>`
+        : '<div class="notice">A data está vinculada a uma reserva. Faça a remarcação pelo Marketplace.</div>';
       const recurring = Number(match.recurrence_total || 1) > 1;
-      this.modal("Editar evento", `<form id="matchEditForm" class="form-grid"><div class="notice"><strong>${escapeHtml(match.title)}</strong><br>${recurring ? "As alterações serão aplicadas somente a esta ocorrência da série." : "Altere os dados operacionais deste evento."}</div><div class="field"><label>Duração do evento</label><input name="duration_minutes" type="number" min="15" max="480" step="15" value="${matchDuration(match)}" required inputmode="numeric"><small>Horário atual: ${escapeHtml(matchSchedule(match))}</small></div><div class="field-row"><div class="field"><label>Máximo de jogadores</label><input name="max_players" type="number" min="4" max="60" value="${Number(match.max_players)}" required></div><div class="field"><label>Jogadores por time <span class="optional-label">opcional</span></label><input name="players_per_team" type="number" min="2" max="11" value="${match.players_per_team == null ? "" : Number(match.players_per_team)}" placeholder="Não definido"></div></div><div class="field-help">A quantidade de times é definida separadamente na aba Times.</div><div class="field"><label>Observações</label><textarea name="notes" placeholder="Uniforme, prazo, regras...">${escapeHtml(match.notes || "")}</textarea></div><button class="btn btn-primary btn-block">Salvar alterações</button></form>`, (root, close) => {
+      this.modal("Editar evento", `<form id="matchEditForm" class="form-grid"><div class="notice"><strong>${escapeHtml(match.title)}</strong><br>${recurring ? "As alterações serão aplicadas somente a esta ocorrência da série." : "Altere os dados operacionais deste evento."}</div>${scheduleField}<div class="field"><label>Duração do evento</label><input name="duration_minutes" type="number" min="15" max="480" step="15" value="${matchDuration(match)}" required inputmode="numeric"><small>Horário atual: ${escapeHtml(matchSchedule(match))}</small></div><div class="field-row"><div class="field"><label>Máximo de jogadores</label><input name="max_players" type="number" min="4" max="60" value="${Number(match.max_players)}" required></div><div class="field"><label>Jogadores por time <span class="optional-label">opcional</span></label><input name="players_per_team" type="number" min="2" max="11" value="${match.players_per_team == null ? "" : Number(match.players_per_team)}" placeholder="Não definido"></div></div><div class="field-help">A quantidade de times é definida separadamente na aba Times.</div><div class="field"><label>Observações</label><textarea name="notes" placeholder="Uniforme, prazo, regras...">${escapeHtml(match.notes || "")}</textarea></div><button class="btn btn-primary btn-block">Salvar alterações</button></form>`, (root, close) => {
         $("#matchEditForm", root).addEventListener("submit", async event => {
           event.preventDefault();
+          const submit = event.submitter || $("button[type=submit], button.btn-primary", event.currentTarget);
+          if (submit.disabled) return;
           const form = new FormData(event.currentTarget);
           const rawPlayersPerTeam = String(form.get("players_per_team") || "").trim();
-          const submit = event.submitter;
+          const localStart = String(form.get("starts_at") || "");
+          const scheduleChanged = context.can_reschedule && localStart !== originalLocalStart;
+          const startsAt = scheduleChanged ? new Date(localStart) : null;
+          if (scheduleChanged && (!localStart || !Number.isFinite(startsAt.getTime()) || startsAt <= new Date())) {
+            return this.toast("Informe uma data e um horário futuros.", true);
+          }
           submit.disabled = true;
           submit.textContent = "Salvando...";
-          await this.repo.updateMatchSettings(matchId, {
-            maxPlayers: Number(form.get("max_players")),
-            playersPerTeam: rawPlayersPerTeam ? Number(rawPlayersPerTeam) : null,
-            durationMinutes: Number(form.get("duration_minutes")),
-            notes: form.get("notes") || ""
-          });
-          this.state = this.repo.state;
-          close();
-          this.render();
-          this.openMatchDetails(matchId);
-          this.toast("Dados do evento atualizados.");
+          try {
+            const result = await this.repo.updateMatchSettings(matchId, {
+              maxPlayers: Number(form.get("max_players")),
+              playersPerTeam: rawPlayersPerTeam ? Number(rawPlayersPerTeam) : null,
+              durationMinutes: Number(form.get("duration_minutes")),
+              notes: form.get("notes") || "",
+              ...(scheduleChanged ? { startsAt: startsAt.toISOString(), expectedStartsAt: match.starts_at } : {})
+            });
+            this.state = this.repo.state;
+            close();
+            this.render();
+            if (!result.refreshError) this.openMatchDetails(matchId);
+            let message = scheduleChanged ? "Data do evento alterada." : "Dados do evento atualizados.";
+            if (scheduleChanged) message += result.notificationError ? " Não foi possível concluir o envio dos avisos."
+              : result.failed > 0 ? " O aviso foi registrado, mas houve falha no push de alguns aparelhos."
+              : result.sent > 0 ? ` Push enviado a ${result.sent} aparelho(s).` : " Nenhum aparelho habilitado recebeu push.";
+            if (result.refreshError) message += " Reabra o evento para carregar os dados atualizados.";
+            this.toast(message, Boolean(result.notificationError || result.failed || result.refreshError));
+          } catch (error) {
+            this.toast(error?.message || "Não foi possível salvar. Confira a conexão e reabra o evento antes de tentar novamente.", true);
+          } finally {
+            submit.disabled = false;
+            submit.textContent = "Salvar alterações";
+          }
         });
       });
     },
@@ -3781,7 +3908,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       try { await this.repo.session(); } catch { dbStatus = "Falha"; }
       const sync = this.lastSyncAt ? shortDate(this.lastSyncAt) : "Não registrada";
       const updateText = this.updateAvailable ? "Atualização pendente" : "Sem atualização detectada";
-      this.modal("Sobre e diagnóstico", `<div class="diagnostic-grid"><div class="diagnostic-item ${online ? "ok" : "bad"}"><span></span><div><small>Internet</small><strong>${online ? "Conectado" : "Offline"}</strong></div></div><div class="diagnostic-item ${dbStatus === "Disponível" ? "ok" : "bad"}"><span></span><div><small>Banco e sessão</small><strong>${dbStatus}</strong></div></div><div class="diagnostic-item ${subscription ? "ok" : "warn"}"><span></span><div><small>Push deste aparelho</small><strong>${escapeHtml(subscription ? "Vinculado" : push)}</strong></div></div><div class="diagnostic-item ${this.updateAvailable ? "warn" : "ok"}"><span></span><div><small>Atualização</small><strong>${escapeHtml(updateText)}</strong></div></div></div><div class="system-info-card"><div><span>Aplicativo</span><strong>${APP_RELEASE.version}</strong></div><div><span>Build do aplicativo</span><strong>${APP_RELEASE.build}</strong></div><div><span>Build do HTML</span><strong>${this.htmlBuild() || "—"}</strong></div><div><span>Service worker</span><strong>${escapeHtml(String(window.tamoonPwa?.getState?.().swBuild || "verificando"))}</strong></div><div><span>Banco</span><strong>${APP_RELEASE.database}</strong></div><div><span>Última sincronização</span><strong>${escapeHtml(sync)}</strong></div><div><span>Modo</span><strong>${isStandalone() ? "Instalado" : "Navegador"}</strong></div><div><span>Dispositivo</span><strong>${escapeHtml(deviceLabel())}</strong></div></div><button class="btn btn-secondary btn-block" data-action="check-update">Verificar atualização</button><button class="btn btn-primary btn-block" data-action="report-problem">Reportar problema</button>`, () => {});
+      this.modal("Sobre e diagnóstico", `<div class="diagnostic-grid"><div class="diagnostic-item ${online ? "ok" : "bad"}"><span></span><div><small>Internet</small><strong>${online ? "Conectado" : "Offline"}</strong></div></div><div class="diagnostic-item ${dbStatus === "Disponível" ? "ok" : "bad"}"><span></span><div><small>Banco e sessão</small><strong>${dbStatus}</strong></div></div><div class="diagnostic-item ${subscription ? "ok" : "warn"}"><span></span><div><small>Push deste aparelho</small><strong>${escapeHtml(subscription ? "Vinculado" : push)}</strong></div></div><div class="diagnostic-item ${this.updateAvailable ? "warn" : "ok"}"><span></span><div><small>Atualização</small><strong>${escapeHtml(updateText)}</strong></div></div></div><div class="system-info-card"><div><span>Aplicativo</span><strong>${APP_RELEASE.version}</strong></div><div><span>Build do aplicativo</span><strong>${APP_RELEASE.build} · ${APP_RELEASE.integration}</strong></div><div><span>Build do HTML</span><strong>${this.htmlBuild() || "—"}</strong></div><div><span>Service worker</span><strong>${escapeHtml(String(window.tamoonPwa?.getState?.().swBuild || "verificando"))}</strong></div><div><span>Banco</span><strong>${APP_RELEASE.database}</strong></div><div><span>Última sincronização</span><strong>${escapeHtml(sync)}</strong></div><div><span>Modo</span><strong>${isStandalone() ? "Instalado" : "Navegador"}</strong></div><div><span>Dispositivo</span><strong>${escapeHtml(deviceLabel())}</strong></div></div><button class="btn btn-secondary btn-block" data-action="check-update">Verificar atualização</button><button class="btn btn-primary btn-block" data-action="report-problem">Reportar problema</button>`, () => {});
     },
 
     async openPlatformAdmin() {
@@ -4202,6 +4329,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         announcement: { icon: "📣", label: "Aviso do grupo" },
         "announcement-resend": { icon: "📣", label: "Aviso reenviado" },
         "match-created": { icon: "⚽", label: "Novo evento" },
+        "match-rescheduled": { icon: "📅", label: "Evento remarcado" },
         "attendance-confirmed": { icon: "✓", label: "Presença confirmada" },
         "attendance-declined": { icon: "×", label: "Alteração de presença" },
         "attendance-reminder": { icon: "🔔", label: "Lembrete de confirmação" },

@@ -1,0 +1,14 @@
+.detail-line > strong.reservation-cancelled-value {
+  color: #ff8b8b;
+}
+html[data-theme="light"] .detail-line > strong.reservation-cancelled-value {
+  color: #b42318;
+}
+
+/* In the customer area the case directory belongs to Minhas reservas. */
+.subnav:has([data-ui-key="user-reservations"]:not([aria-current="page"])) + .content .page-header :is(
+  .page-actions > [data-action="cancellation-cases"],
+  .page-actions:has(> [data-action="cancellation-cases"]:only-child)
+) {
+  display: none;
+}

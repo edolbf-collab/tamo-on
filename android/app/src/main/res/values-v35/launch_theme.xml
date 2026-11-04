@@ -1,0 +1,4 @@
+<resources>
+    <!-- Android 15+ supplies transparent bars for the edge-to-edge launch window. -->
+    <style name="TamoOnLaunchTheme" parent="TamoOnLaunchBase" />
+</resources>

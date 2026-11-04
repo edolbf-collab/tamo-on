@@ -1,0 +1,2 @@
+#backendSyncStatus{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:1000;max-width:min(92vw,560px);padding:10px 16px;border:1px solid #0fa463;border-radius:14px;background:#0d1e1a;color:#e8fff4;font-size:13px;line-height:1.4;box-shadow:0 5px 20px #0004;pointer-events:none}
+#backendSyncStatus[hidden]{display:none}

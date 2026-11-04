@@ -1,4 +1,4 @@
-/* Tâmo On Build 165 — registro PWA antecipado, atualização coerente e diagnóstico do service worker. */
+/* Tâmo On Build 166 — registro PWA antecipado, atualização coerente e diagnóstico do service worker. */
 (() => {
   "use strict";
   if (window.Capacitor?.isNativePlatform?.()) return;

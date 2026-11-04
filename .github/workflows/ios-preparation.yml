@@ -1,9 +1,14 @@
 name: Validar preparação iOS
 on:
   workflow_dispatch:
+  push:
+    branches: [ios-build-165]
+permissions:
+  contents: read
 jobs:
   simulator:
     runs-on: macos-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: mobile
@@ -22,6 +27,9 @@ jobs:
       - run: npm ci
       - run: npm run sync
       - run: npm run check
+      - run: npm run test:auth
+      - name: Validar integração e autorização
+        run: node --test ../integration/auth/tests/*.test.mjs ../integration/marketplace/tests/*.test.mjs ../integration/community/tests/*.test.mjs
       - name: Compilar para simulador (sem assinatura ou envio)
         run: >-
           xcodebuild -project ios/App/App.xcodeproj -scheme App

@@ -1,6 +1,7 @@
-// Tâmo On publish-announcement — Build 115
+// Tâmo On publish-announcement — Build 116
 import { createClient } from "npm:@supabase/supabase-js@2.110.7";
 import { sendNotification } from "npm:web-push-neo@0.1.2";
+import { rescheduleAndNotify } from "./match-reschedule.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -716,6 +717,21 @@ Deno.serve(async (req) => {
       }).eq("id", announcement.id);
       if (metricsError) console.warn("Não foi possível atualizar as métricas do aviso", metricsError);
       return json({ announcement, ...pushResult, action });
+    }
+
+    if (action === "match-reschedule") {
+      if (!canManageMatches) return json({error:"Somente administrador ou organizador pode remarcar eventos.",code:"FORBIDDEN"},403);
+      const callerClient=createClient(supabaseUrl,publicKey,{
+        auth:{persistSession:false,autoRefreshToken:false},global:{headers:{Authorization:authorization}}
+      });
+      stage="reschedule-manual-match";
+      const result=await rescheduleAndNotify({payload,groupId,groupName:group!.name,userId:user.id,appOrigin,formatDateTime,sendGroupPush,
+        save:async(args: Record<string,unknown>)=>{
+          const {data,error}=await callerClient.rpc("reschedule_manual_match",args);
+          if(error)throw new Error(error.message);
+          return data;
+        }});
+      return json({...result,action});
     }
 
     if (action === "match-created") {

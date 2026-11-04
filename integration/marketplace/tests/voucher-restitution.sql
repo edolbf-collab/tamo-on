@@ -1,0 +1,78 @@
+-- Marketplace staging only. All fixtures and notifications are rolled back; no provider API calls.
+begin;
+do $$
+declare c private.community_marketplace_pilot%rowtype;sp uuid;sid uuid;rid uuid;rid2 uuid;legacy uuid;
+ owner_session uuid;other uuid;intent uuid;p1 uuid;p2 uuid;rp1 uuid;rp2 uuid;req uuid;v uuid;x uuid;
+ o jsonb;j jsonb;before_count int;v_contract timestamptz;v_tz text;
+begin
+ select * into strict c from private.community_marketplace_pilot where singleton;
+ select id into strict owner_session from auth.sessions where user_id=c.marketplace_user_id and (not_after is null or not_after>now()) order by created_at desc limit 1;
+ select a.marketplace_user_id into strict other from private.marketplace_pilot_accounts a where a.enabled and a.marketplace_user_id<>c.marketplace_user_id and not exists(select 1 from public.platform_admins where profile_id=a.marketplace_user_id) order by a.created_at limit 1;
+ select vs.id,ve.timezone into strict sp,v_tz from public.venue_spaces vs join public.venues ve on ve.id=vs.venue_id join public.partners p on p.id=ve.partner_id where vs.active and ve.published and p.status='approved' order by vs.created_at limit 1;
+ perform set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',c.marketplace_user_id,'session_id',owner_session)::text,true);
+ sid:=gen_random_uuid();
+ insert into public.schedule_slots(id,venue_space_id,starts_at,ends_at,price,status,created_by) values(sid,sp,now()+interval '79 days',now()+interval '79 days 1 hour',100,'available',c.marketplace_user_id);
+ j:=public.create_reservation_prebooking(sid,null,null,false,'marketplace-cancellation-7d-v1',true);rid:=(j->>'reservation_id')::uuid;
+ select cancellation_contracted_at into v_contract from public.reservations where id=rid;
+ o:=public.reservation_cancellation_options(rid);
+ if not (o->>'automatic')::boolean or (o->>'legacy')::boolean then raise exception 'Same-day cancellation unavailable';end if;
+ if (o->>'deadline_exclusive')::timestamptz is distinct from (((now() at time zone v_tz)::date+8)::timestamp at time zone v_tz) then raise exception 'Seven calendar day count wrong';end if;
+ update public.reservations set cancellation_contracted_at=now()-interval '100 days',cancellation_flow_version=null,cancellation_policy_accepted_at=now()+interval '1 day' where id=rid;
+ if (select cancellation_contracted_at from public.reservations where id=rid) is distinct from v_contract or (select cancellation_flow_version from public.reservations where id=rid) is null then raise exception 'Contract snapshot mutable';end if;
+ begin perform public.cancel_reservation(rid,'cached client',null,true,null);raise exception 'Old endpoint accepted new policy';exception when others then if sqlerrm<>'Atualize a página para escolher restituição ou voucher' then raise;end if;end;
+ update public.reservations set booking_mode='monthly',split_pix=true,status='confirmed',payment_responsible_id=c.marketplace_user_id where id=rid;
+ insert into public.reservation_participants(reservation_id,profile_id,amount_due,amount_paid,status) values(rid,c.marketplace_user_id,60,60,'paid') returning id into rp1;
+ insert into public.reservation_participants(reservation_id,profile_id,amount_due,amount_paid,status) values(rid,other,40,40,'paid') returning id into rp2;
+ insert into public.payment_intents(reservation_id,method,provider,status,amount,external_reference) values(rid,'manual_external','generic_manual','confirmed',100,'test-cancel-'||rid) returning id into intent;
+ insert into public.payments(payment_intent_id,reservation_id,provider,amount,status,paid_at,payment_channel,fee_source,cash_availability,metadata)
+ values(intent,rid,'generic_manual',60,'confirmed',now(),'external','external','external',jsonb_build_object('participant_id',rp1)) returning id into p1;
+ insert into public.payments(payment_intent_id,reservation_id,provider,amount,status,paid_at,payment_channel,fee_source,cash_availability,metadata)
+ values(intent,rid,'generic_manual',40,'confirmed',now(),'external','external','external',jsonb_build_object('participant_id',rp2)) returning id into p2;
+ begin perform public.submit_reservation_cancellation(rid,'stale','refund',o->>'preview_token',false);raise exception 'Stale preview accepted';exception when others then if sqlerrm<>'A reserva mudou. Abra novamente o cancelamento' then raise;end if;end;
+ o:=public.reservation_cancellation_options(rid);
+ begin perform public.submit_reservation_cancellation(rid,'missing consent','voucher',o->>'preview_token',false);raise exception 'Missing consent accepted';exception when others then if sqlerrm<>'Confirme o uso único e a validade de 90 dias' then raise;end if;end;
+ if exists(select 1 from public.cancellation_requests where reservation_id=rid) then raise exception 'Failed transaction left case';end if;
+ j:=public.submit_reservation_cancellation(rid,'Teste rateio com escolhas individuais','voucher',o->>'preview_token',true);req:=(j->>'request_id')::uuid;
+ if (j->>'review')::boolean then raise exception 'Unexpected review';end if;
+ if (select status from public.reservation_occurrences where reservation_id=rid)<>'cancelled' then raise exception 'Future slot not released';end if;
+ if (select resolution from private.cancellation_payment_choices where payment_id=p1)<>'voucher' or (select resolution from private.cancellation_payment_choices where payment_id=p2)<>'refund' then raise exception 'Payer ownership violated';end if;
+ if (select sum(amount) from public.accounting_ledger where reservation_id=rid and entry_type='refund_required')<>40 then raise exception 'Wrong refund obligation';end if;
+ select voucher_id into v from private.cancellation_payment_choices where payment_id=p1;
+ if (select expires_at from public.vouchers where id=v)<>now()+interval '90 days' or (select minimum_reservation_value from public.vouchers where id=v)<>60 then raise exception 'Voucher conditions wrong';end if;
+ -- Use a real issued choice in this transaction. No network calls are made.
+ if private.voucher_restitution_deadline('2027-01-31 21:21:00-03'::timestamptz) <> '2027-02-08 00:00:00-03'::timestamptz then raise exception 'Incorrect local calendar deadline'; end if;
+ begin perform public.request_expired_voucher_restitution(v);raise exception 'Early claim accepted';
+ exception when others then if sqlerrm<>'O voucher ainda está no prazo de uso' then raise;end if;end;
+ update public.vouchers set valid_from=now()-interval '103 days',expires_at=now()-interval '20 minutes' where id=v;
+ perform private.send_expired_voucher_restitution_notices();perform private.send_expired_voucher_restitution_notices();
+ if (select count(*) from public.notifications where entity_id=v and data->>'notice'='0')<>1 then raise exception 'Expiry notice missing/duplicated';end if;
+ update public.vouchers set expires_at=now()-interval '6 days' where id=v;
+ perform private.send_expired_voucher_restitution_notices();perform private.send_expired_voucher_restitution_notices();
+ if (select count(*) from public.notifications where entity_id=v and data->>'notice'='-3')<>1 then raise exception 'Final reminder missing/duplicated';end if;
+ update public.vouchers set expires_at=now()-interval '10 days' where id=v;
+ begin perform public.request_expired_voucher_restitution(v);raise exception 'Late claim accepted';
+ exception when others then if sqlerrm not like 'Prazo do aplicativo encerrado%' then raise;end if;end;
+ update public.vouchers set expires_at=now()-interval '1 hour',status='used' where id=v;
+ begin perform public.request_expired_voucher_restitution(v);raise exception 'Used voucher accepted';
+ exception when others then if sqlerrm not like 'O voucher já foi utilizado%' then raise;end if;end;
+ update public.vouchers set status='expired' where id=v;
+ perform set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',other)::text,true);
+ begin perform public.request_expired_voucher_restitution(v);raise exception 'Wrong owner accepted';
+ exception when others then if sqlerrm not in ('Voucher indisponível para esta conta','MARKETPLACE_PILOT_RESTRICTED') then raise;end if;end;
+ perform set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',c.marketplace_user_id,'session_id',owner_session)::text,true);
+ j:=public.request_expired_voucher_restitution(v);
+ if j->>'protocol' is null or (select refunded_amount from public.payments where id=p1)<>0 then raise exception 'No receipt or money moved on request';end if;
+ if not exists(select 1 from jsonb_array_elements(public.voucher_restitution_directory()) a where a->>'voucher_id'=v::text and a->>'requested_at' is not null) then raise exception 'Missing claim';end if;
+ update public.vouchers set expires_at=now()-interval '12 days' where id=v;
+ if public.request_expired_voucher_restitution(v)<>j then raise exception 'Unstable receipt';end if;
+ perform public.review_expired_voucher_restitution(v,'approved','Teste isolado');
+ perform public.review_expired_voucher_restitution(v,'approved','Teste isolado');
+ if (select amount from public.accounting_ledger where reservation_id=rid and entry_type='refund_required')<>100 then raise exception 'Refund not linked to original allocation';end if;
+ j:=public.choose_cancellation_resolution(req,'voucher',true);
+ if (j->>'vouchers_issued')::int<>0 then raise exception 'Duplicate reissue';end if;
+ if (select count(*) from private.asaas_refund_requests where payment_id=p1)<>0 then raise exception 'Provider called by registration';end if;
+ perform public.record_cash_cancellation_refund((select id from private.cancellation_payment_choices where payment_id=p1),'teste de devolução em transação revertida');
+ if not exists(select 1 from jsonb_array_elements(public.voucher_restitution_directory()) a where a->>'voucher_id'=v::text and (a->>'refunded')::bool) then raise exception 'Receipt did not reflect settlement';end if;
+end $$;
+rollback;
+select 'PASS: boundaries, reminders, owner, idempotency, review and settlement' as result;
