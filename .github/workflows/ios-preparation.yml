@@ -41,3 +41,11 @@ jobs:
           -configuration Debug -sdk iphonesimulator
           -destination 'generic/platform=iOS Simulator'
           -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Validar archive Release para iPhone (sem assinatura ou envio)
+        run: |
+          set -euo pipefail
+          build=$(node -p "require('../version.json').build")
+          xcodebuild -project ios/App/App.xcodeproj -scheme App \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Tamoon.xcarchive" CODE_SIGNING_ALLOWED=NO archive
+          python3 scripts/verify-archive.py "$RUNNER_TEMP/Tamoon.xcarchive" "$build"

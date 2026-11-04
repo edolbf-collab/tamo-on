@@ -1,0 +1,127 @@
+name: Preparar ou enviar iOS ao TestFlight
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Commit completo revisado da branch ios-build-165
+        required: true
+        type: string
+      build_number:
+        description: Número Apple ainda não utilizado (primeiro envio 168)
+        required: true
+        default: '168'
+        type: string
+      upload:
+        description: Assinar e enviar somente ao TestFlight interno
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: tamoon-testflight
+  cancel-in-progress: false
+jobs:
+  testflight:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-latest
+    timeout-minutes: 30
+    environment: testflight
+    env:
+      TF_SOURCE_SHA: ${{ inputs.source_sha }}
+      TF_BUILD_NUMBER: ${{ inputs.build_number }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ios-build-165
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fixar o código revisado e validar a versão
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TF_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$TF_BUILD_NUMBER" =~ ^[1-9][0-9]{0,3}(\.[0-9]{1,2}){0,2}$ ]]
+          git merge-base --is-ancestor "$TF_SOURCE_SHA" origin/ios-build-165
+          git checkout --detach "$TF_SOURCE_SHA"
+          test "$(git rev-parse HEAD)" = "$TF_SOURCE_SHA"
+          test -f mobile/ExportOptions-TestFlight.plist
+          python3 - <<'PY'
+          import json, os
+          release=json.load(open('version.json'))
+          assert int(os.environ['TF_BUILD_NUMBER'].split('.')[0]) >= release['build']
+          PY
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Preparar o pacote validado
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          major=$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)
+          test "$major" -ge 26
+          npm ci --prefix mobile --no-audit --no-fund
+          npm run sync --prefix mobile
+          npm run check --prefix mobile
+          npm run test:auth --prefix mobile
+          node --test integration/auth/tests/*.test.mjs integration/marketplace/tests/*.test.mjs integration/community/tests/*.test.mjs
+      - name: Validar archive sem usar credenciais
+        if: ${{ !inputs.upload }}
+        run: |
+          set -euo pipefail
+          xcodebuild -project mobile/ios/App/App.xcodeproj -scheme App \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Tamoon.xcarchive" \
+            CURRENT_PROJECT_VERSION="$TF_BUILD_NUMBER" CODE_SIGNING_ALLOWED=NO archive
+          python3 mobile/scripts/verify-archive.py "$RUNNER_TEMP/Tamoon.xcarchive" "$TF_BUILD_NUMBER"
+      - name: Assinar e enviar o build interno autorizado
+        if: ${{ inputs.upload }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          : "${ASC_KEY_ID:?Configure a chave no ambiente testflight}"
+          : "${ASC_ISSUER_ID:?Configure o emissor no ambiente testflight}"
+          : "${ASC_PRIVATE_KEY:?Configure a chave privada no ambiente testflight}"
+          umask 077
+          mkdir -p "$RUNNER_TEMP/tamoon-signing"
+          python3 - <<'PY'
+          import os, pathlib, re
+          assert re.fullmatch(r'[A-Z0-9]{10}', os.environ['ASC_KEY_ID'])
+          assert re.fullmatch(r'[a-fA-F0-9-]{36}', os.environ['ASC_ISSUER_ID'])
+          key=os.environ['ASC_PRIVATE_KEY'].replace('\\n','\n').strip()+'\n'
+          assert key.startswith('-----BEGIN PRIVATE KEY-----\n')
+          assert key.endswith('-----END PRIVATE KEY-----\n')
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'tamoon-signing/AuthKey.p8'
+          p.write_text(key); p.chmod(0o600)
+          PY
+          KEY_FILE="$RUNNER_TEMP/tamoon-signing/AuthKey.p8"
+          openssl pkey -in "$KEY_FILE" -check -noout >/dev/null 2>&1
+          TF_KEYCHAIN_PASSWORD=$(openssl rand -hex 24)
+          echo "::add-mask::$TF_KEYCHAIN_PASSWORD"
+          security create-keychain -p "$TF_KEYCHAIN_PASSWORD" "$RUNNER_TEMP/tamoon-signing.keychain-db"
+          security set-keychain-settings -lut 3600 "$RUNNER_TEMP/tamoon-signing.keychain-db"
+          security unlock-keychain -p "$TF_KEYCHAIN_PASSWORD" "$RUNNER_TEMP/tamoon-signing.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/tamoon-signing.keychain-db" "$HOME/Library/Keychains/login.keychain-db"
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY_FILE" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          xcodebuild -project mobile/ios/App/App.xcodeproj -scheme App \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Tamoon.xcarchive" \
+            CURRENT_PROJECT_VERSION="$TF_BUILD_NUMBER" CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=4T892ZTN46 "${AUTH[@]}" archive
+          python3 mobile/scripts/verify-archive.py "$RUNNER_TEMP/Tamoon.xcarchive" "$TF_BUILD_NUMBER"
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Tamoon.xcarchive" \
+            -exportOptionsPlist mobile/ExportOptions-TestFlight.plist \
+            -exportPath "$RUNNER_TEMP/tamoon-export" "${AUTH[@]}"
+          echo "Upload concluído. Aguarde o processamento e confira o build no TestFlight antes de distribuí-lo."
+      - name: Remover as credenciais temporárias
+        if: ${{ always() && inputs.upload }}
+        run: |
+          security delete-keychain "$RUNNER_TEMP/tamoon-signing.keychain-db" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/tamoon-signing"
