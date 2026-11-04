@@ -1,0 +1,1 @@
+{"name":"tamoon-account-deletion-tests","private":true,"devDependencies":{"@electric-sql/pglite":"0.3.14","playwright":"1.62.1"}}

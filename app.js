@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 167, database: 151, edge: 116, integration: "167-R1" });
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 168, database: 152, edge: 116, integration: "168-R1" });
   const APP_ASSET_TOKEN = "beta167r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
@@ -2510,7 +2510,7 @@
       document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel"><div class="auth-stadium"><div class="auth-lights"></div><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><span class="auth-kicker">SUA PELADA. SEU GRUPO. SEU APP.</span></div><div class="auth-copy"><h1>Entre em campo</h1><p>Presença, times equilibrados, membros, caixa e churrasco em um único lugar.</p>${error ? `<div class="notice auth-error"><strong>Falha no login</strong><br>${escapeHtml(error)}</div>` : ""}<div class="google-card"><button id="googleLoginButton" class="google-oauth-button" type="button" aria-label="Continuar com Google"><svg class="google-g" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.23c1.89-1.74 2.99-4.3 2.99-7.41Z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.61-2.36l-3.23-2.54c-.9.6-2.04.96-3.38.96-2.6 0-4.81-1.76-5.6-4.13H3.07v2.62A9.99 9.99 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.4 13.93A6.02 6.02 0 0 1 6.08 12c0-.67.12-1.32.32-1.93V7.45H3.07A10 10 0 0 0 2 12c0 1.61.38 3.14 1.07 4.55l3.33-2.62Z"/><path fill="#EA4335" d="M12 5.94c1.47 0 2.79.51 3.83 1.5l2.87-2.88A9.64 9.64 0 0 0 12 2a9.99 9.99 0 0 0-8.93 5.45l3.33 2.62C7.19 7.7 9.4 5.94 12 5.94Z"/></svg><span>Continuar com Google</span><span class="google-login-spinner" aria-hidden="true"></span></button><p id="googleLoginMessage">Use sua conta Google para continuar. Não há cadastro por e-mail ou senha.</p></div><div class="auth-features"><span>✓ Acesso seguro</span><span>✓ Dados em nuvem</span><span>✓ Sincronização entre celulares</span></div></div></section></main><div id="toastRoot" class="toast-root"></div>`;
       $(".auth-copy")?.insertAdjacentHTML("beforeend", '<p class="legal-auth-links"><strong>Disponível apenas para pessoas com 18 anos completos ou mais.</strong><br><a href="/legal/">Termos de Uso, Privacidade e Código de Conduta</a></p>');
       this.setupGoogleLogin();
-      const receipt=localStorage.getItem("tamoon-deletion-receipt");
+      let receipt; try { receipt=localStorage.getItem("tamoon-deletion-receipt"); } catch {}
       if(receipt && /^[a-f0-9-]{36}$/i.test(receipt)) $(".auth-copy")?.insertAdjacentHTML("beforeend", `<p><a href="https://app.tamoon.app.br/legal/protocolo-exclusao.html#${encodeURIComponent(receipt)}" target="_blank" rel="noopener">Consultar meu pedido de exclusão</a></p>`);
       if (error && history.replaceState) history.replaceState({}, document.title, location.pathname);
     },

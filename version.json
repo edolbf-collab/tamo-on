@@ -1,11 +1,11 @@
 {
   "channel": "beta",
   "version": "Beta 1.0",
-  "build": 167,
-  "database": 151,
+  "build": 168,
+  "database": 152,
   "edge": 116,
   "mandatory": false,
-  "notes": "Ajustes de tela de ponta a ponta e otimização do pacote Android.",
-  "label": "Tâmo On Beta 1.0 Build 167",
-  "integration": "167-R1"
+  "notes": "Solicitação de exclusão dentro do app, protocolo e revisão dos dados da Comunidade e do Marketplace.",
+  "label": "Tâmo On Beta 1.0 Build 168",
+  "integration": "168-R1"
 }

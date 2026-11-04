@@ -1,0 +1,37 @@
+name: Account deletion validation
+on:
+  push:
+    branches: [main, ios-build-165]
+    paths:
+      - 'account-deletion.js'
+      - 'legal/**'
+      - 'app.js'
+      - 'supabase/**'
+      - 'tests/account-deletion/**'
+      - '.github/workflows/account-deletion.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deletion:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --prefix tests/account-deletion --ignore-scripts --no-audit --no-fund
+      - name: Database isolation and deletion protocol
+        run: node tests/account-deletion/database.cjs
+      - name: Existing auth and Marketplace behavior
+        run: node --test integration/auth/tests/*.test.mjs integration/marketplace/tests/*.test.mjs integration/community/tests/*.test.mjs
+      - name: Install WebKit
+        working-directory: tests/account-deletion
+        run: npx --no-install playwright install webkit
+      - name: WebKit mobile deletion flow
+        env:
+          TAMOON_TEST_ENGINE: webkit
+        run: node tests/account-deletion/web.cjs

@@ -60,3 +60,12 @@
   Cache-Control: no-cache, no-store, must-revalidate
 /auth-access.css
   Cache-Control: no-cache, max-age=0, must-revalidate
+
+/account-deletion.js
+  Cache-Control: no-cache, max-age=0, must-revalidate
+/legal/protocolo-exclusao.html
+  Cache-Control: no-cache, max-age=0, must-revalidate
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow
+/legal/receipt.js
+  Cache-Control: no-cache, max-age=0, must-revalidate
