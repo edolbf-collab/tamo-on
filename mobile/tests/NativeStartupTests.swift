@@ -19,10 +19,10 @@ final class NativeStartupTests: XCTestCase {
             "SceneDelegate must launch TamoonViewController, not CAPBridgeViewController")
         let webView = try XCTUnwrap(controller.webView)
         let keychainStatus = SecItemCopyMatching([
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: "br.app.tamoon.native-test",
-            kSecAttrAccount: UUID().uuidString,
-            kSecReturnData: true
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "br.app.tamoon.native-test",
+            kSecAttrAccount as String: UUID().uuidString,
+            kSecReturnData as String: true
         ] as CFDictionary, nil)
         XCTAssertEqual(keychainStatus, errSecItemNotFound,
             "Simulator test host must be signed for Keychain; OSStatus: \(keychainStatus)")
