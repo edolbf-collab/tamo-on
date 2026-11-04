@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 168, database: 152, edge: 116, integration: "168-R2" });
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 168, database: 152, edge: 116, integration: "168-R3" });
   const APP_ASSET_TOKEN = "beta167r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
@@ -2382,7 +2382,7 @@
         <button class="card menu-row" data-action="notification-settings"><span class="menu-icon">🔔</span><div class="list-main"><strong>Notificações no celular</strong><small>${escapeHtml(pushText)}</small></div><strong>›</strong></button>
         ${groupTools}
         <button class="card menu-row" data-action="community-safety"><span class="menu-icon">🛡</span><div class="list-main"><strong>Segurança e convivência</strong><small>${this.state.is_platform_admin && this.state.safety?.pending_reports ? `${Number(this.state.safety.pending_reports)} denúncia(s) aguardando análise.` : "Denúncias e participantes bloqueados."}</small></div><strong>›</strong></button>
-        <button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Documentos, aceites e exclusão da conta.</small></div><strong>›</strong></button>
+        <button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Documentos e registros de aceite.</small></div><strong>›</strong></button>
         <div class="section-title"><h2>Suporte do beta</h2></div>
         <button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button>
         <button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>
