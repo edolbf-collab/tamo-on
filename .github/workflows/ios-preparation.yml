@@ -25,8 +25,11 @@ jobs:
       - name: Validar limites da tela e navegação local em sete tamanhos
         run: node tests/home-layout.test.mjs
   simulator:
-    runs-on: macos-latest
+    # Avoid the macOS ARM capacity queue; keep the iOS toolchain explicit.
+    runs-on: macos-15-intel
     timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     defaults:
       run:
         working-directory: mobile
