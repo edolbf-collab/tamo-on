@@ -1,12 +1,13 @@
-# Ativação Apple e preparação iOS — 4/11/2026
+# Ativação Apple e preparação iOS — 3/11/2026 (BRT)
 
 ## Confirmado na Apple
 
 - Organização TAMO ON TECNOLOGIA E INTERMEDIACAO LTDA ativa; renovação em 4/11/2027; Team ID `4T892ZTN46`.
 - App ID explícito `br.app.tamoon`, descrição `Tamo On`, registrado com Sign in with Apple como primário.
 - Services ID `br.app.tamoon.web`, descrição `Tamo On Web`, associado ao mesmo App ID. Domínios `app.tamoon.app.br` e `xvwgrpnioaqyijhzqxqh.supabase.co`; retorno `https://xvwgrpnioaqyijhzqxqh.supabase.co/auth/v1/callback`.
-- Nenhuma chave privada Apple, certificado de distribuição ou perfil foi criado.
-- App Store Connect acessível e sem apps. Formulário inicial preparado: iOS, Tâmo On, Português (Brasil), Bundle ID `br.app.tamoon`, SKU `tamoon-ios`. A criação aguarda escolha do nome público de desenvolvedor.
+- Chave Sign in with Apple criada após autorização expressa, restrita ao App ID do Tâmo On e ao Services ID associado. Armazenada no Supabase; cópias temporárias e área de transferência removidas. Nenhum certificado de distribuição ou perfil foi criado.
+- [App criado na App Store Connect](https://appstoreconnect.apple.com/apps/6830420681/distribution/info): ID Apple `6830420681`, iOS, Tâmo On, Português (Brasil), Bundle ID `br.app.tamoon`, SKU `tamoon-ios`. Nome público de desenvolvedor autorizado: `TAMO ON TECNOLOGIA E INTERMEDIACAO LTDA`.
+- Ficha alinhada à versão `1.0.167`, categoria Esportes, copyright 2026 e lançamento manual. Estado: Preparar para envio. Nenhum build foi enviado à Apple.
 
 ## Código preparado
 
@@ -16,9 +17,9 @@ A branch histórica `ios-build-165` foi atualizada com a main `094d2f16c40272c88
 - Preservados Keychain, login nativo, retorno Google por PKCE, revogação Apple, compartilhamento, exclusão dentro do app e perfil sem grupo.
 - Pacote local inclui o Marketplace atual, sua navegação de restituições e o bundle versionado existente. Scripts e estilos são locais; os dois projetos Supabase têm origens explícitas na política de conteúdo.
 - A entrada nativa do Marketplace usa o SDK empacotado e a sessão da Comunidade no Keychain. A sessão do Marketplace continua temporária e sujeita à lista privada de autorização.
-- Origem `capacitor://localhost` preparada nas duas funções de ponte. Origens arbitrárias de localhost continuam rejeitadas. Alterações de servidor ainda não implantadas.
+- Origem `capacitor://localhost` implantada nas duas funções de ponte. A comparação com o código remoto confirmou que essa era a única diferença. Origens arbitrárias de localhost continuam rejeitadas.
 - Workflow de simulador dispara ao atualizar esta branch e também manualmente, com acesso somente de leitura e limite de 25 minutos. Não assina nem envia à Apple.
-- Flags Apple e vinculação desativadas. Nenhuma alteração desta preparação foi enviada à main, à Play Store ou ao banco em produção.
+- Flags públicas de interface para Apple e vinculação continuam desativadas. A main e a Play Store não foram alteradas. As alterações de servidor estão registradas abaixo.
 
 ## Validação
 
@@ -28,17 +29,28 @@ A branch histórica `ios-build-165` foi atualizada com a main `094d2f16c40272c88
 
 A [execução 41752518492](https://github.com/edolbf-collab/tamo-on/actions/runs/41752518492), sobre o commit `e62dae42aeb86a2e59563426f388178786a047d0`, passou em todas as etapas: Xcode **26.6**, 153 testes (6 de autenticação nativa + 147 de integração), empacotamento e compilação Swift para simulador, concluída com `BUILD SUCCEEDED`. É uma compilação sem assinatura; não foi gerado IPA de distribuição nem enviado build ao TestFlight.
 
+## Configuração de servidor concluída
+
+- Projeto Comunidade `xvwgrpnioaqyijhzqxqh`: provedor Apple habilitado, IDs na ordem `br.app.tamoon.web,br.app.tamoon`, segredo OAuth salvo, vinculação manual habilitada. Google preservado; acesso anônimo desativado e confirmação de e-mail mantida.
+- URL padrão de autenticação atualizada para `https://app.tamoon.app.br/`; retorno exato `br.app.tamoon://auth/callback` adicionado. Os quatro retornos anteriores foram preservados.
+- Segredos `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_CLIENT_ID`, `APPLE_PRIVATE_KEY` e `APPLE_TOKEN_ENCRYPTION_KEY` salvos no servidor. Os hashes exibidos pelo painel coincidiram com os valores preparados. Nenhum segredo foi incluído no repositório, frontend ou IPA.
+- Segredo OAuth web válido até **2/5/2027, 22h32 BRT**. Renovar antes dessa data. A chave de assinatura `.p8` não tem essa expiração; o servidor nativo gera segredos assinados com validade de cinco minutos. Não foi criado lembrete automático nesta etapa.
+- Migração `20261104014342_apple_auth_grants_activation`: somente a tabela `apple_auth_grants` da preparação anterior, com tokens cifrados, RLS e acesso exclusivo do serviço. Arquivo criado pelo CLI e alinhado à versão efetivamente aplicada. Verificado: `anon` e `authenticated` sem leitura/inserção; serviço com acesso; zero credenciais de usuários armazenadas durante a preparação.
+- Função `apple-sign-in` versão 1 publicada. A autenticação é feita pela própria função com o código Apple e o nonce; a vinculação exige sessão Supabase válida e preserva o UUID. O portão JWT do gateway não é usado neste endpoint de entrada.
+- Ponte Comunidade `marketplace-group-pilot` versão 4 e ponte Marketplace `community-marketplace-session` versão 5 publicadas, mantendo as autorizações e a lista privada do piloto.
+- **12 verificações HTTP aprovadas**: quatro na função Apple (preflight, método, pedido inválido e vínculo sem sessão) e quatro em cada ponte (origem nativa, origem web, origem externa e falta de sessão).
+- **6 testes Deno de cifragem/revogação aprovados** com credenciais fictícias: AES-GCM, assinatura e validade do segredo, falha do provedor, ausência de concessão, conta Google, idempotência e adulteração do token. O workflow passou a executar essa suíte junto aos 153 testes anteriores.
+- Advisors: nenhuma nova advertência de segurança. A nova tabela tem aviso informativo de RLS sem políticas, intencional porque é exclusiva do serviço. As advertências preexistentes ficaram registradas para revisão separada; não foram alteradas permissões de outras funções.
+- A checagem HTTP extra do início do OAuth web não concluiu por timeout de conexão neste ambiente. A configuração foi confirmada no painel; login Apple real, e-mail oculto e retorno completo ainda dependem da validação em aparelho.
+
 ## Ordem até TestFlight
 
-1. **Nome público do desenvolvedor:** a Apple permite defini-lo no primeiro app e informa que não poderá ser editado depois. Um nome comercial alternativo precisa ser registrado; a razão social já está validada.
-2. **Chave Sign in with Apple:** gerar para `br.app.tamoon`, após autorização específica para criar a credencial persistente. Manter o `.p8` privado, somente nos serviços necessários, nunca no Git, frontend ou IPA.
-3. **Auth da Comunidade:** Services ID primeiro e Bundle ID adicional; segredo OAuth, manual identity linking e retorno `br.app.tamoon://auth/callback`. Preservar Google e os retornos existentes. O conector disponível não expõe edição de Auth/secrets; requer painel autorizado ou outro canal seguro.
-4. **Servidor Apple e exclusão:** consulta ao projeto Comunidade confirmou que `apple_auth_grants` não existe e `apple-sign-in` não foi publicada. Reconciliar o incremento de exclusão de 27/10 com os dados e obrigações do piloto Marketplace antes de aplicá-lo. A preparação antiga antecede esse piloto e não deve ser implantada sem revisão.
-5. **Ponte nativa:** validar e publicar as funções preparadas. Testar lista privada, bloqueios, papéis, Pix simulado, volta à Comunidade e perda de sessão em aparelho.
-6. **Privacidade:** atualizar a minuta para Apple, e-mail privado, revogação/exclusão e dados do Marketplace. Definir/revisar a nova versão e vigência antes de ativar as flags, sem reescrever silenciosamente documentos já aceitos.
-7. **Compilação e assinatura:** Xcode 26+ em Mac autorizado na equipe, ou integração Apple de build autorizada. Linux empacota os arquivos, mas não gera IPA. Executar testes em iPhone.
-8. **Ficha Apple:** App Privacy, classificação etária, criptografia, instruções de revisão, acesso de demonstração sem credenciais pessoais e capturas reais. Definir distribuição geográfica antes das declarações territoriais, como status de comerciante na UE.
-9. **TestFlight primeiro:** validar Apple com e-mail oculto, vínculo Google/Apple mantendo UUID, exclusão/revogação, grupos, presença, caixa, convites, reservas e vouchers. Revisão/publicação App Store vem após essa validação.
+1. **Exclusão de contas:** reconciliar o incremento de 27/10 com os dados e obrigações atuais do Marketplace antes de aplicá-lo. `account_deletion_requests` e a nova versão de `delete-beta-user` continuam pendentes; a migração antiga completa não foi implantada.
+2. **Privacidade e e-mail oculto:** revisar a minuta para Apple, revogação/exclusão e Marketplace, definir versão/vigência e configurar as fontes de e-mail no Private Email Relay conforme os remetentes efetivamente usados.
+3. **Assinatura:** gerar a distribuição para aparelho em Mac autorizado ou serviço de build autorizado. A compilação de simulador já passou; ainda não há IPA assinado nem build no TestFlight.
+4. **Ficha Apple:** completar App Privacy, classificação etária, criptografia, descrição, instruções de revisão, acesso de demonstração e capturas reais. Conferir a distribuição inicial no Brasil antes de qualquer declaração territorial.
+5. **Teste real:** Apple com e-mail oculto, vínculo Google/Apple mantendo UUID, exclusão/revogação, lista privada, bloqueios, papéis, Pix simulado, volta à Comunidade, perda de sessão, grupos, presença, caixa, convites, reservas e vouchers.
+6. **Liberação:** ativar os botões Apple apenas após validar o fluxo completo e a privacidade. TestFlight primeiro; revisão e publicação na App Store depois.
 
 APNs segue fora da implementação atual. Os avisos são consultáveis no app; não anunciar push em segundo plano antes de implementar e testar.
 

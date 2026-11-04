@@ -1,5 +1,5 @@
 import {encryptToken,revokeAppleGrant} from '../../supabase/functions/_shared/apple.ts';
-import {generateKeyPair,exportPKCS8,jwtVerify} from '../../supabase/functions/node_modules/jose/dist/webapi/index.js';
+import {generateKeyPair,exportPKCS8,jwtVerify} from 'npm:jose@6.2.13';
 const assert=(value:unknown,message:string)=>{if(!value)throw new Error(message);};
 const keys=await generateKeyPair('ES256',{extractable:true});
 Deno.env.set('APPLE_PRIVATE_KEY',await exportPKCS8(keys.privateKey));

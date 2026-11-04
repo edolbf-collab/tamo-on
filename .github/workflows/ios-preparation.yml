@@ -30,6 +30,11 @@ jobs:
       - run: npm run test:auth
       - name: Validar integração e autorização
         run: node --test ../integration/auth/tests/*.test.mjs ../integration/marketplace/tests/*.test.mjs ../integration/community/tests/*.test.mjs
+      - name: Validar cifragem e revogação Apple
+        working-directory: supabase/functions
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx --yes deno@2.9.6 test --node-modules-dir=manual --no-remote --no-lock --allow-env ../../tests/ios-preparation/apple.test.ts
       - name: Compilar para simulador (sem assinatura ou envio)
         run: >-
           xcodebuild -project ios/App/App.xcodeproj -scheme App
