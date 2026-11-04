@@ -24,7 +24,9 @@ A branch histórica `ios-build-165` foi atualizada com a main `094d2f16c40272c88
 
 `npm ci --prefix mobile`, `npm run sync --prefix mobile` e `npm run check --prefix mobile` concluídos. São verificados versão, Team ID, recursos locais e separação de segredos do servidor.
 
-153 testes automatizados de autorização, integração e vinculação e 20 verificações de interface passaram, incluindo a entrada nativa do Marketplace. Os testes usam contas simuladas e não substituem login Apple real, compilação Swift, assinatura, iPhone ou revisão Apple. O workflow registra separadamente o resultado de compilação do simulador.
+153 testes automatizados de autorização, integração e vinculação e 20 verificações de interface passaram, incluindo a entrada nativa do Marketplace. Os testes usam contas simuladas e não substituem login Apple real, assinatura, testes em iPhone ou revisão Apple.
+
+A [execução 41752518492](https://github.com/edolbf-collab/tamo-on/actions/runs/41752518492), sobre o commit `e62dae42aeb86a2e59563426f388178786a047d0`, passou em todas as etapas: Xcode **26.6**, 153 testes (6 de autenticação nativa + 147 de integração), empacotamento e compilação Swift para simulador, concluída com `BUILD SUCCEEDED`. É uma compilação sem assinatura; não foi gerado IPA de distribuição nem enviado build ao TestFlight.
 
 ## Ordem até TestFlight
 
