@@ -11,6 +11,7 @@ const project=read('ios/App/App.xcodeproj/project.pbxproj');
 const release=JSON.parse(fs.readFileSync(path.join(root,'../version.json'),'utf8'));
 for(const item of ['TamoonNativePlugin.swift in Sources','PrivacyInfo.xcprivacy in Resources',`CURRENT_PROJECT_VERSION = ${release.build}`,`MARKETING_VERSION = 1.0.${release.build}`,'DEVELOPMENT_TEAM = 4T892ZTN46','CODE_SIGN_ENTITLEMENTS = App/App.entitlements'])assert(project.includes(item),item);
 assert(read('ios/App/App/Base.lproj/Main.storyboard').includes('TamoonViewController'));
+assert(/rootViewController\s*=\s*TamoonViewController\(\)/.test(read('ios/App/App/SceneDelegate.swift')), 'Scene startup must register the native session plugin');
 assert(read('ios/App/App/App.entitlements').includes('com.apple.developer.applesignin'));
 assert(read('ios/App/App/Info.plist').includes('br.app.tamoon'));
 assert(!fs.existsSync(path.join(root,'www/backend')));assert(!fs.existsSync(path.join(root,'www/supabase')));
