@@ -24,11 +24,12 @@ concurrency:
 jobs:
   testflight:
     if: github.ref == 'refs/heads/main'
-    # Match the runner and default Xcode used by the successful build 169.
-    runs-on: macos-latest
+    # Use the macOS 15 ARM pool while macOS 26 runner capacity is constrained.
+    runs-on: macos-15
     timeout-minutes: 30
     environment: testflight
     env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
       TF_SOURCE_SHA: ${{ inputs.source_sha }}
       TF_BUILD_NUMBER: ${{ inputs.build_number }}
     steps:
@@ -60,7 +61,10 @@ jobs:
       - name: Preparar o pacote validado
         run: |
           set -euo pipefail
+          test "$(uname -m)" = arm64
+          test -d "$DEVELOPER_DIR"
           xcodebuild -version
+          test "$(xcodebuild -version | head -1)" = 'Xcode 26.3'
           major=$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)
           test "$major" -ge 26
           npm ci --prefix mobile --no-audit --no-fund
