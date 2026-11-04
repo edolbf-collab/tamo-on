@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../../../app.js', import.meta.url), 'utf8');
 const personal = ['profile', 'notification-settings', 'community-safety', 'legal-documents',
-  'report-problem', 'about-diagnostics', 'sign-out'];
+  'report-problem', 'about-diagnostics', 'account-delete', 'sign-out'];
 const member = ['announcement-center', 'invite'];
 const organizer = ['announcement', 'players'];
 const admin = ['group-settings', 'manage-roles'];
@@ -46,12 +46,12 @@ function community(role = null, platformAdmin = false) {
 
 for (const [label, role, platformAdmin, extra] of [
   ['active account without a group', null, false, []],
-  ['platform admin without a group', null, true, ['platform-admin']],
+  ['platform admin without a group', null, true, ['platform-admin', 'deletion-admin']],
   ['member', 'member', false, member],
   ['treasurer', 'treasurer', false, member],
   ['organizer', 'organizer', false, [...member, ...organizer]],
   ['group admin', 'admin', false, [...member, ...organizer, ...admin]],
-  ['group owner and platform admin', 'owner', true, [...member, ...organizer, ...admin, 'platform-admin', 'export']]
+  ['group owner and platform admin', 'owner', true, [...member, ...organizer, ...admin, 'platform-admin', 'deletion-admin', 'export']]
 ]) {
   test('More navigation shows the permitted actions for ' + label, () => {
     const {open} = community(role, platformAdmin);
