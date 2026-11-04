@@ -114,8 +114,18 @@ jobs:
             -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Tamoon.xcarchive" \
             CURRENT_PROJECT_VERSION="$TF_BUILD_NUMBER" CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=4T892ZTN46 "${AUTH[@]}" archive
+            CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            DEVELOPMENT_TEAM=4T892ZTN46 archive
           python3 mobile/scripts/verify-archive.py "$RUNNER_TEMP/Tamoon.xcarchive" "$TF_BUILD_NUMBER"
+          codesign -d --entitlements :- "$RUNNER_TEMP/Tamoon.xcarchive/Products/Applications/App.app" \
+            2>/dev/null > "$RUNNER_TEMP/tamoon-archive-entitlements.plist"
+          python3 - <<'PY'
+          import os, pathlib, plistlib
+          path=pathlib.Path(os.environ['RUNNER_TEMP'])/'tamoon-archive-entitlements.plist'
+          entitlements=plistlib.loads(path.read_bytes())
+          assert entitlements.get('com.apple.developer.applesignin') == ['Default'], 'Archive sem autorização Apple Sign In'
+          print('Entitlement Apple Sign In preservado antes da assinatura de distribuição.')
+          PY
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Tamoon.xcarchive" \
             -exportOptionsPlist mobile/ExportOptions-TestFlight.plist \
             -exportPath "$RUNNER_TEMP/tamoon-export" "${AUTH[@]}"
