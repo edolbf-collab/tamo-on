@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 116,
   "mandatory": false,
-  "notes": "Solicitação de exclusão dentro do app, protocolo e revisão dos dados da Comunidade e do Marketplace.",
+  "notes": "Pedido único de exclusão da conta do Tâmo On, centralizado no menu Mais.",
   "label": "Tâmo On Beta 1.0 Build 168",
-  "integration": "168-R1"
+  "integration": "168-R2"
 }
