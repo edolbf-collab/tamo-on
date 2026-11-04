@@ -24,10 +24,12 @@ concurrency:
 jobs:
   testflight:
     if: github.ref == 'refs/heads/main'
-    runs-on: macos-latest
+    # Avoid the macOS ARM capacity queue; keep the iOS toolchain explicit.
+    runs-on: macos-15-intel
     timeout-minutes: 30
     environment: testflight
     env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
       TF_SOURCE_SHA: ${{ inputs.source_sha }}
       TF_BUILD_NUMBER: ${{ inputs.build_number }}
     steps:
