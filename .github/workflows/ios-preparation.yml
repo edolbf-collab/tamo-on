@@ -25,9 +25,11 @@ jobs:
       - name: Validar limites da tela e navegação local em sete tamanhos
         run: node tests/home-layout.test.mjs
   simulator:
-    # Match the runner and default Xcode used by the successful build 169.
-    runs-on: macos-latest
+    # Use the macOS 15 ARM pool while macOS 26 runner capacity is constrained.
+    runs-on: macos-15
     timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     defaults:
       run:
         working-directory: mobile
@@ -38,9 +40,13 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-      - name: Verificar Xcode
+      - name: Verificar macOS ARM e Xcode 26.3
         run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          test -d "$DEVELOPER_DIR"
           xcodebuild -version
+          test "$(xcodebuild -version | head -1)" = 'Xcode 26.3'
           major=$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)
           test "$major" -ge 26
       - name: Iniciar simulador durante a compilação
