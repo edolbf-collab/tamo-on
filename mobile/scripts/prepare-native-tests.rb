@@ -10,6 +10,8 @@ tests = project.new_target(:unit_test_bundle, 'NativeStartupTests', :ios, '15.0'
 tests.add_dependency(app)
 file = project.main_group.new_file('../../tests/NativeStartupTests.swift')
 tests.source_build_phase.add_file_reference(file)
+fixture = project.main_group.new_file('../../tests/home-fixture.js')
+tests.resources_build_phase.add_file_reference(fixture)
 tests.build_configurations.each do |config|
   config.build_settings['PRODUCT_NAME'] = '$(TARGET_NAME)'
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'br.app.tamoon.NativeStartupTests'

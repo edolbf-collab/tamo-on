@@ -147,6 +147,8 @@
     move(localStorage, "-pending-invite", "tamoon-pending-invite");
   };
   const appBaseUrl = () => new URL("./", document.baseURI).href;
+  // Capacitor treats extensionless paths as Community SPA routes.
+  const marketplaceUrl = query => `${window.TamoonNative?.isIOS ? "/marketplace/index.html" : "/marketplace/"}${query}`;
   const assetUrl = path => new URL(path, document.baseURI).href;
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
@@ -1339,7 +1341,7 @@
         if(error)throw error;
         const labels={standby_payment:"Aguardando pagamento simulado",published:"Pagamento simulado confirmado",cancelled:"Reserva cancelada"};
         const rows=(data.events||[]).map(e=>`<article class="card"><strong>${escapeHtml(e.code||"Reserva")}</strong><p>${escapeHtml(labels[e.state]||e.state)}</p><p>${escapeHtml(new Date(e.starts_at).toLocaleString("pt-BR"))} · ${Number(e.amount||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})} (simulado)</p>${e.match_id?`<button class="btn btn-secondary" data-pilot-match="${escapeHtml(e.match_id)}">Abrir jogo</button>`:"<small>O jogo novo será publicado depois da confirmação do sandbox.</small>"}</article>`).join("");
-        this.modal(`Reservas de teste — ${data.name}`,`<p>Valores de sandbox, sem lançamento no caixa do grupo.</p>${rows||"<p>Nenhuma reserva sincronizada.</p>"}<a class="btn btn-primary" href="/marketplace/?page=reservations">Ver minhas reservas</a>`,(root,close)=>{
+        this.modal(`Reservas de teste — ${data.name}`,`<p>Valores de sandbox, sem lançamento no caixa do grupo.</p>${rows||"<p>Nenhuma reserva sincronizada.</p>"}<a class="btn btn-primary" href="${marketplaceUrl("?page=reservations")}">Ver minhas reservas</a>`,(root,close)=>{
           root.querySelectorAll("[data-pilot-match]").forEach(button=>button.addEventListener("click",async()=>{
             close();this.state=await this.repo.init(data.group_id);this.render();this.openRsvp(button.dataset.pilotMatch);
           }));
@@ -2401,7 +2403,7 @@
           rsvp: () => this.openRsvp(data.id || this.nextMatch()?.id),
           "home-game-response": () => this.setHomeGameResponse(data.id, data.value),
           "home-bbq-response": () => this.setHomeBbqResponse(data.id, data.value),
-          "playing-spaces": () => this.state.marketplace_pilot ? location.assign("/marketplace/?page=discover") : this.toast("Onde jogar está em construção. O acesso será liberado quando a Comunidade for conectada aos espaços parceiros."),
+          "playing-spaces": () => this.state.marketplace_pilot ? location.assign(marketplaceUrl("?page=discover")) : this.toast("Onde jogar está em construção. O acesso será liberado quando a Comunidade for conectada aos espaços parceiros."),
           "draw-teams": () => this.openTeamsForMatch(data.id),
           "configure-teams": () => this.drawTeams(data.id, Number($("#teamCountSelect")?.value || 2)),
           "clear-teams": () => this.undoTeamSeparation(data.id),

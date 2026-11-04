@@ -6,6 +6,24 @@ on:
 permissions:
   contents: read
 jobs:
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps webkit
+      - name: Validar limites da tela e navegação local em sete tamanhos
+        run: node tests/home-layout.test.mjs
   simulator:
     runs-on: macos-latest
     timeout-minutes: 25
