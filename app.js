@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 168, database: 152, edge: 116, integration: "168-R1" });
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 168, database: 152, edge: 116, integration: "168-R2" });
   const APP_ASSET_TOKEN = "beta167r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
@@ -2011,7 +2011,7 @@
     },
 
     emptyGroupPage() {
-      return `<section class="welcome-field"><div class="welcome-overlay"><img src="brand/tamo-on-logo-horizontal-negative.svg" alt="" class="welcome-mark"><span class="eyebrow">CONTA TÂMO ON CONECTADA</span><h1>Monte seu grupo</h1><p>Crie um grupo com escudo próprio ou entre usando um código de convite.</p><div class="welcome-actions"><button class="btn btn-primary btn-small" data-action="create-group">+ Criar grupo</button><button class="btn btn-secondary btn-small" data-action="join-group">Inserir código</button><button class="btn btn-secondary btn-small" data-action="community-safety">Segurança e convivência</button>${this.state.marketplace_pilot ? `<button class="btn btn-primary btn-small" data-action="playing-spaces">Onde jogar, quadras e reservas</button>` : ""}<button class="btn btn-secondary btn-small" data-action="account-delete">Excluir minha conta</button></div></div></section>`;
+      return `<section class="welcome-field"><div class="welcome-overlay"><img src="brand/tamo-on-logo-horizontal-negative.svg" alt="" class="welcome-mark"><span class="eyebrow">CONTA TÂMO ON CONECTADA</span><h1>Monte seu grupo</h1><p>Crie um grupo com escudo próprio ou entre usando um código de convite.</p><div class="welcome-actions"><button class="btn btn-primary btn-small" data-action="create-group">+ Criar grupo</button><button class="btn btn-secondary btn-small" data-action="join-group">Inserir código</button><button class="btn btn-secondary btn-small" data-action="community-safety">Segurança e convivência</button>${this.state.marketplace_pilot ? `<button class="btn btn-primary btn-small" data-action="playing-spaces">Onde jogar, quadras e reservas</button>` : ""}</div></div></section>`;
     },
 
     homePage() {

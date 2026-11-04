@@ -26,9 +26,10 @@ await page.evaluate(()=>{
  App.state={is_platform_admin:false};
 });
 await page.evaluate(()=>TamoonLegal.openCenter(App));
-check(await page.locator('#legalCenterDelete').count()===1,'Deletion remains accessible when legal document fetch fails');
-await page.locator('#legalCenterDelete').click();await page.locator('#deletionForm').waitFor();
+check(await page.locator('#legalCenterDelete').count()===0,'Documents and privacy does not duplicate the deletion action');
+await page.evaluate(()=>TamoonDeletion.open(App));await page.locator('#deletionForm').waitFor();
 check((await page.locator('#deletionContent').innerText()).includes('30 dias'),'Deadline shown before confirmation');
+check((await page.locator('#deletionContent').innerText()).includes('em todo o aplicativo')&&!/Comunidade|Marketplace/.test(await page.locator('#deletionContent').innerText()),'User requests deletion of one complete Tâmo On account');
 await page.locator('#deletionForm button').click();
 check(await page.evaluate(()=>calls.filter(c=>c.name==='request_my_account_deletion').length)===0,'Unchecked confirmation cannot submit');
 await page.locator('#deletionForm input').check();await page.locator('#deletionForm button').click();

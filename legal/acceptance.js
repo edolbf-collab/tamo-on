@@ -146,11 +146,10 @@
       }
     },
     async openCenter(app) {
-      // O pedido de exclusão é público e não depende da consulta dos documentos.
+      // Este centro reúne os documentos; a solicitação de exclusão fica no menu Mais.
       let documents;
-      app.modal('Documentos e privacidade',`<div class="legal-center"><section class="legal-deletion-card" aria-labelledby="legalDeletionTitle"><h3 id="legalDeletionTitle">Excluir minha conta</h3><p>Solicite a exclusão aqui e acompanhe pelo protocolo, sem enviar e-mail.</p><button type="button" class="btn btn-danger-outline btn-block" id="legalCenterDelete">Solicitar exclusão da conta</button></section><div id="legalCenterDocuments"><p role="status">Carregando documentos…</p></div></div>`,root=>{
+      app.modal('Documentos e privacidade',`<div class="legal-center"><div id="legalCenterDocuments"><p role="status">Carregando documentos…</p></div></div>`,root=>{
         documents=root.querySelector('#legalCenterDocuments');
-        root.querySelector('#legalCenterDelete').onclick=()=>window.TamoonDeletion.open(app);
       });
       try {
         const data=await request(app.repo,'get_community_legal_status');
@@ -170,7 +169,7 @@
         });
       }catch(error){
         if(!documents?.isConnected)return;
-        documents.innerHTML='<p class="legal-status" role="status">Não foi possível carregar os documentos agora. O pedido de exclusão continua disponível acima.</p><p><a href="/legal/" target="_blank" rel="noopener noreferrer">Consultar os documentos na página pública</a></p>';
+        documents.innerHTML='<p class="legal-status" role="status">Não foi possível carregar os documentos agora. Tente novamente ou consulte a página pública.</p><p><a href="/legal/" target="_blank" rel="noopener noreferrer">Consultar os documentos na página pública</a></p>';
       }
     }
   };
