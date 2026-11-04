@@ -1,4 +1,5 @@
 # Add a hosted XCTest target only in the CI checkout, never to the distributed app.
+gem 'xcodeproj', '1.27.0'
 require 'xcodeproj'
 mobile = File.expand_path('..', __dir__)
 project_path = File.join(mobile, 'ios/App/App.xcodeproj')
@@ -10,6 +11,7 @@ tests.add_dependency(app)
 file = project.main_group.new_file('../../tests/NativeStartupTests.swift')
 tests.source_build_phase.add_file_reference(file)
 tests.build_configurations.each do |config|
+  config.build_settings['PRODUCT_NAME'] = '$(TARGET_NAME)'
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'br.app.tamoon.NativeStartupTests'
   config.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'
   config.build_settings['SWIFT_VERSION'] = '5.0'
