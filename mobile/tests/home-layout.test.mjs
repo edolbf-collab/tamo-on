@@ -30,7 +30,7 @@ try {
     const page=await context.newPage();
     await page.goto(origin);
     await page.waitForSelector('#googleLoginButton');
-    await page.evaluate(`async()=>{${fixture}}`);
+    await page.evaluate(`(async()=>{${fixture}})()`);
     const initial=await page.evaluate(()=>{
       const main=document.querySelector('#mainContent'),nav=document.querySelector('.bottom-nav'),header=document.querySelector('.topbar');
       return {width:innerWidth,height:innerHeight,bodyWidth:document.body.scrollWidth,shell:document.querySelector('#app').getBoundingClientRect().toJSON(),main:main.getBoundingClientRect().toJSON(),nav:nav.getBoundingClientRect().toJSON(),header:header.getBoundingClientRect().toJSON(),scrollHeight:main.scrollHeight,clientHeight:main.clientHeight};
