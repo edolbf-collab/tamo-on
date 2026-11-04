@@ -15,14 +15,14 @@ const session=u=>({access_token:jwt,refresh_token:'test-only',token_type:'bearer
  await new Promise(resolve=>server.listen(8778,'127.0.0.1',resolve));
  const browser=await webkit.launch({headless:true});
  const base='http://127.0.0.1:8778';
- async function scenario({platform='ios',enabled=true,loggedIn=false,width=390}={}){
+ async function scenario({platform='ios',enabled,loggedIn=false,width=390}={}){
   const context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',userAgent:platform.startsWith('android')?'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36':platform==='ios'?'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1':'Mozilla/5.0 Macintosh Safari'});
   if(platform==='android-app')await context.addInitScript(()=>{const original=window.matchMedia.bind(window);window.matchMedia=q=>q==='(display-mode: standalone)'?{matches:true}:original(q);});
   const page=await context.newPage(),errors=[],calls=[];let current=user(),conflict=false;
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('https://cdn.jsdelivr.net/**',r=>r.fulfill({contentType:'text/javascript',body:sdk}));
   await page.route('https://static.cloudflareinsights.com/**',r=>r.fulfill({contentType:'text/javascript',body:''}));
-  await page.route('**/auth-config.js?*',r=>r.fulfill({contentType:'text/javascript',body:`window.TAMOON_AUTH_CONFIG={appleEnabled:${enabled},linkingEnabled:${enabled}};`}));
+  if(enabled!==undefined)await page.route('**/auth-config.js?*',r=>r.fulfill({contentType:'text/javascript',body:`window.TAMOON_AUTH_CONFIG={appleEnabled:${enabled},linkingEnabled:${enabled}};`}));
   await page.route('**/supabase-config.js?*',r=>r.fulfill({contentType:'text/javascript',body:`window.TAMOON_CONFIG={supabaseUrl:'https://xvwgrpnioaqyijhzqxqh.supabase.co',supabasePublishableKey:'sb_publishable_test',authRedirectUrl:'${base}/'};`}));
   await page.route('https://*.supabase.co/**',async r=>{
    const url=new URL(r.request().url());calls.push({url:url.href,body:r.request().postDataJSON?.(),headers:r.request().headers()});let data=[],status=200;
@@ -47,6 +47,7 @@ const session=u=>({access_token:jwt,refresh_token:'test-only',token_type:'bearer
   for(const platform of ['ios','desktop','android-browser','android-app'])for(const width of [320,390]){
    const f=await scenario({platform,width});const {page}=f;
    await page.locator('#googleLoginButton').waitFor();
+   assert.equal(await page.getByRole('link',{name:'Privacidade no acesso com Apple',exact:true}).count(),1);
    assert.equal(await page.locator('#appleLoginButton').isVisible(),platform!=='android-app');
    if(platform==='android-app'){await page.getByText('Outras formas de entrar',{exact:true}).click();assert.equal(await page.locator('#appleLoginButton').isVisible(),true);}
    const widths=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,width:innerWidth}));assert.ok(widths.scroll<=widths.width);
@@ -57,6 +58,8 @@ const session=u=>({access_token:jwt,refresh_token:'test-only',token_type:'bearer
   const disabled=await scenario({enabled:false});await disabled.page.locator('#googleLoginButton').waitFor();assert.equal(await disabled.page.locator('#appleLoginButton').count(),0);
   await disabled.page.locator('#googleLoginButton').click();await disabled.page.waitForURL('https://xvwgrpnioaqyijhzqxqh.supabase.co/auth/v1/authorize?*');
   const oauth=new URL(disabled.page.url());assert.equal(oauth.searchParams.get('provider'),'google');assert.equal(oauth.searchParams.get('code_challenge_method'),'s256');assert.ok(oauth.searchParams.get('code_challenge'));await disabled.context.close();
+  const apple=await scenario();await apple.page.locator('#appleLoginButton').click();await apple.page.waitForURL('https://xvwgrpnioaqyijhzqxqh.supabase.co/auth/v1/authorize?*');
+  const appleOauth=new URL(apple.page.url());assert.equal(appleOauth.searchParams.get('provider'),'apple');assert.equal(appleOauth.searchParams.get('code_challenge_method'),'s256');assert.ok(appleOauth.searchParams.get('code_challenge'));await apple.context.close();
   const f=await scenario({loggedIn:true});await f.page.waitForFunction(()=>window.App?.ready);
   await f.page.evaluate(()=>App.openProfileModal());await f.page.locator('#profileAccessButton').click();
   await f.page.getByRole('button',{name:'Vincular Apple',exact:true}).waitFor();
@@ -69,6 +72,6 @@ const session=u=>({access_token:jwt,refresh_token:'test-only',token_type:'bearer
   await f.page.goto(base+'/?code=test-only');await f.page.getByText('Apple vinculado à sua conta.',{exact:false}).waitFor();
   assert.equal(await f.page.evaluate(()=>App.state.profile.id),id);assert.equal(await f.page.evaluate(()=>App.state.profile.email),'original@example.test');
   assert.equal(await f.page.getByText('Vinculado',{exact:true}).count(),2);assert.deepEqual(f.errors,[]);await f.context.close();
-  console.log('Auth browser: 8 platform/width presentations, disabled Apple, real SDK Google PKCE, duplicate-account refusal and Apple linking callback with preserved UUID: PASS');
+  console.log('Auth browser: 8 platform/width presentations, disabled Apple, real SDK Google/Apple PKCE, duplicate-account refusal and Apple linking callback with preserved UUID: PASS');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -35,3 +35,10 @@ jobs:
         env:
           TAMOON_TEST_ENGINE: webkit
         run: node tests/account-deletion/web.cjs
+      - name: WebKit Apple login and linking with production flags
+        env:
+          NODE_PATH: ./tests/account-deletion/node_modules
+          AUTH_TEST_SDK: /tmp/tamoon-supabase-sdk.js
+        run: |
+          curl --fail --silent --show-error --location https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.7/dist/umd/supabase.min.js --output "$AUTH_TEST_SDK"
+          node integration/auth/tests/browser.cjs

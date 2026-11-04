@@ -1,3 +1,5 @@
+> Atualização 168-R3: Apple e vinculação habilitados nesta entrega, com aviso complementar de privacidade e cache atualizado. O pedido único de exclusão do Build 168 já está em produção, com revisão administrativa; a migração destrutiva antiga não deve ser aplicada. Consulte [o estado atual e as pendências](../ATIVACAO-APPLE-168-R3.md). O texto abaixo registra a preparação anterior.
+
 # Ativação Apple e preparação iOS — 3/11/2026 (BRT)
 
 ## Confirmado na Apple

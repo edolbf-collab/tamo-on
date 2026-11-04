@@ -146,7 +146,7 @@
       const apple = `<button id="appleLoginButton" class="apple-login-button" type="button" data-auth-provider="apple">${appleIcon}<span>Continuar com Apple</span></button>`;
       message.insertAdjacentHTML('beforebegin', androidApp() ? `<details class="other-login"><summary>Outras formas de entrar</summary>${apple}</details>` : apple);
       message.textContent = 'Escolha uma forma de acesso para continuar.';
-      card.insertAdjacentHTML('beforeend','<p class="account-link-help">Já usa o Tâmo On? Entre pela opção habitual e vincule a outra em Meu perfil → Formas de acesso.</p>');
+      card.insertAdjacentHTML('beforeend','<p class="account-link-help">Já usa o Tâmo On? Entre pela opção habitual e vincule a outra em Meu perfil → Formas de acesso.</p><p class="account-link-help"><a href="/legal/privacidade-v1.2.html#acesso-apple">Privacidade no acesso com Apple</a></p>');
     }
     let busy = false;
     card.querySelectorAll('[data-auth-provider]').forEach(button => button.addEventListener('click', async () => {
@@ -174,7 +174,7 @@
         ? `<button type="button" class="btn btn-secondary" data-link-provider="${provider}">Vincular ${label}</button>` : '<span class="access-pending">Disponível em breve</span>';
       return `<div class="access-method"><strong>${label}</strong>${action}</div>`;
     }).join('');
-    app.modal('Formas de acesso', `<p>Use Google ou Apple para entrar na mesma conta Tâmo On.</p><div class="access-methods">${rows}</div><p class="access-help">Ao vincular, confirme o acesso à conta escolhida. Seus grupos, reservas e pagamentos permanecem nesta conta.</p><p id="accessMethodStatus" role="status" aria-live="polite"${notice?.ok === false ? ' class="error-text"' : ''}>${escape(notice?.message)}</p><div class="access-close"><button type="button" class="btn btn-secondary" id="closeAccessMethods">Fechar</button></div>`, (root, close) => {
+    app.modal('Formas de acesso', `<p>Use Google ou Apple para entrar na mesma conta Tâmo On.</p><div class="access-methods">${rows}</div><p class="access-help">Ao vincular, confirme o acesso à conta escolhida. Seus grupos, reservas e pagamentos permanecem nesta conta. Você pode escolher Ocultar meu e-mail na Apple.</p><p class="access-help"><a href="/legal/privacidade-v1.2.html#acesso-apple">Privacidade no acesso com Apple</a></p><p id="accessMethodStatus" role="status" aria-live="polite"${notice?.ok === false ? ' class="error-text"' : ''}>${escape(notice?.message)}</p><div class="access-close"><button type="button" class="btn btn-secondary" id="closeAccessMethods">Fechar</button></div>`, (root, close) => {
       root.querySelector('#closeAccessMethods').onclick = close;
       let busy = false;
       const buttons = [...root.querySelectorAll('[data-link-provider]')];

@@ -1,10 +1,14 @@
-# Login e vinculação Google/Apple — preparação 166-R18
+# Login e vinculação Google/Apple — ativação 168-R3
+
+**4/11/2026:** Apple e vinculação habilitados no piloto. O servidor já tem provedor Apple, vinculação manual e retornos configurados. A verificação HTTP confirmou Google e Apple ativos e o redirecionamento Apple com o Services ID e callback esperados. O aviso complementar está na política de privacidade; a exclusão é uma solicitação unificada com revisão administrativa, conforme Build 168. A validação real com a Conta Apple no iPhone e a distribuição TestFlight continuam pendentes.
+
+O roteiro abaixo registra a preparação original; o estado atual e os limites estão em `ATIVACAO-APPLE-168-R3.md`.
 
 O código web/Android está na `main`. A preparação nativa foi atualizada em `ios-build-165`, sobre a preparação iOS já existente, sem substituir a base integrada 166. `auth-config.js`, `auth-access.js` e `auth-access.css` são idênticos nas duas branches. Ao preparar o próximo iOS com a build integrada mais recente, preservar o adaptador `mobile/src/native.js`, o plugin Swift e as funcionalidades nativas anteriores. Não distribuir a antiga interface 165 como se fosse a última build 166.
 
 ## Estado desta entrega
 
-- `appleEnabled: false` e `linkingEnabled: false`. Login Google continua disponível; Apple não aparece na entrada pública enquanto não estiver configurada. Em Meu perfil → Formas de acesso, Google aparece vinculado e Apple disponível em breve.
+- `appleEnabled: true` e `linkingEnabled: true`. Login Google preservado. Apple disponível na entrada e em Meu perfil → Formas de acesso.
 - Quando habilitada: web (inclusive navegador Android) e iOS mostram Google e Apple. Android instalado/TWA agrupa Apple em **Outras formas de entrar**. A identificação de plataforma só controla apresentação; não concede acesso.
 - Vinculação só parte de uma sessão autenticada, usando `linkIdentity`. A identidade interna permanece a mesma. O fluxo não altera e-mail principal, perfis, permissões, reservas, vouchers ou pagamentos.
 - A tentativa local guarda apenas provedor, UUID de origem e horário, por até 20 minutos; nunca guarda tokens do provedor. O retorno é conferido com `getUser` no servidor. Conta diferente encerra a sessão local e não é anunciada como vinculação bem-sucedida.
@@ -12,7 +16,7 @@ O código web/Android está na `main`. A preparação nativa foi atualizada em `
 - O SDK web está fixado em 2.110.7, igual ao pacote nativo existente. OAuth usa PKCE; iOS mantém sessão no Keychain.
 - Nenhuma conta, sessão ou credencial Apple real foi criada para os testes. Não foram alterados documentos legais, permissões RLS, schema, configuração Auth ou a lista de três contas do Marketplace.
 
-## Ativação depois da liberação Apple
+## Roteiro original de preparação (histórico)
 
 1. Confirmar Apple Developer Program ativo e Team ID. Manter o Bundle ID `br.app.tamoon`, habilitar Sign in with Apple e configurar assinatura no Xcode.
 2. Criar **Services ID** para web/Android, associado ao **mesmo App ID primário** do iOS. Esse agrupamento deve ser validado para que a identidade Apple seja reconhecida entre web e aplicativo nativo. Não configurar os dois como aplicações Apple independentes.

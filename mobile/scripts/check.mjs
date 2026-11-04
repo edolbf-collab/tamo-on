@@ -30,8 +30,8 @@ for(const asset of JSON.parse(read('www/marketplace/pilot-assets.json')))assert(
 const secretPatterns=[/-----BEGIN (?:EC |RSA )?PRIVATE KEY-----/,/sb_secret_[A-Za-z0-9]/,/APPLE_PRIVATE_KEY\s*[:=]/];
 for(const filename of ['www/native.js','www/supabase-config.js'])for(const pattern of secretPatterns)assert(!pattern.test(read(filename)),`${filename} contains a server secret`);
 console.log('Estrutura iOS, versão, recursos, política de conteúdo e separação de secrets: OK.');
-console.log('A compilação Swift, assinatura e testes no iPhone exigem Xcode/macOS e ainda não foram executados.');
+console.log('Esta checagem não substitui compilação Swift, assinatura ou teste em iPhone.');
 
 for(const name of ['auth-config.js','auth-access.js','auth-access.css'])assert(fs.existsSync(path.join(root,'www',name)));
-assert(read('www/auth-config.js').includes('appleEnabled: false'));
-assert(read('www/auth-config.js').includes('linkingEnabled: false'));
+assert(read('www/auth-config.js').includes('appleEnabled: true'));
+assert(read('www/auth-config.js').includes('linkingEnabled: true'));
