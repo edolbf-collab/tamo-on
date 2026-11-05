@@ -6,6 +6,6 @@
   <key>teamID</key><string>4T892ZTN46</string>
   <key>signingStyle</key><string>automatic</string>
   <key>manageAppVersionAndBuildNumber</key><false/>
-  <key>testFlightInternalTestingOnly</key><true/>
+  <key>testFlightInternalTestingOnly</key><false/>
   <key>uploadSymbols</key><true/>
 </dict></plist>
