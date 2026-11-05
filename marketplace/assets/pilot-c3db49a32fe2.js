@@ -496,7 +496,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if (voucherRefreshError) throw voucherRefreshError;
     const [voucherStateResult, cancellationResult, ledgerResult, financialReconciliationResult, paymentResponsibleDirectoryResult, partnerDocumentsResult, partnerTeamResult, communityNotificationsResult,
       monthlyLinksResult, monthlyLinkDirectoryResult, monthlySplitDirectoryResult, monthlyCyclesResult, monthlyPreReservationsResult, monthlyStagesResult, monthlyEventsResult, monthlyRequestsResult, occurrenceTransfersResult, reservationFinancialStatusResult, partnerOnboardingResult, partnerClientsResult,
-      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult] = await readDirectories([
+      scheduleDetailsResult, adminUsersResult, adminReservationsResult, initialSlotFlagsResult, voucherRestitutionResult] = await readDirectories([
       () => c.from("marketplace_voucher_effective_state").select("*").order("created_at", { ascending: false }),
       () => c.from("cancellation_requests").select("*").order("created_at", { ascending: false }),
       () => c.from("accounting_ledger").select("*").order("created_at", { ascending: false }),
@@ -520,8 +520,10 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       () => snapshot.partner_memberships?.length ? c.from("schedule_slots").select("id,venue_space_id,series_id,monthly_link_key,starts_at,ends_at,status,blocked_reason,blocked_at") : Promise.resolve({data:[]}),
       () => snapshot.is_admin===true ? c.rpc("admin_marketplace_users") : Promise.resolve({data:[]}),
       () => snapshot.is_admin===true ? c.rpc("admin_search_reservations",{p_partner_id:null,p_user_id:null,p_date:null,p_status:null}) : Promise.resolve({data:[]}),
-      () => c.rpc("agenda_initial_slot_flags",{})
+      () => c.rpc("agenda_initial_slot_flags",{}),
+      () => c.rpc("voucher_restitution_directory",{})
     ]);
+    snapshot.voucher_restitutions = voucherRestitutionResult.data || [];
     snapshot.voucher_effective_state = voucherStateResult.data || [];
     snapshot.cancellation_requests = cancellationResult.data || [];
     snapshot.accounting_ledger = ledgerResult.data || [];
@@ -2346,6 +2348,29 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 
 ;
 
+;/* refund-review.js */
+(function(root){
+ const labels={pending_review:'Em análise',waiting_funds:'Aguardando saldo',approved:'Aprovada para execução',processing:'Em processamento',completed:'Concluída'};
+ function render(rows,{esc,money,date,all=false}){
+  const pending=rows.filter(r=>r.status!=='completed'),visible=all?rows:pending;
+  return `<p>Analise o pedido e registre a decisão antes de executar a devolução. A consulta de saldo é repetida no envio; nenhuma transferência para recompor saldo é feita automaticamente.</p>
+  <div class="meta-row"><strong>${pending.length} pendente(s)</strong><span>${money(pending.reduce((n,r)=>n+Number(r.pending),0))} a devolver</span><span>${pending.filter(r=>r.attention).length} para acompanhamento</span></div>
+  <p class="field-help">O destaque após 2 dias é um alerta operacional. Confira o prazo aplicável a cada caso e programe o próximo acompanhamento.</p>
+  <div class="dialog-actions"><button class="button secondary small" data-action="admin-refunds" data-all="${!all}">${all?'Ver pendentes':'Ver também concluídas'}</button><button class="button ghost small" data-action="admin-refunds" data-all="${all}">Atualizar</button></div>
+  <div class="cancellation-case-list">${visible.map(r=>`<article class="card"><h3>${esc(r.reservation_code)} · ${esc(r.partner_name)}</h3><span class="status ${r.status==='completed'?'status-ok':'status-neutral'}">${esc(labels[r.status]||r.status)}</span>${r.attention&&r.status!=='completed'?'<p><strong>Acompanhamento pendente</strong></p>':''}
+  <p>Solicitado em ${esc(date(r.requested_at))}</p><p>${esc(r.reason||'Restituição solicitada')}</p>
+  <div class="detail-line"><span>Previsto / confirmado / pendente</span><strong>${money(r.required)} / ${money(r.refunded)} / ${money(r.pending)}</strong></div>
+  ${r.assigned_to?`<p>Responsável: ${esc(r.assigned_to)}</p>`:''}${r.note?`<p>${esc(r.note)}</p>`:''}${r.follow_up_at?`<p>Próximo acompanhamento: ${esc(date(r.follow_up_at))}</p>`:''}
+  <details><summary>Pagamentos envolvidos</summary>${(r.payments||[]).map(p=>`<p>${esc(p.payer)} · ${esc(p.channel)} · ${money(p.amount)} pago · ${money(p.refunded)} devolvido</p>`).join('')}</details>
+  ${r.status!=='completed'?`<div class="dialog-actions">${r.status!=='processing'?`<button class="button secondary small" data-action="admin-refund-review" data-reservation-id="${esc(r.reservation_id)}">Registrar análise</button>`:''}<button class="button secondary small" data-action="asaas-refund-open" data-reservation-id="${esc(r.reservation_id)}">Conferir pagamentos e saldos</button></div>`:''}
+  ${r.status==='approved'?(r.payments||[]).filter(p=>p.choice_id&&!['asaas_pix','asaas_card'].includes(p.channel)&&Number(p.amount)>Number(p.refunded)).map(p=>`<button class="button secondary small" data-action="cancellation-cash-refund" data-choice-id="${esc(p.choice_id)}">Registrar devolução externa · ${money(Number(p.amount)-Number(p.refunded))}</button>`).join(''):''}
+  ${(r.history||[]).length?`<details><summary>Histórico administrativo</summary>${r.history.map(h=>`<p><strong>${esc(date(h.at))} · ${esc(h.actor)} · ${esc(labels[h.status]||h.status)}</strong><br>${esc(h.note)}</p>`).join('')}</details>`:''}</article>`).join('')||'<p>Nenhuma devolução nesta fila.</p>'}</div>`;
+ }
+ root.MarketplaceRefundReview={render,labels};
+})(typeof window==='undefined'?globalThis:window);
+
+;
+
 ;/* app.js */
 (function () {
   "use strict";
@@ -3675,6 +3700,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       };
     });
 
+    const restitutionByVoucher = new Map((bootstrap?.voucher_restitutions || []).map(item => [item.voucher_id, item]));
     state.cancellationVouchers = rows.filter((row) => row.origin === "cancellation").map((row) => {
       const venue = backendVoucherVenue(row);
       const status = backendVoucherStatus(row);
@@ -3689,6 +3715,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         code:String(row.code || "").toUpperCase(),
         sourceReservationId:row.source_reservation_code || (bootstrap?.reservations||[]).find(reservation=>reservation.id===row.source_reservation_id)?.public_code || row.source_reservation_id || "",
         backendSourceReservationId:row.source_reservation_id || "",
+        restitution:restitutionByVoucher.get(row.id),
         ownerUserId:row.owner_user_id || "",
         user:row.owner_name || (ownerIsCurrent ? state.userProfile.name : "Usuário da reserva"),
         venueId:venue.id,
@@ -4670,6 +4697,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if(/PREBOOKING_EVENT_INVALID/.test(message))return "O evento não está mais disponível para este grupo e horário. Abra novamente a edição para escolher outro evento ou reservar sem evento.";
     if(/PREBOOKING_EVENT_LOCKED/.test(message))return "O evento vinculado já foi alterado ou publicado. Confira o vínculo antes de continuar.";
     if(/PREBOOKING_EDIT_SINGLE_ONLY/.test(message))return "Esta edição está disponível para pré-reservas avulsas. O vínculo mensalista tem regras próprias.";
+    if(/REFUND_ADMIN_REVIEW_REQUIRED/.test(message))return "Registre ou atualize a aprovação na fila de devoluções.";
+    if(/REFUND_INVALID_REVIEW/.test(message))return "Informe o encaminhamento e uma análise de 3 a 2.000 caracteres.";
+    if(/REFUND_NOT_PENDING/.test(message))return "Esta devolução já foi concluída ou mudou. Atualize a fila.";
     if(/REFUND_FORBIDDEN/.test(message))return "Você não tem permissão financeira para esta reserva.";
     if(/REFUND_SCOPE_UNSUPPORTED|REFUND_PAYMENT_REVIEW_REQUIRED/.test(message))return "Esta reserva exige conferência antes do reembolso. A ação disponível atende ao Pix integral avulso, sem rateio ou crédito de cancelamento utilizado.";
     if(/REFUND_SANDBOX_REQUIRED|REFUND_API_KEY_REQUIRED/.test(message))return "A integração de reembolso Sandbox precisa ser conferida pela administração.";
@@ -6915,11 +6945,11 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   function cancellationContractText() {
-    return "Cancelamento automático dentro de 7 dias corridos, contados a partir do dia seguinte à contratação, e antes do início do horário reservado. Você também pode solicitar no próprio dia da contratação. Escolha restituição integral ou voucher de uso único, válido por 90 dias, no mesmo parceiro, para reserva de valor igual ou superior. Após o prazo, o voucher deixa de ser utilizável automaticamente. Pedidos fora do fluxo automático são registrados para análise individual, preservados os direitos legais. Em rateios, cada pagador decide sobre seu valor; o organizador não converte o pagamento dos demais em voucher.";
+    return "Cancelamento automático dentro de 7 dias corridos, contados a partir do dia seguinte à contratação, e antes do início do horário reservado. Você também pode solicitar no próprio dia da contratação. Escolha restituição integral ou voucher de uso único, válido por 90 dias, no mesmo parceiro, para reserva de valor igual ou superior. Se vencer sem uso, solicite a restituição em Meus vouchers até o fim do sétimo dia corrido seguinte ao vencimento (horário de Brasília). Depois, o suporte recebe pedidos para análise individual. Em rateios, cada pagador decide sobre seu valor; o organizador não converte o pagamento dos demais em voucher.";
   }
 
   function cancellationVoucherChoiceText() {
-    return "Escolho receber meu valor em voucher de uso único, em vez de restituição. O voucher vale por 90 dias no mesmo parceiro e exige reserva de valor igual ou superior, com pagamento da diferença. Após o vencimento, seu uso automático é encerrado. Situações específicas podem ser submetidas ao atendimento, preservados os direitos legais.";
+    return "Escolho receber meu valor em voucher de uso único, em vez de restituição. O voucher vale por 90 dias no mesmo parceiro e exige reserva de valor igual ou superior, com pagamento da diferença. Se vencer sem uso, posso solicitar restituição em Meus vouchers desde o vencimento até o fim do sétimo dia corrido seguinte, no horário de Brasília. Vale a data do pedido. Depois, posso falar com o suporte para análise individual.";
   }
 
   function openNewCancellation(reservation,options) {
@@ -6940,22 +6970,56 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       }});
   }
 
+  let adminRefundSequence=0;
+  async function openAdminRefunds(all=false){
+    if(state.role!=='admin'||!backendIsOnline()||partnerReadonlyActive())return;
+    const identity=backendRuntime.identityId,seq=++adminRefundSequence;
+    try{
+      const rows=await window.MarketplaceBackend.rpc('admin_refund_directory',{});
+      if(seq!==adminRefundSequence||identity!==backendRuntime.identityId||state.role!=='admin')return;
+      openDetail({eyebrow:'Administração',title:'Devoluções',body:window.MarketplaceRefundReview.render(rows,{esc,money,date:backendDateTimeLabel,all})});
+      detailDialog.dataset.view='admin-refunds';
+    }catch(error){if(identity===backendRuntime.identityId)showToast(backendErrorMessage(error));}
+  }
+  function openAdminRefundReview(reservationId){
+    if(state.role!=='admin'||partnerReadonlyActive())return;
+    const identity=backendRuntime.identityId;
+    openForm({eyebrow:'Devoluções',title:'Registrar análise',description:'Confira o motivo, os pagamentos, a comissão e os saldos. A aprovação não movimenta dinheiro. Seu usuário será registrado como responsável. Após uma devolução confirmada, revise novamente os valores restantes.',
+      fields:[{name:'status',label:'Encaminhamento',type:'select',value:'pending_review',options:[{value:'pending_review',label:'Continuar em análise'},{value:'waiting_funds',label:'Aguardar recomposição de saldo'},{value:'approved',label:'Aprovar execução'}]},
+        {name:'note',label:'Análise e providências (uso interno)',type:'textarea',required:true,full:true},
+        {name:'followup',label:'Próximo acompanhamento',type:'select',value:'24',options:[{value:'24',label:'Em 24 horas'},{value:'12',label:'Em 12 horas'},{value:'48',label:'Em 48 horas'}]}],submitLabel:'Salvar análise',
+      onSubmit:async data=>{
+        if(identity!==backendRuntime.identityId||state.role!=='admin')return false;
+        if(String(data.note||'').trim().length<3)return markFormFieldInvalid('note','Informe a análise realizada.');
+        const hours=Number(data.followup);if(![12,24,48].includes(hours))return false;
+        const result=await runBackendMutation('Análise registrada.',()=>window.MarketplaceBackend.rpc('review_admin_refund',{p_reservation_id:reservationId,p_status:data.status,p_note:String(data.note).trim(),p_follow_up_at:new Date(Date.now()+hours*3600000).toISOString()}),()=>false);
+        return result?{afterClose:()=>openAdminRefunds()}:false;
+      }});
+  }
+
   let cancellationCasesSequence=0;
   async function openCancellationCases() {
     const seq=++cancellationCasesSequence,identity=backendRuntime.identityId,role=state.role;
     try {
-      const cases=await window.MarketplaceBackend.rpc("cancellation_case_directory",{});
+      const [cases, restitutions] = await Promise.all([
+        window.MarketplaceBackend.rpc("cancellation_case_directory",{}),
+        window.MarketplaceBackend.rpc("voucher_restitution_directory",{})
+      ]);
       if(seq!==cancellationCasesSequence||identity!==backendRuntime.identityId||role!==state.role)return;
       const labels={pending:"Em análise",processed:"Cancelamento processado",rejected:"Pedido não aprovado",approved:"Pedido aprovado"};
-      openDetail({eyebrow:"Atendimento e pagamentos",title:"Cancelamentos e restituições",body:`<div class="cancellation-case-list">${(cases||[]).map(c=>{
+      openDetail({eyebrow:"Atendimento e pagamentos",title:"Cancelamentos e restituições",body:`${role==="admin"?'<button class="button primary" data-action="admin-refunds">Abrir fila de devoluções</button>':''}<div class="cancellation-case-list">${(cases||[]).map(c=>{
         const history=c.resolution_details?.history||[];
-        c={...c,can_decide:role==="admin"&&c.can_decide,can_comment:role==="partner"&&c.can_comment,can_refund:(role==="admin"||role==="partner")&&c.can_refund};
-        const ownChoices=(c.choices||[]).filter(x=>x.mine&&x.can_choose);
+        c={...c,can_decide:role==="admin"&&c.can_decide,can_comment:role==="partner"&&c.can_comment,can_refund:role==="admin"&&c.can_refund};
+        const claims = (restitutions || []).filter(item => item.case_id === c.id && item.requested_at && (role !== "user" || item.mine));
+        const ownChoices=(c.choices||[]).filter(x=>x.mine&&x.can_choose&&!claims.some(item=>item.choice_id===x.id));
         return `<article class="card"><h3>${esc(c.public_code)} · ${esc(labels[c.status]||c.status)}</h3><p>Solicitado em ${esc(backendDateTimeLabel(c.created_at))}</p><p>${esc(c.reason)}</p>
         ${c.status==="pending"?"<p>A reserva permanece inalterada enquanto o pedido é analisado.</p>":""}
-        ${(c.choices||[]).map(x=>`<div class="detail-line"><span>${x.mine?"Seu pagamento":"Pagamento"} · ${x.resolution==="voucher"?"Voucher emitido":Number(x.refunded_amount)>=Number(x.amount)?"Restituição concluída":"Restituição pendente"}</span><strong>${money(x.amount)}</strong></div>${x.cash&&x.resolution==="refund"&&Number(x.refunded_amount)<Number(x.amount)&&c.can_refund?`<button class="button secondary small" data-action="cancellation-cash-refund" data-choice-id="${esc(x.id)}">Registrar devolução em dinheiro</button>`:""}`).join("")}
+        ${(c.choices||[]).map(x=>`<div class="detail-line"><span>${x.mine?"Seu pagamento":"Pagamento"} · ${x.resolution==="voucher"?"Voucher emitido":Number(x.refunded_amount)>=Number(x.amount)?"Restituição concluída":({processing:"Devolução em processamento",review:"Solicitação em análise"}[x.refund_state]||"Solicitação recebida")}</span><strong>${money(x.amount)}</strong></div>${x.cash&&x.resolution==="refund"&&Number(x.refunded_amount)<Number(x.amount)&&c.can_refund?`<button class="button secondary small" data-action="admin-refunds">Analisar devolução externa</button>`:""}`).join("")}
+        ${claims.map(item => `<div class="card"><strong>Restituição do voucher · ${money(item.amount)}</strong>
+          ${voucherReceipt(item)}
+          ${c.can_decide && !item.decision ? `<button class="button secondary small" data-action="cancellation-voucher-review" data-id="${esc(item.voucher_id)}">Analisar restituição</button>` : ""}</div>`).join("")}
         ${ownChoices.length?`<div class="dialog-actions"><button class="button secondary small" data-action="cancellation-choice" data-request-id="${esc(c.id)}" data-resolution="refund">Manter restituição</button><button class="button secondary small" data-action="cancellation-choice" data-request-id="${esc(c.id)}" data-resolution="voucher">Escolher voucher · 90 dias</button></div>`:""}
-        ${c.can_refund&&c.status==="processed"&&(c.choices||[]).some(x=>!x.cash&&x.resolution==="refund"&&Number(x.refunded_amount)<Number(x.amount))?`<button class="button secondary small" data-action="cancellation-refund-process" data-reservation-id="${esc(c.reservation_id)}">Processar restituições</button>`:""}
+        ${c.can_refund&&c.status==="processed"&&(c.choices||[]).some(x=>!x.cash&&x.resolution==="refund"&&Number(x.refunded_amount)<Number(x.amount))?`<button class="button secondary small" data-action="admin-refunds" data-reservation-id="${esc(c.reservation_id)}">Analisar restituições</button>`:""}
         ${history.length?`<details><summary>Manifestações e decisão</summary>${history.map(h=>`<p><strong>${esc(backendDateTimeLabel(h.at))} · ${esc({approve:"Aprovado",deny:"Não aprovado",comment:"Manifestação"}[h.decision]||h.decision)}</strong><br>${esc(h.reason)}</p>`).join("")}</details>`:""}
         ${c.status==="pending"&&(c.can_decide||c.can_comment)?`<button class="button secondary small" data-action="cancellation-review" data-request-id="${esc(c.id)}" data-can-decide="${c.can_decide}">${c.can_decide?"Analisar pedido":"Registrar manifestação"}</button>`:""}
         <p class="field-help">Dúvidas ou novos documentos: suporte@tamoon.app.br.</p></article>`;
@@ -6965,8 +7029,36 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 
   async function handleCancellationAction(button) {
     const action=button.dataset.action,identity=backendRuntime.identityId;
+    if(action==='admin-refunds'){await openAdminRefunds(button.dataset.all==='true');return true;}
+    if(action==='admin-refund-review'){openAdminRefundReview(button.dataset.reservationId);return true;}
+    if(action==='asaas-refund-balance'){await openAsaasRefund(button.dataset.reservationId,'balance',null,button.dataset.paymentId);return true;}
     if(action==="cancellation-cases"){await openCancellationCases();return true;}
     if(action==="cancellation-refund-process"){await openAsaasCancellationRefund(button.dataset.reservationId);return true;}
+    if(action==="cancellation-voucher-request"){
+      const voucher = state.cancellationVouchers.find(v => v.backendId === button.dataset.id && v.ownerUserId === identity);
+      if (!voucher || !backendIsOnline()) return true;
+      askConfirm({title:"Solicitar restituição",message:`Registrar o pedido de ${money(voucher.value)} referente ao voucher ${voucher.code}? Você receberá um protocolo para acompanhar a análise.`,confirmLabel:"Registrar pedido",onConfirm:async()=>{
+        if (identity !== backendRuntime.identityId) return;
+        const receipt = await runBackendMutation("", () => window.MarketplaceBackend.rpc("request_expired_voucher_restitution",{p_voucher_id:voucher.backendId}), () => false);
+        if (!receipt || identity !== backendRuntime.identityId) return;
+        voucher.restitution = {...voucher.restitution,requested_at:receipt.requested_at,choice_id:receipt.protocol};
+        render();
+        showToast("Pedido de restituição registrado.");
+      }});
+      return true;
+    }
+    if(action==="cancellation-voucher-review"){
+      if (state.role !== "admin") return true;
+      openForm({eyebrow:"Voucher vencido",title:"Analisar restituição",description:"A aprovação encaminha o pagamento ao fluxo financeiro da reserva. A pessoa poderá consultar o motivo da decisão.",
+        fields:[{name:"decision",label:"Decisão",type:"select",required:true,options:[{value:"",label:"Selecione"},{value:"approved",label:"Aprovar restituição"},{value:"declined",label:"Indeferir pedido"}]},
+          {name:"reason",label:"Motivo da decisão",type:"textarea",required:true,full:true}],submitLabel:"Registrar decisão",
+        onSubmit:async data=>{
+          if(identity!==backendRuntime.identityId || state.role!=="admin")return false;
+          const result=await runBackendMutation("Decisão registrada.",()=>window.MarketplaceBackend.rpc("review_expired_voucher_restitution",{p_voucher_id:button.dataset.id,p_decision:data.decision,p_reason:data.reason}),()=>false);
+          return result ? {afterClose:openCancellationCases} : false;
+        }});
+      return true;
+    }
     if(action==="cancellation-choice"){
       const voucher=button.dataset.resolution==="voucher";
       openForm({eyebrow:"Seu pagamento",title:voucher?"Escolher voucher":"Manter restituição",description:voucher?cancellationVoucherChoiceText():"A restituição seguirá pelo pagamento de origem, sem desconto de tarifa.",
@@ -6989,11 +7081,12 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
         }});return true;
     }
     if(action==="cancellation-cash-refund"){
+      if(state.role!=="admin")return true;
       openForm({eyebrow:"Devolução em dinheiro",title:"Registrar devolução realizada",description:"Registre apenas uma devolução já efetuada ao pagador. Pagamentos digitais são conciliados pelo Asaas.",fields:[{name:"reference",label:"Comprovante ou referência",required:true,full:true}],submitLabel:"Confirmar devolução",
         onSubmit:async data=>{
           if(identity!==backendRuntime.identityId)return false;
           const result=await runBackendMutation("Devolução registrada.",()=>window.MarketplaceBackend.rpc("record_cash_cancellation_refund",{p_choice_id:button.dataset.choiceId,p_reference:String(data.reference||"").trim()}));
-          if(!result)return false;return {afterClose:openCancellationCases};
+          if(!result)return false;return {afterClose:()=>openAdminRefunds()};
         }});return true;
     }
     return false;
@@ -7056,6 +7149,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   function notificationVisibleForRole(notification,role=state.role) {
     // Payment assignments concern the account as a payer, even when that
     // same account also owns/manages the establishment or is an administrator.
+    if(notification?.type==='admin_refund_requested')return role==='admin';
     const personalPaymentTypes=["pix_share_pending","monthly_pix_share_pending",
       "card_payment_assigned","monthly_card_payment_assigned"];
     return role==="user" || !personalPaymentTypes.includes(notification?.type);
@@ -7656,6 +7750,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
+    if(backendIsOnline()&&state.role==="admin")actions+=`<button class="button primary small" data-action="admin-refunds">Devoluções</button>`;
     if(backendIsOnline())actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
@@ -9057,12 +9152,35 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     return `${pageHeader("Área do usuário", "Favoritos", "Acesse rapidamente os locais que você marcou.", `<button class="button ghost" data-nav="discover">Buscar mais quadras</button>`)}<section class="grid">${favoriteVenues.map(venueCard).join("") || emptyState("♡", "Nenhuma quadra foi adicionada aos favoritos.")}</section>`;
   }
 
+  function voucherSupportLink(code) {
+    const subject = encodeURIComponent("Análise individual do voucher " + code);
+    return `<a class="button secondary small" href="mailto:suporte@tamoon.app.br?subject=${esc(subject)}">Falar com o suporte</a>`;
+  }
+
+  function voucherReceipt(item) {
+    const status = item.refunded ? "Restituição concluída" : item.decision === "approved" ? "Aprovada · aguardando devolução" : item.decision === "declined" ? "Pedido indeferido" : "Pedido em análise";
+    return `<p><strong>${status}</strong> · ${esc(backendDateTimeLabel(item.requested_at))}</p><p class="field-help">Protocolo: ${esc(item.choice_id)}</p>
+      ${item.reason ? `<p>${esc(item.reason)}</p>` : ""}`;
+  }
+
+  function voucherRestitutionActions(voucher) {
+    const item = voucher.restitution;
+    if (!item || !item.mine) return "";
+    if (item.requested_at) return voucherReceipt(item) + (item.decision === "declined" ? voucherSupportLink(voucher.code) : "");
+    if (!item.unused) return "";
+    const now = Date.now(), deadline = Date.parse(item.deadline);
+    const lastDay = new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo"}).format(deadline-1);
+    if (now < Date.parse(item.expires_at)) return `<p class="field-help">Se vencer sem uso, você poderá pedir a restituição pelo app até ${esc(lastDay)}.</p>`;
+    if (now >= deadline) return `<p>O prazo de solicitação pelo app terminou em ${esc(lastDay)}. Você pode pedir análise individual.</p>${voucherSupportLink(voucher.code)}`;
+    return `<p>Solicite até <strong>${esc(lastDay)}</strong> (horário de Brasília). Vale a data do pedido.</p><button class="button primary" data-action="cancellation-voucher-request" data-id="${esc(voucher.backendId)}">Solicitar restituição</button>`;
+  }
+
   function userPromotions() {
     activeCancellationVouchers();
     const vouchers = state.cancellationVouchers.filter((voucher) => voucher.ownerUserId ? voucher.ownerUserId === backendRuntime.identityId : voucher.user === state.userProfile.name);
     return `${pageHeader("Área do usuário", "Meus vouchers", "Consulte créditos de cancelamento e vouchers promocionais disponíveis.")}
       ${backendIsOnline() ? `<div class="backend-domain-note"><span class="backend-domain-dot" aria-hidden="true"></span><strong>Marketplace em ambiente de homologação</strong><small>Créditos, promoções e pagamentos individuais ou rateados usam os registros oficiais protegidos.</small></div>` : ""}
-      <section class="section"><div class="section-heading"><div><h2>Vouchers de cancelamento</h2><p>Uso único, no mesmo parceiro, em nova reserva de valor igual ou superior, dentro da validade. Você pode escolher qualquer dia e horário disponível.</p></div></div><div class="grid two">${vouchers.map((voucher) => `<article class="card voucher-card"><div class="section-heading"><div><span class="status ${["active", "active_extended"].includes(voucher.status) ? "status-ok" : voucher.status === "reserved" ? "status-warning" : "status-neutral"}">${esc(voucherStatusLabel(voucher))}</span><h3>${esc(voucher.code)}</h3></div><strong class="voucher-value">${money(voucher.value)}</strong></div><div class="detail-list"><div class="detail-line"><span>Parceiro</span><strong>${esc(voucher.venue)}</strong></div><div class="detail-line"><span>Reserva de origem</span><strong>${esc(voucher.sourceReservationId || "Não informada")}</strong></div><div class="detail-line"><span>Validade atual</span><strong>${esc(voucher.expiresAt)}</strong></div><div class="detail-line"><span>Regra de uso</span><strong>Reserva de ${money(voucher.minimumReservationValue)} ou mais</strong></div><div class="detail-line"><span>Uso</span><strong>Integral e único</strong></div><div class="detail-line"><span>Horário original</span><strong>${esc(voucher.originalTime || "—")} · ${esc(voucher.originalPeriod || "—")}</strong></div>${voucher.extensionReason ? `<div class="detail-line"><span>Prorrogação</span><strong>Validade prorrogada por disponibilidade insuficiente do parceiro.</strong></div>` : ""}${voucher.reassignedFrom ? `<div class="detail-line"><span>Realocação</span><strong>${esc(voucher.reassignmentStatus)}</strong></div>` : ""}</div></article>`).join("") || emptyState("V", "Nenhum voucher de cancelamento foi gerado para este usuário.")}</div></section>
+      <section class="section"><div class="section-heading"><div><h2>Vouchers de cancelamento</h2><p>Uso único, no mesmo parceiro, em nova reserva de valor igual ou superior, dentro da validade. Você pode escolher qualquer dia e horário disponível.</p></div></div><div class="grid two">${vouchers.map((voucher) => `<article class="card voucher-card"><div class="section-heading"><div><span class="status ${["active", "active_extended"].includes(voucher.status) ? "status-ok" : voucher.status === "reserved" ? "status-warning" : "status-neutral"}">${esc(voucherStatusLabel(voucher))}</span><h3>${esc(voucher.code)}</h3></div><strong class="voucher-value">${money(voucher.value)}</strong></div><div class="detail-list"><div class="detail-line"><span>Parceiro</span><strong>${esc(voucher.venue)}</strong></div><div class="detail-line"><span>Reserva de origem</span><strong>${esc(voucher.sourceReservationId || "Não informada")}</strong></div><div class="detail-line"><span>Validade atual</span><strong>${esc(voucher.expiresAt)}</strong></div><div class="detail-line"><span>Regra de uso</span><strong>Reserva de ${money(voucher.minimumReservationValue)} ou mais</strong></div><div class="detail-line"><span>Uso</span><strong>Integral e único</strong></div><div class="detail-line"><span>Horário original</span><strong>${esc(voucher.originalTime || "—")} · ${esc(voucher.originalPeriod || "—")}</strong></div>${voucher.extensionReason ? `<div class="detail-line"><span>Prorrogação</span><strong>Validade prorrogada por disponibilidade insuficiente do parceiro.</strong></div>` : ""}${voucher.reassignedFrom ? `<div class="detail-line"><span>Realocação</span><strong>${esc(voucher.reassignmentStatus)}</strong></div>` : ""}</div>${voucherRestitutionActions(voucher)}</article>`).join("") || emptyState("V", "Nenhum voucher de cancelamento foi gerado para este usuário.")}</div></section>
       <section class="section"><div class="section-heading"><div><h2>Vouchers promocionais</h2><p>Ofertas oficiais independentes dos créditos gerados por cancelamento.</p></div></div><div class="grid">${state.promotions.filter((promo)=>!promo.deleted).map((promo) => `<article class="card"><span class="status ${promo.active ? "status-ok" : "status-neutral"}">${promo.active ? "Disponível" : "Encerrada"}</span><h3>${esc(promo.title)}</h3><p class="meta-row"><span>${esc(promo.venue)}</span><span>Código válido até ${esc(promo.validUntil)}</span></p><p class="field-help">${esc(promotionEventLabel(promo))}</p><div class="promo-code"><div><strong>${esc(promo.code)}</strong><div class="meta-row">${esc(promotionBenefitLabel(promo))}</div></div><button class="button ${state.appliedVouchers.includes(promo.code) ? "ghost" : "secondary"} small" data-action="apply-voucher" data-code="${esc(promo.code)}" ${promo.active ? "" : "disabled"}>${state.appliedVouchers.includes(promo.code) ? "Aplicado" : "Aplicar"}</button></div></article>`).join("") || emptyState("%", "Nenhum voucher promocional disponível.")}</div></section>`;
   }
 
@@ -9597,7 +9715,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   function asaasRefundButton(id,summary,reservation) {
-    if(!backendIsOnline() || partnerReadonlyActive() || !(state.role==="admin" || (state.role==="partner" && canManageBackendFinance())))return "";
+    if(!backendIsOnline() || partnerReadonlyActive() || state.role!=="admin")return "";
     const r=reservation || (state.reservations||[]).find(item=>item.backendId===id);
     if(!id || !["refund_pending","refunded"].includes(r?.backendStatus||summary?.financial_status) || r?.monthly)return "";
     return `<button class="button secondary small" data-action="asaas-refund-open" data-reservation-id="${esc(id)}">Devolução do pagamento</button>`;
@@ -9613,7 +9731,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
   function asaasRefundFailure(p) {
     if(p.denial_reason&&p.status!=='completed')return p.denial_reason;
-    if(/INSUFFICIENT_BALANCE$/.test(p.error_code||''))return 'O Asaas recusou a devolução por saldo insuficiente. Regularize o saldo antes de solicitar novamente.';
+    if(/INSUFFICIENT_BALANCE$/.test(p.error_code||''))return 'Saldo insuficiente na conferência ou na execução. Regularize o saldo e registre nova aprovação antes de tentar novamente.';
     if(p.transfer_fail_reason)return p.transfer_fail_reason;
     if(p.status==='rejected')return 'O Asaas não aceitou a solicitação, ou a conferência anterior ao envio falhou. Nenhuma devolução foi confirmada. Verifique a cobrança e o saldo antes de solicitar novamente.';
     return '';
@@ -9621,18 +9739,18 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   function asaasRefundPresentation(c,{checking=false,unavailable=false}={}) {
     const labels={denial_review:'Recusa recebida · em conferência',not_requested:'Aguardando solicitação',requesting:'Solicitação em andamento',submitted:'Aguardando confirmação do Asaas',unknown:'Resultado ainda não confirmado',rejected:'Solicitação não aceita',partial:'Devolução parcial confirmada',completed:'Devolução concluída',transfer_authorization:'Aguardando autorização no Asaas',transfer_failed:'Devolução falhou no Asaas',transfer_cancelled:'Devolução cancelada no Asaas',transfer_blocked:'Devolução bloqueada no Asaas',transfer_done:'Conciliando devolução'};
     const feedback=unavailable?'Não foi possível confirmar o status agora. A consulta será repetida automaticamente; novos envios permanecem bloqueados.':checking?'Verificando automaticamente o resultado no Asaas…':asaasRefundNeedsMonitoring(c)?'Acompanhando automaticamente a resposta do Asaas. Você pode continuar usando o aplicativo.':'Situação atualizada. A devolução retorna ao pagador pelo meio original.';
-    return `<p>Reserva <strong>${esc(c.reservation_code)}</strong> · Pago: ${money(c.payment_amount)} · Devolução prevista: ${money(c.refund_target)} · Já devolvido: ${money(c.refunded_amount)}</p><p>Cada pagador recebe integralmente o valor pago, descontando apenas o que já foi devolvido. Cotas não pagas não geram devolução.</p><p class="asaas-refund-feedback" role="status">${feedback}</p>${(c.payments||[]).map(p=>{
-      const retry=p.can_retry===true,enabled=!checking&&!unavailable&&!p.transfer_lookup&&!p.split_review_required&&!p.denial_review_required&&(p.can_submit===true||retry);
+    return `<div class="dialog-actions"><button class="button secondary small" data-action="admin-refund-review" data-reservation-id="${esc(c.reservation_id)}">Registrar análise</button><button class="button ghost small" data-action="admin-refunds">Fila de devoluções</button></div>${!c.review_approved?'<p class="callout">Execução bloqueada até registrar a aprovação dos valores atuais.</p>':''}${c.balance?`<div class="callout"><strong>${c.balance.sufficient?'Saldo suficiente nesta consulta':'Saldo a regularizar'}</strong><p>Conta emissora: ${money(c.balance.issuer_available)} disponível / ${money(c.balance.issuer_required)} necessário.</p>${c.balance.platform_available!==null?`<p>Tâmo On: ${money(c.balance.platform_available)} disponível / ${money(c.balance.platform_required)} de comissão a devolver.</p>`:''}<small>Consulta: ${esc(backendDateTimeLabel(c.balance.checked_at))}. O saldo será conferido novamente no envio.</small></div>`:''}<p>Reserva <strong>${esc(c.reservation_code)}</strong> · Pago: ${money(c.payment_amount)} · Devolução prevista: ${money(c.refund_target)} · Já devolvido: ${money(c.refunded_amount)}</p><p>Cada pagador recebe integralmente o valor pago, descontando apenas o que já foi devolvido. Cotas não pagas não geram devolução.</p><p class="asaas-refund-feedback" role="status">${feedback}</p>${(c.payments||[]).map(p=>{
+      const retry=p.can_retry===true,enabled=c.review_approved===true&&c.balance?.sufficient!==false&&!checking&&!unavailable&&!p.transfer_lookup&&!p.split_review_required&&!p.denial_review_required&&(p.can_submit===true||retry);
       const action=retry?'asaas-refund-retry':'asaas-refund-submit';
       const note=p.split_review_required?'O Asaas informou a reversão da comissão, mas a devolução ao pagador ainda não foi conciliada. Uma nova solicitação fica bloqueada até a conferência.':p.denial_review_required?'A recusa desta tentativa foi recebida. A confirmação atual no Asaas ainda está em conferência; novos envios permanecem bloqueados.':p.status==='unknown'?'O resultado é incerto. Uma nova solicitação permanece bloqueada.':p.status==='partial'?'A próxima solicitação devolverá todo o saldo restante deste pagamento.':p.status==='transfer_authorization'?'Autorize a devolução no painel do Asaas. O aplicativo acompanhará a confirmação automaticamente.':p.status==='completed'?'O Asaas confirmou a devolução deste pagamento.':retry?'A falha será confirmada novamente no Asaas antes de um novo envio.':'';
       const failure=asaasRefundFailure(p);
       const denialHistory=p.unmatched_denial?`<details class="asaas-refund-history"><summary>Recusa registrada no histórico</summary><p>${esc(p.unmatched_denial.reason||'O Asaas informou uma recusa de estorno.')}</p>${p.unmatched_denial.event_created_at?`<p>Data informada pelo Asaas: ${esc(p.unmatched_denial.event_created_at)}</p>`:''}<p>Esse evento não identifica a tentativa de devolução. Ele não altera o resultado da solicitação atual.</p></details>`:'';
-      return `<article class="asaas-refund-item pf-payment"><h3>${esc(p.payer_name)} · ${p.billing_type==='CREDIT_CARD'?'Cartão':'Pix'}</h3><p><strong>${esc(labels[p.status]||'Em conferência')}</strong></p><dl class="pf-lines"><div><dt>Pagamento original</dt><dd>${money(p.payment_amount)}</dd></div><div><dt>Já devolvido</dt><dd>${money(p.refunded_amount)}</dd></div><div><dt>Valor a devolver</dt><dd><strong>${money(p.amount)}</strong></dd></div></dl>${failure?`<p class="asaas-refund-feedback asaas-refund-error" role="status">${esc(failure)}</p>`:''}${note?`<p>${esc(note)}</p>`:''}${p.transfer_lookup?'<p>A confirmação ainda está em andamento. Uma nova solicitação permanece bloqueada.</p>':''}${denialHistory}${p.split_enabled?(p.split_already_reversed?'<p class="field-help">A comissão já foi devolvida ao estabelecimento. Uma nova solicitação não descontará essa comissão novamente. As tarifas do Asaas ficam com o estabelecimento.</p>':'<p class="field-help">A devolução inclui a reversão da comissão pelo split. As tarifas do Asaas ficam com o estabelecimento.</p>'):'<p class="field-help">As tarifas do Asaas ficam com o estabelecimento.</p>'}${enabled?`<div class="dialog-actions"><button class="button primary" data-action="${action}" data-reservation-id="${esc(c.reservation_id)}" data-payment-id="${esc(p.payment_id)}" data-request-id="${esc(p.request_id||'')}">${retry||p.status==='rejected'?'Solicitar novamente':'Solicitar devolução integral'}</button></div>`:''}</article>`;
+      return `<article class="asaas-refund-item pf-payment"><h3>${esc(p.payer_name)} · ${p.billing_type==='CREDIT_CARD'?'Cartão':'Pix'}</h3><p><strong>${esc(labels[p.status]||'Em conferência')}</strong></p><dl class="pf-lines"><div><dt>Pagamento original</dt><dd>${money(p.payment_amount)}</dd></div><div><dt>Já devolvido</dt><dd>${money(p.refunded_amount)}</dd></div><div><dt>Valor a devolver</dt><dd><strong>${money(p.amount)}</strong></dd></div></dl>${failure?`<p class="asaas-refund-feedback asaas-refund-error" role="status">${esc(failure)}</p>`:''}${note?`<p>${esc(note)}</p>`:''}${p.transfer_lookup?'<p>A confirmação ainda está em andamento. Uma nova solicitação permanece bloqueada.</p>':''}${denialHistory}${p.split_enabled?(p.split_already_reversed?'<p class="field-help">A comissão já foi devolvida ao estabelecimento. Uma nova solicitação não descontará essa comissão novamente. As tarifas do Asaas ficam com o estabelecimento.</p>':'<p class="field-help">A devolução inclui a reversão da comissão pelo split. As tarifas do Asaas ficam com o estabelecimento.</p>'):'<p class="field-help">As tarifas do Asaas ficam com o estabelecimento.</p>'}${p.can_submit||p.can_retry?`<button class="button secondary small" data-action="asaas-refund-balance" data-reservation-id="${esc(c.reservation_id)}" data-payment-id="${esc(p.payment_id)}">Conferir saldos</button>`:''}${enabled?`<div class="dialog-actions"><button class="button primary" data-action="${action}" data-reservation-id="${esc(c.reservation_id)}" data-payment-id="${esc(p.payment_id)}" data-request-id="${esc(p.request_id||'')}">${retry||p.status==='rejected'?'Solicitar novamente':'Solicitar devolução integral'}</button></div>`:''}</article>`;
     }).join('')}`;
   }
   function asaasRefundMonitorValid(m) {
     return m===asaasRefundMonitor&&m.identity===backendRuntime.identityId&&m.role===state.role
-      &&backendIsOnline()&&!partnerReadonlyActive()&&(state.role==='admin'||(state.role==='partner'&&canManageBackendFinance()))
+      &&backendIsOnline()&&!partnerReadonlyActive()&&state.role==='admin'
       &&detailDialog.open&&detailDialog.dataset.view==='asaas-refund'&&detailDialog.dataset.refundReservationId===m.reservationId;
   }
   function scheduleAsaasRefundMonitor(m,delay=12000) {
@@ -9661,7 +9779,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     },delay);
   }
   async function openAsaasRefund(reservationId,action="preview",expectedRequestId=null,paymentId=null,amount=null) {
-    if(partnerReadonlyActive() || !backendIsOnline() || !(state.role==="admin" || (state.role==="partner" && canManageBackendFinance())))return;
+    if(partnerReadonlyActive() || !backendIsOnline() || state.role!=="admin")return;
     const identity=backendRuntime.identityId,role=state.role;
     stopAsaasRefundMonitor();
     let c,uncertain=false;
@@ -9670,7 +9788,9 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     } catch(error) {
       const code=String(error?.message||'');
       if(/REFUND_FORBIDDEN|UNAUTHORIZED|PARTNER_PREVIEW_READ_ONLY/.test(code)){showToast('Você não tem permissão financeira para esta reserva.');return;}
-      if(/REFUND_SCOPE_UNSUPPORTED|REFUND_PAYMENT_REVIEW_REQUIRED/.test(code)){showToast('Esta reserva exige conferência dos pagamentos e do cancelamento antes da devolução.');return;}
+      if(/REFUND_SCOPE_UNSUPPORTED|REFUND_PAYMENT_REVIEW_REQUIRED/.test(code)){showToast('Este caso exige conciliação individual. O pedido permanece na fila; a integração não enviará uma devolução de valor diferente.');return;}
+      if(code==='REFUND_ADMIN_REVIEW_REQUIRED'){showToast('Registre ou atualize a aprovação na fila de devoluções antes de executar.');return;}
+      if(action==='balance'){showToast('Não foi possível conferir os saldos agora. Nenhum estorno foi enviado.');return;}
       if(code==='ASAAS_COMMUNICATION_BUSY'){showToast('Aguarde a comunicação que está em andamento.');return;}
       uncertain=true;
       try{c=await window.MarketplaceBackend.asaasRefund(reservationId,'preview',null,{background:true});}
@@ -10857,7 +10977,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
   }
 
   async function handleAction(button) {
-    if(button?.dataset?.action?.startsWith("cancellation-") && await handleCancellationAction(button))return;
+    if((button?.dataset?.action?.startsWith("cancellation-") || button?.dataset?.action?.startsWith("admin-refund") || button?.dataset?.action==="asaas-refund-balance") && await handleCancellationAction(button))return;
     // Capture the native change before asynchronous authorization/dispatch yields.
     const actionChecked = button.checked;
     if(!await waitForInitialDetails())return;
@@ -10895,13 +11015,13 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
       await openAsaasRefund(button.dataset.reservationId,action==="asaas-refund-open"?"preview":"reconcile",null,button.dataset.paymentId||null);return;
     }
     if(action==="asaas-refund-submit" || action==="asaas-refund-retry"){
-      if(partnerReadonlyActive() || !(state.role==="admin" || (state.role==="partner" && canManageBackendFinance())))return;
+      if(partnerReadonlyActive() || state.role!=="admin")return;
       const reservationId=button.dataset.reservationId,paymentId=button.dataset.paymentId,expected=button.dataset.requestId||null,identity=backendRuntime.identityId;
       try{
         const c=await window.MarketplaceBackend.asaasRefund(reservationId,'preview');
         if(identity!==backendRuntime.identityId)return;
         const p=c.payments.find(x=>x.payment_id===paymentId),retry=action==='asaas-refund-retry';
-        if(!p||p.request_id!==expected||p.transfer_lookup||!(retry?p.can_retry:p.can_submit)){await openAsaasRefund(reservationId);return;}
+        if(c.review_approved!==true||!p||p.request_id!==expected||p.transfer_lookup||!(retry?p.can_retry:p.can_submit)){await openAsaasRefund(reservationId);return;}
         const value=Number(p.amount);
         if(!Number.isFinite(value)||value<=0){await openAsaasRefund(reservationId);return;}
         askConfirm({title:retry?'Solicitar novo reembolso':`Devolver ${money(value)}`,message:`Devolver ${money(value)} do pagamento de ${esc(p.payer_name)} pela reserva ${c.reservation_code}? O sistema consultará o Asaas antes do envio. ${p.split_enabled?'A comissão será devolvida proporcionalmente. ':''}As tarifas ficam com o estabelecimento.`,confirmLabel:'Conferir e solicitar',onConfirm:async()=>{if(identity===backendRuntime.identityId)await openAsaasRefund(reservationId,retry?'retry':'submit',expected,paymentId,null);}});
@@ -11981,7 +12101,8 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if(!notificationVisibleForRole(row)){
       showToast("Esta atualização de pagamento está disponível na área Usuário.");return;
     }
-    if(row.type==="cancellation_case_updated"){
+    if(row.type==='admin_refund_requested'&&state.role==='admin'){await openAdminRefunds();if(!document.hidden)await readPersonalNotification(id);return;}
+    if(row.type==="cancellation_case_updated" || row.type==="voucher_restitution_requested"){
       await openCancellationCases();if(!document.hidden)await readPersonalNotification(id);return;
     }
     if(row.entity_type==="partner_application"){
@@ -11993,7 +12114,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     if(row.entity_type==="occurrence_transfer" && (state.occurrenceTransfers||[]).some(item=>item.id===row.entity_id && (item.canManageAsGroup||item.canManageAsPartner))) {
       await openOccurrenceTransferConversation(row.entity_id);return;
     }
-    if(row.entity_type==="voucher"&&["cancellation_voucher_issued","cancellation_voucher_reminder"].includes(row.type)){
+    if(row.entity_type==="voucher"&&["cancellation_voucher_issued","cancellation_voucher_reminder","voucher_restitution_reviewed"].includes(row.type)){
       state.role="user";state.activePage.user="promotions";detailDialog.close();render();await readPersonalNotification(id);return;
     }
     if(row.entity_type==="monthly_link_request"){
