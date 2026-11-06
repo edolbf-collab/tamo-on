@@ -15,7 +15,7 @@ function fixture(){
 }
 test('navigation retains the exact destinations and current page for each role',()=>{
  const c=fixture();
- for(const [role,count] of [['user',6],['admin',7]]){
+ for(const [role,count] of [['user',6],['admin',8]]){
   const html=c.navigationItems(role);
   assert.equal((html.match(/data-nav=/g)||[]).length,count);
   assert.equal((html.match(/aria-current="page"/g)||[]).length,1);

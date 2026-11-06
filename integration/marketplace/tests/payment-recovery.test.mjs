@@ -15,7 +15,7 @@ function refreshFixture(error){
   window:{MarketplaceBackend:{session:{user:{id:'owner'}},bootstrap:async()=>{if(error)throw error;return previous}},
    TamoonMarketplacePilot:{handleError:e=>handled.push(e),isTransient:e=>e.code==='57014',ready(){}}},
   state:{role:'user'},backendIsOnline:()=>true,backendSyncStatus(){},render(){},updateBackendRoleAccess(){},backendErrorMessage:e=>e.message,
-  syncStateFromBackend(){},refreshOpenVenueScheduleFromBackend(){},restoreAsaasReturn(){},
+  adminRefundContext:()=>false,syncStateFromBackend(){},refreshOpenVenueScheduleFromBackend(){},restoreAsaasReturn(){},
   detailDialog:{open:false},reservationDialog:{open:false},chatDialog:{open:false}};
  vm.createContext(context);vm.runInContext(between('  async function refreshBackendBootstrap(', '  async function handleBackendStatus('),context);
  return {context,handled,previous};

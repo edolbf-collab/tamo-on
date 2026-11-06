@@ -130,6 +130,7 @@
       ["reservations", "▣", "Reservas"],
       ["users", "◎", "Usuários"],
       ["finance", "$", "Financeiro"],
+      ["refunds", "↩", "Devoluções"],
       ["vouchers", "%", "Vouchers"],
       ["settings", "⚙", "Configurações"]
     ]
@@ -2489,6 +2490,7 @@
         updateBackendRoleAccess();
         if(changed || !applied)render();
         if(applied && changed && backendIsOnline()&&["partner","admin"].includes(state.role)&&state.activePage?.[state.role]==="finance")loadFinancialPeriod(true).catch(()=>{});
+        if(applied && changed && adminRefundContext())adminRefundStore.load(true);
         if(applied && changed)refreshOpenVenueScheduleFromBackend();
         if(detailDialog?.open&&detailDialog.dataset.view==="asaas-payment")refreshOpenAsaasPaymentFromBackend();
         if(applied && changed && detailDialog?.open&&detailDialog.dataset.view==="occurrence-transfer-chat"&&!formDialog.open&&!transferChatSending) {
@@ -4596,30 +4598,72 @@
       }});
   }
 
-  let adminRefundSequence=0;
-  async function openAdminRefunds(all=false){
-    if(state.role!=='admin'||!backendIsOnline()||partnerReadonlyActive())return;
-    const identity=backendRuntime.identityId,seq=++adminRefundSequence;
-    try{
-      const rows=await window.MarketplaceBackend.rpc('admin_refund_directory',{});
-      if(seq!==adminRefundSequence||identity!==backendRuntime.identityId||state.role!=='admin')return;
-      openDetail({eyebrow:'Administração',title:'Devoluções',body:window.MarketplaceRefundReview.render(rows,{esc,money,date:backendDateTimeLabel,all})});
-      detailDialog.dataset.view='admin-refunds';
-    }catch(error){if(identity===backendRuntime.identityId)showToast(backendErrorMessage(error));}
+  function adminRefundContext(){
+    const id=backendRuntime.identityId;
+    return id && state.role==='admin' && backendIsOnline() && !partnerReadonlyActive()
+      && backendRuntime.bootstrap?.is_admin===true && backendRuntime.bootstrap?.profile?.status==='active'
+      && backendRuntime.bootstrap?.profile?.id===id && backendRuntime.session?.user?.id===id
+      && window.MarketplaceBackend?.session?.user?.id===id
+      && !window.TamoonMarketplacePilot?.blocked && !window.TamoonMarketplacePilot?.leaving ? id : '';
+  }
+  const adminRefundStore=window.MarketplaceRefundReview.createStore({
+    context:adminRefundContext,
+    fetchRows:()=>window.MarketplaceBackend.rpc('admin_refund_directory',{}),
+    errorMessage:()=> 'Não foi possível atualizar as devoluções. Tente novamente para consultar os valores atuais.',
+    onChange:()=>{
+      render();
+      if(detailDialog.open && detailDialog.dataset.view==='admin-refund-details' && !formDialog.open){
+        const model=adminRefundStore.get(),row=model.rows?.find(r=>r.reservation_id===detailDialog.dataset.refundReservationId);
+        if(row)window.MarketplaceUI.update(detailBody,window.MarketplaceRefundReview.renderDetails(row,{esc,money,date:backendDateTimeLabel}));
+        else if(!model.loading){detailDialog.close();showToast('Atualize a lista para consultar esta devolução.');}
+      }
+    }
+  });
+  let adminRefundLoadScheduled=false;
+  function ensureAdminRefunds(){
+    const model=adminRefundStore.get();
+    if(!adminRefundContext() || adminRefundLoadScheduled || model.loading || model.rows!==null || model.error)return;
+    adminRefundLoadScheduled=true;
+    setTimeout(()=>{adminRefundLoadScheduled=false;adminRefundStore.load();},0);
+  }
+  function adminRefundPage(){
+    const model=adminRefundStore.get();
+    const actions='<button class="button secondary small" data-action="admin-refund-refresh"'+(model.loading?' disabled':'')+'>Atualizar</button>';
+    return pageHeader('Administração','Devoluções','Analise os pedidos e acompanhe os valores até a confirmação da devolução.',actions)
+      +(adminRefundContext()?window.MarketplaceRefundReview.renderPage(model,{esc,money,date:backendDateTimeLabel})
+        :'<div class="callout">Acesse com uma conta administrativa ativa para consultar as devoluções.</div>');
+  }
+  function openAdminRefundDetails(reservationId){
+    if(!adminRefundContext())return;
+    const row=adminRefundStore.get().rows?.find(r=>r.reservation_id===reservationId);
+    if(!row){showToast('Atualize a lista para consultar esta devolução.');return;}
+    openDetail({eyebrow:'Devoluções',title:row.reservation_code,
+      body:window.MarketplaceRefundReview.renderDetails(row,{esc,money,date:backendDateTimeLabel})});
+    detailDialog.dataset.view='admin-refund-details';
+    detailDialog.dataset.refundReservationId=reservationId;
+  }
+  async function openAdminRefunds(reservationId=null){
+    const identity=adminRefundContext();
+    if(!identity)return;
+    detailReturnContext=null;
+    if(detailDialog.open)detailDialog.close();
+    await nav('admin','refunds');
+    await adminRefundStore.load(true);
+    if(reservationId && identity===adminRefundContext() && state.activePage.admin==='refunds')openAdminRefundDetails(reservationId);
   }
   function openAdminRefundReview(reservationId){
-    if(state.role!=='admin'||partnerReadonlyActive())return;
+    if(!adminRefundContext())return;
     const identity=backendRuntime.identityId;
     openForm({eyebrow:'Devoluções',title:'Registrar análise',description:'Confira o motivo, os pagamentos, a comissão e os saldos. A aprovação não movimenta dinheiro. Seu usuário será registrado como responsável. Após uma devolução confirmada, revise novamente os valores restantes.',
       fields:[{name:'status',label:'Encaminhamento',type:'select',value:'pending_review',options:[{value:'pending_review',label:'Continuar em análise'},{value:'waiting_funds',label:'Aguardar recomposição de saldo'},{value:'approved',label:'Aprovar execução'}]},
         {name:'note',label:'Análise e providências (uso interno)',type:'textarea',required:true,full:true},
         {name:'followup',label:'Próximo acompanhamento',type:'select',value:'24',options:[{value:'24',label:'Em 24 horas'},{value:'12',label:'Em 12 horas'},{value:'48',label:'Em 48 horas'}]}],submitLabel:'Salvar análise',
       onSubmit:async data=>{
-        if(identity!==backendRuntime.identityId||state.role!=='admin')return false;
+        if(identity!==adminRefundContext())return false;
         if(String(data.note||'').trim().length<3)return markFormFieldInvalid('note','Informe a análise realizada.');
         const hours=Number(data.followup);if(![12,24,48].includes(hours))return false;
         const result=await runBackendMutation('Análise registrada.',()=>window.MarketplaceBackend.rpc('review_admin_refund',{p_reservation_id:reservationId,p_status:data.status,p_note:String(data.note).trim(),p_follow_up_at:new Date(Date.now()+hours*3600000).toISOString()}),()=>false);
-        return result?{afterClose:()=>openAdminRefunds()}:false;
+        return result?{afterClose:()=>openAdminRefunds(reservationId)}:false;
       }});
   }
 
@@ -4655,7 +4699,11 @@
 
   async function handleCancellationAction(button) {
     const action=button.dataset.action,identity=backendRuntime.identityId;
-    if(action==='admin-refunds'){await openAdminRefunds(button.dataset.all==='true');return true;}
+    if(action==='admin-refunds'){await openAdminRefunds(button.dataset.reservationId||null);return true;}
+    if(action==='admin-refund-refresh'){await adminRefundStore.load(true);return true;}
+    if(action==='admin-refund-details'){openAdminRefundDetails(button.dataset.reservationId);return true;}
+    if(action==='admin-refund-clear'){adminRefundStore.setFilters(window.MarketplaceRefundReview.defaults());return true;}
+    if(action==='admin-refund-page'){adminRefundStore.setPage(button.dataset.page);return true;}
     if(action==='admin-refund-review'){openAdminRefundReview(button.dataset.reservationId);return true;}
     if(action==='asaas-refund-balance'){await openAsaasRefund(button.dataset.reservationId,'balance',null,button.dataset.paymentId);return true;}
     if(action==="cancellation-cases"){await openCancellationCases();return true;}
@@ -5353,7 +5401,7 @@
             const unread=navigationUnreadCount(role,id);
             const restricted=role==="partner"&&!partnerPageAllowed(id);
             if(restricted)return `<button type="button" data-ui-key="${role}-${id}" class="subnav-button is-restricted" disabled aria-disabled="true"><span class="subnav-icon" aria-hidden="true">${icon}</span><span class="subnav-label">${esc(label)}<small>${partnerAccessPending ? "Atualizando…" : "Acesso Restrito"}</small></span></button>`;
-            const badgeLabel=id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
+            const badgeLabel=id==="refunds"&&role==="admin"?"devolução(ões) pendente(s)":id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
             return `<button type="button" data-ui-key="${role}-${id}" class="subnav-button ${state.activePage[role] === id ? "active" : ""} ${unread ? "has-unread" : ""}" data-nav="${id}" ${state.activePage[role]===id?'aria-current="page"':''}><span class="subnav-icon" aria-hidden="true">${icon}</span><span class="subnav-label">${label}</span>${messageBadge(unread,badgeLabel)}</button>`;
           }).join("");
   }
@@ -5376,8 +5424,7 @@
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
-    if(backendIsOnline()&&state.role==="admin")actions+=`<button class="button primary small" data-action="admin-refunds">Devoluções</button>`;
-    if(backendIsOnline())actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
+    if(backendIsOnline() && !(state.role==="admin" && state.activePage.admin==="refunds"))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
@@ -6000,6 +6047,7 @@
   }
 
   function navigationUnreadCount(role, page) {
+    if(page==="refunds" && role==="admin")return window.MarketplaceRefundReview.summary(adminRefundStore.get().rows||[]).pending;
     if(page==="reservations"&&role==="user")return userReservationsUnreadCount();
     if(page==="shares"&&role==="user")return userPendingSharesCount();
     if(page==="reservations"&&role==="partner")return totalUnreadForRole("partner")+occurrenceTransferUnreadForRole("partner");
@@ -6012,7 +6060,7 @@
     for(const button of app.querySelectorAll("[data-nav]")){
       const count=navigationUnreadCount(state.role,button.dataset.nav);
       button.querySelector(".message-badge")?.remove();
-      if(count)button.insertAdjacentHTML("beforeend",messageBadge(count,"atualização(ões) pendente(s)"));
+      if(count)button.insertAdjacentHTML("beforeend",messageBadge(count,button.dataset.nav==="refunds"?"devolução(ões) pendente(s)":"atualização(ões) pendente(s)"));
       button.classList.toggle("has-unread",count>0);
     }
     renderNotificationControls();
@@ -8066,12 +8114,17 @@
 
 
   function adminView() {
-    const views = { overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, vouchers: adminVouchers, settings: adminSettings };
+    const views = { overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
     return navShell("admin", (views[state.activePage.admin] || adminOverview)());
   }
 
   function render() {
     if(window.TamoonMarketplacePilot?.leaving)return;
+    adminRefundStore.get();
+    if(!adminRefundContext() && ['admin-refund-details','asaas-refund','admin-refunds'].includes(detailDialog.dataset.view)){
+      stopAsaasRefundMonitor();detailReturnContext=null;if(detailDialog.open)detailDialog.close();
+      if(formDialog.open)formDialog.close();
+    }
     capturePartnerInterestDraft();
     const financeScreen=state.activePage?.[state.role]==="finance"?captureFinanceScreen(app.querySelector(".finance-page")):null;
     const preserveFinance=financeScreen&&state.activePage?.[state.role]==="finance"&&financeScreen.identity===financeScreenIdentity();
@@ -8138,6 +8191,7 @@
     if (adminReservationFilter) adminReservationFilter.value = state.filters.adminReservationStatus;
     app.partnerAccessKey=partnerAccessKey;
     updateRoleUnreadIndicators();
+    ensureAdminRefunds();
     if(changedFinance)restoreFinanceScreen(app.querySelector(".finance-page"),financeScreen);
     if(preserveFinance)app.style.minHeight="";
   }
@@ -9978,6 +10032,7 @@
   }, true);
 
   app.addEventListener("input", (event) => {
+    if(event.target.dataset.refundFilter==="search"){adminRefundStore.setFilters({search:event.target.value});return;}
     if(event.target.id==="venueSearch"){state.search.venue=event.target.value;saveState();render();const input=document.getElementById("venueSearch");input?.focus();input?.setSelectionRange(state.search.venue.length,state.search.venue.length);}
     if(event.target.id==="adminApplicationSearch"){state.search.adminApplication=event.target.value;saveState();render();const input=document.getElementById("adminApplicationSearch");input?.focus();input?.setSelectionRange(state.search.adminApplication.length,state.search.adminApplication.length);}
     if(event.target.id==="adminPartnerSearch"){state.search.adminPartner=event.target.value;saveState();render();const input=document.getElementById("adminPartnerSearch");input?.focus();input?.setSelectionRange(state.search.adminPartner.length,state.search.adminPartner.length);}
@@ -9985,6 +10040,7 @@
   });
 
   app.addEventListener("change", (event) => {
+    if(event.target.dataset.refundFilter){adminRefundStore.setFilters({[event.target.dataset.refundFilter]:event.target.value});return;}
     if(event.target.id==="financeMonth"){changeFinancePeriod(event.target.value);return;}
     if(event.target.id==="financePeriodMode"){changeFinancePeriod(event.target.value==="all"?"all":window.MarketplaceFinancePeriod.currentMonth());return;}
     if (event.target.form?.id === "partnerInterestForm") capturePartnerInterestDraft(event.target.form);
@@ -10001,6 +10057,11 @@
     if(event.target.id==="partnerPhotoUpload" && event.target.files?.length){handlePartnerPhotoUpload(event.target.files);}
     if(event.target.id==="partnerDocumentUpload" && event.target.files?.[0]){handlePartnerDocumentUpload(event.target.files[0]);event.target.value="";}
   });
+
+  setInterval(()=>{
+    if(!document.hidden && adminRefundContext() && state.activePage.admin==='refunds'
+      && !formDialog.open && !confirmDialog.open && !backendRuntime.mutating)adminRefundStore.load(true);
+  },60000);
 
   setInterval(() => {
     if (chatDialog?.open && selectedChatReservationId) renderOpenChat();

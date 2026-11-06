@@ -71,8 +71,15 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
     await page.locator('#marketplaceMenu [data-nav="reservations"]').click();
     await page.locator('#adminReservationDate').waitFor();
     assert.equal(await page.locator('#marketplaceMenu').evaluate(node=>node.open),false);
-    await page.getByRole('button',{name:'Devoluções',exact:true}).click();
-    await page.locator('#detailDialog').getByText('RES-QA · Quadra de demonstração').waitFor();
+    await page.getByRole('button',{name:'Abrir menu do Marketplace',exact:true}).click();
+    await page.locator('#marketplaceMenu [data-nav="refunds"]').click();
+    await page.locator('#app').getByRole('heading',{name:'Devoluções',exact:true}).waitFor();
+    assert.equal(await page.locator('#marketplaceMenu').evaluate(node=>node.open),false);
+    assert.equal(await page.locator('.page-header [data-action="admin-refunds"]').count(),0);
+    await page.locator('#refundSearch').fill('RES-QA');
+    await page.getByRole('button',{name:'Ver detalhes de RES-QA',exact:true}).click();
+    await page.locator('#detailTitle').getByText('RES-QA',{exact:true}).waitFor();
+    assert.equal(await page.locator('#detailDialog').evaluate(el=>el.scrollWidth>el.clientWidth+2),false);
     await page.getByRole('button',{name:'Registrar análise',exact:true}).click();
     await page.locator('#formDialog [name="note"]').fill('Conferidos motivo, prazo e composição do pagamento.');
     await page.locator('#formDialog [name="status"]').selectOption('approved');
@@ -82,10 +89,16 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
     await page.getByRole('button',{name:'Conferir saldos',exact:true}).click();
     await page.locator('#detailDialog').getByText('Saldo a regularizar',{exact:true}).waitFor();
     assert.equal(actions.includes('refund:submit'),false);
-    assert.equal(await page.locator('#detailDialog').evaluate(el=>el.scrollWidth>el.clientWidth+2),false);
+    await page.getByRole('button',{name:'Fila de devoluções',exact:true}).click();
+    assert.equal(await page.locator('#detailDialog').evaluate(node=>node.open),false);
+    assert.equal(await page.locator('#refundSearch').inputValue(),'RES-QA');
+    await page.locator('#refundStatus').selectOption('completed');
+    await page.getByText('Nenhum pedido nesta seleção',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();
+    await page.getByRole('button',{name:'Ver detalhes de RES-QA',exact:true}).waitFor();
     await page.screenshot({path:'/tmp/refund-review-mobile.png',fullPage:true,animations:'disabled'});
     await page.keyboard.press('Escape');
-    } else {assert.equal(await page.locator('.pilot-sync-bar').isVisible(),false);assert.equal(actions.includes('import_group'),false);assert.equal(requests.some(p=>p.includes('marketplace-group-pilot')),false);assert.equal(await page.getByRole('button',{name:'Administração',exact:true}).isDisabled(),true);}
+    } else {assert.equal(requests.some(p=>p.endsWith('/admin_refund_directory')),false);assert.equal(await page.locator('[data-nav="refunds"]').count(),0);assert.equal(await page.locator('.pilot-sync-bar').isVisible(),false);assert.equal(actions.includes('import_group'),false);assert.equal(requests.some(p=>p.includes('marketplace-group-pilot')),false);assert.equal(await page.getByRole('button',{name:'Administração',exact:true}).isDisabled(),true);}
     if(process.env.PILOT_TEST_SCREENSHOT&&isOwner){
       await page.screenshot({path:process.env.PILOT_TEST_SCREENSHOT,fullPage:true,animations:'disabled'});
       await page.getByRole('button',{name:'Abrir menu do Marketplace',exact:true}).click();

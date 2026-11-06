@@ -6,7 +6,18 @@ Implementação sobre `main` em `776de03`. Implantação autorizada em 05/11/202
 
 Usuário e parceiro continuam solicitando cancelamento/restituição nos caminhos existentes. Os direitos, a liberação de horários, a escolha individual de vouchers e a contabilização não foram modificados. Os solicitantes acompanham estados simples, sem notas internas ou informações de saldo.
 
-A Administração acessa **Devoluções** pelo cabeçalho ou por **Cancelamentos e restituições**. A fila inclui obrigações financeiras anteriores e novas, inclusive pedidos relativos a ocorrências mensalistas. Exibe valor previsto, devolvido e pendente, motivo, pagamentos, responsável e histórico. A análise permite continuar em avaliação, aguardar saldo ou aprovar execução; não movimenta dinheiro. O responsável é quem registra a análise. Pode programar acompanhamento em 12, 24 ou 48 horas. O destaque após dois dias é operacional, não uma definição de prazo legal.
+A Administração acessa **Devoluções** pelo menu lateral, junto de Financeiro, Reservas e Vouchers. O menu móvel oferece o mesmo acesso. Os atalhos existentes em **Cancelamentos e restituições** abrem essa mesma área. A fila inclui obrigações financeiras anteriores e novas, inclusive pedidos relativos a ocorrências mensalistas. Os detalhes exibem valor previsto, devolvido e pendente, motivo, pagamentos, responsável e histórico. A análise permite continuar em avaliação, aguardar saldo ou aprovar execução; não movimenta dinheiro. O responsável é quem registra a análise. Pode programar acompanhamento em 12, 24 ou 48 horas. O destaque após dois dias é operacional, não uma definição de prazo legal.
+
+## Tela dedicada — 06/11/2026
+
+- Quatro indicadores acompanham os filtros: pedidos pendentes, aguardando saldo, em processamento e total a devolver. O contador no menu mantém o total de pedidos pendentes.
+- Filtros por código de reserva, situação, parceiro e período de solicitação. A seleção inicial apresenta as pendências, com acompanhamentos vencidos primeiro e pedidos mais antigos em seguida. A lista tem páginas de 15 pedidos.
+- A lista compacta mostra reserva, parceiro, situação, data e valor pendente. Notas, pagamentos, responsável, análise e histórico ficam nos detalhes. O botão repetido no cabeçalho foi retirado.
+- Ao salvar uma análise, os mesmos detalhes são reabertos e os filtros são preservados. A fila é atualizada após mudanças recebidas do backend e a cada minuto enquanto a tela está visível e nenhuma análise ou confirmação está em curso.
+- Falha de consulta apresenta aviso e nova tentativa; não é mostrada como fila vazia nem saldo zero. Pedidos e filtros ficam somente na memória, vinculados à identidade administrativa ativa. Perda de acesso invalida respostas pendentes e fecha os detalhes administrativos.
+- Esta revisão altera apenas a interface e seus testes. Não reaplica migrações, não publica funções do processador e não habilita dinheiro real. O teste com uma pequena movimentação real permanece para o início da operação.
+
+Validação desta revisão: 166 testes Node aprovados, sintaxe e bundle conferidos. Fluxo exercitado em Chromium com serviços simulados: menu, filtros, detalhes, gravação de análise e bloqueio por saldo insuficiente. A conferência visual usa telas de computador e larguras móveis; não representa teste em aparelho físico nem transação real.
 
 Somente administradores ativos podem consultar o processador e executar devoluções, incluindo registro de devolução externa. As regras são impostas no servidor, inclusive para clientes antigos. Uma alteração nos valores, escolha de voucher ou confirmação parcial invalida a aprovação anterior. Após cada pagamento confirmado, os valores restantes precisam ser revisados. Uma reserva não pode ter dois pagamentos em execução simultânea.
 
@@ -21,7 +32,7 @@ Uma resposta HTTP bem-sucedida registra envio, não conclusão. A confirmação 
 - Nenhum pagamento real ou estorno real foi realizado durante a validação.
 - Não foi gerado AAB ou IPA. Android TWA usará a versão web após publicação; o pacote iOS 171 em revisão não é atualizado por este incremental. A interface precisa entrar em um próximo build iOS. A proteção do servidor, quando aplicada, também abrange clientes antigos; nesse intervalo a Administração opera pela web.
 
-## Validação
+## Validação da integração financeira anterior
 
 - 156 testes Node de Marketplace, autenticação e integração da Comunidade.
 - Teste transacional no projeto Marketplace Staging, com migração e fixtures revertidos por ROLLBACK. Cobriu bloqueio de usuários/parceiros, aprovação, espera de saldo, aprovação invalidada, concorrência, notificações internas, vouchers, duplicidade e confirmação de devolução.
