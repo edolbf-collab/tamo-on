@@ -101,7 +101,7 @@ const financial='<header class="page-header"><div><span class="eyebrow">Administ
      const extra=destination==='shares'?'<button data-nav="reservations">Ver minhas reservas</button>':'';
      const html=c.navShell(role,c.pageHeader('',destination,'',extra));
      await page.locator('#app').evaluate((app,markup)=>{app.innerHTML=markup;},html);
-     const visible=!(role==='admin'&&destination==='refunds');
+     const visible=(role!=='user'||destination==='reservations')&&!(role==='admin'&&destination==='refunds');
      assert.equal(await page.locator('#app [data-action="cancellation-cases"]').isVisible(),visible,role+'/'+destination);
      assert.equal(await page.locator('#app .page-actions').isVisible(),visible||Boolean(extra));
      if(extra)assert.ok(await page.getByRole('button',{name:'Ver minhas reservas'}).isVisible());
