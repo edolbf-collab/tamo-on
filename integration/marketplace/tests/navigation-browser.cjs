@@ -66,9 +66,10 @@ const financial='<header class="page-header"><div><span class="eyebrow">Administ
   assert.equal(await page.evaluate(()=>document.getElementById('infoDialog').open),true);
   assert.equal(await page.evaluate(()=>document.body.style.position),'');await page.keyboard.press('Escape');
   console.log('existing preference handlers and handover to Help dialog: PASS');
-  for(const [role,heading,count] of [['user','Usuário',6],['partner','Parceiro',8],['admin','Administração',7]]){
+  for(const [role,heading,count] of [['user','Usuário',6],['partner','Parceiro',8],['admin','Administração',8]]){
    await page.evaluate(({heading,markup})=>window.drawer.update({heading,markup}),{heading,markup:c.navigationItems(role)});
    await open();assert.equal(await page.locator('#marketplaceMenu [data-nav]').count(),count);
+   if(role==='admin')assert.equal(await page.locator('#marketplaceMenu [data-nav="refunds"]').textContent(),'↩Devoluções');
    if(role==='partner')assert.equal(await page.locator('#marketplaceMenu .is-restricted').isDisabled(),true);
    await page.keyboard.press('Escape');
   }
@@ -94,20 +95,20 @@ const financial='<header class="page-header"><div><span class="eyebrow">Administ
   await page.evaluate(()=>document.body.classList.remove('pilot-locked'));
   for(const width of [390,1200]){
    await page.setViewportSize({width,height:844});
-   for(const [role,destinations] of Object.entries({user:['discover','reservations','shares','promotions','favorites','profile'],partner:['finance'],admin:['finance']})){
+   for(const [role,destinations] of Object.entries({user:['discover','reservations','shares','promotions','favorites','profile'],partner:['finance'],admin:['finance','refunds']})){
     for(const destination of destinations){
      c.state.role=role;c.state.activePage[role]=destination;
      const extra=destination==='shares'?'<button data-nav="reservations">Ver minhas reservas</button>':'';
      const html=c.navShell(role,c.pageHeader('',destination,'',extra));
      await page.locator('#app').evaluate((app,markup)=>{app.innerHTML=markup;},html);
-     const visible=role!=='user'||destination==='reservations';
+     const visible=!(role==='admin'&&destination==='refunds');
      assert.equal(await page.locator('#app [data-action="cancellation-cases"]').isVisible(),visible,role+'/'+destination);
      assert.equal(await page.locator('#app .page-actions').isVisible(),visible||Boolean(extra));
      if(extra)assert.ok(await page.getByRole('button',{name:'Ver minhas reservas'}).isVisible());
     }
    }
   }
-  console.log('cancellation directory in customer reservations and staff views on mobile and desktop: PASS');
+  console.log('cancellation directory in customer and staff views, dedicated admin refunds destination on mobile and desktop: PASS');
   await context.close();
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
