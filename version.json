@@ -1,11 +1,11 @@
 {
   "channel": "beta",
-  "version": "Beta 1.0",
+  "version": "1.0",
   "build": 168,
   "database": 152,
   "edge": 116,
   "mandatory": false,
-  "notes": "Acesso com Apple e vinculação à mesma conta Google, com aviso de privacidade e exclusão unificada.",
-  "label": "Tâmo On Beta 1.0 Build 168",
-  "integration": "168-R3"
+  "notes": "Apresentação da comunidade atualizada para uso público, com suporte e administração da plataforma.",
+  "label": "Tâmo On 1.0 Build 168",
+  "integration": "168-R4"
 }
