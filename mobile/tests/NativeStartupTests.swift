@@ -37,6 +37,11 @@ final class NativeStartupTests: XCTestCase {
             const native = window.TamoonNative;
             if (!native?.isIOS || !window.Capacitor.isPluginAvailable('TamoonNative'))
                 throw new Error('Native iOS plugin missing');
+            if (!native.push || !window.Capacitor.isPluginAvailable('PushNotifications'))
+                throw new Error('Native push plugin missing');
+            const notificationStatus = await native.push.status();
+            if (!['prompt', 'granted', 'denied'].includes(notificationStatus.permission))
+                throw new Error('Native notification permission bridge failed');
             const key = 'tamoon-native-startup-test-' + crypto.randomUUID();
             try {
                 if (await native.storage.getItem(key) !== null) throw new Error('Expected empty test key');

@@ -11,22 +11,25 @@ Estado em 4/11/2026. O titular confirmou o fluxo e a vinculação Apple no aplic
 - O workflow de preparação também compila um archive Release/arm64 sem credenciais. O simulador não substitui essa validação nem um teste no aparelho.
 - Workflow de envio exclusivamente manual. Exige o SHA completo de um commit da branch iOS e um número de build válido. Sem selecionar `upload`, apenas verifica o archive. Não publica artefatos nem credenciais no repositório público.
 
-## Bloqueio atual da assinatura
+## Credenciais e proteções configuradas
 
-Em Usuários e acesso → Integrações → API do App Store Connect, a Apple exige que o titular solicite acesso e aceite os termos específicos. A janela foi aberta para conferência; a caixa de aceite não foi marcada e a solicitação não foi enviada.
+O titular autorizou o aceite dos termos da API e a solicitação da organização. A Apple aprovou o acesso imediatamente em 4/11/2026. Em autorização separada, o titular aprovou gerar a chave de equipe **Tamo On TestFlight**, com função Administrador, e armazená-la no GitHub para assinatura e envio. Chaves de equipe abrangem todos os apps da conta, conforme sua função; essa credencial não é restrita a um único aplicativo.
 
-O Xcode Cloud desta conta ainda não está configurado; o painel solicita a configuração inicial pelo Xcode. O caminho preparado usa o Mac do GitHub Actions já empregado nas validações. O envio depende de habilitar a API e configurar uma chave autorizada para assinatura automática e upload. A chave de Sign in with Apple é diferente e não deve ser reaproveitada.
+O ambiente GitHub `testflight` está criado, permite apenas a branch `main`, exige aprovação de `edolbf-collab` e não permite ignorar suas proteções. `ASC_KEY_ID`, `ASC_ISSUER_ID` e `ASC_PRIVATE_KEY` foram cadastrados somente como segredos desse ambiente. A cópia temporária da chave baixada foi removida após o armazenamento. A chave de Sign in with Apple é diferente e não foi reaproveitada.
 
-## Antes de habilitar o envio
+## Assinatura e envio
 
-1. Obter a confirmação do titular para aceitar os termos de uso interno da API e enviar a solicitação da organização. A Apple pode analisar o pedido.
-2. Após aprovação, escolher o menor nível de acesso que permita provisionamento e assinatura automática. Chaves individuais não permitem provisionamento; chaves de equipe abrangem todos os apps da conta, conforme sua função. Conferir o alcance real antes de criar a chave e obter a autorização para essa credencial e seu armazenamento no GitHub.
-3. Criar o ambiente GitHub `testflight`, restrito à branch `main`, com aprovação do responsável. Armazenar somente ali `ASC_KEY_ID`, `ASC_ISSUER_ID` e `ASC_PRIVATE_KEY`. Não usar secrets de repositório para contornar a revisão do ambiente.
-4. O executor usa um Keychain temporário e apaga o arquivo da chave ao terminar. A assinatura de distribuição é gerenciada pela Apple. Se a Apple recusar a função selecionada, parar e revisar o acesso; não elevar a função automaticamente nem revogar certificados existentes para tentar corrigir.
+O fluxo usa o Mac do GitHub Actions já empregado nas validações. O archive recebe assinatura local ad hoc (`CODE_SIGN_IDENTITY=-`, `AD_HOC_CODE_SIGNING_ALLOWED=YES`), preservando os entitlements sem exigir um iPhone registrado para um perfil de desenvolvimento. Antes da exportação, o fluxo confere a presença de `com.apple.developer.applesignin = [Default]`. A exportação usa assinatura automática de distribuição gerenciada pela Apple e a chave de API autorizada.
+
+O executor usa um Keychain temporário e apaga o arquivo da chave ao terminar. Não usar segredos de repositório para contornar a revisão do ambiente. Se a Apple recusar a função selecionada, revisar o acesso; não elevar a função automaticamente nem revogar certificados existentes para tentar corrigir.
 
 ## Primeiro envio
 
-No workflow **Preparar ou enviar iOS ao TestFlight**, executar a versão da `main`, informar o SHA revisado da `ios-build-165`, `build_number=168` se ainda estiver disponível e `upload=true`. O fluxo instala as dependências fixadas, recompõe os recursos locais, executa os testes, arquiva para iPhone e pede ao Xcode que assine e envie à Apple.
+O upload de **1.0.168 (168)** foi concluído em **4/11/2026 às 13:09 UTC (10:09 BRT)**. A [execução de envio](https://github.com/edolbf-collab/tamo-on/actions/runs/41834822087) terminou com sucesso, incluindo archive Release/arm64, testes de autenticação e integração, conferência dos recursos e do entitlement Apple Sign In, exportação e upload. Código do app: `60989efb69820d8f1edb9052d45b4833d3d3678e`; workflow utilizado: `c5e59d5603cb73858c9cc3b23c30bcdd736e425e`.
+
+A Apple concluiu o processamento e exibiu o build como **Pronto para testar**. O build foi associado ao grupo **Piloto interno**. Nenhum tester foi convidado; a inclusão do destinatário está pendente de autorização explícita do titular. A instalação no iPhone ainda não foi validada.
+
+Para um novo envio, no workflow **Preparar ou enviar iOS ao TestFlight**, executar a versão da `main`, informar o SHA revisado da `ios-build-165`, um número de build Apple ainda não utilizado e `upload=true`. O build 168 já foi enviado e não deve ser reutilizado. O fluxo instala as dependências fixadas, recompõe os recursos locais, executa os testes, arquiva para iPhone e pede ao Xcode que assine e envie à Apple.
 
 O arquivo de exportação define `testFlightInternalTestingOnly=true`; esse primeiro build não poderá ser usado para revisão externa nem publicação na App Store. Uma distribuição externa posterior exigirá outro build e a preparação específica de revisão.
 

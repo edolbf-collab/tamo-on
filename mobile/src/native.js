@@ -1,6 +1,8 @@
 import {Capacitor,registerPlugin} from '@capacitor/core';
 import {Share} from '@capacitor/share';
 import {Clipboard} from '@capacitor/clipboard';
+import {PushNotifications} from '@capacitor/push-notifications';
+import {createNativePush} from './push.mjs';
 import {createClient} from '@supabase/supabase-js';
 
 window.supabase={createClient};
@@ -57,6 +59,9 @@ window.TamoonNative={
   async saveJson(data,name){await Bridge.shareFile({name,contents:JSON.stringify(data,null,2)});}
 };
 if(isIOS){
+  const push = createNativePush({plugin:PushNotifications, storage:window.TamoonNative.storage, environment:'production', getApp:()=>window.App});
+  window.TamoonNative.push = push;
+  push.listen().catch(()=>{});
   Bridge.addListener('appleCredentialRevoked',async()=>{
     if(!window.App?.repo)return;
     await window.TamoonNative.checkAppleCredential(App.repo.client);

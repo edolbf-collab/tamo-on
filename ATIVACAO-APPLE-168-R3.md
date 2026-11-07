@@ -1,6 +1,6 @@
 # Ativação Apple e vinculação — 168-R3
 
-Atualização: o titular confirmou o fluxo e o vínculo Apple em 4/11/2026 e autorizou avançar ao TestFlight. Consulte [a preparação do primeiro build nativo](docs/TESTFLIGHT-168.md). As pendências de teste real abaixo registram o estado anterior a essa confirmação; a instalação nativa ainda depende do primeiro build assinado.
+Atualização: o titular confirmou o fluxo e o vínculo Apple em 4/11/2026 e autorizou avançar ao TestFlight. O primeiro build nativo **1.0.168 (168)** foi assinado e enviado à Apple em 4/11/2026, às 10:09 BRT. Consulte [o registro do TestFlight](docs/TESTFLIGHT-168.md) para o estado de processamento e distribuição. As pendências e a ausência de envio mencionadas abaixo registram a entrega original de ativação; o teste do pacote nativo no iPhone ainda depende de instalação e confirmação do titular.
 
 Data: 4 de novembro de 2026. Escopo autorizado: concluir a preparação e ativar o acesso Apple e a vinculação com a conta existente do Tâmo On.
 

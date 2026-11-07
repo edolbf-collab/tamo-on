@@ -10,7 +10,7 @@ function fixture(){
  backendDateTimeLabel:String,openForm:f=>forms.push(f),openDetail:d=>details.push(d),showToast(){},
  markFormFieldInvalid:(...x)=>{invalid.push(x);return false},backendErrorMessage:e=>e.message,
  runBackendMutation:async(_,operation)=>operation(),window:{MarketplaceBackend:{rpc:async(name,args)=>{calls.push({name,args});return {request_id:'case',review:false}}}},openAsaasRefund:async()=>{},setFormFieldVisible(){}};
- vm.createContext(c);vm.runInContext(section('  function cancellationContractText(', '  let cancellationPreviewSequence='),c);
+ vm.createContext(c);vm.runInContext(fs.readFileSync(new URL('../../../marketplace/refund-review.js',import.meta.url),'utf8'),c);vm.runInContext(section('  function cancellationContractText(', '  let cancellationPreviewSequence='),c);
  return {c,calls,forms,details,invalid};
 }
 test('cancellation defaults to refund and requires explicit consent to voucher only owned funds',async()=>{

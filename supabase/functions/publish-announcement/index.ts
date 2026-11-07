@@ -2,6 +2,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2.110.7";
 import { sendNotification } from "npm:web-push-neo@0.1.2";
 import { rescheduleAndNotify } from "./match-reschedule.mjs";
+import { createApnsSender } from "./apns.mjs";
+
+const sendApns = createApnsSender({env: (name: string) => Deno.env.get(name)});
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,7 +52,7 @@ function formatDateTime(value: string, timeZone: string) {
   }
 }
 
-type StoredSubscription = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string };
+type StoredSubscription = { id: string; user_id: string; endpoint: string; p256dh?: string; auth?: string; native?: boolean; updated_at?: string };
 type PushFailure = { statusCode: number; reason: string };
 type PushResult = {
   sent: number;
@@ -101,6 +104,15 @@ Deno.serve(async (req) => {
     stage = "authenticate-user";
     const userClient = createClient(supabaseUrl, publicKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const adminClient = createClient(supabaseUrl, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const loadSubscriptions = async (userIds: string[]): Promise<StoredSubscription[]> => {
+      const [web, native] = await Promise.all([
+        adminClient.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", userIds).eq("enabled", true),
+        adminClient.from("native_push_subscriptions").select("id,user_id,endpoint,updated_at").in("user_id", userIds).eq("enabled", true),
+      ]);
+      if (web.error) throw web.error;
+      if (native.error) throw native.error;
+      return [...(web.data || []), ...(native.data || []).map(row => ({...row, native:true}))];
+    };
     const { data: userData, error: userError } = await userClient.auth.getUser(accessToken);
     const user = userData.user;
     if (userError || !user) return json({ error: "Sessão inválida ou expirada.", code: "AUTH_INVALID" }, 401);
@@ -151,7 +163,8 @@ Deno.serve(async (req) => {
       group = data;
     }
 
-    const appOrigin = String(Deno.env.get("APP_BASE_URL") || req.headers.get("Origin") || "").trim().replace(/\/+$/, "");
+    const requestedOrigin = String(Deno.env.get("APP_BASE_URL") || req.headers.get("Origin") || "").trim().replace(/\/+$/, "");
+    const appOrigin = requestedOrigin.startsWith("capacitor:") ? "https://app.tamoon.app.br" : requestedOrigin;
 
 
     const eventIdFromData = (data: Record<string, unknown>, fallback: string) => cleanText(
@@ -209,6 +222,7 @@ Deno.serve(async (req) => {
 
     const providerFromEndpoint = (endpoint: string) => {
       const value = String(endpoint || "").toLowerCase();
+      if (value.startsWith("apns://")) return "apns";
       if (value.includes("web.push.apple.com")) return "apple";
       if (value.includes("fcm.googleapis.com") || value.includes("googleapis.com")) return "google";
       if (value.includes("mozilla.com")) return "mozilla";
@@ -261,6 +275,16 @@ Deno.serve(async (req) => {
       provider: string;
     }) => {
       try {
+        if (options.subscription.native) {
+          const now = new Date().toISOString();
+          const {error} = await adminClient.from("native_push_subscriptions").update({
+            last_attempt_at: now,
+            ...(options.success ? {last_success_at:now, consecutive_failures:0, last_failure_reason:null, last_failure_status:null} : {last_failure_at:now, last_failure_reason:cleanText(options.technicalReason,120), last_failure_status:options.statusCode}),
+            ...(options.statusCode === 410 ? {enabled:false} : {})
+          }).eq("id", options.subscription.id).eq("user_id", options.subscription.user_id).eq("updated_at", options.subscription.updated_at!);
+          if (error) console.warn("Não foi possível registrar a entrega nativa.");
+          return;
+        }
         const { error } = await adminClient.rpc("record_push_delivery_attempt_v2", {
           p_subscription_id: options.subscription.id,
           p_group_id: options.deliveryGroupId || null,
@@ -298,7 +322,13 @@ Deno.serve(async (req) => {
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         const attemptStartedAt = Date.now();
         try {
-          await sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, notificationPayload, {
+          if (subscription.native) {
+            // Recheck immediately before each attempt, including retries after sign-out.
+            const {data: current, error} = await adminClient.from("native_push_subscriptions").select("id").eq("id", subscription.id).eq("user_id", subscription.user_id).eq("updated_at", subscription.updated_at!).eq("enabled", true).maybeSingle();
+            if (error) throw error;
+            if (!current) throw Object.assign(new Error("Registro de aparelho desativado."), {statusCode:410});
+            await sendApns(subscription.endpoint, JSON.parse(notificationPayload), deliveryId);
+          } else await sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh!, auth: subscription.auth! } }, notificationPayload, {
             vapidDetails: { subject: vapidSubject, publicKey: vapidPublicKey, privateKey: vapidPrivateKey },
             TTL: 86400,
             urgency: "high",
@@ -314,7 +344,7 @@ Deno.serve(async (req) => {
             maxAttempts,
             isFinal: true,
             success: true,
-            statusCode: 201,
+            statusCode: subscription.native ? 200 : 201,
             technicalReason: "",
             durationMs: Date.now() - attemptStartedAt,
             transient: false,
@@ -411,9 +441,7 @@ Deno.serve(async (req) => {
         activeUserIds = [...new Set((activeRows || []).map((item) => item.user_id).filter(Boolean))];
         activeUserIds = await safetyRecipients(activeUserIds, options.data);
         if (activeUserIds.length) {
-          const { data, error } = await adminClient.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", activeUserIds).eq("enabled", true);
-          if (error) throw error;
-          subscriptions = (data || []) as StoredSubscription[];
+          subscriptions = await loadSubscriptions(activeUserIds);
         }
       }
 
@@ -496,9 +524,7 @@ Deno.serve(async (req) => {
         activeUserIds = [...new Set((activeRows || []).map((item) => item.user_id).filter(Boolean))];
         activeUserIds = await safetyRecipients(activeUserIds, options.data);
         if (activeUserIds.length) {
-          const { data, error } = await adminClient.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", activeUserIds).eq("enabled", true);
-          if (error) throw error;
-          subscriptions = (data || []) as StoredSubscription[];
+          subscriptions = await loadSubscriptions(activeUserIds);
           if (options.endpoint) subscriptions = subscriptions.filter((item) => item.endpoint === options.endpoint);
         }
       }
@@ -575,9 +601,7 @@ Deno.serve(async (req) => {
         .filter((id) => id !== options.excludeUserId);
       let subscriptions: StoredSubscription[] = [];
       if (activeUserIds.length) {
-        const { data, error } = await adminClient.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", activeUserIds).eq("enabled", true);
-        if (error) throw error;
-        subscriptions = (data || []) as StoredSubscription[];
+        subscriptions = await loadSubscriptions(activeUserIds);
       }
       const inboxNotifications = await storeUserNotifications(activeUserIds, options, null);
       let sent = 0;

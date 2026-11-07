@@ -50,15 +50,32 @@ begin
  end if;
  j:=public.cancellation_case_directory();
  if not exists(select 1 from jsonb_array_elements(j) a where a->>'id'=req::text and jsonb_array_length(a->'choices')>=1) then raise exception 'Payer case missing';end if;
+ begin perform public.admin_refund_directory();raise exception 'Queue exposed to non-admin';exception when others then if sqlerrm<>'REFUND_FORBIDDEN' then raise;end if;end;
+ begin perform public.review_admin_refund(rid,'approved','Forged approval',null);raise exception 'Non-admin approval';exception when others then if sqlerrm<>'REFUND_FORBIDDEN' then raise;end if;end;
  perform public.choose_cancellation_resolution(req,'refund',false);
  perform set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',c.marketplace_user_id,'session_id',owner_session)::text,true);
  -- Move the outstanding refund payment to a synthetic Asaas charge. No HTTP request is made.
  update public.payments set provider='asaas',provider_transaction_id='pay_cancellation_rollback_'||replace(p2::text,'-',''),metadata=metadata||jsonb_build_object('billingType','PIX','status','RECEIVED','netValue',40),payment_channel='asaas_pix',cash_availability='received',fee_source='provider' where id=p2;
  j:=public.asaas_refund_payments(rid,c.marketplace_user_id);
  if jsonb_array_length(j->'payments')<>1 or (j#>>'{payments,0,amount}')::numeric<>40 then raise exception 'Digital refund included voucher amount';end if;
+ -- Both direct service entrypoints and browser operations require active platform administration.
+ begin perform public.asaas_refund_payments(rid,other);raise exception 'Partner/user can access refund processor';exception when others then if sqlerrm<>'REFUND_FORBIDDEN' then raise;end if;end;
+ begin perform public.claim_asaas_refund_payment(rid,c.marketplace_user_id,p2,null,null,null);raise exception 'Unreviewed refund allowed';exception when others then if sqlerrm<>'REFUND_ADMIN_REVIEW_REQUIRED' then raise;end if;end;
+ perform public.review_admin_refund(rid,'waiting_funds','Awaiting partner balance',now()+interval '1 day');
+ begin perform public.claim_asaas_refund_payment(rid,c.marketplace_user_id,p2,null,null,null);raise exception 'Waiting funds refund allowed';exception when others then if sqlerrm<>'REFUND_ADMIN_REVIEW_REQUIRED' then raise;end if;end;
+ perform public.review_admin_refund(rid,'approved','Verified cancellation and payment allocation',null);
+ j:=public.admin_refund_directory();
+ if not exists(select 1 from jsonb_array_elements(j) z where z->>'reservation_id'=rid::text and z->>'status'='approved') then raise exception 'Approved queue entry missing';end if;
+ update public.payments set refunded_amount=0.01 where id=p2;
+ begin perform private.assert_refund_approved(rid,c.marketplace_user_id);raise exception 'Changed financial facts accepted';exception when others then if sqlerrm<>'REFUND_ADMIN_REVIEW_REQUIRED' then raise;end if;end;
+ update public.payments set refunded_amount=0 where id=p2;
  j:=public.claim_asaas_refund_payment(rid,c.marketplace_user_id,p2,null,null,null);
  if not (j->>'claimed')::boolean then raise exception 'Refund claim failed';end if;
  if (public.claim_asaas_refund_payment(rid,c.marketplace_user_id,p2,null,null,null)->>'claimed')::boolean then raise exception 'Duplicate refund claim';end if;
+ begin perform public.review_admin_refund(rid,'approved','Concurrent review',null);raise exception 'Review changed during execution';exception when others then if sqlerrm<>'REFUND_RECONCILIATION_REQUIRED' then raise;end if;end;
+ if not exists(select 1 from public.notifications where entity_id=rid and type='admin_refund_requested' and profile_id=c.marketplace_user_id) then raise exception 'Admin notification missing';end if;
+ if exists(select 1 from public.notifications n where entity_id=rid and type='admin_refund_requested' and not exists(select 1 from public.platform_admins a where a.profile_id=n.profile_id)) then raise exception 'Internal notification leaked';end if;
+ begin perform public.claim_asaas_refund(rid,c.marketplace_user_id);raise exception 'Legacy bypass allowed';exception when others then if sqlerrm<>'REFUND_USE_REVIEWED_PAYMENT_FLOW' then raise;end if;end;
  perform set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',other)::text,true);
  begin perform public.choose_cancellation_resolution(req,'voucher',true);raise exception 'Voucher issued after refund began';exception when others then if sqlerrm<>'Restituição já iniciada; não é possível emitir voucher' then raise;end if;end;
  perform set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',c.marketplace_user_id,'session_id',owner_session)::text,true);
@@ -66,6 +83,8 @@ begin
  perform private.apply_asaas_refund_evidence('rollback-event','PAYMENT_REFUNDED',j);
  perform private.apply_asaas_refund_evidence('rollback-event','PAYMENT_REFUNDED',j);
  if (select refunded_amount from public.payments where id=p2)<>40 or (select status from public.reservations where id=rid)<>'cancelled' then raise exception 'Mixed refund/webhook reconciliation wrong';end if;
+ j:=public.admin_refund_directory();
+ if not exists(select 1 from jsonb_array_elements(j) z where z->>'reservation_id'=rid::text and z->>'status'='completed') then raise exception 'Completion missing from queue';end if;
  j:=private.reservation_financial_snapshot(rid);
  if (j->>'refund_pending')::numeric<>0 or (j->>'liquidated_value')::numeric<>60 then raise exception 'Voucher value lost after digital refund';end if;
 end $$;

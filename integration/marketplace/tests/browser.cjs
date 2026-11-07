@@ -26,6 +26,7 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
  for(const scenario of ['anonymous','denied','owner','customer','partner']) {
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
   const page=await context.newPage(); const errors=[],requests=[],actions=[];
+  let reviewStatus='pending_review';
   const allowed=['owner','customer','partner'].includes(scenario); const isOwner=scenario==='owner';
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('https://cdn.jsdelivr.net/**',r=>r.fulfill({contentType:'text/javascript',body:sdk}));
@@ -41,6 +42,10 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
    else if(url.pathname.endsWith('/partner_readonly_status'))data={available:true,active:false};
    else if(url.pathname.endsWith('/marketplace_bootstrap'))data={...bootstrap,is_admin:isOwner};
    else if(url.pathname.endsWith('/assert_marketplace_writable'))data=true;
+   else if(url.pathname.endsWith('/admin_refund_directory'))data=[{reservation_id:'11111111-1111-4111-8111-111111111119',reservation_code:'RES-QA',partner_name:'Quadra de demonstração',requested_at:'2026-11-04T12:00:00Z',required:100,refunded:0,pending:100,status:reviewStatus,attention:true,reason:'Cancelamento solicitado pelo cliente',payments:[{payer:'Cliente de demonstração',amount:100,refunded:0,channel:'asaas_pix'}],history:[]}];
+   else if(url.pathname.endsWith('/review_admin_refund')){reviewStatus=r.request().postDataJSON().p_status;data={status:reviewStatus};}
+   else if(url.pathname.endsWith('/functions/v1/asaas-refund')){const body=r.request().postDataJSON();actions.push('refund:'+body.action);data={reservation_id:body.reservationId,reservation_code:'RES-QA',review_approved:reviewStatus==='approved',payment_amount:100,refund_target:100,refunded_amount:0,payments:[{payment_id:'11111111-1111-4111-8111-111111111118',payer_name:'Cliente de demonstração',payment_amount:100,amount:100,refunded_amount:0,billing_type:'PIX',status:'not_requested',can_submit:true}],...(body.action==='balance'?{balance:{checked_at:new Date().toISOString(),sufficient:false,issuer_available:0,issuer_required:94,platform_available:6,platform_required:6}}:{})};}
+
    await r.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
   });
   if(scenario!=='anonymous') await page.addInitScript(({session})=>localStorage.setItem('sb-xvwgrpnioaqyijhzqxqh-auth-token',JSON.stringify(session)),{session:session(communityId)});
@@ -66,7 +71,34 @@ for(const key of ['chats','events','groups','spaces','venues','partners','paymen
     await page.locator('#marketplaceMenu [data-nav="reservations"]').click();
     await page.locator('#adminReservationDate').waitFor();
     assert.equal(await page.locator('#marketplaceMenu').evaluate(node=>node.open),false);
-    } else {assert.equal(await page.locator('.pilot-sync-bar').isVisible(),false);assert.equal(actions.includes('import_group'),false);assert.equal(requests.some(p=>p.includes('marketplace-group-pilot')),false);assert.equal(await page.getByRole('button',{name:'Administração',exact:true}).isDisabled(),true);}
+    await page.getByRole('button',{name:'Abrir menu do Marketplace',exact:true}).click();
+    await page.locator('#marketplaceMenu [data-nav="refunds"]').click();
+    await page.locator('#app').getByRole('heading',{name:'Devoluções',exact:true}).waitFor();
+    assert.equal(await page.locator('#marketplaceMenu').evaluate(node=>node.open),false);
+    assert.equal(await page.locator('.page-header [data-action="admin-refunds"]').count(),0);
+    await page.locator('#refundSearch').fill('RES-QA');
+    await page.getByRole('button',{name:'Ver detalhes de RES-QA',exact:true}).click();
+    await page.locator('#detailTitle').getByText('RES-QA',{exact:true}).waitFor();
+    assert.equal(await page.locator('#detailDialog').evaluate(el=>el.scrollWidth>el.clientWidth+2),false);
+    await page.getByRole('button',{name:'Registrar análise',exact:true}).click();
+    await page.locator('#formDialog [name="note"]').fill('Conferidos motivo, prazo e composição do pagamento.');
+    await page.locator('#formDialog [name="status"]').selectOption('approved');
+    await page.getByRole('button',{name:'Salvar análise',exact:true}).click();
+    await page.locator('#detailDialog').getByText('Aprovada para execução',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'Conferir pagamentos e saldos',exact:true}).click();
+    await page.getByRole('button',{name:'Conferir saldos',exact:true}).click();
+    await page.locator('#detailDialog').getByText('Saldo a regularizar',{exact:true}).waitFor();
+    assert.equal(actions.includes('refund:submit'),false);
+    await page.getByRole('button',{name:'Fila de devoluções',exact:true}).click();
+    assert.equal(await page.locator('#detailDialog').evaluate(node=>node.open),false);
+    assert.equal(await page.locator('#refundSearch').inputValue(),'RES-QA');
+    await page.locator('#refundStatus').selectOption('completed');
+    await page.getByText('Nenhum pedido nesta seleção',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();
+    await page.getByRole('button',{name:'Ver detalhes de RES-QA',exact:true}).waitFor();
+    await page.screenshot({path:'/tmp/refund-review-mobile.png',fullPage:true,animations:'disabled'});
+    await page.keyboard.press('Escape');
+    } else {assert.equal(requests.some(p=>p.endsWith('/admin_refund_directory')),false);assert.equal(await page.locator('[data-nav="refunds"]').count(),0);assert.equal(await page.locator('.pilot-sync-bar').isVisible(),false);assert.equal(actions.includes('import_group'),false);assert.equal(requests.some(p=>p.includes('marketplace-group-pilot')),false);assert.equal(await page.getByRole('button',{name:'Administração',exact:true}).isDisabled(),true);}
     if(process.env.PILOT_TEST_SCREENSHOT&&isOwner){
       await page.screenshot({path:process.env.PILOT_TEST_SCREENSHOT,fullPage:true,animations:'disabled'});
       await page.getByRole('button',{name:'Abrir menu do Marketplace',exact:true}).click();

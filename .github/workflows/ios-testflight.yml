@@ -24,10 +24,12 @@ concurrency:
 jobs:
   testflight:
     if: github.ref == 'refs/heads/main'
-    runs-on: macos-latest
+    # Use the macOS 15 ARM pool while macOS 26 runner capacity is constrained.
+    runs-on: macos-15
     timeout-minutes: 30
     environment: testflight
     env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
       TF_SOURCE_SHA: ${{ inputs.source_sha }}
       TF_BUILD_NUMBER: ${{ inputs.build_number }}
     steps:
@@ -59,7 +61,10 @@ jobs:
       - name: Preparar o pacote validado
         run: |
           set -euo pipefail
+          test "$(uname -m)" = arm64
+          test -d "$DEVELOPER_DIR"
           xcodebuild -version
+          test "$(xcodebuild -version | head -1)" = 'Xcode 26.3'
           major=$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)
           test "$major" -ge 26
           npm ci --prefix mobile --no-audit --no-fund
@@ -114,8 +119,18 @@ jobs:
             -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/Tamoon.xcarchive" \
             CURRENT_PROJECT_VERSION="$TF_BUILD_NUMBER" CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=4T892ZTN46 "${AUTH[@]}" archive
+            CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            DEVELOPMENT_TEAM=4T892ZTN46 archive
           python3 mobile/scripts/verify-archive.py "$RUNNER_TEMP/Tamoon.xcarchive" "$TF_BUILD_NUMBER"
+          codesign -d --entitlements :- "$RUNNER_TEMP/Tamoon.xcarchive/Products/Applications/App.app" \
+            2>/dev/null > "$RUNNER_TEMP/tamoon-archive-entitlements.plist"
+          python3 - <<'PY'
+          import os, pathlib, plistlib
+          path=pathlib.Path(os.environ['RUNNER_TEMP'])/'tamoon-archive-entitlements.plist'
+          entitlements=plistlib.loads(path.read_bytes())
+          assert entitlements.get('com.apple.developer.applesignin') == ['Default'], 'Archive sem autorização Apple Sign In'
+          print('Entitlement Apple Sign In preservado antes da assinatura de distribuição.')
+          PY
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Tamoon.xcarchive" \
             -exportOptionsPlist mobile/ExportOptions-TestFlight.plist \
             -exportPath "$RUNNER_TEMP/tamoon-export" "${AUTH[@]}"

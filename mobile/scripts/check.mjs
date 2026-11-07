@@ -13,6 +13,11 @@ for(const item of ['TamoonNativePlugin.swift in Sources','PrivacyInfo.xcprivacy 
 assert(read('ios/App/App/Base.lproj/Main.storyboard').includes('TamoonViewController'));
 assert(/rootViewController\s*=\s*TamoonViewController\(\)/.test(read('ios/App/App/SceneDelegate.swift')), 'Scene startup must register the native session plugin');
 assert(read('ios/App/App/App.entitlements').includes('com.apple.developer.applesignin'));
+assert(read('ios/App/App/App.entitlements').includes('<key>aps-environment</key>'));
+assert(read('ios/App/CapApp-SPM/Package.swift').includes('CapacitorPushNotifications'));
+assert(read('ios/App/App/AppDelegate.swift').includes('.capacitorDidRegisterForRemoteNotifications'));
+assert(!read('www/app.js').includes('Nesta versão de preparação, os avisos'));
+assert(!read('www/app.js').includes('Painel Beta'));
 assert(read('ios/App/App/Info.plist').includes('br.app.tamoon'));
 assert(!fs.existsSync(path.join(root,'www/backend')));assert(!fs.existsSync(path.join(root,'www/supabase')));
 assert.equal(JSON.parse(read('package.json')).version,`1.0.${release.build}`);

@@ -130,6 +130,7 @@
       ["reservations", "▣", "Reservas"],
       ["users", "◎", "Usuários"],
       ["finance", "$", "Financeiro"],
+      ["refunds", "↩", "Devoluções"],
       ["vouchers", "%", "Vouchers"],
       ["settings", "⚙", "Configurações"]
     ]
@@ -2323,6 +2324,9 @@
     if(/PREBOOKING_EVENT_INVALID/.test(message))return "O evento não está mais disponível para este grupo e horário. Abra novamente a edição para escolher outro evento ou reservar sem evento.";
     if(/PREBOOKING_EVENT_LOCKED/.test(message))return "O evento vinculado já foi alterado ou publicado. Confira o vínculo antes de continuar.";
     if(/PREBOOKING_EDIT_SINGLE_ONLY/.test(message))return "Esta edição está disponível para pré-reservas avulsas. O vínculo mensalista tem regras próprias.";
+    if(/REFUND_ADMIN_REVIEW_REQUIRED/.test(message))return "Registre ou atualize a aprovação na fila de devoluções.";
+    if(/REFUND_INVALID_REVIEW/.test(message))return "Informe o encaminhamento e uma análise de 3 a 2.000 caracteres.";
+    if(/REFUND_NOT_PENDING/.test(message))return "Esta devolução já foi concluída ou mudou. Atualize a fila.";
     if(/REFUND_FORBIDDEN/.test(message))return "Você não tem permissão financeira para esta reserva.";
     if(/REFUND_SCOPE_UNSUPPORTED|REFUND_PAYMENT_REVIEW_REQUIRED/.test(message))return "Esta reserva exige conferência antes do reembolso. A ação disponível atende ao Pix integral avulso, sem rateio ou crédito de cancelamento utilizado.";
     if(/REFUND_SANDBOX_REQUIRED|REFUND_API_KEY_REQUIRED/.test(message))return "A integração de reembolso Sandbox precisa ser conferida pela administração.";
@@ -2486,6 +2490,7 @@
         updateBackendRoleAccess();
         if(changed || !applied)render();
         if(applied && changed && backendIsOnline()&&["partner","admin"].includes(state.role)&&state.activePage?.[state.role]==="finance")loadFinancialPeriod(true).catch(()=>{});
+        if(applied && changed && adminRefundContext())adminRefundStore.load(true);
         if(applied && changed)refreshOpenVenueScheduleFromBackend();
         if(detailDialog?.open&&detailDialog.dataset.view==="asaas-payment")refreshOpenAsaasPaymentFromBackend();
         if(applied && changed && detailDialog?.open&&detailDialog.dataset.view==="occurrence-transfer-chat"&&!formDialog.open&&!transferChatSending) {
@@ -4593,6 +4598,75 @@
       }});
   }
 
+  function adminRefundContext(){
+    const id=backendRuntime.identityId;
+    return id && state.role==='admin' && backendIsOnline() && !partnerReadonlyActive()
+      && backendRuntime.bootstrap?.is_admin===true && backendRuntime.bootstrap?.profile?.status==='active'
+      && backendRuntime.bootstrap?.profile?.id===id && backendRuntime.session?.user?.id===id
+      && window.MarketplaceBackend?.session?.user?.id===id
+      && !window.TamoonMarketplacePilot?.blocked && !window.TamoonMarketplacePilot?.leaving ? id : '';
+  }
+  const adminRefundStore=window.MarketplaceRefundReview.createStore({
+    context:adminRefundContext,
+    fetchRows:()=>window.MarketplaceBackend.rpc('admin_refund_directory',{}),
+    errorMessage:()=> 'Não foi possível atualizar as devoluções. Tente novamente para consultar os valores atuais.',
+    onChange:()=>{
+      render();
+      if(detailDialog.open && detailDialog.dataset.view==='admin-refund-details' && !formDialog.open){
+        const model=adminRefundStore.get(),row=model.rows?.find(r=>r.reservation_id===detailDialog.dataset.refundReservationId);
+        if(row)window.MarketplaceUI.update(detailBody,window.MarketplaceRefundReview.renderDetails(row,{esc,money,date:backendDateTimeLabel}));
+        else if(!model.loading){detailDialog.close();showToast('Atualize a lista para consultar esta devolução.');}
+      }
+    }
+  });
+  let adminRefundLoadScheduled=false;
+  function ensureAdminRefunds(){
+    const model=adminRefundStore.get();
+    if(!adminRefundContext() || adminRefundLoadScheduled || model.loading || model.rows!==null || model.error)return;
+    adminRefundLoadScheduled=true;
+    setTimeout(()=>{adminRefundLoadScheduled=false;adminRefundStore.load();},0);
+  }
+  function adminRefundPage(){
+    const model=adminRefundStore.get();
+    const actions='<button class="button secondary small" data-action="admin-refund-refresh"'+(model.loading?' disabled':'')+'>Atualizar</button>';
+    return pageHeader('Administração','Devoluções','Analise os pedidos e acompanhe os valores até a confirmação da devolução.',actions)
+      +(adminRefundContext()?window.MarketplaceRefundReview.renderPage(model,{esc,money,date:backendDateTimeLabel})
+        :'<div class="callout">Acesse com uma conta administrativa ativa para consultar as devoluções.</div>');
+  }
+  function openAdminRefundDetails(reservationId){
+    if(!adminRefundContext())return;
+    const row=adminRefundStore.get().rows?.find(r=>r.reservation_id===reservationId);
+    if(!row){showToast('Atualize a lista para consultar esta devolução.');return;}
+    openDetail({eyebrow:'Devoluções',title:row.reservation_code,
+      body:window.MarketplaceRefundReview.renderDetails(row,{esc,money,date:backendDateTimeLabel})});
+    detailDialog.dataset.view='admin-refund-details';
+    detailDialog.dataset.refundReservationId=reservationId;
+  }
+  async function openAdminRefunds(reservationId=null){
+    const identity=adminRefundContext();
+    if(!identity)return;
+    detailReturnContext=null;
+    if(detailDialog.open)detailDialog.close();
+    await nav('admin','refunds');
+    await adminRefundStore.load(true);
+    if(reservationId && identity===adminRefundContext() && state.activePage.admin==='refunds')openAdminRefundDetails(reservationId);
+  }
+  function openAdminRefundReview(reservationId){
+    if(!adminRefundContext())return;
+    const identity=backendRuntime.identityId;
+    openForm({eyebrow:'Devoluções',title:'Registrar análise',description:'Confira o motivo, os pagamentos, a comissão e os saldos. A aprovação não movimenta dinheiro. Seu usuário será registrado como responsável. Após uma devolução confirmada, revise novamente os valores restantes.',
+      fields:[{name:'status',label:'Encaminhamento',type:'select',value:'pending_review',options:[{value:'pending_review',label:'Continuar em análise'},{value:'waiting_funds',label:'Aguardar recomposição de saldo'},{value:'approved',label:'Aprovar execução'}]},
+        {name:'note',label:'Análise e providências (uso interno)',type:'textarea',required:true,full:true},
+        {name:'followup',label:'Próximo acompanhamento',type:'select',value:'24',options:[{value:'24',label:'Em 24 horas'},{value:'12',label:'Em 12 horas'},{value:'48',label:'Em 48 horas'}]}],submitLabel:'Salvar análise',
+      onSubmit:async data=>{
+        if(identity!==adminRefundContext())return false;
+        if(String(data.note||'').trim().length<3)return markFormFieldInvalid('note','Informe a análise realizada.');
+        const hours=Number(data.followup);if(![12,24,48].includes(hours))return false;
+        const result=await runBackendMutation('Análise registrada.',()=>window.MarketplaceBackend.rpc('review_admin_refund',{p_reservation_id:reservationId,p_status:data.status,p_note:String(data.note).trim(),p_follow_up_at:new Date(Date.now()+hours*3600000).toISOString()}),()=>false);
+        return result?{afterClose:()=>openAdminRefunds(reservationId)}:false;
+      }});
+  }
+
   let cancellationCasesSequence=0;
   async function openCancellationCases() {
     const seq=++cancellationCasesSequence,identity=backendRuntime.identityId,role=state.role;
@@ -4603,19 +4677,19 @@
       ]);
       if(seq!==cancellationCasesSequence||identity!==backendRuntime.identityId||role!==state.role)return;
       const labels={pending:"Em análise",processed:"Cancelamento processado",rejected:"Pedido não aprovado",approved:"Pedido aprovado"};
-      openDetail({eyebrow:"Atendimento e pagamentos",title:"Cancelamentos e restituições",body:`<div class="cancellation-case-list">${(cases||[]).map(c=>{
+      openDetail({eyebrow:"Atendimento e pagamentos",title:"Cancelamentos e restituições",body:`${role==="admin"?'<button class="button primary" data-action="admin-refunds">Abrir fila de devoluções</button>':''}<div class="cancellation-case-list">${(cases||[]).map(c=>{
         const history=c.resolution_details?.history||[];
-        c={...c,can_decide:role==="admin"&&c.can_decide,can_comment:role==="partner"&&c.can_comment,can_refund:(role==="admin"||role==="partner")&&c.can_refund};
+        c={...c,can_decide:role==="admin"&&c.can_decide,can_comment:role==="partner"&&c.can_comment,can_refund:role==="admin"&&c.can_refund};
         const claims = (restitutions || []).filter(item => item.case_id === c.id && item.requested_at && (role !== "user" || item.mine));
         const ownChoices=(c.choices||[]).filter(x=>x.mine&&x.can_choose&&!claims.some(item=>item.choice_id===x.id));
         return `<article class="card"><h3>${esc(c.public_code)} · ${esc(labels[c.status]||c.status)}</h3><p>Solicitado em ${esc(backendDateTimeLabel(c.created_at))}</p><p>${esc(c.reason)}</p>
         ${c.status==="pending"?"<p>A reserva permanece inalterada enquanto o pedido é analisado.</p>":""}
-        ${(c.choices||[]).map(x=>`<div class="detail-line"><span>${x.mine?"Seu pagamento":"Pagamento"} · ${x.resolution==="voucher"?"Voucher emitido":Number(x.refunded_amount)>=Number(x.amount)?"Restituição concluída":"Restituição pendente"}</span><strong>${money(x.amount)}</strong></div>${x.cash&&x.resolution==="refund"&&Number(x.refunded_amount)<Number(x.amount)&&c.can_refund?`<button class="button secondary small" data-action="cancellation-cash-refund" data-choice-id="${esc(x.id)}">Registrar devolução em dinheiro</button>`:""}`).join("")}
+        ${(c.choices||[]).map(x=>`<div class="detail-line"><span>${x.mine?"Seu pagamento":"Pagamento"} · ${x.resolution==="voucher"?"Voucher emitido":Number(x.refunded_amount)>=Number(x.amount)?"Restituição concluída":({processing:"Devolução em processamento",review:"Solicitação em análise"}[x.refund_state]||"Solicitação recebida")}</span><strong>${money(x.amount)}</strong></div>${x.cash&&x.resolution==="refund"&&Number(x.refunded_amount)<Number(x.amount)&&c.can_refund?`<button class="button secondary small" data-action="admin-refunds">Analisar devolução externa</button>`:""}`).join("")}
         ${claims.map(item => `<div class="card"><strong>Restituição do voucher · ${money(item.amount)}</strong>
           ${voucherReceipt(item)}
           ${c.can_decide && !item.decision ? `<button class="button secondary small" data-action="cancellation-voucher-review" data-id="${esc(item.voucher_id)}">Analisar restituição</button>` : ""}</div>`).join("")}
         ${ownChoices.length?`<div class="dialog-actions"><button class="button secondary small" data-action="cancellation-choice" data-request-id="${esc(c.id)}" data-resolution="refund">Manter restituição</button><button class="button secondary small" data-action="cancellation-choice" data-request-id="${esc(c.id)}" data-resolution="voucher">Escolher voucher · 90 dias</button></div>`:""}
-        ${c.can_refund&&c.status==="processed"&&(c.choices||[]).some(x=>!x.cash&&x.resolution==="refund"&&Number(x.refunded_amount)<Number(x.amount))?`<button class="button secondary small" data-action="cancellation-refund-process" data-reservation-id="${esc(c.reservation_id)}">Processar restituições</button>`:""}
+        ${c.can_refund&&c.status==="processed"&&(c.choices||[]).some(x=>!x.cash&&x.resolution==="refund"&&Number(x.refunded_amount)<Number(x.amount))?`<button class="button secondary small" data-action="admin-refunds" data-reservation-id="${esc(c.reservation_id)}">Analisar restituições</button>`:""}
         ${history.length?`<details><summary>Manifestações e decisão</summary>${history.map(h=>`<p><strong>${esc(backendDateTimeLabel(h.at))} · ${esc({approve:"Aprovado",deny:"Não aprovado",comment:"Manifestação"}[h.decision]||h.decision)}</strong><br>${esc(h.reason)}</p>`).join("")}</details>`:""}
         ${c.status==="pending"&&(c.can_decide||c.can_comment)?`<button class="button secondary small" data-action="cancellation-review" data-request-id="${esc(c.id)}" data-can-decide="${c.can_decide}">${c.can_decide?"Analisar pedido":"Registrar manifestação"}</button>`:""}
         <p class="field-help">Dúvidas ou novos documentos: suporte@tamoon.app.br.</p></article>`;
@@ -4625,6 +4699,13 @@
 
   async function handleCancellationAction(button) {
     const action=button.dataset.action,identity=backendRuntime.identityId;
+    if(action==='admin-refunds'){await openAdminRefunds(button.dataset.reservationId||null);return true;}
+    if(action==='admin-refund-refresh'){await adminRefundStore.load(true);return true;}
+    if(action==='admin-refund-details'){openAdminRefundDetails(button.dataset.reservationId);return true;}
+    if(action==='admin-refund-clear'){adminRefundStore.setFilters(window.MarketplaceRefundReview.defaults());return true;}
+    if(action==='admin-refund-page'){adminRefundStore.setPage(button.dataset.page);return true;}
+    if(action==='admin-refund-review'){openAdminRefundReview(button.dataset.reservationId);return true;}
+    if(action==='asaas-refund-balance'){await openAsaasRefund(button.dataset.reservationId,'balance',null,button.dataset.paymentId);return true;}
     if(action==="cancellation-cases"){await openCancellationCases();return true;}
     if(action==="cancellation-refund-process"){await openAsaasCancellationRefund(button.dataset.reservationId);return true;}
     if(action==="cancellation-voucher-request"){
@@ -4674,11 +4755,12 @@
         }});return true;
     }
     if(action==="cancellation-cash-refund"){
+      if(state.role!=="admin")return true;
       openForm({eyebrow:"Devolução em dinheiro",title:"Registrar devolução realizada",description:"Registre apenas uma devolução já efetuada ao pagador. Pagamentos digitais são conciliados pelo Asaas.",fields:[{name:"reference",label:"Comprovante ou referência",required:true,full:true}],submitLabel:"Confirmar devolução",
         onSubmit:async data=>{
           if(identity!==backendRuntime.identityId)return false;
           const result=await runBackendMutation("Devolução registrada.",()=>window.MarketplaceBackend.rpc("record_cash_cancellation_refund",{p_choice_id:button.dataset.choiceId,p_reference:String(data.reference||"").trim()}));
-          if(!result)return false;return {afterClose:openCancellationCases};
+          if(!result)return false;return {afterClose:()=>openAdminRefunds()};
         }});return true;
     }
     return false;
@@ -4741,6 +4823,7 @@
   function notificationVisibleForRole(notification,role=state.role) {
     // Payment assignments concern the account as a payer, even when that
     // same account also owns/manages the establishment or is an administrator.
+    if(notification?.type==='admin_refund_requested')return role==='admin';
     const personalPaymentTypes=["pix_share_pending","monthly_pix_share_pending",
       "card_payment_assigned","monthly_card_payment_assigned"];
     return role==="user" || !personalPaymentTypes.includes(notification?.type);
@@ -5318,7 +5401,7 @@
             const unread=navigationUnreadCount(role,id);
             const restricted=role==="partner"&&!partnerPageAllowed(id);
             if(restricted)return `<button type="button" data-ui-key="${role}-${id}" class="subnav-button is-restricted" disabled aria-disabled="true"><span class="subnav-icon" aria-hidden="true">${icon}</span><span class="subnav-label">${esc(label)}<small>${partnerAccessPending ? "Atualizando…" : "Acesso Restrito"}</small></span></button>`;
-            const badgeLabel=id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
+            const badgeLabel=id==="refunds"&&role==="admin"?"devolução(ões) pendente(s)":id==="shares"&&role==="user"?"pagamento(s) pendente(s)":"atualização(ões) nova(s)";
             return `<button type="button" data-ui-key="${role}-${id}" class="subnav-button ${state.activePage[role] === id ? "active" : ""} ${unread ? "has-unread" : ""}" data-nav="${id}" ${state.activePage[role]===id?'aria-current="page"':''}><span class="subnav-icon" aria-hidden="true">${icon}</span><span class="subnav-label">${label}</span>${messageBadge(unread,badgeLabel)}</button>`;
           }).join("");
   }
@@ -5341,7 +5424,7 @@
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
-    if(backendIsOnline())actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
+    if(backendIsOnline() && !(state.role==="admin" && state.activePage.admin==="refunds"))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
@@ -5964,6 +6047,7 @@
   }
 
   function navigationUnreadCount(role, page) {
+    if(page==="refunds" && role==="admin")return window.MarketplaceRefundReview.summary(adminRefundStore.get().rows||[]).pending;
     if(page==="reservations"&&role==="user")return userReservationsUnreadCount();
     if(page==="shares"&&role==="user")return userPendingSharesCount();
     if(page==="reservations"&&role==="partner")return totalUnreadForRole("partner")+occurrenceTransferUnreadForRole("partner");
@@ -5976,7 +6060,7 @@
     for(const button of app.querySelectorAll("[data-nav]")){
       const count=navigationUnreadCount(state.role,button.dataset.nav);
       button.querySelector(".message-badge")?.remove();
-      if(count)button.insertAdjacentHTML("beforeend",messageBadge(count,"atualização(ões) pendente(s)"));
+      if(count)button.insertAdjacentHTML("beforeend",messageBadge(count,button.dataset.nav==="refunds"?"devolução(ões) pendente(s)":"atualização(ões) pendente(s)"));
       button.classList.toggle("has-unread",count>0);
     }
     renderNotificationControls();
@@ -7305,7 +7389,7 @@
   }
 
   function asaasRefundButton(id,summary,reservation) {
-    if(!backendIsOnline() || partnerReadonlyActive() || !(state.role==="admin" || (state.role==="partner" && canManageBackendFinance())))return "";
+    if(!backendIsOnline() || partnerReadonlyActive() || state.role!=="admin")return "";
     const r=reservation || (state.reservations||[]).find(item=>item.backendId===id);
     if(!id || !["refund_pending","refunded"].includes(r?.backendStatus||summary?.financial_status) || r?.monthly)return "";
     return `<button class="button secondary small" data-action="asaas-refund-open" data-reservation-id="${esc(id)}">Devolução do pagamento</button>`;
@@ -7321,7 +7405,7 @@
   }
   function asaasRefundFailure(p) {
     if(p.denial_reason&&p.status!=='completed')return p.denial_reason;
-    if(/INSUFFICIENT_BALANCE$/.test(p.error_code||''))return 'O Asaas recusou a devolução por saldo insuficiente. Regularize o saldo antes de solicitar novamente.';
+    if(/INSUFFICIENT_BALANCE$/.test(p.error_code||''))return 'Saldo insuficiente na conferência ou na execução. Regularize o saldo e registre nova aprovação antes de tentar novamente.';
     if(p.transfer_fail_reason)return p.transfer_fail_reason;
     if(p.status==='rejected')return 'O Asaas não aceitou a solicitação, ou a conferência anterior ao envio falhou. Nenhuma devolução foi confirmada. Verifique a cobrança e o saldo antes de solicitar novamente.';
     return '';
@@ -7329,18 +7413,18 @@
   function asaasRefundPresentation(c,{checking=false,unavailable=false}={}) {
     const labels={denial_review:'Recusa recebida · em conferência',not_requested:'Aguardando solicitação',requesting:'Solicitação em andamento',submitted:'Aguardando confirmação do Asaas',unknown:'Resultado ainda não confirmado',rejected:'Solicitação não aceita',partial:'Devolução parcial confirmada',completed:'Devolução concluída',transfer_authorization:'Aguardando autorização no Asaas',transfer_failed:'Devolução falhou no Asaas',transfer_cancelled:'Devolução cancelada no Asaas',transfer_blocked:'Devolução bloqueada no Asaas',transfer_done:'Conciliando devolução'};
     const feedback=unavailable?'Não foi possível confirmar o status agora. A consulta será repetida automaticamente; novos envios permanecem bloqueados.':checking?'Verificando automaticamente o resultado no Asaas…':asaasRefundNeedsMonitoring(c)?'Acompanhando automaticamente a resposta do Asaas. Você pode continuar usando o aplicativo.':'Situação atualizada. A devolução retorna ao pagador pelo meio original.';
-    return `<p>Reserva <strong>${esc(c.reservation_code)}</strong> · Pago: ${money(c.payment_amount)} · Devolução prevista: ${money(c.refund_target)} · Já devolvido: ${money(c.refunded_amount)}</p><p>Cada pagador recebe integralmente o valor pago, descontando apenas o que já foi devolvido. Cotas não pagas não geram devolução.</p><p class="asaas-refund-feedback" role="status">${feedback}</p>${(c.payments||[]).map(p=>{
-      const retry=p.can_retry===true,enabled=!checking&&!unavailable&&!p.transfer_lookup&&!p.split_review_required&&!p.denial_review_required&&(p.can_submit===true||retry);
+    return `<div class="dialog-actions"><button class="button secondary small" data-action="admin-refund-review" data-reservation-id="${esc(c.reservation_id)}">Registrar análise</button><button class="button ghost small" data-action="admin-refunds">Fila de devoluções</button></div>${!c.review_approved?'<p class="callout">Execução bloqueada até registrar a aprovação dos valores atuais.</p>':''}${c.balance?`<div class="callout"><strong>${c.balance.sufficient?'Saldo suficiente nesta consulta':'Saldo a regularizar'}</strong><p>Conta emissora: ${money(c.balance.issuer_available)} disponível / ${money(c.balance.issuer_required)} necessário.</p>${c.balance.platform_available!==null?`<p>Tâmo On: ${money(c.balance.platform_available)} disponível / ${money(c.balance.platform_required)} de comissão a devolver.</p>`:''}<small>Consulta: ${esc(backendDateTimeLabel(c.balance.checked_at))}. O saldo será conferido novamente no envio.</small></div>`:''}<p>Reserva <strong>${esc(c.reservation_code)}</strong> · Pago: ${money(c.payment_amount)} · Devolução prevista: ${money(c.refund_target)} · Já devolvido: ${money(c.refunded_amount)}</p><p>Cada pagador recebe integralmente o valor pago, descontando apenas o que já foi devolvido. Cotas não pagas não geram devolução.</p><p class="asaas-refund-feedback" role="status">${feedback}</p>${(c.payments||[]).map(p=>{
+      const retry=p.can_retry===true,enabled=c.review_approved===true&&c.balance?.sufficient!==false&&!checking&&!unavailable&&!p.transfer_lookup&&!p.split_review_required&&!p.denial_review_required&&(p.can_submit===true||retry);
       const action=retry?'asaas-refund-retry':'asaas-refund-submit';
       const note=p.split_review_required?'O Asaas informou a reversão da comissão, mas a devolução ao pagador ainda não foi conciliada. Uma nova solicitação fica bloqueada até a conferência.':p.denial_review_required?'A recusa desta tentativa foi recebida. A confirmação atual no Asaas ainda está em conferência; novos envios permanecem bloqueados.':p.status==='unknown'?'O resultado é incerto. Uma nova solicitação permanece bloqueada.':p.status==='partial'?'A próxima solicitação devolverá todo o saldo restante deste pagamento.':p.status==='transfer_authorization'?'Autorize a devolução no painel do Asaas. O aplicativo acompanhará a confirmação automaticamente.':p.status==='completed'?'O Asaas confirmou a devolução deste pagamento.':retry?'A falha será confirmada novamente no Asaas antes de um novo envio.':'';
       const failure=asaasRefundFailure(p);
       const denialHistory=p.unmatched_denial?`<details class="asaas-refund-history"><summary>Recusa registrada no histórico</summary><p>${esc(p.unmatched_denial.reason||'O Asaas informou uma recusa de estorno.')}</p>${p.unmatched_denial.event_created_at?`<p>Data informada pelo Asaas: ${esc(p.unmatched_denial.event_created_at)}</p>`:''}<p>Esse evento não identifica a tentativa de devolução. Ele não altera o resultado da solicitação atual.</p></details>`:'';
-      return `<article class="asaas-refund-item pf-payment"><h3>${esc(p.payer_name)} · ${p.billing_type==='CREDIT_CARD'?'Cartão':'Pix'}</h3><p><strong>${esc(labels[p.status]||'Em conferência')}</strong></p><dl class="pf-lines"><div><dt>Pagamento original</dt><dd>${money(p.payment_amount)}</dd></div><div><dt>Já devolvido</dt><dd>${money(p.refunded_amount)}</dd></div><div><dt>Valor a devolver</dt><dd><strong>${money(p.amount)}</strong></dd></div></dl>${failure?`<p class="asaas-refund-feedback asaas-refund-error" role="status">${esc(failure)}</p>`:''}${note?`<p>${esc(note)}</p>`:''}${p.transfer_lookup?'<p>A confirmação ainda está em andamento. Uma nova solicitação permanece bloqueada.</p>':''}${denialHistory}${p.split_enabled?(p.split_already_reversed?'<p class="field-help">A comissão já foi devolvida ao estabelecimento. Uma nova solicitação não descontará essa comissão novamente. As tarifas do Asaas ficam com o estabelecimento.</p>':'<p class="field-help">A devolução inclui a reversão da comissão pelo split. As tarifas do Asaas ficam com o estabelecimento.</p>'):'<p class="field-help">As tarifas do Asaas ficam com o estabelecimento.</p>'}${enabled?`<div class="dialog-actions"><button class="button primary" data-action="${action}" data-reservation-id="${esc(c.reservation_id)}" data-payment-id="${esc(p.payment_id)}" data-request-id="${esc(p.request_id||'')}">${retry||p.status==='rejected'?'Solicitar novamente':'Solicitar devolução integral'}</button></div>`:''}</article>`;
+      return `<article class="asaas-refund-item pf-payment"><h3>${esc(p.payer_name)} · ${p.billing_type==='CREDIT_CARD'?'Cartão':'Pix'}</h3><p><strong>${esc(labels[p.status]||'Em conferência')}</strong></p><dl class="pf-lines"><div><dt>Pagamento original</dt><dd>${money(p.payment_amount)}</dd></div><div><dt>Já devolvido</dt><dd>${money(p.refunded_amount)}</dd></div><div><dt>Valor a devolver</dt><dd><strong>${money(p.amount)}</strong></dd></div></dl>${failure?`<p class="asaas-refund-feedback asaas-refund-error" role="status">${esc(failure)}</p>`:''}${note?`<p>${esc(note)}</p>`:''}${p.transfer_lookup?'<p>A confirmação ainda está em andamento. Uma nova solicitação permanece bloqueada.</p>':''}${denialHistory}${p.split_enabled?(p.split_already_reversed?'<p class="field-help">A comissão já foi devolvida ao estabelecimento. Uma nova solicitação não descontará essa comissão novamente. As tarifas do Asaas ficam com o estabelecimento.</p>':'<p class="field-help">A devolução inclui a reversão da comissão pelo split. As tarifas do Asaas ficam com o estabelecimento.</p>'):'<p class="field-help">As tarifas do Asaas ficam com o estabelecimento.</p>'}${p.can_submit||p.can_retry?`<button class="button secondary small" data-action="asaas-refund-balance" data-reservation-id="${esc(c.reservation_id)}" data-payment-id="${esc(p.payment_id)}">Conferir saldos</button>`:''}${enabled?`<div class="dialog-actions"><button class="button primary" data-action="${action}" data-reservation-id="${esc(c.reservation_id)}" data-payment-id="${esc(p.payment_id)}" data-request-id="${esc(p.request_id||'')}">${retry||p.status==='rejected'?'Solicitar novamente':'Solicitar devolução integral'}</button></div>`:''}</article>`;
     }).join('')}`;
   }
   function asaasRefundMonitorValid(m) {
     return m===asaasRefundMonitor&&m.identity===backendRuntime.identityId&&m.role===state.role
-      &&backendIsOnline()&&!partnerReadonlyActive()&&(state.role==='admin'||(state.role==='partner'&&canManageBackendFinance()))
+      &&backendIsOnline()&&!partnerReadonlyActive()&&state.role==='admin'
       &&detailDialog.open&&detailDialog.dataset.view==='asaas-refund'&&detailDialog.dataset.refundReservationId===m.reservationId;
   }
   function scheduleAsaasRefundMonitor(m,delay=12000) {
@@ -7369,7 +7453,7 @@
     },delay);
   }
   async function openAsaasRefund(reservationId,action="preview",expectedRequestId=null,paymentId=null,amount=null) {
-    if(partnerReadonlyActive() || !backendIsOnline() || !(state.role==="admin" || (state.role==="partner" && canManageBackendFinance())))return;
+    if(partnerReadonlyActive() || !backendIsOnline() || state.role!=="admin")return;
     const identity=backendRuntime.identityId,role=state.role;
     stopAsaasRefundMonitor();
     let c,uncertain=false;
@@ -7378,7 +7462,9 @@
     } catch(error) {
       const code=String(error?.message||'');
       if(/REFUND_FORBIDDEN|UNAUTHORIZED|PARTNER_PREVIEW_READ_ONLY/.test(code)){showToast('Você não tem permissão financeira para esta reserva.');return;}
-      if(/REFUND_SCOPE_UNSUPPORTED|REFUND_PAYMENT_REVIEW_REQUIRED/.test(code)){showToast('Esta reserva exige conferência dos pagamentos e do cancelamento antes da devolução.');return;}
+      if(/REFUND_SCOPE_UNSUPPORTED|REFUND_PAYMENT_REVIEW_REQUIRED/.test(code)){showToast('Este caso exige conciliação individual. O pedido permanece na fila; a integração não enviará uma devolução de valor diferente.');return;}
+      if(code==='REFUND_ADMIN_REVIEW_REQUIRED'){showToast('Registre ou atualize a aprovação na fila de devoluções antes de executar.');return;}
+      if(action==='balance'){showToast('Não foi possível conferir os saldos agora. Nenhum estorno foi enviado.');return;}
       if(code==='ASAAS_COMMUNICATION_BUSY'){showToast('Aguarde a comunicação que está em andamento.');return;}
       uncertain=true;
       try{c=await window.MarketplaceBackend.asaasRefund(reservationId,'preview',null,{background:true});}
@@ -8028,12 +8114,17 @@
 
 
   function adminView() {
-    const views = { overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, vouchers: adminVouchers, settings: adminSettings };
+    const views = { overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
     return navShell("admin", (views[state.activePage.admin] || adminOverview)());
   }
 
   function render() {
     if(window.TamoonMarketplacePilot?.leaving)return;
+    adminRefundStore.get();
+    if(!adminRefundContext() && ['admin-refund-details','asaas-refund','admin-refunds'].includes(detailDialog.dataset.view)){
+      stopAsaasRefundMonitor();detailReturnContext=null;if(detailDialog.open)detailDialog.close();
+      if(formDialog.open)formDialog.close();
+    }
     capturePartnerInterestDraft();
     const financeScreen=state.activePage?.[state.role]==="finance"?captureFinanceScreen(app.querySelector(".finance-page")):null;
     const preserveFinance=financeScreen&&state.activePage?.[state.role]==="finance"&&financeScreen.identity===financeScreenIdentity();
@@ -8100,6 +8191,7 @@
     if (adminReservationFilter) adminReservationFilter.value = state.filters.adminReservationStatus;
     app.partnerAccessKey=partnerAccessKey;
     updateRoleUnreadIndicators();
+    ensureAdminRefunds();
     if(changedFinance)restoreFinanceScreen(app.querySelector(".finance-page"),financeScreen);
     if(preserveFinance)app.style.minHeight="";
   }
@@ -8565,7 +8657,7 @@
   }
 
   async function handleAction(button) {
-    if(button?.dataset?.action?.startsWith("cancellation-") && await handleCancellationAction(button))return;
+    if((button?.dataset?.action?.startsWith("cancellation-") || button?.dataset?.action?.startsWith("admin-refund") || button?.dataset?.action==="asaas-refund-balance") && await handleCancellationAction(button))return;
     // Capture the native change before asynchronous authorization/dispatch yields.
     const actionChecked = button.checked;
     if(!await waitForInitialDetails())return;
@@ -8603,13 +8695,13 @@
       await openAsaasRefund(button.dataset.reservationId,action==="asaas-refund-open"?"preview":"reconcile",null,button.dataset.paymentId||null);return;
     }
     if(action==="asaas-refund-submit" || action==="asaas-refund-retry"){
-      if(partnerReadonlyActive() || !(state.role==="admin" || (state.role==="partner" && canManageBackendFinance())))return;
+      if(partnerReadonlyActive() || state.role!=="admin")return;
       const reservationId=button.dataset.reservationId,paymentId=button.dataset.paymentId,expected=button.dataset.requestId||null,identity=backendRuntime.identityId;
       try{
         const c=await window.MarketplaceBackend.asaasRefund(reservationId,'preview');
         if(identity!==backendRuntime.identityId)return;
         const p=c.payments.find(x=>x.payment_id===paymentId),retry=action==='asaas-refund-retry';
-        if(!p||p.request_id!==expected||p.transfer_lookup||!(retry?p.can_retry:p.can_submit)){await openAsaasRefund(reservationId);return;}
+        if(c.review_approved!==true||!p||p.request_id!==expected||p.transfer_lookup||!(retry?p.can_retry:p.can_submit)){await openAsaasRefund(reservationId);return;}
         const value=Number(p.amount);
         if(!Number.isFinite(value)||value<=0){await openAsaasRefund(reservationId);return;}
         askConfirm({title:retry?'Solicitar novo reembolso':`Devolver ${money(value)}`,message:`Devolver ${money(value)} do pagamento de ${esc(p.payer_name)} pela reserva ${c.reservation_code}? O sistema consultará o Asaas antes do envio. ${p.split_enabled?'A comissão será devolvida proporcionalmente. ':''}As tarifas ficam com o estabelecimento.`,confirmLabel:'Conferir e solicitar',onConfirm:async()=>{if(identity===backendRuntime.identityId)await openAsaasRefund(reservationId,retry?'retry':'submit',expected,paymentId,null);}});
@@ -9689,6 +9781,7 @@
     if(!notificationVisibleForRole(row)){
       showToast("Esta atualização de pagamento está disponível na área Usuário.");return;
     }
+    if(row.type==='admin_refund_requested'&&state.role==='admin'){await openAdminRefunds();if(!document.hidden)await readPersonalNotification(id);return;}
     if(row.type==="cancellation_case_updated" || row.type==="voucher_restitution_requested"){
       await openCancellationCases();if(!document.hidden)await readPersonalNotification(id);return;
     }
@@ -9939,6 +10032,7 @@
   }, true);
 
   app.addEventListener("input", (event) => {
+    if(event.target.dataset.refundFilter==="search"){adminRefundStore.setFilters({search:event.target.value});return;}
     if(event.target.id==="venueSearch"){state.search.venue=event.target.value;saveState();render();const input=document.getElementById("venueSearch");input?.focus();input?.setSelectionRange(state.search.venue.length,state.search.venue.length);}
     if(event.target.id==="adminApplicationSearch"){state.search.adminApplication=event.target.value;saveState();render();const input=document.getElementById("adminApplicationSearch");input?.focus();input?.setSelectionRange(state.search.adminApplication.length,state.search.adminApplication.length);}
     if(event.target.id==="adminPartnerSearch"){state.search.adminPartner=event.target.value;saveState();render();const input=document.getElementById("adminPartnerSearch");input?.focus();input?.setSelectionRange(state.search.adminPartner.length,state.search.adminPartner.length);}
@@ -9946,6 +10040,7 @@
   });
 
   app.addEventListener("change", (event) => {
+    if(event.target.dataset.refundFilter){adminRefundStore.setFilters({[event.target.dataset.refundFilter]:event.target.value});return;}
     if(event.target.id==="financeMonth"){changeFinancePeriod(event.target.value);return;}
     if(event.target.id==="financePeriodMode"){changeFinancePeriod(event.target.value==="all"?"all":window.MarketplaceFinancePeriod.currentMonth());return;}
     if (event.target.form?.id === "partnerInterestForm") capturePartnerInterestDraft(event.target.form);
@@ -9962,6 +10057,11 @@
     if(event.target.id==="partnerPhotoUpload" && event.target.files?.length){handlePartnerPhotoUpload(event.target.files);}
     if(event.target.id==="partnerDocumentUpload" && event.target.files?.[0]){handlePartnerDocumentUpload(event.target.files[0]);event.target.value="";}
   });
+
+  setInterval(()=>{
+    if(!document.hidden && adminRefundContext() && state.activePage.admin==='refunds'
+      && !formDialog.open && !confirmDialog.open && !backendRuntime.mutating)adminRefundStore.load(true);
+  },60000);
 
   setInterval(() => {
     if (chatDialog?.open && selectedChatReservationId) renderOpenChat();

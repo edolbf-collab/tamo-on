@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "Beta 1.0", build: 168, database: 152, edge: 116, integration: "168-R3" });
-  const APP_ASSET_TOKEN = "beta167r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "1.0", build: 169, database: 152, edge: 117, integration: "169-R1" });
+  const APP_ASSET_TOKEN = "release169r1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -303,6 +303,7 @@
     }
 
     async signOut() {
+      await window.TamoonNative?.push?.disable();
       this.access.removePending();
       clearTimeout(this.reloadTimer);
       clearTimeout(this.notificationReloadTimer);
@@ -1412,6 +1413,9 @@
         this.lastSyncAt = nowIso();
         this.finishBootFeedback();
         this.render();
+        window.TamoonNative?.push?.initialize(this.repo.client, this.state.profile.id).catch(() => {
+          this.toast("Não foi possível atualizar as notificações deste iPhone. Confira em Mais → Notificações no celular.", true);
+        });
         this.startAccessMonitor();
         this.refreshMarketplacePilot();
         await this.registerServiceWorker();
@@ -1494,7 +1498,7 @@
           this.renderBetaAccessDenied(error);
           return;
         }
-        console.warn("Não foi possível conferir o acesso ao beta.", error);
+        console.warn("Não foi possível conferir o acesso à plataforma.", error);
       }
     },
 
@@ -2361,7 +2365,7 @@
     morePage() {
       const group = this.currentGroup();
       const pushConfigured = Boolean(String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim());
-      const pushText = window.TamoonNative?.isIOS ? "Consulte os avisos na central do aplicativo." : !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
+      const pushText = window.TamoonNative?.isIOS ? "Receba avisos mesmo com o aplicativo fechado." : !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
       const groupTools = group ? `
         <button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button>
         <button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>
@@ -2375,9 +2379,9 @@
         ` : ""}
       ` : "";
       const adminTools = this.state.is_platform_admin ? `
-        <div class="section-title"><h2>Operação do beta</h2><small>Acesso exclusivo da plataforma.</small></div>
+        <div class="section-title"><h2>Operação da plataforma</h2><small>Acesso exclusivo da plataforma.</small></div>
         <button class="card menu-row admin-menu-row" data-action="deletion-admin"><span class="menu-icon">§</span><div class="list-main"><strong>Pedidos de exclusão</strong><small>Solicitações e prazos de atendimento.</small></div><strong>›</strong></button>
-        <button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel Beta</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button>
+        <button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel da plataforma</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button>
         ${group ? '<button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : ""}
       ` : "";
       return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list">
@@ -2386,13 +2390,13 @@
         ${groupTools}
         <button class="card menu-row" data-action="community-safety"><span class="menu-icon">🛡</span><div class="list-main"><strong>Segurança e convivência</strong><small>${this.state.is_platform_admin && this.state.safety?.pending_reports ? `${Number(this.state.safety.pending_reports)} denúncia(s) aguardando análise.` : "Denúncias e participantes bloqueados."}</small></div><strong>›</strong></button>
         <button class="card menu-row" data-action="legal-documents"><span class="menu-icon">§</span><div class="list-main"><strong>Documentos e privacidade</strong><small>Documentos e registros de aceite.</small></div><strong>›</strong></button>
-        <div class="section-title"><h2>Suporte do beta</h2></div>
+        <div class="section-title"><h2>Suporte</h2></div>
         <button class="card menu-row feedback-row" data-action="report-problem"><span class="menu-icon">⚑</span><div class="list-main"><strong>Reportar problema</strong><small>Envie o relato com diagnóstico automático.</small></div><strong>›</strong></button>
         <button class="card menu-row" data-action="about-diagnostics"><span class="menu-icon">i</span><div class="list-main"><strong>Sobre e diagnóstico</strong><small>Versão, sincronização, push e atualização.</small></div><strong>›</strong></button>
         ${adminTools}
         <button class="card menu-row danger-row" data-action="account-delete"><span class="menu-icon">×</span><div class="list-main"><strong>Excluir minha conta</strong><small>Solicitar exclusão permanente e acompanhar o pedido.</small></div><strong>›</strong></button>
         <button class="card menu-row danger-row" data-action="sign-out"><span class="menu-icon danger-avatar">↪</span><div class="list-main"><strong>Sair da conta</strong><small>Desconectar deste aparelho.</small></div><strong>›</strong></button>
-      </div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build} · Beta aberto</div>`;
+      </div><div class="version-card">Tâmo On ${APP_RELEASE.version} · Build ${APP_RELEASE.build}</div>`;
     },
 
     async handleAction(action, data) {
@@ -2460,7 +2464,7 @@
       clearInterval(this.matchTimelineTimer);
       const email = this.repo?.state?.profile?.email || "E-mail não identificado";
       const hasIdentifiedEmail = email !== "E-mail não identificado";
-      document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel simple-auth access-denied-panel"><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><span class="access-denied-icon">!</span><h1>Acesso indisponível</h1><p>O beta é aberto e não exige autorização prévia de e-mail. Confira abaixo a situação desta conta.</p><div class="denied-account-card"><small>CONTA UTILIZADA</small><div><strong id="deniedAccountEmail">${escapeHtml(email)}</strong>${hasIdentifiedEmail ? '<button id="copyDeniedEmail" class="copy-email-button" type="button" aria-label="Copiar e-mail">Copiar</button>' : ''}</div></div><div class="notice auth-error"><strong>Situação do acesso</strong><br><span id="deniedAccessMessage">${escapeHtml(error?.message || "Não foi possível liberar o acesso desta conta.")}</span></div><div class="access-denied-instructions"><strong>Precisa de ajuda?</strong><p>Se o acesso estiver bloqueado, entre em contato com <a href="mailto:suporte@tamoon.app.br">suporte@tamoon.app.br</a> e informe o e-mail acima. Você também pode sair e entrar novamente.</p></div><div id="deniedCheckStatus" class="denied-check-status" role="status" aria-live="polite"></div><button id="deniedCheckAccess" class="btn btn-primary btn-block">Verificar acesso</button><button id="deniedSignOut" class="btn btn-secondary btn-block">Sair e usar outra conta</button></section></main><div id="toastRoot" class="toast-root"></div>`;
+      document.body.innerHTML = `<main class="auth-screen"><section class="auth-panel simple-auth access-denied-panel"><img src="/brand/tamo-on-logo-horizontal-negative.svg" class="auth-brand-logo" alt="Tâmo On"><span class="access-denied-icon">!</span><h1>Acesso indisponível</h1><p>O cadastro é aberto e não exige autorização prévia de e-mail. Confira abaixo a situação desta conta.</p><div class="denied-account-card"><small>CONTA UTILIZADA</small><div><strong id="deniedAccountEmail">${escapeHtml(email)}</strong>${hasIdentifiedEmail ? '<button id="copyDeniedEmail" class="copy-email-button" type="button" aria-label="Copiar e-mail">Copiar</button>' : ''}</div></div><div class="notice auth-error"><strong>Situação do acesso</strong><br><span id="deniedAccessMessage">${escapeHtml(error?.message || "Não foi possível liberar o acesso desta conta.")}</span></div><div class="access-denied-instructions"><strong>Precisa de ajuda?</strong><p>Se o acesso estiver bloqueado, entre em contato com <a href="mailto:suporte@tamoon.app.br">suporte@tamoon.app.br</a> e informe o e-mail acima. Você também pode sair e entrar novamente.</p></div><div id="deniedCheckStatus" class="denied-check-status" role="status" aria-live="polite"></div><button id="deniedCheckAccess" class="btn btn-primary btn-block">Verificar acesso</button><button id="deniedSignOut" class="btn btn-secondary btn-block">Sair e usar outra conta</button></section></main><div id="toastRoot" class="toast-root"></div>`;
 
       $("#copyDeniedEmail")?.addEventListener("click", async event => {
         try {
@@ -3884,7 +3888,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     openProblemReport() {
-      this.modal("Reportar problema", `<form id="problemForm" class="form-grid"><div class="notice"><strong>Beta fechado</strong><br>O relatório inclui automaticamente versão, aparelho, tela atual e estado das notificações. Não inclua senhas ou dados sensíveis.</div><div class="field"><label>Categoria</label><select name="category"><option value="erro">Erro ou função que não respondeu</option><option value="visual">Problema visual</option><option value="notificacao">Notificação</option><option value="sugestao">Sugestão de melhoria</option></select></div><div class="field"><label>Resumo</label><input name="title" maxlength="100" required placeholder="Ex.: não consegui confirmar presença"></div><div class="field"><label>O que aconteceu?</label><textarea name="description" maxlength="1500" required placeholder="Descreva os passos, o resultado esperado e o que apareceu na tela."></textarea></div><label class="check-row"><input type="checkbox" name="contact_ok" checked><span>O suporte pode entrar em contato pelo e-mail da minha conta.</span></label><button type="submit" class="btn btn-primary btn-block">Enviar relatório</button></form>`, (root, close) => {
+      this.modal("Reportar problema", `<form id="problemForm" class="form-grid"><div class="notice"><strong>Diagnóstico do aplicativo</strong><br>O relatório inclui automaticamente versão, aparelho, tela atual e estado das notificações. Não inclua senhas ou dados sensíveis.</div><div class="field"><label>Categoria</label><select name="category"><option value="erro">Erro ou função que não respondeu</option><option value="visual">Problema visual</option><option value="notificacao">Notificação</option><option value="sugestao">Sugestão de melhoria</option></select></div><div class="field"><label>Resumo</label><input name="title" maxlength="100" required placeholder="Ex.: não consegui confirmar presença"></div><div class="field"><label>O que aconteceu?</label><textarea name="description" maxlength="1500" required placeholder="Descreva os passos, o resultado esperado e o que apareceu na tela."></textarea></div><label class="check-row"><input type="checkbox" name="contact_ok" checked><span>O suporte pode entrar em contato pelo e-mail da minha conta.</span></label><button type="submit" class="btn btn-primary btn-block">Enviar relatório</button></form>`, (root, close) => {
         $("#problemForm", root).addEventListener("submit", async event => {
           event.preventDefault();
           const button = event.currentTarget.querySelector('button[type="submit"]');
@@ -3893,7 +3897,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
           try {
             await this.repo.reportProblem({ category: form.get("category"), title: form.get("title"), description: form.get("description"), contactOk: form.get("contact_ok") === "on" });
             close();
-            this.toast("Relatório enviado. Obrigado por ajudar no beta.");
+            this.toast("Relatório enviado. Obrigado por ajudar a melhorar o Tâmo On.");
           } catch (error) {
             button.disabled = false; button.textContent = "Enviar relatório";
             this.toast(error.message || "Não foi possível enviar o relatório.", true);
@@ -3915,7 +3919,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
     async openPlatformAdmin() {
       if (!this.state.is_platform_admin) return this.toast("Acesso restrito à administração da plataforma.", true);
-      this.modal("Painel Beta", `<div class="admin-loading">Carregando indicadores, acessos e erros…</div>`, () => {});
+      this.modal("Painel da plataforma", `<div class="admin-loading">Carregando indicadores, acessos e erros…</div>`, () => {});
       try {
         const data = await this.repo.platformDashboard();
         const s = data.summary || {};
@@ -3976,15 +3980,15 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         const systemStatus = Number(s.errors_24h || 0) ? "Sistema requer análise" : "Sistema operacional";
         const errorSubtitle = `${Number(s.errors_24h || 0)} registro(s) distribuído(s) em ${Number(s.error_groups_24h || 0)} erro(s) distinto(s)`;
 
-        this.modal("Painel Beta", `<div class="health-strip ${Number(s.errors_24h || 0) ? "warn" : "ok"}"><span></span><div><strong>${systemStatus}</strong><small>${escapeHtml(errorSubtitle)}</small></div></div><div class="admin-toolbar"><button id="openCommunityModeration" class="btn btn-secondary">Denúncias da comunidade</button><button id="sendSystemNotification" class="btn btn-primary">Enviar notificação</button><button id="refreshPlatformPanel" class="btn btn-secondary">Atualizar painel</button></div><div class="admin-stats">${stat("Usuários", s.users_total)}${stat("Acessos ativos", s.beta_active)}${stat("Push ativo", s.push_users_active)}${stat("Push saudável", s.push_devices_healthy)}${stat("Instáveis", s.push_devices_unstable, Number(s.push_devices_unstable || 0) ? "warning" : "")}${stat("Atenção", s.push_devices_attention, Number(s.push_devices_attention || 0) ? "warning" : "")}${stat("Reativar", s.push_devices_reactivation, Number(s.push_devices_reactivation || 0) ? "danger" : "")}${stat("Configuração", s.push_devices_configuration_error, Number(s.push_devices_configuration_error || 0) ? "danger" : "")}${stat("Recuperados 30d", s.push_recovered_30d)}${stat("Falhas finais 30d", s.push_final_failures_30d, Number(s.push_final_failures_30d || 0) ? "danger" : "")}${stat("Tentativas técnicas", s.push_attempts_30d)}${stat("Assinaturas expiradas", s.push_devices_invalid, Number(s.push_devices_invalid || 0) ? "warning" : "")}${stat("Sem notificações", s.push_users_without_active, Number(s.push_users_without_active || 0) ? "warning" : "")}${stat("Convites pendentes", s.beta_invited, Number(s.beta_invited || 0) ? "warning" : "")}${stat("Bloqueados", s.beta_blocked, Number(s.beta_blocked || 0) ? "danger" : "")}${stat("Grupos", s.groups_total)}${stat("Peladas futuras", s.matches_upcoming)}${stat("Relatos abertos", s.feedback_open, Number(s.feedback_open || 0) ? "warning" : "")}${stat("Erros 24h", s.errors_24h, Number(s.errors_24h || 0) ? "danger" : "")}</div>
+        this.modal("Painel da plataforma", `<div class="health-strip ${Number(s.errors_24h || 0) ? "warn" : "ok"}"><span></span><div><strong>${systemStatus}</strong><small>${escapeHtml(errorSubtitle)}</small></div></div><div class="admin-toolbar"><button id="openCommunityModeration" class="btn btn-secondary">Denúncias da comunidade</button><button id="sendSystemNotification" class="btn btn-primary">Enviar notificação</button><button id="refreshPlatformPanel" class="btn btn-secondary">Atualizar painel</button></div><div class="admin-stats">${stat("Usuários", s.users_total)}${stat("Acessos ativos", s.beta_active)}${stat("Push ativo", s.push_users_active)}${stat("Push saudável", s.push_devices_healthy)}${stat("Instáveis", s.push_devices_unstable, Number(s.push_devices_unstable || 0) ? "warning" : "")}${stat("Atenção", s.push_devices_attention, Number(s.push_devices_attention || 0) ? "warning" : "")}${stat("Reativar", s.push_devices_reactivation, Number(s.push_devices_reactivation || 0) ? "danger" : "")}${stat("Configuração", s.push_devices_configuration_error, Number(s.push_devices_configuration_error || 0) ? "danger" : "")}${stat("Recuperados 30d", s.push_recovered_30d)}${stat("Falhas finais 30d", s.push_final_failures_30d, Number(s.push_final_failures_30d || 0) ? "danger" : "")}${stat("Tentativas técnicas", s.push_attempts_30d)}${stat("Assinaturas expiradas", s.push_devices_invalid, Number(s.push_devices_invalid || 0) ? "warning" : "")}${stat("Sem notificações", s.push_users_without_active, Number(s.push_users_without_active || 0) ? "warning" : "")}${stat("Convites pendentes", s.beta_invited, Number(s.beta_invited || 0) ? "warning" : "")}${stat("Bloqueados", s.beta_blocked, Number(s.beta_blocked || 0) ? "danger" : "")}${stat("Grupos", s.groups_total)}${stat("Peladas futuras", s.matches_upcoming)}${stat("Relatos abertos", s.feedback_open, Number(s.feedback_open || 0) ? "warning" : "")}${stat("Erros 24h", s.errors_24h, Number(s.errors_24h || 0) ? "danger" : "")}</div>
 
-        <details class="admin-section-card" open><summary><div><strong>Acessos do beta</strong><small>Cadastro automático, bloqueio e exclusão de contas.</small></div><span>${accessList.length}</span></summary><div class="notice">No beta aberto, novas contas são cadastradas automaticamente no primeiro acesso. Os bloqueios administrativos continuam válidos.</div><div class="beta-access-list">${accessRows}</div></details>
+        <details class="admin-section-card" open><summary><div><strong>Acessos da plataforma</strong><small>Cadastro automático, bloqueio e exclusão de contas.</small></div><span>${accessList.length}</span></summary><div class="notice">Novas contas são cadastradas automaticamente no primeiro acesso. Os bloqueios administrativos continuam válidos.</div><div class="beta-access-list">${accessRows}</div></details>
 
         <details class="admin-section-card" open><summary><div><strong>Saúde das notificações</strong><small>Estado atual, repetições automáticas, recuperações e falhas finais.</small></div><span class="push-summary-count ${pushReview.length ? "warn" : "ok"}">${pushReview.length}</span></summary><div class="push-status-summary"><strong>${Number(s.push_devices_healthy || 0)} aparelho(s) saudável(is)</strong><small>${Number(s.push_notifications_30d || 0)} envio(s) · ${Number(s.push_attempts_30d || 0)} tentativa(s) técnica(s) · ${Number(s.push_recovered_30d || 0)} recuperado(s) · ${Number(s.push_final_failures_30d || 0)} falha(s) final(is), nos últimos 30 dias.</small></div><div class="push-status-list">${pushRows}</div></details>
 
         <details class="admin-section-card" open><summary><div><strong>Erros agrupados — 24 horas</strong><small>Analise causas distintas, não apenas o contador bruto.</small></div><span>${errorGroups.length}</span></summary><div class="admin-error-list">${errorRows}</div></details>
 
-        <details class="admin-section-card"><summary><div><strong>Segurança e integridade</strong><small>Verificações automáticas do banco.</small></div><span class="security-mini ${securityTone}">${securityTone === "ok" ? "OK" : "Atenção"}</span></summary><div class="security-grid">${stat("Tabelas sem RLS", security.tables_without_rls, Number(security.tables_without_rls || 0) ? "danger" : "")}${stat("Auth sem acesso", security.auth_users_without_access, Number(security.auth_users_without_access || 0) ? "danger" : "")}${stat("Vínculos bloqueados", security.blocked_group_memberships, Number(security.blocked_group_memberships || 0) ? "warning" : "")}${stat("Função do hook", security.hook_function_ready ? "Preparada" : "Ausente", security.hook_function_ready ? "" : "danger")}</div><div class="notice"><strong>Beta aberto</strong><br>Novas contas entram sem convite. O controle de acesso mantém os bloqueios administrativos e as permissões dos grupos. O hook existente, quando ativado, impede novos cadastros com e-mails bloqueados.</div></details>
+        <details class="admin-section-card"><summary><div><strong>Segurança e integridade</strong><small>Verificações automáticas do banco.</small></div><span class="security-mini ${securityTone}">${securityTone === "ok" ? "OK" : "Atenção"}</span></summary><div class="security-grid">${stat("Tabelas sem RLS", security.tables_without_rls, Number(security.tables_without_rls || 0) ? "danger" : "")}${stat("Auth sem acesso", security.auth_users_without_access, Number(security.auth_users_without_access || 0) ? "danger" : "")}${stat("Vínculos bloqueados", security.blocked_group_memberships, Number(security.blocked_group_memberships || 0) ? "warning" : "")}${stat("Função do hook", security.hook_function_ready ? "Preparada" : "Ausente", security.hook_function_ready ? "" : "danger")}</div><div class="notice"><strong>Cadastro aberto</strong><br>Novas contas entram sem convite. O controle de acesso mantém os bloqueios administrativos e as permissões dos grupos. O hook existente, quando ativado, impede novos cadastros com e-mails bloqueados.</div></details>
 
         <details class="admin-section-card"><summary><div><strong>Relatos recentes</strong><small>Descrição e contexto técnico completo.</small></div><span>${(data.reports || []).length}</span></summary><div class="admin-feed">${reports}</div></details>
         <details class="admin-section-card"><summary><div><strong>Logs recentes</strong><small>Abra cada registro para consultar os metadados.</small></div><span>${(data.logs || []).length}</span></summary><div class="admin-logs">${logs}</div></details>
@@ -4121,7 +4125,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         }[String(item.health_status || "")] || "Estado indefinido";
         const lastFailure = item.last_failure_at ? shortDate(item.last_failure_at) : "Nenhuma";
 
-        this.modal("Tentativas de notificação", `<div class="push-detail-user"><strong>${escapeHtml(item.user_name || item.email)}</strong><small>${escapeHtml(item.email)} · ${escapeHtml(currentStatus)}</small></div><div class="admin-stats compact push-metrics-grid"><div class="admin-stat"><small>Envios</small><strong>${grouped.length}</strong></div><div class="admin-stat"><small>Aceitos</small><strong>${acceptedCount}</strong></div><div class="admin-stat ${finalFailureCount ? "danger" : ""}"><small>Falhas finais</small><strong>${finalFailureCount}</strong></div><div class="admin-stat"><small>Recuperados</small><strong>${recoveredCount}</strong></div><div class="admin-stat"><small>Tentativas técnicas</small><strong>${rows.length}</strong></div><div class="admin-stat ${technicalFailures ? "warning" : ""}"><small>Falhas técnicas</small><strong>${technicalFailures}</strong></div></div><div class="notice push-current-state"><strong>Última falha registrada</strong><br>${escapeHtml(lastFailure)}${item.last_failure_status ? ` · código ${escapeHtml(String(item.last_failure_status))}` : ""}${item.last_failure_summary ? `<br>${escapeHtml(item.last_failure_summary)}` : ""}<br><small>O endpoint completo e o endereço da infraestrutura não são exibidos. A identificação utiliza apenas hash sanitizado.</small></div><div class="push-attempt-list">${deliveryCards}</div><button type="button" class="btn btn-secondary btn-block" id="backToPlatformPanel">Voltar ao Painel Beta</button>`, (root, close) => {
+        this.modal("Tentativas de notificação", `<div class="push-detail-user"><strong>${escapeHtml(item.user_name || item.email)}</strong><small>${escapeHtml(item.email)} · ${escapeHtml(currentStatus)}</small></div><div class="admin-stats compact push-metrics-grid"><div class="admin-stat"><small>Envios</small><strong>${grouped.length}</strong></div><div class="admin-stat"><small>Aceitos</small><strong>${acceptedCount}</strong></div><div class="admin-stat ${finalFailureCount ? "danger" : ""}"><small>Falhas finais</small><strong>${finalFailureCount}</strong></div><div class="admin-stat"><small>Recuperados</small><strong>${recoveredCount}</strong></div><div class="admin-stat"><small>Tentativas técnicas</small><strong>${rows.length}</strong></div><div class="admin-stat ${technicalFailures ? "warning" : ""}"><small>Falhas técnicas</small><strong>${technicalFailures}</strong></div></div><div class="notice push-current-state"><strong>Última falha registrada</strong><br>${escapeHtml(lastFailure)}${item.last_failure_status ? ` · código ${escapeHtml(String(item.last_failure_status))}` : ""}${item.last_failure_summary ? `<br>${escapeHtml(item.last_failure_summary)}` : ""}<br><small>O endpoint completo e o endereço da infraestrutura não são exibidos. A identificação utiliza apenas hash sanitizado.</small></div><div class="push-attempt-list">${deliveryCards}</div><button type="button" class="btn btn-secondary btn-block" id="backToPlatformPanel">Voltar ao Painel da plataforma</button>`, (root, close) => {
           $("#backToPlatformPanel", root)?.addEventListener("click", () => { close(); this.openPlatformAdmin(); });
         });
       } catch (error) {
@@ -4138,9 +4142,9 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
       const accountText = item?.user_id
         ? "A conta será removida definitivamente do Supabase Auth. Os vínculos ativos, assinaturas push, avaliações feitas e dados pessoais do jogador serão removidos ou anonimizados."
-        : "Este e-mail ainda não criou uma conta. A autorização pendente será removida definitivamente da lista do beta.";
+        : "Este e-mail ainda não criou uma conta. A autorização pendente será removida definitivamente da lista de acesso.";
 
-      this.modal("Excluir membro do beta", `<form id="permanentBetaDeleteForm" class="form-grid"><div class="destructive-warning"><span>!</span><div><strong>Exclusão permanente e irreversível</strong><p>${escapeHtml(accountText)}</p></div></div><div class="permanent-delete-summary"><strong>${escapeHtml(displayName)}</strong><small>${escapeHtml(email)} · ${Number(item?.groups_count || 0)} grupo(s)</small></div>${item?.user_id ? '<div class="notice"><strong>Tratamento dos grupos</strong><br>A administração será transferida automaticamente quando houver outro integrante. Grupos sem nenhum outro membro serão excluídos. O histórico preservado será anonimizado como “Usuário excluído”.</div>' : ''}<div class="field"><label>Digite o e-mail completo para confirmar</label><input name="confirmation" type="email" required autocomplete="off" placeholder="${escapeHtml(email)}"></div><button class="btn btn-danger btn-block" id="confirmPermanentBetaDelete" disabled>Excluir permanentemente</button></form>`, (root, close) => {
+      this.modal("Excluir conta da plataforma", `<form id="permanentBetaDeleteForm" class="form-grid"><div class="destructive-warning"><span>!</span><div><strong>Exclusão permanente e irreversível</strong><p>${escapeHtml(accountText)}</p></div></div><div class="permanent-delete-summary"><strong>${escapeHtml(displayName)}</strong><small>${escapeHtml(email)} · ${Number(item?.groups_count || 0)} grupo(s)</small></div>${item?.user_id ? '<div class="notice"><strong>Tratamento dos grupos</strong><br>A administração será transferida automaticamente quando houver outro integrante. Grupos sem nenhum outro membro serão excluídos. O histórico preservado será anonimizado como “Usuário excluído”.</div>' : ''}<div class="field"><label>Digite o e-mail completo para confirmar</label><input name="confirmation" type="email" required autocomplete="off" placeholder="${escapeHtml(email)}"></div><button class="btn btn-danger btn-block" id="confirmPermanentBetaDelete" disabled>Excluir permanentemente</button></form>`, (root, close) => {
         const form = $("#permanentBetaDeleteForm", root);
         const input = form.elements.confirmation;
         const button = $("#confirmPermanentBetaDelete", root);
@@ -4189,7 +4193,10 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
     notificationAppUrl(value) {
       try {
-        const url = new URL(String(value || appBaseUrl()), document.baseURI);
+        let url = new URL(String(value || appBaseUrl()), document.baseURI);
+        if (window.TamoonNative?.isIOS && url.origin === "https://app.tamoon.app.br" && ["/", "/index.html"].includes(url.pathname)) {
+          url = new URL(`${location.protocol}//${location.host}/${url.search}`);
+        }
         const base = new URL(appBaseUrl());
         if (url.origin !== location.origin || ![base.pathname, `${base.pathname}index.html`].includes(url.pathname)) return null;
         return url;
@@ -4462,6 +4469,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     async enablePushNotifications() {
+      if (window.TamoonNative?.isIOS) return window.TamoonNative.push.enable();
       if (!pushSupported()) throw new Error("Este navegador não oferece notificações push.");
       const publicKey = String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim();
       if (!publicKey) throw new Error("A chave pública VAPID ainda não foi configurada.");
@@ -4482,6 +4490,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     async disablePushNotifications(silent = false) {
+      if (window.TamoonNative?.isIOS) return window.TamoonNative.push.disable();
       if (!pushSupported()) return;
       try {
         const subscription = await this.currentPushSubscription();
@@ -4496,6 +4505,16 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     async maybeShowNotificationOnboarding() {
+      if (window.TamoonNative?.isIOS) {
+        const key = `tamoon-ios-push-onboarding-${this.state.profile.id}`;
+        if (localStorage.getItem(key)) return;
+        try {
+          const status = await window.TamoonNative.push.status();
+          if (!status.active) await this.openNotificationSettings();
+          localStorage.setItem(key, "done");
+        } catch { /* The settings entry remains available for a later retry. */ }
+        return;
+      }
       const key = "tamoon-notification-onboarding-v2";
       if (localStorage.getItem(key) === "done") return;
       if (!pushSupported()) return;
@@ -4573,7 +4592,21 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
     async openNotificationSettings() {
       if(window.TamoonNative?.isIOS) {
-        this.modal("Notificações no iPhone", '<p>Nesta versão de preparação, os avisos ficam disponíveis na central do aplicativo. As notificações com o app fechado ainda não estão disponíveis.</p>',()=>{});
+        try {
+          const push = window.TamoonNative.push;
+          const status = await push.status();
+          this.modal("Notificações no iPhone", `<p>Receba os avisos do Tâmo On mesmo com o aplicativo fechado.</p><p><strong>${status.active ? "Ativadas neste iPhone" : "Notificações desativadas"}</strong></p>${status.permission === "denied" ? '<p>Para permitir, abra Ajustes → Apps → Tâmo On → Notificações.</p>' : ''}<div class="form-grid"><button class="btn btn-primary btn-block" data-native-push="enable">${status.active ? "Atualizar vínculo do aparelho" : "Ativar notificações"}</button>${status.active ? '<button class="btn btn-secondary btn-block" data-native-push="test">Enviar teste para este iPhone</button><button class="btn btn-secondary btn-block" data-native-push="disable">Desativar neste iPhone</button>' : ''}</div>`, (root, close) => {
+            root.querySelectorAll('[data-native-push]').forEach(button => button.addEventListener('click', async () => {
+              button.disabled = true;
+              try {
+                await push[button.dataset.nativePush]();
+                close();
+                this.toast(button.dataset.nativePush === 'test' ? 'Teste aceito pelo serviço da Apple. Confira a notificação no iPhone.' : button.dataset.nativePush === 'disable' ? 'Notificações desativadas neste iPhone.' : 'Notificações ativadas neste iPhone.');
+              } catch (error) { this.toast(error.message || 'Não foi possível atualizar as notificações.', true); }
+              finally { button.disabled = false; }
+            }));
+          });
+        } catch (error) { this.toast(error.message || "Não foi possível consultar as notificações. Tente novamente.", true); }
         return;
       }
       const supported = pushSupported();
@@ -4632,7 +4665,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       const enableAction = `<button class="btn btn-primary btn-block" id="enablePush">${subscription ? "Vincular novamente" : "Ativar notificações"}</button>`;
       const activeActions = '<button class="btn btn-primary btn-block" id="testPush">Enviar notificação de teste</button><button class="btn btn-danger btn-block" id="disablePush">Desativar neste aparelho</button>';
       const actions = active ? activeActions : enableAction;
-      this.modal("Notificações no celular", `<div class="notification-status-card ${tone}"><span>🔔</span><div><strong>${escapeHtml(status)}</strong><p>${escapeHtml(explanation)}</p></div></div>${configured && supported && !iosInstallRequired ? actions : ""}<div class="notice"><strong>Validação deste aparelho</strong><br>Cada tentativa de entrega passa a registrar sucesso, falha, código e horário para análise do beta. Nenhum conteúdo privado da notificação é exibido nas métricas.</div><div class="notice"><strong>Privacidade</strong><br>A ativação vale somente para este aparelho. Você pode desativar a qualquer momento.</div>`, (root, close) => {
+      this.modal("Notificações no celular", `<div class="notification-status-card ${tone}"><span>🔔</span><div><strong>${escapeHtml(status)}</strong><p>${escapeHtml(explanation)}</p></div></div>${configured && supported && !iosInstallRequired ? actions : ""}<div class="notice"><strong>Validação deste aparelho</strong><br>Cada tentativa de entrega passa a registrar sucesso, falha, código e horário para diagnóstico do aplicativo. Nenhum conteúdo privado da notificação é exibido nas métricas.</div><div class="notice"><strong>Privacidade</strong><br>A ativação vale somente para este aparelho. Você pode desativar a qualquer momento.</div>`, (root, close) => {
         $("#enablePush", root)?.addEventListener("click", async event => {
           const button = event.currentTarget; button.disabled = true; button.textContent = "Ativando…";
           try { await this.enablePushNotifications(); close(); this.toast("Notificações ativadas e vinculadas neste aparelho."); }

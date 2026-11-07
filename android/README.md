@@ -14,7 +14,13 @@ A TWA usa a aplicação web hospedada, sem copiar o Marketplace para dentro do A
 
 `twa-manifest.json` é um template de origem, sem versão própria; o fluxo de release deste repositório usa Gradle. Caso regenere o projeto com outra ferramenta, preserve a leitura da versão e a tarefa de validação.
 
-## Compilar
+## Ícone compartilhado com iOS
+
+O ícone Android e a imagem de 512 px da Google Play usam a marca verde sobre fundo escuro aprovada no iOS. Execute `bash android/sync-launcher-icons.sh` a partir da raiz para atualizar os recursos a partir de `native-assets` (requer ImageMagick). O ícone adaptativo mantém a margem segura do símbolo; os ícones convencionais e a imagem da loja derivam do original iOS. O ícone de notificação permanece monocromático.
+
+`android/store_icon.png` é a imagem para a página da loja. A mudança do ícone instalado exige distribuir um novo AAB com a chave de upload existente; alterar somente a página da Google Play não atualiza os aparelhos.
+
+## Compilação do pacote
 
 Requisitos: JDK 17 completo (incluindo `javac`), Android SDK Platform 36, Build Tools 36.0.0. Gradle 9.1.0 é baixado pelo wrapper e verificado por checksum. Android Gradle Plugin 9.0.1 e Browser Helper 2.7.4 estão fixados.
 

@@ -2,6 +2,22 @@
   "appId": "br.app.tamoon",
   "appName": "Tâmo On",
   "webDir": "www",
-  "ios": {"backgroundColor": "#061820", "preferredContentMode": "mobile"},
-  "server": {"hostname": "localhost", "iosScheme": "capacitor"}
+  "ios": {
+    "backgroundColor": "#061820",
+    "preferredContentMode": "mobile"
+  },
+  "server": {
+    "hostname": "localhost",
+    "iosScheme": "capacitor"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "banner",
+        "list"
+      ]
+    }
+  }
 }
