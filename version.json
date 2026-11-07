@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Notificações nativas no iPhone, apresentação sem Beta e melhorias na Administração.",
+  "notes": "Correção do diagnóstico e recuperação do vínculo de notificações; teste de exibição local no Android.",
   "label": "Tâmo On 1.0 Build 169",
-  "integration": "169-R1"
+  "integration": "169-R2"
 }
