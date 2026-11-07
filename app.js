@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "1.0", build: 169, database: 152, edge: 117, integration: "169-R1" });
-  const APP_ASSET_TOKEN = "release169r1";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "1.0", build: 169, database: 152, edge: 117, integration: "169-R2" });
+  const APP_ASSET_TOKEN = "release169r2";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -3908,13 +3908,21 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
     async openDiagnostics() {
       const online = navigator.onLine;
-      const push = pushSupported() ? Notification.permission : "não suportado";
-      const subscription = pushSupported() ? await this.currentPushSubscription().catch(() => null) : null;
+      const native=Boolean(window.TamoonNative?.isIOS);
+      let pushHealth;
+      try {
+        if(native)pushHealth=window.TamoonPushClient.diagnostic({native:true,nativeStatus:await window.TamoonNative.push.status()});
+        else {
+          const supported=pushSupported(),subscription=supported?await this.currentPushSubscription():null;
+          const record=subscription?(this.state.push_subscriptions||[]).find(row=>row.endpoint===subscription.endpoint):null;
+          pushHealth=window.TamoonPushClient.diagnostic({supported,permission:supported?Notification.permission:'unsupported',subscription,record});
+        }
+      } catch {pushHealth=window.TamoonPushClient.diagnostic({error:true});}
       let dbStatus = "Disponível";
       try { await this.repo.session(); } catch { dbStatus = "Falha"; }
       const sync = this.lastSyncAt ? shortDate(this.lastSyncAt) : "Não registrada";
       const updateText = this.updateAvailable ? "Atualização pendente" : "Sem atualização detectada";
-      this.modal("Sobre e diagnóstico", `<div class="diagnostic-grid"><div class="diagnostic-item ${online ? "ok" : "bad"}"><span></span><div><small>Internet</small><strong>${online ? "Conectado" : "Offline"}</strong></div></div><div class="diagnostic-item ${dbStatus === "Disponível" ? "ok" : "bad"}"><span></span><div><small>Banco e sessão</small><strong>${dbStatus}</strong></div></div><div class="diagnostic-item ${subscription ? "ok" : "warn"}"><span></span><div><small>Push deste aparelho</small><strong>${escapeHtml(subscription ? "Vinculado" : push)}</strong></div></div><div class="diagnostic-item ${this.updateAvailable ? "warn" : "ok"}"><span></span><div><small>Atualização</small><strong>${escapeHtml(updateText)}</strong></div></div></div><div class="system-info-card"><div><span>Aplicativo</span><strong>${APP_RELEASE.version}</strong></div><div><span>Build do aplicativo</span><strong>${APP_RELEASE.build} · ${APP_RELEASE.integration}</strong></div><div><span>Build do HTML</span><strong>${this.htmlBuild() || "—"}</strong></div><div><span>Service worker</span><strong>${escapeHtml(String(window.tamoonPwa?.getState?.().swBuild || "verificando"))}</strong></div><div><span>Banco</span><strong>${APP_RELEASE.database}</strong></div><div><span>Última sincronização</span><strong>${escapeHtml(sync)}</strong></div><div><span>Modo</span><strong>${isStandalone() ? "Instalado" : "Navegador"}</strong></div><div><span>Dispositivo</span><strong>${escapeHtml(deviceLabel())}</strong></div></div><button class="btn btn-secondary btn-block" data-action="check-update">Verificar atualização</button><button class="btn btn-primary btn-block" data-action="report-problem">Reportar problema</button>`, () => {});
+      this.modal("Sobre e diagnóstico", `<div class="diagnostic-grid"><div class="diagnostic-item ${online ? "ok" : "bad"}"><span></span><div><small>Internet</small><strong>${online ? "Conectado" : "Offline"}</strong></div></div><div class="diagnostic-item ${dbStatus === "Disponível" ? "ok" : "bad"}"><span></span><div><small>Banco e sessão</small><strong>${dbStatus}</strong></div></div><div class="diagnostic-item ${pushHealth.tone}"><span></span><div><small>Push deste aparelho</small><strong>${escapeHtml(pushHealth.label)}</strong></div></div><div class="diagnostic-item ${this.updateAvailable ? "warn" : "ok"}"><span></span><div><small>Atualização</small><strong>${escapeHtml(updateText)}</strong></div></div></div><div class="system-info-card"><div><span>Aplicativo</span><strong>${APP_RELEASE.version}</strong></div><div><span>Build do aplicativo</span><strong>${APP_RELEASE.build} · ${APP_RELEASE.integration}</strong></div><div><span>Build do HTML</span><strong>${this.htmlBuild() || "—"}</strong></div><div><span>Service worker</span><strong>${escapeHtml(String(window.tamoonPwa?.getState?.().swBuild || "verificando"))}</strong></div><div><span>Banco</span><strong>${APP_RELEASE.database}</strong></div><div><span>Última sincronização</span><strong>${escapeHtml(sync)}</strong></div><div><span>Modo</span><strong>${isStandalone() ? "Instalado" : "Navegador"}</strong></div><div><span>Dispositivo</span><strong>${escapeHtml(deviceLabel())}</strong></div></div><button class="btn btn-secondary btn-block" data-action="check-update">Verificar atualização</button><button class="btn btn-primary btn-block" data-action="report-problem">Reportar problema</button>`, () => {});
     },
 
     async openPlatformAdmin() {
@@ -4468,7 +4476,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       return registration?.pushManager?.getSubscription() || null;
     },
 
-    async enablePushNotifications() {
+    async enablePushNotifications({renew=false} = {}) {
       if (window.TamoonNative?.isIOS) return window.TamoonNative.push.enable();
       if (!pushSupported()) throw new Error("Este navegador não oferece notificações push.");
       const publicKey = String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim();
@@ -4477,14 +4485,15 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       const permission = await Notification.requestPermission();
       if (permission !== "granted") throw new Error(permission === "denied" ? "As notificações foram bloqueadas nos ajustes do aparelho." : "A permissão para notificações não foi concedida.");
       const registration = await this.ensureServiceWorker();
-      let subscription = await registration.pushManager.getSubscription();
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: base64UrlToUint8Array(publicKey)
-        });
-      }
-      await this.repo.savePushSubscription(subscription);
+      const accountId=this.state.profile?.id;
+      const assertAccount=()=>{if(!accountId||this.state.profile?.id!==accountId||this.repo.state.profile?.id!==accountId)throw Error("A conta mudou. Abra as notificações novamente.");};
+      const current=await registration.pushManager.getSubscription();
+      const record=current?(this.state.push_subscriptions||[]).find(row=>row.endpoint===current.endpoint):null;
+      const subscription=await window.TamoonPushClient.register({
+        manager:registration.pushManager,key:base64UrlToUint8Array(publicKey),record,force:renew,
+        assertAccount,save:subscription=>this.repo.savePushSubscription(subscription),
+        remove:endpoint=>this.repo.removePushSubscription(endpoint)
+      });
       this.state = this.repo.state;
       return subscription;
     },
@@ -4515,7 +4524,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         } catch { /* The settings entry remains available for a later retry. */ }
         return;
       }
-      const key = "tamoon-notification-onboarding-v2";
+      const key = `tamoon-notification-onboarding-v3-${this.state.profile.id}`;
       if (localStorage.getItem(key) === "done") return;
       if (!pushSupported()) return;
       if (!String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim()) return;
@@ -4617,7 +4626,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       const linked = Boolean(dbSubscription?.enabled);
       const permission = supported ? Notification.permission : "unsupported";
       const iosInstallRequired = isIos() && !isStandalone();
-      const active = Boolean(subscription && linked);
+      const active = Boolean(subscription && linked && permission === "granted" && !dbSubscription?.invalidated_at);
       const failures = Number(dbSubscription?.consecutive_failures || 0);
       const lastFailure = dbSubscription?.last_failure_at ? shortDate(dbSubscription.last_failure_at) : "";
       const lastSuccess = dbSubscription?.last_success_at ? shortDate(dbSubscription.last_success_at) : "";
@@ -4645,8 +4654,8 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         explanation = `O aparelho permanece vinculado, mas houve ${failures} falha(s) consecutiva(s)${lastFailure ? `; última em ${lastFailure}` : ""}${failureCode ? `, código ${failureCode}` : ""}${failureReason ? `: ${failureReason}` : "."}`;
         tone = "is-warning";
       } else if (active && lastSuccess) {
-        status = "Ativas e validadas";
-        explanation = `Última entrega confirmada em ${lastSuccess}. Você pode enviar um novo teste a qualquer momento.`;
+        status = "Vinculadas · envio aceito pelo serviço";
+        explanation = `Último envio aceito pelo serviço em ${lastSuccess}. Isso não confirma a exibição no aparelho. Use o teste abaixo e confira a notificação.`;
         tone = "is-active";
       } else if (active) {
         status = "Ativas, aguardando validação";
@@ -4664,8 +4673,21 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
       const enableAction = `<button class="btn btn-primary btn-block" id="enablePush">${subscription ? "Vincular novamente" : "Ativar notificações"}</button>`;
       const activeActions = '<button class="btn btn-primary btn-block" id="testPush">Enviar notificação de teste</button><button class="btn btn-danger btn-block" id="disablePush">Desativar neste aparelho</button>';
-      const actions = active ? activeActions : enableAction;
-      this.modal("Notificações no celular", `<div class="notification-status-card ${tone}"><span>🔔</span><div><strong>${escapeHtml(status)}</strong><p>${escapeHtml(explanation)}</p></div></div>${configured && supported && !iosInstallRequired ? actions : ""}<div class="notice"><strong>Validação deste aparelho</strong><br>Cada tentativa de entrega passa a registrar sucesso, falha, código e horário para diagnóstico do aplicativo. Nenhum conteúdo privado da notificação é exibido nas métricas.</div><div class="notice"><strong>Privacidade</strong><br>A ativação vale somente para este aparelho. Você pode desativar a qualquer momento.</div>`, (root, close) => {
+      const recoveryAction=permission==='granted'?'<button class="btn btn-secondary btn-block" id="renewPush">Renovar vínculo deste aparelho</button>':'';
+      const localAction=/Android/i.test(navigator.userAgent)&&permission==='granted'?'<button class="btn btn-secondary btn-block" id="localPushTest">Testar exibição neste Android</button>':'';
+      const actions = (active ? activeActions : enableAction)+recoveryAction+localAction;
+      this.modal("Notificações no celular", `<div class="notification-status-card ${tone}"><span>🔔</span><div><strong>${escapeHtml(status)}</strong><p>${escapeHtml(explanation)}</p></div></div>${configured && supported && !iosInstallRequired ? actions : ""}<div class="notice"><strong>Validação deste aparelho</strong><br>O histórico registra se o serviço aceitou ou recusou o envio. A exibição depende das permissões do aparelho. No Android, confira Ajustes → Apps → Tâmo On → Notificações, incluindo as categorias, e as permissões de notificações do Chrome. O teste local verifica a exibição sem enviar uma mensagem pela internet.</div><div class="notice"><strong>Privacidade</strong><br>A ativação vale somente para este aparelho. Você pode desativar a qualquer momento.</div>`, (root, close) => {
+        $("#renewPush",root)?.addEventListener("click",async event=>{
+          const button=event.currentTarget;button.disabled=true;
+          try{await this.enablePushNotifications({renew:true});close();this.toast("Vínculo renovado. Envie um teste e confira a notificação no aparelho.");}
+          catch(error){button.disabled=false;this.toast(error.message||"Não foi possível renovar o vínculo.",true);}
+        });
+        $("#localPushTest",root)?.addEventListener("click",async event=>{
+          const button=event.currentTarget;button.disabled=true;
+          try{const registration=await this.ensureServiceWorker();await registration.showNotification("Teste local do Tâmo On",{body:"Se você recebeu este aviso, a exibição local está funcionando. Falta conferir o envio pela internet.",icon:"/tamo-on-icon-192.png",tag:"tamoon-local-diagnostic",data:{url:"./?page=more"}});this.toast("Exibição local solicitada. Confira a central de notificações do Android.");}
+          catch(error){this.toast(error.message||"O Android não permitiu exibir a notificação local.",true);}
+          finally{button.disabled=false;}
+        });
         $("#enablePush", root)?.addEventListener("click", async event => {
           const button = event.currentTarget; button.disabled = true; button.textContent = "Ativando…";
           try { await this.enablePushNotifications(); close(); this.toast("Notificações ativadas e vinculadas neste aparelho."); }
@@ -4679,7 +4701,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
             this.state = this.repo.state;
             if (Number(result.sent || 0) > 0) {
               close();
-              this.toast("Notificação de teste enviada. Confirme o recebimento neste aparelho.");
+              this.toast("Teste aceito pelo serviço de push. Confira a notificação no aparelho; envio aceito não confirma a exibição.");
             } else {
               button.disabled = false;
               button.textContent = "Enviar notificação de teste";
