@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 116,
   "mandatory": false,
-  "notes": "Correção do diagnóstico e recuperação do vínculo de notificações; teste de exibição local no Android.",
+  "notes": "Permissão de notificações verificada novamente após vincular; tela atualizada e teste local sempre acessível no Android.",
   "label": "Tâmo On 1.0 Build 168",
-  "integration": "168-R5"
+  "integration": "168-R6"
 }

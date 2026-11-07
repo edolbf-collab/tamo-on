@@ -76,7 +76,10 @@ const financial='<header class="page-header"><div><span class="eyebrow">Administ
   await open();await page.evaluate(()=>window.drawer.update({heading:'Quero ser parceiro',markup:''}));
   assert.equal(await isOpen(),false);await open();assert.equal(await page.locator('#marketplaceMenuLinks').isVisible(),false);
   assert.ok(await page.locator('#openReleaseNotes').isVisible());
-  await page.setViewportSize({width:1280,height:900});assert.equal(await isOpen(),false);
+  await page.setViewportSize({width:1280,height:900});
+  // The matchMedia change event is delivered after the viewport mutation.
+  await page.waitForFunction(()=>!document.getElementById('marketplaceMenu').open);
+  assert.equal(await isOpen(),false);
   assert.equal(await page.locator('#openMarketplaceMenu').isVisible(),false);
   assert.deepEqual(await headerControls(),['openNotifications','toggleNotificationSound','marketplaceSessionButton','toggleMarketplaceTheme','openReleaseNotes']);
   assert.equal(await page.locator('.role-layout > .subnav').isVisible(),true);
