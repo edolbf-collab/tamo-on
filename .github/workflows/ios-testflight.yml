@@ -22,7 +22,39 @@ concurrency:
   group: tamoon-testflight
   cancel-in-progress: false
 jobs:
+  dependencies:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TF_SOURCE_SHA: ${{ inputs.source_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ios-build-165
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fixar o código revisado
+        run: |
+          set -euo pipefail
+          [[ "$TF_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git merge-base --is-ancestor "$TF_SOURCE_SHA" origin/ios-build-165
+          git checkout --detach "$TF_SOURCE_SHA"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Preparar dependências para macOS ARM
+        run: |
+          npm ci --prefix mobile --ignore-scripts --cache .ios-npm-cache --no-audit --no-fund
+          node mobile/scripts/cache-darwin.mjs .ios-npm-cache
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-npm-cache
+          path: .ios-npm-cache/_cacache
+          include-hidden-files: true
+          retention-days: 1
   testflight:
+    needs: dependencies
     if: github.ref == 'refs/heads/main'
     # Use the macOS 15 ARM pool while macOS 26 runner capacity is constrained.
     runs-on: macos-15
@@ -58,6 +90,10 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: mobile/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-npm-cache
+          path: .ios-npm-cache/_cacache
       - name: Preparar o pacote validado
         run: |
           set -euo pipefail
@@ -67,7 +103,7 @@ jobs:
           test "$(xcodebuild -version | head -1)" = 'Xcode 26.3'
           major=$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)
           test "$major" -ge 26
-          npm ci --prefix mobile --no-audit --no-fund
+          npm ci --prefix mobile --offline --cache .ios-npm-cache --no-audit --no-fund
           npm run sync --prefix mobile
           npm run check --prefix mobile
           npm run test:auth --prefix mobile
@@ -129,6 +165,7 @@ jobs:
           path=pathlib.Path(os.environ['RUNNER_TEMP'])/'tamoon-archive-entitlements.plist'
           entitlements=plistlib.loads(path.read_bytes())
           assert entitlements.get('com.apple.developer.applesignin') == ['Default'], 'Archive sem autorização Apple Sign In'
+          assert entitlements.get('aps-environment') == 'production', 'Archive sem autorização APNs de produção'
           print('Entitlement Apple Sign In preservado antes da assinatura de distribuição.')
           PY
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Tamoon.xcarchive" \
