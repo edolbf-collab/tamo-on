@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 116,
   "mandatory": false,
-  "notes": "Apresentação da comunidade atualizada para uso público, com suporte e administração da plataforma.",
+  "notes": "Correção do diagnóstico e recuperação do vínculo de notificações; teste de exibição local no Android.",
   "label": "Tâmo On 1.0 Build 168",
-  "integration": "168-R4"
+  "integration": "168-R5"
 }
