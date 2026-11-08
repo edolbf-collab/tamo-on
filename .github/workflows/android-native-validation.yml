@@ -8,7 +8,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: android-native-${{ github.ref }}
+  group: android-native-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   android-native:
@@ -34,7 +34,7 @@ jobs:
           npm run sync:android --prefix mobile
           npm run check --prefix mobile
           npm run check:android --prefix mobile
-          node --test tests/push/*.test.mjs integration/auth/tests/*.test.mjs integration/community/tests/*.test.mjs integration/marketplace/tests/*.test.mjs tests/ios-preparation/identity-linking.test.mjs mobile/tests/android-database.test.mjs
+          node --test tests/push/*.test.mjs integration/auth/tests/*.test.mjs integration/community/tests/*.test.mjs integration/marketplace/tests/*.test.mjs tests/ios-preparation/identity-linking.test.mjs mobile/tests/android-*.test.mjs
       - name: Verify packaged layout and marketplace navigation
         working-directory: mobile
         run: |

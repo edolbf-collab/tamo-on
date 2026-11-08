@@ -1415,7 +1415,7 @@
         this.finishBootFeedback();
         this.render();
         window.TamoonNative?.push?.initialize(this.repo.client, this.state.profile.id).catch(() => {
-          this.toast("Não foi possível atualizar as notificações deste iPhone. Confira em Mais → Notificações no celular.", true);
+          this.toast("Não foi possível atualizar as notificações deste aparelho. Confira em Mais → Notificações no celular.", true);
         });
         this.startAccessMonitor();
         this.refreshMarketplacePilot();
@@ -1652,6 +1652,7 @@
     },
 
     async checkForUpdates(showCurrent = false) {
+      if(window.TamoonNative?.isNative){if(showCurrent)this.toast("As atualizações deste aplicativo são distribuídas pela loja do seu aparelho.");return false;}
       try {
         const response = await fetch(`version.json?t=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw new Error("Não foi possível consultar a versão publicada.");
@@ -3924,7 +3925,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       try { await this.repo.session(); } catch { dbStatus = "Falha"; }
       const sync = this.lastSyncAt ? shortDate(this.lastSyncAt) : "Não registrada";
       const updateText = this.updateAvailable ? "Atualização pendente" : "Sem atualização detectada";
-      this.modal("Sobre e diagnóstico", `<div class="diagnostic-grid"><div class="diagnostic-item ${online ? "ok" : "bad"}"><span></span><div><small>Internet</small><strong>${online ? "Conectado" : "Offline"}</strong></div></div><div class="diagnostic-item ${dbStatus === "Disponível" ? "ok" : "bad"}"><span></span><div><small>Banco e sessão</small><strong>${dbStatus}</strong></div></div><div class="diagnostic-item ${pushHealth.tone}"><span></span><div><small>Push deste aparelho</small><strong>${escapeHtml(pushHealth.label)}</strong></div></div><div class="diagnostic-item ${this.updateAvailable ? "warn" : "ok"}"><span></span><div><small>Atualização</small><strong>${escapeHtml(updateText)}</strong></div></div></div><div class="system-info-card"><div><span>Aplicativo</span><strong>${APP_RELEASE.version}</strong></div><div><span>Build do aplicativo</span><strong>${APP_RELEASE.build} · ${APP_RELEASE.integration}</strong></div><div><span>Build do HTML</span><strong>${this.htmlBuild() || "—"}</strong></div><div><span>Service worker</span><strong>${escapeHtml(String(window.tamoonPwa?.getState?.().swBuild || "verificando"))}</strong></div><div><span>Banco</span><strong>${APP_RELEASE.database}</strong></div><div><span>Última sincronização</span><strong>${escapeHtml(sync)}</strong></div><div><span>Modo</span><strong>${isStandalone() ? "Instalado" : "Navegador"}</strong></div><div><span>Dispositivo</span><strong>${escapeHtml(deviceLabel())}</strong></div></div><button class="btn btn-secondary btn-block" data-action="check-update">Verificar atualização</button><button class="btn btn-primary btn-block" data-action="report-problem">Reportar problema</button>`, () => {});
+      this.modal("Sobre e diagnóstico", `<div class="diagnostic-grid"><div class="diagnostic-item ${online ? "ok" : "bad"}"><span></span><div><small>Internet</small><strong>${online ? "Conectado" : "Offline"}</strong></div></div><div class="diagnostic-item ${dbStatus === "Disponível" ? "ok" : "bad"}"><span></span><div><small>Banco e sessão</small><strong>${dbStatus}</strong></div></div><div class="diagnostic-item ${pushHealth.tone}"><span></span><div><small>Push deste aparelho</small><strong>${escapeHtml(pushHealth.label)}</strong></div></div><div class="diagnostic-item ${this.updateAvailable ? "warn" : "ok"}"><span></span><div><small>Atualização</small><strong>${escapeHtml(updateText)}</strong></div></div></div><div class="system-info-card"><div><span>Aplicativo</span><strong>${APP_RELEASE.version}</strong></div><div><span>Build do aplicativo</span><strong>${escapeHtml(String(window.TamoonNative?.appInfo?.build || APP_RELEASE.build))} · ${APP_RELEASE.integration}</strong></div><div><span>Build do HTML</span><strong>${this.htmlBuild() || "—"}</strong></div>${native ? "" : `<div><span>Service worker</span><strong>${escapeHtml(String(window.tamoonPwa?.getState?.().swBuild || "verificando"))}</strong></div>`}<div><span>Banco</span><strong>${APP_RELEASE.database}</strong></div><div><span>Última sincronização</span><strong>${escapeHtml(sync)}</strong></div><div><span>Modo</span><strong>${native || isStandalone() ? "Instalado" : "Navegador"}</strong></div><div><span>Dispositivo</span><strong>${escapeHtml(deviceLabel())}</strong></div></div><button class="btn btn-secondary btn-block" data-action="check-update">Verificar atualização</button><button class="btn btn-primary btn-block" data-action="report-problem">Reportar problema</button>`, () => {});
     },
 
     async openPlatformAdmin() {

@@ -4,6 +4,7 @@ import {Share} from '@capacitor/share';
 import {Clipboard} from '@capacitor/clipboard';
 import {PushNotifications} from '@capacitor/push-notifications';
 import {createNativePush} from './push.mjs';
+import {nativeBack} from './back.mjs';
 import {createClient} from '@supabase/supabase-js';
 
 window.supabase={createClient};
@@ -88,6 +89,8 @@ window.TamoonNative={
   async saveJson(data,name){await Bridge.shareFile({name,contents:JSON.stringify(data,null,2)});}
 };
 if(isNative){
+  NativeApp.getInfo().then(info=>{window.TamoonNative.appInfo=info;}).catch(()=>{});
+  if(isAndroid)NativeApp.addListener('backButton',({canGoBack})=>nativeBack({document,app:window.App,marketplace:window.TamoonMarketplacePilot,location,history,canGoBack,minimize:()=>NativeApp.minimizeApp()}).catch(()=>{})).catch(()=>{});
   const push = createNativePush({plugin:PushNotifications, storage:window.TamoonNative.storage, environment:'production', platform:Capacitor.getPlatform(), origin:isAndroid?'https://localhost':'capacitor://localhost', notificationStatus:()=>Bridge.notificationStatus(), navigate:url=>{if(location.pathname.startsWith('/marketplace/')){location.assign(url);return true;}return false;}, getApp:()=>window.App});
   window.TamoonNative.push = push;
   push.listen().catch(()=>{});

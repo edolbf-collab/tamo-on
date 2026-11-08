@@ -27,7 +27,7 @@ O Gradle impede builds de distribuição sem o arquivo Firebase e a configuraç�
 
 ## Validação
 
-Em 08/11, os testes locais de Comunidade, Marketplace, autenticação, push web/nativo e banco isolado somaram 215 aprovações. O teste de banco aplica as migrações reais em Postgres isolado, com funções de autorização de teste, e verifica rotação, RLS, impedimento de gravação direta, ausência de acesso anônimo, transferência de vínculo, remoção e cascata sem alterar dados de produção.
+Em 08/11, os testes locais de Comunidade, Marketplace, autenticação, push web/nativo e banco isolado somaram 219 aprovações. O teste de banco aplica as migrações reais em Postgres isolado, com funções de autorização de teste, e verifica rotação, RLS, impedimento de gravação direta, ausência de acesso anônimo, transferência de vínculo, remoção e cascata sem alterar dados de produção.
 
 `android-native-validation.yml` compila o aplicativo debug e executa um teste em emulador para abertura do login empacotado e leitura/gravação/remoção pela ponte de armazenamento cifrado. Consultar o resultado da execução antes de considerar essa validação aprovada.
 
@@ -42,7 +42,7 @@ npm ci --prefix mobile
 npm run sync:android --prefix mobile
 npm run check --prefix mobile
 npm run check:android --prefix mobile
-node --test tests/push/*.test.mjs integration/auth/tests/*.test.mjs integration/community/tests/*.test.mjs integration/marketplace/tests/*.test.mjs tests/ios-preparation/identity-linking.test.mjs mobile/tests/android-database.test.mjs
+node --test tests/push/*.test.mjs integration/auth/tests/*.test.mjs integration/community/tests/*.test.mjs integration/marketplace/tests/*.test.mjs tests/ios-preparation/identity-linking.test.mjs mobile/tests/android-*.test.mjs
 # Na pasta mobile/android, depois de configurar Firebase e a assinatura:
 ./gradlew --no-daemon :app:bundleRelease
 ```
