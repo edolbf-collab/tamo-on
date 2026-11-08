@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Capacitor permission metadata is inspected through reflection. R8 full mode
+# must not fold PluginHandle.pluginAnnotation to null in release builds.
+-keep class com.getcapacitor.PluginHandle { *; }
+-keep @interface com.getcapacitor.annotation.CapacitorPlugin { *; }
+-keep @interface com.getcapacitor.annotation.Permission { *; }
+-keep @interface com.getcapacitor.annotation.PermissionCallback { *; }
+-keep @interface com.getcapacitor.annotation.ActivityCallback { *; }
+-keep @interface com.getcapacitor.PluginMethod { *; }

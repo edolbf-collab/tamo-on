@@ -23,6 +23,16 @@ public class NativeStartupTest {
         do { if("true".equals(js(expression)))return;Thread.sleep(150); } while(System.currentTimeMillis()<deadline);
         fail("Packaged app did not satisfy: "+expression);
     }
+    @Test public void notificationPermissionMetadataSurvivesCompilation() throws Exception {
+        until("Boolean(window.TamoonNative?.push)");
+        activity.getScenario().onActivity(a->{
+            com.getcapacitor.PluginHandle handle=a.getBridge().getPlugin("PushNotifications");
+            assertNotNull("Push plugin metadata",handle.getPluginAnnotation());
+            assertEquals("receive",handle.getPluginAnnotation().permissions()[0].alias());
+        });
+        js("(async()=>{try{const result=await TamoonNative.push.status();document.documentElement.dataset.permissionTest=['granted','denied','prompt','prompt-with-rationale'].includes(result.permission)?'ok':'bad';}catch{document.documentElement.dataset.permissionTest='error';}})()");
+        until("document.documentElement.dataset.permissionTest==='ok'");
+    }
     @Test public void packagedLoginAndEncryptedBridgeWorkWithoutBrowserProvider() throws Exception {
         until("Boolean(window.TamoonNative?.isAndroid && window.TamoonNative?.push && document.getElementById('googleLoginButton'))");
         assertEquals("\"https://localhost\"",js("location.origin"));

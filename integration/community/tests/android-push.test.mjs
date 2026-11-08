@@ -16,7 +16,7 @@ function fixture({permission='granted',systemEnabled=true}={}) {
   const app={ready:true,state:{profile:{id:account},currentGroupId:'g'},drainNotificationOpen:async()=>{}};
   const push=createNativePush({plugin,platform:'android',origin:'https://localhost',notificationStatus:async()=>({enabled:systemEnabled}),
     storage:{getItem:async k=>values.get(k),setItem:async(k,v)=>values.set(k,v)},getApp:()=>app});
-  return {push,client,events,calls,values,app,setAccount:value=>{account=value;}};
+  return {push,plugin,client,events,calls,values,app,setAccount:value=>{account=value;}};
 }
 test('Android registers natively without Web Push; FCM token case survives storage and test targeting',async()=>{
   const f=fixture();await f.push.initialize(f.client,'user-a');await f.push.enable();
@@ -78,4 +78,16 @@ test('FCM uses signed OAuth with fixed endpoints and distinguishes stale devices
 test('missing Firebase credentials cannot make network requests',async()=>{
   const sender=createFcmSender({env:()=>'',request:()=>{throw Error('must not send');}});
   await assert.rejects(sender(`fcm://${token}`,{data:{url:'/'}}),{statusCode:503,body:'FCM_NOT_CONFIGURED'});
+});
+
+test('empty native permission responses do not crash diagnostics or claim activation',async()=>{
+  for(const response of [undefined,null,{}, {receive:'unexpected'}]) {
+    const f=fixture(); await f.push.initialize(f.client,'user-a');
+    f.plugin.checkPermissions=async()=>response;
+    f.plugin.requestPermissions=async()=>response;
+    assert.equal((await f.push.status()).permission,'unavailable');
+    assert.equal((await f.push.status()).active,false);
+    await assert.rejects(f.push.enable(),/Não foi possível consultar/);
+    assert(!f.calls.some(([name])=>name.startsWith('save')));
+  }
 });

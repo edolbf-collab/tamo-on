@@ -16,7 +16,9 @@ export function createNativePush({plugin, storage, environment = 'production', p
   let client, userId, endpoint = '', installing, registration, desired = false, generation = 0;
   let pendingURL = '';
   async function permission() {
-    const value=(await plugin.checkPermissions()).receive;
+    const value=(await plugin.checkPermissions())?.receive;
+    // A missing bridge response is not permission granted (or user denial).
+    if (!['granted','denied','prompt','prompt-with-rationale'].includes(value)) return 'unavailable';
     if(android&&value==='granted'&&notificationStatus&&!(await notificationStatus()).enabled)return 'denied';
     return value;
   }
@@ -102,7 +104,9 @@ export function createNativePush({plugin, storage, environment = 'production', p
     async enable() {
       if (!client || !userId) throw Error('Entre na sua conta antes de ativar as notificações.');
       const requested = await plugin.requestPermissions();
-      if (requested.receive !== 'granted' || await permission() !== 'granted') throw Error('Permita as notificações em Ajustes → Apps → Tâmo On → Notificações.');
+      const checked = await permission();
+      if (!requested?.receive || checked === 'unavailable') throw Error('Não foi possível consultar a permissão de notificações neste aparelho. Atualize o aplicativo e tente novamente.');
+      if (requested.receive !== 'granted' || checked !== 'granted') throw Error('Permita as notificações em Ajustes → Apps → Tâmo On → Notificações.');
       if (android) await plugin.createChannel({id:'tamoon-alerts',name:'Avisos do Tâmo On',importance:4,sound:'default',visibility:0});
       desired = true;
       return register();
