@@ -139,10 +139,10 @@
   }
   async function start() {
     try {
-      clearLocal(); if(!window.TamoonNative?.isIOS) await script(sdk);
+      clearLocal(); if(!window.TamoonNative?.isNative) await script(sdk);
       const config = window.TAMOON_CONFIG;
       if (!config?.supabaseUrl || !config?.supabasePublishableKey) throw new Error("CONFIG_MISSING");
-      community = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, {auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, ...(window.TamoonNative?.isIOS ? {storage:window.TamoonNative.storage,flowType:'pkce'} : {})}});
+      community = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, {auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, ...(window.TamoonNative?.isNative ? {storage:window.TamoonNative.storage,flowType:'pkce'} : {})}});
       const result = await request("session");
       if (!result.session?.access_token || !result.session?.refresh_token) throw new Error("ACCESS_FAILED");
       pendingSession = result.session; canSyncCommunity = result.canSyncCommunity === true; showDiagnostics();

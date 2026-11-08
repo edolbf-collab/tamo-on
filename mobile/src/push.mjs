@@ -8,9 +8,18 @@ export function nativeNotificationURL(value, origin = 'capacitor://localhost') {
   } catch { return null; }
 }
 
-export function createNativePush({plugin, storage, environment, getApp, uuid = () => crypto.randomUUID()}) {
+export function createNativePush({plugin, storage, environment = 'production', platform = 'ios', origin = 'capacitor://localhost', notificationStatus, navigate, getApp, uuid = () => crypto.randomUUID()}) {
+  const android = platform === 'android';
+  const table = android ? 'android_push_subscriptions' : 'native_push_subscriptions';
+  const saveRPC = android ? 'save_android_push_subscription' : 'save_native_push_subscription';
+  const removeRPC = android ? 'remove_android_push_subscription' : 'remove_native_push_subscription';
   let client, userId, endpoint = '', installing, registration, desired = false, generation = 0;
   let pendingURL = '';
+  async function permission() {
+    const value=(await plugin.checkPermissions()).receive;
+    if(android&&value==='granted'&&notificationStatus&&!(await notificationStatus()).enabled)return 'denied';
+    return value;
+  }
   const preference = 'tamoon-native-push-enabled';
   const installationKey = 'tamoon-native-push-installation';
   let installationId;
@@ -30,26 +39,27 @@ export function createNativePush({plugin, storage, environment, getApp, uuid = (
     installing = (async () => {
       await plugin.addListener('registration', async ({value}) => {
         const pending = registration;
-        if (!pending || !desired || pending.generation !== generation) return;
+        const eventGeneration = generation;
+        if (!desired || !client || !installationId || (pending && pending.generation !== generation)) return;
         try {
-          const token = String(value || '').toLowerCase();
-          if (!/^[a-f0-9]{64,512}$/.test(token)) throw Error('A Apple retornou um registro de aparelho inválido.');
+          const token = android ? String(value || '') : String(value || '').toLowerCase();
+          if (!(android ? /^[A-Za-z0-9_:-]{20,2048}$/ : /^[a-f0-9]{64,512}$/).test(token)) throw Error('O serviço retornou um registro de aparelho inválido.');
           const {data} = await client.auth.getSession();
-          if (data.session?.user?.id !== userId || pending.generation !== generation) throw Error('A conta mudou. Ative as notificações novamente.');
-          await rpc('save_native_push_subscription', {p_token: token, p_environment: environment, p_installation_id: installationId});
-          if (pending.generation !== generation) return;
-          endpoint = `apns://${environment}/${token}`;
+          if (data.session?.user?.id !== userId || eventGeneration !== generation) throw Error('A conta mudou. Ative as notificações novamente.');
+          await rpc(saveRPC, {p_token: token, ...(android ? {} : {p_environment: environment}), p_installation_id: installationId});
+          if (eventGeneration !== generation) return;
+          endpoint = android ? `fcm://${token}` : `apns://${environment}/${token}`;
           await storage.setItem(preference, 'yes');
-          pending.resolve(endpoint);
-        } catch (error) { pending.reject(error); }
+          pending?.resolve(endpoint);
+        } catch (error) { endpoint = ''; pending?.reject(error); }
       });
-      await plugin.addListener('registrationError', () => registration?.reject(Error('Não foi possível registrar este iPhone na Apple. Tente novamente.')));
+      await plugin.addListener('registrationError', () => registration?.reject(Error('Não foi possível registrar este aparelho. Tente novamente.')));
       await plugin.addListener('pushNotificationReceived', () => {
         const app = getApp();
         if (app?.ready && app.state.profile?.id === userId) app.repo.loadUserNotifications().then(() => app.updateNotificationBadge()).catch(() => {});
       });
       await plugin.addListener('pushNotificationActionPerformed', ({notification}) => {
-        pendingURL = nativeNotificationURL(notification?.data?.url) || '';
+        pendingURL = nativeNotificationURL(notification?.data?.url, origin) || '';
         flush();
       });
     })();
@@ -57,6 +67,7 @@ export function createNativePush({plugin, storage, environment, getApp, uuid = (
   };
   function flush() {
     const app = getApp();
+    if(pendingURL && !app && navigate?.(pendingURL)){pendingURL='';return;}
     if (!pendingURL || !app?.ready || app.state.profile?.id !== userId) return;
     app.pendingNotificationUrl = pendingURL;
     pendingURL = '';
@@ -67,7 +78,7 @@ export function createNativePush({plugin, storage, environment, getApp, uuid = (
     const current = {generation};
     current.promise = new Promise((resolve, reject) => { current.resolve = resolve; current.reject = reject; });
     registration = current;
-    const timeout = setTimeout(() => current.reject(Error('A Apple não confirmou o registro. Verifique a conexão e tente novamente.')), 20000);
+    const timeout = setTimeout(() => current.reject(Error('O serviço não confirmou o registro. Verifique a conexão e tente novamente.')), 20000);
     try {
       return await Promise.all([current.promise, plugin.register()]).then(([value]) => value);
     } finally {
@@ -85,13 +96,14 @@ export function createNativePush({plugin, storage, environment, getApp, uuid = (
       installationId = await storage.getItem(installationKey);
       if (!installationId) { installationId = uuid(); await storage.setItem(installationKey, installationId); }
       desired = await storage.getItem(preference) === 'yes';
-      if (desired && (await plugin.checkPermissions()).receive === 'granted') await register();
+      if (desired && (await permission()) === 'granted') await register();
       flush();
     },
     async enable() {
       if (!client || !userId) throw Error('Entre na sua conta antes de ativar as notificações.');
-      const permission = await plugin.requestPermissions();
-      if (permission.receive !== 'granted') throw Error('Permita as notificações em Ajustes → Apps → Tâmo On → Notificações.');
+      const requested = await plugin.requestPermissions();
+      if (requested.receive !== 'granted' || await permission() !== 'granted') throw Error('Permita as notificações em Ajustes → Apps → Tâmo On → Notificações.');
+      if (android) await plugin.createChannel({id:'tamoon-alerts',name:'Avisos do Tâmo On',importance:4,sound:'default',visibility:0});
       desired = true;
       return register();
     },
@@ -99,7 +111,7 @@ export function createNativePush({plugin, storage, environment, getApp, uuid = (
       if (!client || !installationId) return;
       generation += 1; desired = false;
       // Stop on the server before confirming sign-out or disabling on this device.
-      await rpc('remove_native_push_subscription', {p_installation_id: installationId});
+      await rpc(removeRPC, {p_installation_id: installationId});
       endpoint = ''; pendingURL = '';
       registration?.reject(Error('Notificações desativadas.'));
       await storage.setItem(preference, 'no');
@@ -107,19 +119,19 @@ export function createNativePush({plugin, storage, environment, getApp, uuid = (
       await plugin.removeAllDeliveredNotifications().catch(() => {});
     },
     async status() {
-      const permission = (await plugin.checkPermissions()).receive;
+      const permissionValue = await permission();
       let active = false;
       if (client && installationId && userId) {
-        const {data, error} = await client.from('native_push_subscriptions').select('enabled').eq('installation_id', installationId).eq('user_id', userId).maybeSingle();
+        const {data, error} = await client.from(table).select('enabled').eq('installation_id', installationId).eq('user_id', userId).maybeSingle();
         if (error) throw error;
-        active = permission === 'granted' && desired && Boolean(data?.enabled) && Boolean(endpoint);
+        active = permissionValue === 'granted' && desired && Boolean(data?.enabled) && Boolean(endpoint);
       }
-      return {permission, active, endpoint};
+      return {permission:permissionValue, active, endpoint, provider:android?'Google':'Apple'};
     },
     async test() {
-      if (!endpoint) throw Error('Ative as notificações neste iPhone primeiro.');
+      if (!endpoint) throw Error('Ative as notificações neste aparelho primeiro.');
       const {data, error} = await client.functions.invoke('publish-announcement', {body: {action:'test-push', endpoint, groupId:getApp()?.state.currentGroupId}});
-      if (error || !data?.sent) throw Error(data?.failureReason || 'Não foi possível enviar o teste ao serviço da Apple.');
+      if (error || !data?.sent) throw Error(data?.failureReason || 'Não foi possível enviar o teste ao serviço de notificações.');
       return data;
     }
   };

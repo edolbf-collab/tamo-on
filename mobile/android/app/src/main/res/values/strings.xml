@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tâmo On</string>
+    <string name="title_activity_main">Tâmo On</string>
+    <string name="package_name">br.app.tamoon</string>
+    <string name="custom_url_scheme">br.app.tamoon</string>
+</resources>

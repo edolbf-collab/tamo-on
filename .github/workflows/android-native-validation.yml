@@ -1,0 +1,69 @@
+name: Android native validation
+on:
+  push:
+    branches: [feat/android-native]
+  pull_request:
+    paths: ['mobile/**', 'integration/**', 'supabase/**', 'app.js', 'auth-access.js', 'push-client.js', '.github/workflows/android-native-validation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Prepare local app and run account/push/database regression tests
+        run: |
+          npm ci --prefix mobile --no-audit --no-fund
+          npm run sync:android --prefix mobile
+          npm run check --prefix mobile
+          npm run check:android --prefix mobile
+          node --test tests/push/*.test.mjs integration/auth/tests/*.test.mjs integration/community/tests/*.test.mjs integration/marketplace/tests/*.test.mjs tests/ios-preparation/identity-linking.test.mjs mobile/tests/android-database.test.mjs
+      - name: Verify packaged layout and marketplace navigation
+        working-directory: mobile
+        run: |
+          npx playwright install --with-deps chromium
+          TAMOON_TEST_BROWSER=chromium node tests/home-layout.test.mjs
+      - name: Compile Android without production credentials
+        working-directory: mobile/android
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify packaged startup and encrypted native session bridge
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          working-directory: mobile/android
+          script: ./gradlew --no-daemon :app:connectedDebugAndroidTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-native-validation
+          path: mobile/android/app/build/reports/androidTests/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Record validation scope
+        if: always()
+        run: echo 'Debug compile and emulator tests only. No production Firebase configuration, signing or Play Store upload. Physical background push and upgrade from the Play build remain release gates.' >> "$GITHUB_STEP_SUMMARY"

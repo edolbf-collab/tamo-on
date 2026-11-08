@@ -2,8 +2,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2.110.7";
 import { sendNotification } from "npm:web-push-neo@0.1.2";
 import { rescheduleAndNotify } from "./match-reschedule.mjs";
+import { createFcmSender } from "./fcm.mjs";
 import { createApnsSender } from "./apns.mjs";
 
+const sendFcm = createFcmSender({env: (name: string) => Deno.env.get(name)});
 const sendApns = createApnsSender({env: (name: string) => Deno.env.get(name)});
 
 const corsHeaders = {
@@ -52,7 +54,7 @@ function formatDateTime(value: string, timeZone: string) {
   }
 }
 
-type StoredSubscription = { id: string; user_id: string; endpoint: string; p256dh?: string; auth?: string; native?: boolean; updated_at?: string };
+type StoredSubscription = { id: string; user_id: string; endpoint: string; p256dh?: string; auth?: string; native?: boolean; android?: boolean; updated_at?: string };
 type PushFailure = { statusCode: number; reason: string };
 type PushResult = {
   sent: number;
@@ -105,13 +107,15 @@ Deno.serve(async (req) => {
     const userClient = createClient(supabaseUrl, publicKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const adminClient = createClient(supabaseUrl, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const loadSubscriptions = async (userIds: string[]): Promise<StoredSubscription[]> => {
-      const [web, native] = await Promise.all([
+      const [web, native, android] = await Promise.all([
         adminClient.from("push_subscriptions").select("id,user_id,endpoint,p256dh,auth").in("user_id", userIds).eq("enabled", true),
         adminClient.from("native_push_subscriptions").select("id,user_id,endpoint,updated_at").in("user_id", userIds).eq("enabled", true),
+        adminClient.from("android_push_subscriptions").select("id,user_id,endpoint,updated_at").in("user_id", userIds).eq("enabled", true),
       ]);
       if (web.error) throw web.error;
       if (native.error) throw native.error;
-      return [...(web.data || []), ...(native.data || []).map(row => ({...row, native:true}))];
+      if (android.error) throw android.error;
+      return [...(web.data || []), ...(native.data || []).map(row => ({...row, native:true})), ...(android.data || []).map(row => ({...row, native:true, android:true}))];
     };
     const { data: userData, error: userError } = await userClient.auth.getUser(accessToken);
     const user = userData.user;
@@ -222,6 +226,7 @@ Deno.serve(async (req) => {
 
     const providerFromEndpoint = (endpoint: string) => {
       const value = String(endpoint || "").toLowerCase();
+      if (value.startsWith("fcm://")) return "google";
       if (value.startsWith("apns://")) return "apns";
       if (value.includes("web.push.apple.com")) return "apple";
       if (value.includes("fcm.googleapis.com") || value.includes("googleapis.com")) return "google";
@@ -277,7 +282,7 @@ Deno.serve(async (req) => {
       try {
         if (options.subscription.native) {
           const now = new Date().toISOString();
-          const {error} = await adminClient.from("native_push_subscriptions").update({
+          const {error} = await adminClient.from(options.subscription.android ? "android_push_subscriptions" : "native_push_subscriptions").update({
             last_attempt_at: now,
             ...(options.success ? {last_success_at:now, consecutive_failures:0, last_failure_reason:null, last_failure_status:null} : {last_failure_at:now, last_failure_reason:cleanText(options.technicalReason,120), last_failure_status:options.statusCode}),
             ...(options.statusCode === 410 ? {enabled:false} : {})
@@ -324,10 +329,10 @@ Deno.serve(async (req) => {
         try {
           if (subscription.native) {
             // Recheck immediately before each attempt, including retries after sign-out.
-            const {data: current, error} = await adminClient.from("native_push_subscriptions").select("id").eq("id", subscription.id).eq("user_id", subscription.user_id).eq("updated_at", subscription.updated_at!).eq("enabled", true).maybeSingle();
+            const {data: current, error} = await adminClient.from(subscription.android ? "android_push_subscriptions" : "native_push_subscriptions").select("id").eq("id", subscription.id).eq("user_id", subscription.user_id).eq("updated_at", subscription.updated_at!).eq("enabled", true).maybeSingle();
             if (error) throw error;
             if (!current) throw Object.assign(new Error("Registro de aparelho desativado."), {statusCode:410});
-            await sendApns(subscription.endpoint, JSON.parse(notificationPayload), deliveryId);
+            await (subscription.android ? sendFcm : sendApns)(subscription.endpoint, JSON.parse(notificationPayload), deliveryId);
           } else await sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh!, auth: subscription.auth! } }, notificationPayload, {
             vapidDetails: { subject: vapidSubject, publicKey: vapidPublicKey, privateKey: vapidPrivateKey },
             TTL: 86400,

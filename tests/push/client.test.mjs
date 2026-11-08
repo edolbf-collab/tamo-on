@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import '../../push-client.js';
 const {register,diagnostic}=globalThis.TamoonPushClient;
+const {readPermission}=globalThis.TamoonPushClient;
 const key=new Uint8Array([1,2,3]);
 function fixture({invalidated=false,oldKey=key,unsubscribeFails=false}={}){
  let current;const calls=[];
@@ -24,3 +25,22 @@ test('query failures cannot be shown as disabled or healthy',()=>{assert.equal(d
 
 test('expired subscription is replaced',async()=>{const f=fixture();f.old.expirationTime=Date.now()-1000;await register(f.options);assert.equal(f.calls[0],'unsubscribe');});
  test('overlapping activation cannot rotate an in-flight subscription',async()=>{const f=fixture();let release;f.options.save=()=>new Promise(resolve=>{release=resolve;});const first=register(f.options);while(!release)await Promise.resolve();await assert.rejects(register({...f.options,force:true}),/andamento/);release();await first;assert.equal(f.calls.includes('unsubscribe'),false);});
+
+test('async push grant resolves a pending Notification snapshot without caching',async()=>{
+ let state='granted';const options={notification:{permission:'default'},manager:{permissionState:async()=>state}};
+ assert.equal((await readPermission(options)).permission,'granted');
+ state='denied';assert.equal((await readPermission(options)).permission,'denied');
+});
+test('explicit notification or push denial never becomes a grant',async()=>{
+ for(const [notification,push] of [['denied','granted'],['granted','denied']])
+  assert.equal((await readPermission({notification:{permission:notification},manager:{permissionState:async()=>push}})).permission,'denied');
+});
+test('pending push permission is not inferred from old synchronous grant',async()=>{
+ assert.equal((await readPermission({notification:{permission:'granted'},manager:{permissionState:async()=>'prompt'}})).permission,'default');
+});
+test('unsupported or failing permission query falls back without fabricating a grant',async()=>{
+ for(const manager of [{},{permissionState:async()=>{throw Error('unsupported');}}]) {
+  assert.equal((await readPermission({notification:{permission:'default'},manager})).permission,'default');
+  assert.equal((await readPermission({notification:{permission:'granted'},manager})).permission,'granted');
+ }
+});

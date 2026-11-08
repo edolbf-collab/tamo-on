@@ -128,10 +128,10 @@ test('checks are deduplicated on resume and a hidden app does not query access',
 });
 
 
-test('iOS reuses Keychain session without fetching the remote SDK; denied accounts stay locked',async()=>{
+test('native apps reuse protected session without fetching the remote SDK; denied accounts stay locked',async()=>{
  const storage={getItem:async()=>null,setItem:async()=>{},removeItem:async()=>{}};
- for(const scenario of ['customer','anonymous','denied']){
-  const f=await start(scenario,{native:{isIOS:true,storage}});
+ for(const platform of ['ios','android'])for(const scenario of ['customer','anonymous','denied']){
+  const f=await start(scenario,{native:{isNative:true,isIOS:platform==='ios',isAndroid:platform==='android',storage}});
   assert.equal(f.scripts.some(src=>src.startsWith('https:')),false);
   assert.equal(f.clients[0].config.auth.storage,storage);
   assert.equal(f.clients[0].config.auth.flowType,'pkce');

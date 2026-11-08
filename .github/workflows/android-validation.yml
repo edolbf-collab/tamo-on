@@ -5,6 +5,9 @@ on:
       - 'android/**'
       - 'styles.css'
       - 'index.html'
+      - 'app.js'
+      - 'push-client.js'
+      - 'tests/push/**'
       - 'marketplace/index.html'
       - 'marketplace/pilot.css'
       - 'integration/marketplace/tests/edge-to-edge-browser.cjs'
@@ -12,6 +15,17 @@ on:
 permissions:
   contents: read
 jobs:
+  push-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/push/*.test.mjs
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 25

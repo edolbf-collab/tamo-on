@@ -1,0 +1,34 @@
+package br.app.tamoon;
+
+import androidx.test.ext.junit.rules.ActivityScenarioRule;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import static org.junit.Assert.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+@RunWith(AndroidJUnit4.class)
+public class NativeStartupTest {
+    @Rule public ActivityScenarioRule<MainActivity> activity = new ActivityScenarioRule<>(MainActivity.class);
+    private String js(String expression) throws Exception {
+        CountDownLatch completed=new CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
+        activity.getScenario().onActivity(a->a.getBridge().getWebView().evaluateJavascript(expression,value->{result.set(value);completed.countDown();}));
+        assertTrue("JavaScript callback",completed.await(10,TimeUnit.SECONDS));return result.get();
+    }
+    private void until(String expression) throws Exception {
+        long deadline=System.currentTimeMillis()+20000;
+        do { if("true".equals(js(expression)))return;Thread.sleep(150); } while(System.currentTimeMillis()<deadline);
+        fail("Packaged app did not satisfy: "+expression);
+    }
+    @Test public void packagedLoginAndEncryptedBridgeWorkWithoutBrowserProvider() throws Exception {
+        until("Boolean(window.TamoonNative?.isAndroid && window.TamoonNative?.push && document.getElementById('googleLoginButton'))");
+        assertEquals("\"https://localhost\"",js("location.origin"));
+        assertEquals("false",js("Boolean(document.getElementById('appleLoginButton'))"));
+        js("(async()=>{try{await TamoonNative.storage.setItem('native-test','test-only');const value=await TamoonNative.storage.getItem('native-test');await TamoonNative.storage.removeItem('native-test');const removed=await TamoonNative.storage.getItem('native-test');document.documentElement.dataset.nativeTest=(value==='test-only'&&removed===null)?'ok':'bad';}catch{document.documentElement.dataset.nativeTest='error';}})()");
+        until("document.documentElement.dataset.nativeTest==='ok'");
+        assertEquals("false",js("Boolean(window.tamoonPwa?.registration)"));
+    }
+}

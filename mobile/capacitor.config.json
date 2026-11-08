@@ -18,6 +18,15 @@
         "banner",
         "list"
       ]
+    },
+    "SystemBars": {
+      "insetsHandling": "native",
+      "style": "LIGHT"
     }
+  },
+  "android": {
+    "backgroundColor": "#061820",
+    "allowMixedContent": false,
+    "minWebViewVersion": 105
   }
 }

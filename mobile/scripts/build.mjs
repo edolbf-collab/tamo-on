@@ -8,7 +8,7 @@ await rm(target,{recursive:true,force:true});await mkdir(target,{recursive:true}
 // Lista explícita: SQL, código servidor, credenciais e arquivos administrativos nunca vão ao IPA.
 const files=['index.html','auth-config.js','auth-access.js','auth-access.css','app.js','push-client.js','account-deletion.js','community-safety.js','styles.css','supabase-config.js','group-avatars-data.js','marketplace-access.js','brand','assets','icons','apple-touch-icon.png','tamo-on-icon-192.png','legal','version.json'];
 for(const file of files)await cp(path.join(root,file),path.join(target,file),{recursive:true});
-await build({entryPoints:[path.join(mobile,'src/native.js')],bundle:true,format:'iife',target:['safari15'],outfile:path.join(target,'native.js'),minify:true,legalComments:'eof'});
+await build({entryPoints:[path.join(mobile,'src/native.js')],bundle:true,format:'iife',target:['safari15','chrome105'],outfile:path.join(target,'native.js'),minify:true,legalComments:'eof'});
 let html=await readFile(path.join(target,'index.html'),'utf8');
 html=html.replace(/<script src="\/pwa-bootstrap[^>]+><\/script>/,'<script src="native.js"></script>')
  .replace(/<link rel="manifest"[^>]+>/,'')
@@ -37,4 +37,4 @@ await writeFile(path.join(marketTarget,'index.html'),marketHtml
  .replace('<meta charset="utf-8">',`<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}">`)
  .replace('<script src="/supabase-config.js','<script src="/native.js"></script>\n  <script src="/supabase-config.js'));
 const release=JSON.parse(await readFile(path.join(root,'version.json'),'utf8'));
-console.log(`Pacote web local do iOS preparado (Build ${release.build}).`);
+console.log(`Pacote web local para iOS e Android preparado (Build ${release.build}).`);

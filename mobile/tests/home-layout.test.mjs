@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 
-const {webkit}=createRequire(import.meta.url)('playwright');
+const engine=createRequire(import.meta.url)('playwright')[process.env.TAMOON_TEST_BROWSER||'webkit'];
 const root=fileURLToPath(new URL('../www/',import.meta.url));
 const fixture=await readFile(new URL('./home-fixture.js',import.meta.url),'utf8');
 // Match CapacitorRouter: extensionless URLs return the Community index, not a directory index.
@@ -22,7 +22,7 @@ const server=createServer(async(req,res)=>{
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const origin=`http://127.0.0.1:${server.address().port}`;
-const browser=await webkit.launch();
+const browser=await engine.launch({...(process.env.TAMOON_TEST_EXECUTABLE?{executablePath:process.env.TAMOON_TEST_EXECUTABLE}:{})});
 try {
   for(const [width,height] of [[320,568],[375,667],[390,844],[430,932],[844,390],[768,1024],[1280,800]]){
     const context=await browser.newContext({viewport:{width,height}});
@@ -45,7 +45,7 @@ try {
       assert(await button.evaluate(el=>{const r=el.getBoundingClientRect(),m=document.querySelector('#mainContent').getBoundingClientRect();return r.top>=m.top-1&&r.bottom<=m.bottom+1&&el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}),'Every home button can be reached');
     }
     // Exercise the production click handler and the packaged native destination.
-    await page.evaluate(()=>{window.TamoonNative.isIOS=true;});
+    await page.evaluate(()=>{window.TamoonNative.isNative=true;});
     await page.locator('[data-action="playing-spaces"]').click();
     await page.waitForURL('**/marketplace/index.html?page=discover');
     assert.equal(await page.locator('#pilotGate').count(),1,'Marketplace document loads');

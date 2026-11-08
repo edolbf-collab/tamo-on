@@ -34,6 +34,13 @@ test('non-owner mapping cannot mint',async()=>{const f=fixture({mapping:{error:{
 test('rate limit cannot mint',async()=>{const f=fixture({mapping:{error:{code:'PT429'}}});assert.equal((await f.handler(req())).status,429)});
 test('email mismatch cannot mint',async()=>{const f=fixture({mapping:{data:{marketplace_id:'market-owner',email:'different@example.test'}}});assert.equal((await f.handler(req())).status,403)});
 test('supported identity and confirmed email required',async()=>{for(const patch of [{identities:[]},{email_confirmed_at:null}]){const f=fixture({auth:{data:{user:{...owner,...patch}}}});assert.equal((await f.handler(req())).status,403)}});
+test('Android native origin passes preflight but still requires authorization',async()=>{
+ const f=fixture();
+ const preflight=await f.handler(new Request('https://bridge.test',{method:'OPTIONS',headers:{Origin:'https://localhost'}}));
+ assert.equal(preflight.headers.get('access-control-allow-origin'),'https://localhost');
+ const denied=await f.handler(new Request('https://bridge.test',{method:'POST',headers:{Origin:'https://localhost'},body:JSON.stringify({action:'session'})}));
+ assert.equal(denied.status,401);assert(!f.calls.some(call=>call[0]==='mint'));
+});
 test('legal access required',async()=>{for(const patch of [{legal:false}]){const f=fixture(patch);assert.equal((await f.handler(req())).status,403);assert.equal(f.calls.some(c=>c[0]==='mint'),false)}});
 test('status validates identity without generating session',async()=>{const f=fixture();const r=await f.handler(req('status'));assert.equal(r.status,200);assert.deepEqual(await r.json(),{allowed:true,canSyncCommunity:true,environment:'staging',realMoney:false});assert.equal(f.calls.some(c=>c[0]==='mint'),false);assert.equal(f.calls.find(c=>c[0]==='mapping')[1].p_exchange,false)});
 test('session ignores supplied target and sends no email',async()=>{const f=fixture();const r=await f.handler(req());assert.equal(r.status,200);assert.deepEqual(await r.json(),{session:{access_token:'access',refresh_token:'refresh'},canSyncCommunity:true,environment:'staging',realMoney:false});assert.deepEqual(f.calls.find(c=>c[0]==='mint')[1],{type:'magiclink',email:owner.email});assert.equal(r.headers.get('cache-control'),'no-store')});

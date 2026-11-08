@@ -70,7 +70,7 @@ test('unrecognized providers and redirect domains are refused',async()=>{
  await assert.rejects(f.api.link('apple','existing-id'),/INVALID_AUTH_URL/);assert.equal(f.redirects.length,0);assert.equal(f.values.size,0);
 });
 test('native Apple linking and Google OAuth both use the native bridge',async()=>{
- let f;const calls=[];const native={isIOS:true,appleAuth:async(_,linking)=>{calls.push(['apple',linking]);f.setUser({...f.user(),identities:[{provider:'apple'},{provider:'google'}]});},finishOAuth:async(_,url,provider,linking)=>{calls.push([provider,linking]);f.setUser({...f.user(),identities:[{provider:'apple'},{provider:'google'}]});}};
+ let f;const calls=[];const native={isNative:true,isIOS:true,appleAuth:async(_,linking)=>{calls.push(['apple',linking]);f.setUser({...f.user(),identities:[{provider:'apple'},{provider:'google'}]});},finishOAuth:async(_,url,provider,linking)=>{calls.push([provider,linking]);f.setUser({...f.user(),identities:[{provider:'apple'},{provider:'google'}]});}};
  f=fixture({native});assert.equal((await f.api.link('apple','existing-id')).ok,true);assert.deepEqual(calls,[['apple',true]]);
  f.setUser({...f.user(),identities:[{provider:'apple'}]});assert.equal((await f.api.link('google','existing-id')).ok,true);assert.equal(f.calls[0][1].options.redirectTo,'br.app.tamoon://auth/callback');assert.equal(f.redirects.length,0);
 });
