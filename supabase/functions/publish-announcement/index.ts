@@ -168,7 +168,9 @@ Deno.serve(async (req) => {
     }
 
     const requestedOrigin = String(Deno.env.get("APP_BASE_URL") || req.headers.get("Origin") || "").trim().replace(/\/+$/, "");
-    const appOrigin = requestedOrigin.startsWith("capacitor:") ? "https://app.tamoon.app.br" : requestedOrigin;
+    // Packaged Android/iOS origins are internal to the device, never push destinations.
+    const isNativeOrigin = requestedOrigin.startsWith("capacitor:") || /^https?:\/\/localhost(?::\d+)?$/.test(requestedOrigin);
+    const appOrigin = isNativeOrigin ? "https://app.tamoon.app.br" : requestedOrigin;
 
 
     const eventIdFromData = (data: Record<string, unknown>, fallback: string) => cleanText(
