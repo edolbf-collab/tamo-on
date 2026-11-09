@@ -41,4 +41,21 @@ public class NativeStartupTest {
         until("document.documentElement.dataset.nativeTest==='ok'");
         assertEquals("false",js("Boolean(window.tamoonPwa?.registration)"));
     }
+    @Test public void invitationIntentStaysPendingBeforeLogin() throws Exception {
+        until("Boolean(window.App && document.getElementById('googleLoginButton'))");
+        activity.getScenario().onActivity(a->{
+            android.content.Intent invite=new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                android.net.Uri.parse("br.app.tamoon://invite?code=A1B2C3D4"));
+            invite.setClass(a,MainActivity.class);
+            invite.addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            a.startActivity(invite);
+        });
+        try {
+            until("window.App.pendingInvite==='A1B2C3D4' && localStorage.getItem('tamoon-pending-invite')==='A1B2C3D4'");
+            assertEquals("true",js("Boolean(document.getElementById('googleLoginButton'))"));
+            assertEquals("false",js("Boolean(document.getElementById('joinGroupForm'))"));
+        } finally {
+            js("localStorage.removeItem('tamoon-pending-invite');window.App.pendingInvite=''");
+        }
+    }
 }
