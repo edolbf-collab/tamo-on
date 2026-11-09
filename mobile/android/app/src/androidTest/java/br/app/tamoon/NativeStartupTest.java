@@ -21,7 +21,7 @@ public class NativeStartupTest {
     private void until(String expression) throws Exception {
         long deadline=System.currentTimeMillis()+20000;
         do { if("true".equals(js(expression)))return;Thread.sleep(150); } while(System.currentTimeMillis()<deadline);
-        fail("Packaged app did not satisfy: "+expression);
+        fail("Packaged app did not satisfy: "+expression+"; state="+js("JSON.stringify({path:location.pathname,pending:window.App?.pendingInvite,stored:localStorage.getItem('tamoon-pending-invite'),info:window.TamoonNative?.appInfo,appPlugin:window.Capacitor?.isPluginAvailable('App'),events:window.__inviteTestEvents})"));
     }
     @Test public void notificationPermissionMetadataSurvivesCompilation() throws Exception {
         until("Boolean(window.TamoonNative?.push)");
@@ -43,10 +43,12 @@ public class NativeStartupTest {
     }
     @Test public void invitationIntentStaysPendingBeforeLogin() throws Exception {
         until("Boolean(window.App && document.getElementById('googleLoginButton'))");
+        js("window.__inviteTestEvents=[];Capacitor.Plugins.App.addListener('appUrlOpen',event=>window.__inviteTestEvents.push(event.url))");
         activity.getScenario().onActivity(a->{
             android.content.Intent invite=new android.content.Intent(android.content.Intent.ACTION_VIEW,
                 android.net.Uri.parse("br.app.tamoon://invite?code=A1B2C3D4"));
-            invite.setClass(a,MainActivity.class);
+            invite.setPackage(a.getPackageName());
+            invite.addCategory(android.content.Intent.CATEGORY_BROWSABLE);
             invite.addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
             a.startActivity(invite);
         });

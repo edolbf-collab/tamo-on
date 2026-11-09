@@ -57,7 +57,7 @@ jobs:
           target: google_apis
           disable-animations: true
           working-directory: mobile/android
-          script: ./gradlew --no-daemon -PverifyMinifiedBridge :app:connectedDebugAndroidTest
+          script: bash -c './gradlew --no-daemon -PverifyMinifiedBridge :app:connectedDebugAndroidTest; result=$?; adb logcat -d -s Capacitor Capacitor/Console Capacitor/AppPlugin ActivityTaskManager; exit "$result"'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
