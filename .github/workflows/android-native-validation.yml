@@ -3,7 +3,7 @@ on:
   push:
     branches: [feat/android-native]
   pull_request:
-    paths: ['mobile/**', 'integration/**', 'supabase/**', 'app.js', 'auth-access.js', 'push-client.js', '.github/workflows/android-native-validation.yml']
+    paths: ['mobile/**', 'integration/**', 'supabase/**', 'app.js', 'auth-access.js', 'push-client.js', 'deployment/site-invite/**', '.github/workflows/android-native-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -34,12 +34,13 @@ jobs:
           npm run sync:android --prefix mobile
           npm run check --prefix mobile
           npm run check:android --prefix mobile
-          node --test tests/push/*.test.mjs integration/auth/tests/*.test.mjs integration/community/tests/*.test.mjs integration/marketplace/tests/*.test.mjs tests/ios-preparation/identity-linking.test.mjs mobile/tests/android-*.test.mjs
+          node --test tests/push/*.test.mjs integration/auth/tests/*.test.mjs integration/community/tests/*.test.mjs integration/marketplace/tests/*.test.mjs tests/ios-preparation/identity-linking.test.mjs mobile/tests/android-*.test.mjs mobile/tests/invite.test.mjs
       - name: Verify packaged layout and marketplace navigation
         working-directory: mobile
         run: |
           npx playwright install --with-deps chromium
           TAMOON_TEST_BROWSER=chromium node tests/home-layout.test.mjs
+          node tests/invite-page.mjs
       - name: Compile Android without production credentials
         working-directory: mobile/android
         run: ./gradlew --no-daemon -PverifyMinifiedBridge :app:assembleDebug :app:assembleDebugAndroidTest

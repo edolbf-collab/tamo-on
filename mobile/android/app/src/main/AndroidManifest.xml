@@ -28,6 +28,12 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="br.app.tamoon" android:host="auth" android:path="/callback" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="br.app.tamoon" android:host="invite" />
+            </intent-filter>
         </activity>
 
         <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="tamoon-alerts" />
