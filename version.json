@@ -1,11 +1,11 @@
 {
   "channel": "beta",
   "version": "1.0",
-  "build": 170,
+  "build": 171,
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Correção do diagnóstico e recuperação do vínculo de notificações; teste de exibição local no Android.",
-  "label": "Tâmo On 1.0 Build 170",
-  "integration": "170-R1"
+  "notes": "Convites de grupo pela página de download, abertura no aplicativo e melhorias nas notificações.",
+  "label": "Tâmo On 1.0 Build 171",
+  "integration": "171-R1"
 }
