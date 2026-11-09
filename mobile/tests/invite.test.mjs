@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {runInNewContext} from 'node:vm';
 import {inviteCode, createInviteReceiver} from '../src/invite.mjs';
 const url='br.app.tamoon://invite?code=A1B2C3D4';
 const memory=()=>{const data=new Map();return {getItem:key=>data.get(key)||null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key)};};
@@ -15,6 +16,10 @@ test('Only the invitation scheme and a single valid group code are accepted',()=
 });
 test('Warm app opens the confirmation form without joining',()=>{
  const f=fixture();assert.equal(f.receive(url),true);assert.equal(f.storage.getItem('tamoon-pending-invite'),'A1B2C3D4');assert.equal(f.app.pendingInvite,'A1B2C3D4');assert.deepEqual(f.calls,['A1B2C3D4']);
+});
+test('Supported older WebViews do not need custom-scheme URL parsing',()=>{
+ assert.equal(runInNewContext(`(${inviteCode.toString()})('br.app.tamoon://invite?code=A1B2C3D4')`,{URLSearchParams}),'A1B2C3D4');
+ for(const suffix of ['\n','\r','\\','#ignored'])assert.equal(inviteCode(url+suffix),null);
 });
 test('Cold startup, login and legal acceptance keep the invite pending',()=>{
  for(const blocked of ['cold','loading','logged-out','legal']){

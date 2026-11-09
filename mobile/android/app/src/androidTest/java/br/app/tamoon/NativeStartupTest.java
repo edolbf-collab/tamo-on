@@ -43,6 +43,7 @@ public class NativeStartupTest {
     }
     @Test public void invitationIntentStaysPendingBeforeLogin() throws Exception {
         until("Boolean(window.App && document.getElementById('googleLoginButton'))");
+        System.out.println("Invite URL parser compatibility: "+js("JSON.stringify((()=>{const url=new URL('br.app.tamoon://invite?code=A1B2C3D4');return {host:url.host,path:url.pathname,userAgent:navigator.userAgent};})())"));
         js("window.__inviteTestEvents=[];Capacitor.Plugins.App.addListener('appUrlOpen',event=>window.__inviteTestEvents.push(event.url))");
         activity.getScenario().onActivity(a->{
             android.content.Intent invite=new android.content.Intent(android.content.Intent.ACTION_VIEW,

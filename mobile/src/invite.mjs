@@ -1,11 +1,13 @@
 // Invitations never authenticate or join a group. They only prefill the existing form.
 export function inviteCode(raw) {
   try {
-    const url = new URL(raw);
-    if (url.protocol !== 'br.app.tamoon:' || url.host !== 'invite' ||
-        (url.pathname !== '' && url.pathname !== '/') || url.username || url.password || url.hash) return null;
-    if (url.searchParams.getAll('code').length !== 1) return null;
-    const code = url.searchParams.get('code').trim().toUpperCase();
+    // Older supported Android WebViews parse custom schemes as opaque paths.
+    // Match our one explicit route, then use the standard query parser only.
+    const route = typeof raw === 'string' && /^br\.app\.tamoon:\/\/invite\/?\?([^#\s\\]*)$/.exec(raw);
+    if (!route || route[0] !== raw) return null;
+    const params = new URLSearchParams(route[1]);
+    if (params.getAll('code').length !== 1) return null;
+    const code = params.get('code').trim().toUpperCase();
     return /^[A-F0-9]{8}$/.test(code) ? code : null;
   } catch { return null; }
 }
