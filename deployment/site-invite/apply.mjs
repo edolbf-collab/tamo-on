@@ -1,0 +1,12 @@
+import {readFile,writeFile,copyFile} from 'node:fs/promises';
+import path from 'node:path';
+const directory=process.argv[2];
+if(!directory)throw Error('Uso: node apply.mjs /pasta/completa-do-site-atual');
+const root=path.resolve(directory), page=path.join(root,'baixar/index.html');
+const html=await readFile(page,'utf8');
+if(!html.includes('downloadStatus')||!html.includes('store-links'))throw Error('A página mudou: revisar o conteúdo antes de aplicar.');
+const script=/<script\s+src=["']\/download\.js(?:\?[^"']*)?["']\s*><\/script>/g;
+if([...html.matchAll(script)].length!==1)throw Error('Não foi encontrada uma única referência ao script de download.');
+await copyFile(new URL('./download.js',import.meta.url),path.join(root,'download.js'));
+await writeFile(page,html.replace(script,'<script src="/download.js?v=convites-20261109"></script>'));
+console.log('Convites aplicados à pasta atual do site. Publique a pasta COMPLETA na Cloudflare Pages.');

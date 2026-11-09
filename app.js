@@ -2676,9 +2676,9 @@
     openInviteModal() {
       const group = this.currentGroup();
       if (!group) return this.openGroupModal();
-      const url = new URL(window.TamoonNative?.isNative ? "https://app.tamoon.app.br/" : appBaseUrl());
+      const url = new URL("https://tamoon.app.br/baixar");
       url.searchParams.set("invite", group.invite_code);
-      const message = `⚽ Você foi convidado para o grupo ${group.name} no Tâmo On!\n\nCódigo de convite: ${group.invite_code}\n\nAcesse ${url.href}\nEntre na sua conta e informe o código para participar.`;
+      const message = `⚽ Você foi convidado para o grupo ${group.name} no Tâmo On!\n\nCódigo de convite: ${group.invite_code}\n\nAbra ou baixe o aplicativo: ${url.href}\nDepois de instalar, volte a este link para abrir o convite. Você também pode entrar na sua conta e informar o código em “Entrar em um grupo”.`;
       this.modal("Convidar para o grupo", `<section class="invite-card">${this.groupAvatar(group, "invite-avatar")}<h3>${escapeHtml(group.name)}</h3><p>Compartilhe o código com quem participará da pelada.</p><div class="invite-code"><strong>${escapeHtml(group.invite_code)}</strong><button id="copyInviteCode" aria-label="Copiar código">⧉</button></div><button class="btn btn-whatsapp btn-block" id="shareWhatsApp">WhatsApp</button><button class="btn btn-secondary btn-block" id="nativeShare">Compartilhar convite</button></section>`, (root) => {
         $("#copyInviteCode", root).addEventListener("click", async () => {
           await navigator.clipboard.writeText(group.invite_code);
