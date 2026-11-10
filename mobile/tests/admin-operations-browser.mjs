@@ -1,7 +1,7 @@
 import {chromium} from 'playwright';import {readFile,mkdir} from 'node:fs/promises';import assert from 'node:assert/strict';
 const root=new URL('../../',import.meta.url),browser=await chromium.launch(process.env.TAMOON_TEST_EXECUTABLE?{executablePath:process.env.TAMOON_TEST_EXECUTABLE}:{});
 try{
-const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+const page=await browser.newPage({viewport:{width:1280,height:900},locale:'pt-BR',timezoneId:'America/Sao_Paulo'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.setContent('<html lang="pt-BR"><body style="background:#081b13;color:#edf7f1;font-family:Arial;margin:20px"><div id="app"><div id="console" data-ui-owned></div></div></body></html>');
 await page.addStyleTag({content:await readFile(new URL('marketplace/admin-operations.css',root),'utf8')});await page.addScriptTag({content:await readFile(new URL('marketplace/admin-operations.js',root),'utf8')});
 await page.evaluate(()=>{
@@ -33,8 +33,8 @@ await page.evaluate(()=>{
   return {items:[row],total:1,stats:{partners:2,users:24,reservations:18,upcoming:9,pending:3,overdue:0,unassigned:1},admins:[{id:'admin',name:'Edo Batista'}],history:[{actor:'Edo Batista',action:'created',created_at:'2026-11-10T13:00Z',changes:{}}],checked_at:'2026-11-10T19:30Z'};
  }});
 });
-await page.locator('.daily-metrics').waitFor();assert.equal(await page.locator('.daily-tabs button').count(),3);
-for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Daily overview no overflow at ${width}`);}
+await page.locator('.daily-metrics').waitFor();assert.equal(await page.locator('.daily-tabs button').count(),4);
+for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Daily overview no overflow at ${width}`);assert.ok(await page.evaluate(()=>{const r=[...document.querySelectorAll('.daily-tabs button')].map(x=>x.getBoundingClientRect());return r.length===4&&r[0].top===r[1].top&&r[2].top===r[3].top&&r[2].top>r[0].top;}),`Four accesses in two rows at ${width}`);}
 await page.screenshot({path:'/tmp/admin-preview/daily-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/admin-preview/daily-mobile.png',fullPage:true});
 await page.locator('.daily-item').click();await page.locator('.daily-editor').waitFor();await page.locator('[name=note]').fill('Acompanhamento conferido');await page.locator('.daily-editor button[type=submit]').click();await page.locator('.daily-editor').waitFor();assert.equal(await page.evaluate(()=>window.dailyCalls.find(c=>c.name==='admin_daily_save').a.p_command.note),'Acompanhamento conferido');
 await page.screenshot({path:'/tmp/admin-preview/daily-support-mobile.png',fullPage:true});
@@ -43,4 +43,23 @@ for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:
 await page.screenshot({path:'/tmp/admin-preview/daily-agenda-desktop.png',fullPage:true});
 await page.evaluate(()=>{window.who='other';});await page.locator('[data-daily-refresh]').click();assert.equal(await page.locator('#console').innerText(),'');assert.deepEqual(errors,[]);
 console.log('PASS: daily overview, support save, agenda and responsive layouts');
+await page.addStyleTag({content:await readFile(new URL('admin-notifications.css',root),'utf8')});await page.addScriptTag({content:await readFile(new URL('admin-notifications.js',root),'utf8')});
+await page.evaluate(()=>{
+ window.who='admin';window.monitorCalls=[];
+ window.monitor=TamoonAdminOperations.mount(document.querySelector('#console'),{mode:'community',initial:{section:'devices'},identity:()=>window.who,rpc:async(n,a)=>{
+ window.monitorCalls.push({n,a});const platform=a.p_platform||'android';
+ return {items:a.p_view==='attempts'?[{id:'attempt-1',platform,user_name:'Pessoa de teste',email:'pessoa@example.test',status:'sent',created_at:'2026-11-10T18:00Z',delivery_id:'00000000-0000-4000-8000-000000000007',attempt_number:2,max_attempts:3,is_final:true,status_code:200,duration_ms:120,group_name:'Futebol de quinta'}]:[{id:'android:00000000-0000-4000-8000-000000000003',platform,user_name:'Pessoa de teste',email:'pessoa@example.test',status:'accepted',enabled:true,last_attempt_at:'2026-11-10T18:00Z',last_success_at:'2026-11-10T18:00Z'}],total:1,summary:{total:1,enabled:1,accepted:1,attention:0,recovered:a.p_view==='attempts'?1:0,final_failed:0},platforms:[{platform,total:1,enabled:1}],checked_at:'2026-11-10T18:00Z'};
+ }});
+});
+await page.locator('.notify-row').waitFor();
+for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Notification no overflow at ${width}`);}
+await page.screenshot({path:'/tmp/admin-preview/notifications-desktop.png',fullPage:true});
+await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/admin-preview/notifications-mobile.png',fullPage:true});
+await page.locator('[name=platform]').selectOption('ios');await page.locator('.notify-filters button[type=submit]').click();await page.locator('.notify-row').waitFor();assert.equal(await page.evaluate(()=>window.monitorCalls.at(-1).a.p_platform),'ios');
+await page.locator('[data-notify-device]').click();await page.locator('.notify-row summary').waitFor();await page.locator('.notify-row summary').click();assert.equal(await page.evaluate(()=>window.monitorCalls.at(-1).a.p_device_id),'android:00000000-0000-4000-8000-000000000003');
+for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Notification history no overflow at ${width}`);}
+await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/admin-preview/notifications-history-mobile.png',fullPage:true});
+await page.evaluate(()=>window.who='other');await page.locator('[data-notify-refresh]').click();assert.equal(await page.locator('.ops-results').innerText(),'');assert.deepEqual(errors,[]);
+console.log('PASS: unified notifications, platform/device filters, history and responsive layout');
+
 }finally{await browser.close();}

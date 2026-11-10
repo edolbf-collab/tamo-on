@@ -1,0 +1,2 @@
+-- Minimal column-only fixture for existing Web Push telemetry.
+create table public.push_delivery_attempts(id uuid primary key default gen_random_uuid(),subscription_id uuid,user_id uuid,group_id uuid,event_type text,event_id text,status text,status_code int,failure_reason text,duration_ms int,created_at timestamptz default now(),delivery_id uuid,attempt_number int,max_attempts int,is_final boolean,transient_failure boolean,error_category text,failure_summary text,provider text);

@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Gestão diária: resumo da operação, pendências e suporte com acompanhamento, e agenda geral.",
+  "notes": "Administração: quatro acessos em duas colunas e monitor unificado de notificações Android, iOS e web.",
   "label": "Tâmo On 1.0 Build 171",
-  "integration": "171-ADMIN3"
+  "integration": "171-ADMIN4"
 }
