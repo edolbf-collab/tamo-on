@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Novo painel administrativo: grupos, usuários, eventos, notificações e operações do marketplace.",
+  "notes": "Administração financeira: fichas de reservas, cobranças, cotas, pendências, devoluções e integrações.",
   "label": "Tâmo On 1.0 Build 171",
-  "integration": "171-ADMIN1"
+  "integration": "171-ADMIN2"
 }
