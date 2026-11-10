@@ -16,7 +16,7 @@ for(const mode of ['community','market'])test(`${mode}: admin-only directory, pa
    create function public.is_platform_admin() returns boolean language sql as $$ select true $$;
    insert into public.groups(id,name,created_by,created_at) values ('${group}','Antigo', '${regular}',now());`);
   else await db.exec(`insert into public.profiles(id,display_name,status) values ('${admin}','Admin','active'),('${regular}','Usuário','active');insert into public.platform_admins(profile_id) values ('${admin}');`);
-  const path=mode==='community'?'supabase/migrations/20261110151314_admin_operations.sql':'integration/marketplace/supabase/migrations/20261110151321_admin_operations.sql';
+  const path=mode==='community'?'supabase/migrations/20261110171752_admin_operations.sql':'integration/marketplace/supabase/migrations/20261110171834_admin_operations.sql';
   await db.exec(await readFile(new URL(path,root),'utf8'));
   const user=async(id,role='authenticated')=>{await db.exec('reset role');await db.query("select set_config('request.uid',$1,false)",[id]);await db.exec('set role '+role);};
   const call=async(section,search='',page=1,status=null,scope=null,size=20)=> (await db.query('select public.admin_operations_directory($1,$2,$3,null,null,$4,$5,$6) result',[section,search,status,scope,page,size])).rows[0].result;

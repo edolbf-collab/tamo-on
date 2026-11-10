@@ -16,8 +16,10 @@ Base: 1.0.171 (177), commit 71848dc. Branch isolada: `feat/admin-operations`.
 
 Autorização de 10/11/2026: publicar na web para validação do titular. Revisão web `171-ADMIN1`, preservando a numeração dos pacotes já enviados às lojas.
 
-1. Migração da Comunidade aplicada em `xvwgrpnioaqyijhzqxqh`.
-2. Migração do Marketplace aplicada em `owybghlwcohfyapvsfdo`, mantendo o piloto restrito e o sandbox.
+1. Migração `20261110171752_admin_operations.sql` da Comunidade aplicada em `xvwgrpnioaqyijhzqxqh`.
+2. Migração `20261110171834_admin_operations.sql` do Marketplace aplicada em `owybghlwcohfyapvsfdo`, mantendo o piloto restrito e o sandbox.
+Os identificadores dos arquivos foram alinhados ao histórico registrado pelo servidor, preservando o SQL aplicado e evitando reaplicação futura.
+
 3. Smoke tests hospedados: as 11 seções responderam sob o papel authenticated com identidade administrativa; totais conferidos com as tabelas de referência. Usuário comum e anônimo negados; acesso direto às projeções negado. Transações de verificação encerradas com ROLLBACK, sem modificar registros de negócio.
 4. Advisors: nenhuma nova advertência de segurança. Apenas informação esperada de RLS sem políticas na tabela privada de origens, cujo acesso direto permanece revogado.
 5. Publicação do frontend pelo fluxo GitHub → Cloudflare Pages (`resenhafc-beta`), com confirmação em `https://app.tamoon.app.br/version.json` antes do aviso de disponibilidade.
