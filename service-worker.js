@@ -1,10 +1,13 @@
 const SW_BUILD = 171;
-const CACHE = "tamo-on-1.0-build-171-r1";
+const CACHE = "tamo-on-1.0-build-171-admin1";
 const BADGE_DB_NAME = "tamoon-pwa-state";
 const BADGE_DB_VERSION = 1;
 const BADGE_STORE_NAME = "app-state";
 const BADGE_COUNT_KEY = "unread-notification-count";
 const ASSETS = [
+  "/admin-community.js?v=admin1",
+  "/marketplace/admin-operations.js?v=admin1",
+  "/marketplace/admin-operations.css?v=admin1",
   "/push-client.js?v=pushfix2",
   "/auth-config.js?v=release171r1",
   "/auth-access.js?v=release171r1",

@@ -125,6 +125,7 @@
       ["registration", "≡", "Cadastro"]
     ],
     admin: [
+      ["operations", "◎", "Central de operações"],
       ["overview", "⌂", "Visão geral"],
       ["partners", "◇", "Parceiros"],
       ["reservations", "▣", "Reservas"],
@@ -8113,13 +8114,26 @@
   }
 
 
+  let operationsConsole=null;
+  function adminOperationsPage(){
+    return pageHeader('Administração','Central de operações','Consulte responsáveis, vínculos e histórico do marketplace.')
+      +(adminRefundContext()?'<div id="marketAdminOperations" data-ui-owned></div>':'<p class="callout">Entre com uma conta de administrador para consultar a operação.</p>');
+  }
+  function mountAdminOperations(){
+    const host=app.querySelector('#marketAdminOperations');
+    if(operationsConsole && (operationsConsole.root!==host || operationsConsole.key!==adminRefundContext())){operationsConsole.dispose();operationsConsole=null;}
+    if(host && adminRefundContext() && !operationsConsole)operationsConsole=window.TamoonAdminOperations.mount(host,{
+      mode:'market',identity:adminRefundContext,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)
+    });
+  }
   function adminView() {
-    const views = { overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
+    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
     return navShell("admin", (views[state.activePage.admin] || adminOverview)());
   }
 
   function render() {
     if(window.TamoonMarketplacePilot?.leaving)return;
+    if(operationsConsole && operationsConsole.key!==adminRefundContext()){operationsConsole.dispose();operationsConsole=null;}
     adminRefundStore.get();
     if(!adminRefundContext() && ['admin-refund-details','asaas-refund','admin-refunds'].includes(detailDialog.dataset.view)){
       stopAsaasRefundMonitor();detailReturnContext=null;if(detailDialog.open)detailDialog.close();
@@ -8175,6 +8189,7 @@
       const summaryHost=document.getElementById("financeSummaryHost");
       if(summaryHost)summaryHost.financeMarkup=financialPeriodPanel(true);
     }
+    mountAdminOperations();
     applyPartnerReadonlyControls();
     window.MarketplaceAgendaNavigation.showSelected(app);
     updateBackendRoleAccess();

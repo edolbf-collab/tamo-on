@@ -6,7 +6,7 @@ const mobile=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const root=path.dirname(mobile),target=path.join(mobile,'www');
 await rm(target,{recursive:true,force:true});await mkdir(target,{recursive:true});
 // Lista explícita: SQL, código servidor, credenciais e arquivos administrativos nunca vão ao IPA.
-const files=['index.html','auth-config.js','auth-access.js','auth-access.css','app.js','push-client.js','account-deletion.js','community-safety.js','styles.css','supabase-config.js','group-avatars-data.js','marketplace-access.js','brand','assets','icons','apple-touch-icon.png','tamo-on-icon-192.png','legal','version.json'];
+const files=['index.html','auth-config.js','auth-access.js','auth-access.css','app.js','admin-community.js','push-client.js','account-deletion.js','community-safety.js','styles.css','supabase-config.js','group-avatars-data.js','marketplace-access.js','brand','assets','icons','apple-touch-icon.png','tamo-on-icon-192.png','legal','version.json'];
 for(const file of files)await cp(path.join(root,file),path.join(target,file),{recursive:true});
 await build({entryPoints:[path.join(mobile,'src/native.js')],bundle:true,format:'iife',target:['safari15','chrome105'],outfile:path.join(target,'native.js'),minify:true,legalComments:'eof'});
 let html=await readFile(path.join(target,'index.html'),'utf8');
@@ -23,7 +23,7 @@ await mkdir(marketTarget,{recursive:true});
 const marketHtml=await readFile(path.join(root,'marketplace/index.html'),'utf8');
 const bundled=JSON.parse(await readFile(path.join(root,'marketplace/pilot-assets.json'),'utf8'));
 if(bundled.length!==1||!/^assets\/pilot-[a-f0-9]{12}\.js$/.test(bundled[0]))throw Error('Expected one versioned Marketplace bundle');
-const marketFiles=new Set(['index.html','pilot-entry.js','pilot-assets.json','manifest.webmanifest',bundled[0],...Array.from(marketHtml.matchAll(/href="([^"?#]+\.css)(?:[?#][^"]*)?"/g),m=>m[1])]);
+const marketFiles=new Set(['index.html','pilot-entry.js','pilot-assets.json','admin-operations.js','manifest.webmanifest',bundled[0],...Array.from(marketHtml.matchAll(/href="([^"?#]+\.css)(?:[?#][^"]*)?"/g),m=>m[1])]);
 for(const file of marketFiles){
  if(file.startsWith('/')||file.includes('..'))throw Error('Unsafe Marketplace asset path');
  await mkdir(path.dirname(path.join(marketTarget,file)),{recursive:true});

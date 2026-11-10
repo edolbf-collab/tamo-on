@@ -1396,6 +1396,7 @@
       this.pilotAccessMonitor = null;
       this.pilotAuthSubscription?.unsubscribe();
       this.pilotAuthSubscription = this.repo.client.auth.onAuthStateChange((event, session) => {
+        if (!session || session.user.id !== this.state.profile?.id) this.adminOperations?.dispose();
         // Supabase auth callbacks must return before requesting another session.
         setTimeout(() => {
           if (!session || session.user.id !== this.state.profile?.id) this.pilotAccessMonitor?.reset();
@@ -2386,7 +2387,7 @@
       const adminTools = this.state.is_platform_admin ? `
         <div class="section-title"><h2>Operação da plataforma</h2><small>Acesso exclusivo da plataforma.</small></div>
         <button class="card menu-row admin-menu-row" data-action="deletion-admin"><span class="menu-icon">§</span><div class="list-main"><strong>Pedidos de exclusão</strong><small>Solicitações e prazos de atendimento.</small></div><strong>›</strong></button>
-        <button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel da plataforma</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button>
+        <button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel da plataforma</strong><small>Grupos, usuários, eventos, notificações e suporte.</small></div><strong>›</strong></button>
         ${group ? '<button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : ""}
       ` : "";
       return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list">
