@@ -1,3 +1,7 @@
+# Tâmo On — preparação iOS sobre a build 167
+
+Projeto nativo atualizado a partir da main `094d2f1`, com Team ID `4T892ZTN46`. Consulte [o estado e as pendências](docs/IOS-ATIVACAO-2026-11-04.md).
+
 # Tâmo On — Beta 1.0 Build 166-R4
 
 Comunidade PWA e aplicativo Android para grupos esportivos, jogos, presença, times, churrasco e caixa. A build 166-R2 inclui o piloto privado do Marketplace C39-R1, conectado exclusivamente ao grupo Teste FC.

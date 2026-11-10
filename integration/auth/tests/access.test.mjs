@@ -70,7 +70,7 @@ test('unrecognized providers and redirect domains are refused',async()=>{
  await assert.rejects(f.api.link('apple','existing-id'),/INVALID_AUTH_URL/);assert.equal(f.redirects.length,0);assert.equal(f.values.size,0);
 });
 test('native Apple linking and Google OAuth both use the native bridge',async()=>{
- let f;const calls=[];const native={isIOS:true,appleAuth:async(_,linking)=>{calls.push(['apple',linking]);f.setUser({...f.user(),identities:[{provider:'apple'},{provider:'google'}]});},finishOAuth:async(_,url,provider,linking)=>{calls.push([provider,linking]);f.setUser({...f.user(),identities:[{provider:'apple'},{provider:'google'}]});}};
+ let f;const calls=[];const native={isNative:true,isIOS:true,appleAuth:async(_,linking)=>{calls.push(['apple',linking]);f.setUser({...f.user(),identities:[{provider:'apple'},{provider:'google'}]});},finishOAuth:async(_,url,provider,linking)=>{calls.push([provider,linking]);f.setUser({...f.user(),identities:[{provider:'apple'},{provider:'google'}]});}};
  f=fixture({native});assert.equal((await f.api.link('apple','existing-id')).ok,true);assert.deepEqual(calls,[['apple',true]]);
  f.setUser({...f.user(),identities:[{provider:'apple'}]});assert.equal((await f.api.link('google','existing-id')).ok,true);assert.equal(f.calls[0][1].options.redirectTo,'br.app.tamoon://auth/callback');assert.equal(f.redirects.length,0);
 });
@@ -78,4 +78,13 @@ test('ordinary Android browser shows both; installed Android groups alternatives
  const f=fixture();f.sandbox.navigator={userAgent:'Android'};f.sandbox.document={referrer:''};f.sandbox.matchMedia=()=>({matches:false});
  assert.equal(Boolean(f.sandbox.TamoonAuth.androidApp()),false);f.sandbox.matchMedia=()=>({matches:true});assert.equal(f.sandbox.TamoonAuth.androidApp(),true);
  f.sandbox.navigator.userAgent='iPhone';assert.equal(f.sandbox.TamoonAuth.androidApp(),false);
+});
+
+test('native Android Google login returns through PKCE bridge and does not redirect the WebView',async()=>{
+ const calls=[];const native={isNative:true,isAndroid:true,finishOAuth:async(...args)=>calls.push(args)};
+ const f=fixture({native});assert.equal(f.api.enabled('apple'),false);
+ await assert.rejects(f.api.login('apple'),/AUTH_NOT_AVAILABLE/);
+ await f.api.login('google');
+ assert.equal(f.calls[0][1].options.redirectTo,'br.app.tamoon://auth/callback');
+ assert.equal(calls[0][2],'google');assert.equal(f.redirects.length,0);
 });

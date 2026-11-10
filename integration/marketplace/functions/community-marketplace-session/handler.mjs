@@ -1,6 +1,6 @@
 // No email/UID from the caller is used to select the Marketplace account.
 export function createHandler({createClient, env, communityUrl, communityKey}) {
-  const origins = new Set(["https://app.tamoon.app.br", "https://resenhafc-beta.pages.dev", "https://marketplace-build-166.resenhafc-beta.pages.dev"]);
+  const origins = new Set(["https://localhost", "capacitor://localhost", "https://app.tamoon.app.br", "https://resenhafc-beta.pages.dev", "https://marketplace-build-166.resenhafc-beta.pages.dev"]);
   const key = (plural, legacy) => {
     try { const parsed = JSON.parse(env(plural) || "{}"); if (parsed.default) return parsed.default; } catch {}
     return env(legacy);

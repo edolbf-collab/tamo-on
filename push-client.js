@@ -54,7 +54,7 @@
   }
   function diagnostic({nativeStatus,native=false,supported,permission,subscription,record,error=false}) {
     if(error)return {tone:'warn',label:'Não foi possível verificar'};
-    if(native)return nativeStatus?.active?{tone:'ok',label:'Vinculado · Apple'}:{tone:'warn',label:nativeStatus?.permission==='denied'?'Bloqueado nos ajustes':'Não vinculado'};
+    if(native)return nativeStatus?.active?{tone:'ok',label:`Vinculado · ${nativeStatus.provider||'Apple'}`}:{tone:'warn',label:nativeStatus?.permission==='denied'?'Bloqueado nos ajustes':'Não vinculado'};
     if(!supported)return {tone:'warn',label:'Não suportado'};
     if(permission!=='granted')return {tone:'warn',label:permission==='denied'?'Bloqueado nos ajustes':'Permissão pendente'};
     if(!subscription||!record?.enabled||record.invalidated_at)return {tone:'warn',label:'Vínculo pendente'};

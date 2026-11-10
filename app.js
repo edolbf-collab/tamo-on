@@ -1,8 +1,8 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "1.0", build: 168, database: 152, edge: 116, integration: "168-R6" });
-  const APP_ASSET_TOKEN = "release168r6";
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "1.0", build: 171, database: 152, edge: 117, integration: "171-ADMIN1" });
+  const APP_ASSET_TOKEN = "release171admin1";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;
   const AUTO_READ_NOTIFICATION_TYPES = new Set(["attendance-confirmed", "attendance-declined"]);
@@ -147,6 +147,8 @@
     move(localStorage, "-pending-invite", "tamoon-pending-invite");
   };
   const appBaseUrl = () => new URL("./", document.baseURI).href;
+  // Capacitor treats extensionless paths as Community SPA routes.
+  const marketplaceUrl = query => `${window.TamoonNative?.isNative ? "/marketplace/index.html" : "/marketplace/"}${query}`;
   const assetUrl = path => new URL(path, document.baseURI).href;
   const avatarKey = value => /^badge-(0[1-9]|1[0-9]|20)$/.test(String(value || "")) ? String(value) : "badge-01";
   const groupAvatarUrl = key => {
@@ -232,7 +234,7 @@
     constructor(config) {
       this.config = config;
       this.client = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !window.TamoonNative?.isIOS, flowType: "pkce", ...(window.TamoonNative?.isIOS ? {storage: window.TamoonNative.storage} : {}) },
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !window.TamoonNative?.isNative, flowType: "pkce", ...(window.TamoonNative?.isNative ? {storage: window.TamoonNative.storage} : {}) },
         global: { fetch: async (...args) => {
           const response = await fetch(...args);
           if (response.status === 403) {
@@ -252,6 +254,7 @@
     }
 
     async session() {
+      await window.TamoonNative?.resumeOAuth?.(this.client);
       return (await this.client.auth.getSession()).data.session;
     }
 
@@ -289,7 +292,7 @@
 
     async signInWithGoogleOAuth() {
       const configuredRedirect = String(this.config.authRedirectUrl || "").trim();
-      const redirectTo = configuredRedirect || appBaseUrl();
+      const redirectTo = window.TamoonNative?.isNative ? "br.app.tamoon://auth/callback" : configuredRedirect || appBaseUrl();
       return this.client.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -301,6 +304,7 @@
     }
 
     async signOut() {
+      await window.TamoonNative?.push?.disable();
       this.access.removePending();
       clearTimeout(this.reloadTimer);
       clearTimeout(this.notificationReloadTimer);
@@ -1339,7 +1343,7 @@
         if(error)throw error;
         const labels={standby_payment:"Aguardando pagamento simulado",published:"Pagamento simulado confirmado",cancelled:"Reserva cancelada"};
         const rows=(data.events||[]).map(e=>`<article class="card"><strong>${escapeHtml(e.code||"Reserva")}</strong><p>${escapeHtml(labels[e.state]||e.state)}</p><p>${escapeHtml(new Date(e.starts_at).toLocaleString("pt-BR"))} · ${Number(e.amount||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})} (simulado)</p>${e.match_id?`<button class="btn btn-secondary" data-pilot-match="${escapeHtml(e.match_id)}">Abrir jogo</button>`:"<small>O jogo novo será publicado depois da confirmação do sandbox.</small>"}</article>`).join("");
-        this.modal(`Reservas de teste — ${data.name}`,`<p>Valores de sandbox, sem lançamento no caixa do grupo.</p>${rows||"<p>Nenhuma reserva sincronizada.</p>"}<a class="btn btn-primary" href="/marketplace/?page=reservations">Ver minhas reservas</a>`,(root,close)=>{
+        this.modal(`Reservas de teste — ${data.name}`,`<p>Valores de sandbox, sem lançamento no caixa do grupo.</p>${rows||"<p>Nenhuma reserva sincronizada.</p>"}<a class="btn btn-primary" href="${marketplaceUrl("?page=reservations")}">Ver minhas reservas</a>`,(root,close)=>{
           root.querySelectorAll("[data-pilot-match]").forEach(button=>button.addEventListener("click",async()=>{
             close();this.state=await this.repo.init(data.group_id);this.render();this.openRsvp(button.dataset.pilotMatch);
           }));
@@ -1392,6 +1396,7 @@
       this.pilotAccessMonitor = null;
       this.pilotAuthSubscription?.unsubscribe();
       this.pilotAuthSubscription = this.repo.client.auth.onAuthStateChange((event, session) => {
+        if (!session || session.user.id !== this.state.profile?.id) this.adminOperations?.dispose();
         // Supabase auth callbacks must return before requesting another session.
         setTimeout(() => {
           if (!session || session.user.id !== this.state.profile?.id) this.pilotAccessMonitor?.reset();
@@ -1399,6 +1404,7 @@
         }, 0);
       }).data.subscription;
       try {
+        await window.TamoonNative?.checkAppleCredential(this.repo.client);
         this.authLinkResult = await this.repo.access.completePendingLink() || this.authLinkResult;
         const loadedState = await this.repo.init(this.launchGroupId || localStorage.getItem("tamoon-current-group") || null);
         if (!loadedState) {
@@ -1409,6 +1415,9 @@
         this.lastSyncAt = nowIso();
         this.finishBootFeedback();
         this.render();
+        window.TamoonNative?.push?.initialize(this.repo.client, this.state.profile.id).catch(() => {
+          this.toast("Não foi possível atualizar as notificações deste aparelho. Confira em Mais → Notificações no celular.", true);
+        });
         this.startAccessMonitor();
         this.refreshMarketplacePilot();
         await this.registerServiceWorker();
@@ -1619,6 +1628,7 @@
     },
 
     async registerServiceWorker() {
+      if (window.TamoonNative?.isNative) return null;
       if (!("serviceWorker" in navigator) || !location.protocol.startsWith("http")) return null;
       try {
         const registration = await (window.tamoonPwa?.getRegistration?.() || navigator.serviceWorker.ready);
@@ -1643,6 +1653,7 @@
     },
 
     async checkForUpdates(showCurrent = false) {
+      if(window.TamoonNative?.isNative){if(showCurrent)this.toast("As atualizações deste aplicativo são distribuídas pela loja do seu aparelho.");return false;}
       try {
         const response = await fetch(`version.json?t=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw new Error("Não foi possível consultar a versão publicada.");
@@ -1670,6 +1681,7 @@
     },
 
     async applyUpdate() {
+      if (window.TamoonNative?.isNative) return;
       const registration = await this.ensureServiceWorker();
       await registration.update().catch(() => {});
       if (registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
@@ -1681,6 +1693,7 @@
     },
 
     async ensureServiceWorker() {
+      if (window.TamoonNative?.isNative) return null;
       if (this.swRegistration) return this.swRegistration;
       await this.registerServiceWorker();
       return navigator.serviceWorker.ready;
@@ -2358,7 +2371,7 @@
     morePage() {
       const group = this.currentGroup();
       const pushConfigured = Boolean(String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim());
-      const pushText = !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
+      const pushText = window.TamoonNative?.isNative ? "Receba avisos mesmo com o aplicativo fechado." : !pushSupported() ? "Este navegador não oferece notificações push." : !pushConfigured ? "Conclua a configuração VAPID." : "Receba avisos mesmo com o aplicativo fechado.";
       const groupTools = group ? `
         <button class="card menu-row" data-action="announcement-center"><span class="menu-icon">📣</span><div class="list-main"><strong>Central de avisos</strong><small>Consulte os comunicados do grupo.</small></div><strong>›</strong></button>
         <button class="card menu-row" data-action="invite"><span class="menu-icon">↗</span><div class="list-main"><strong>Convidar pelo WhatsApp</strong><small>Código ${escapeHtml(group.invite_code)}</small></div><strong>›</strong></button>
@@ -2374,7 +2387,7 @@
       const adminTools = this.state.is_platform_admin ? `
         <div class="section-title"><h2>Operação da plataforma</h2><small>Acesso exclusivo da plataforma.</small></div>
         <button class="card menu-row admin-menu-row" data-action="deletion-admin"><span class="menu-icon">§</span><div class="list-main"><strong>Pedidos de exclusão</strong><small>Solicitações e prazos de atendimento.</small></div><strong>›</strong></button>
-        <button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel da plataforma</strong><small>Saúde, métricas, feedbacks e logs.</small></div><strong>›</strong></button>
+        <button class="card menu-row admin-menu-row" data-action="platform-admin"><span class="menu-icon">◉</span><div class="list-main"><strong>Painel da plataforma</strong><small>Grupos, usuários, eventos, notificações e suporte.</small></div><strong>›</strong></button>
         ${group ? '<button class="card menu-row admin-menu-row" data-action="export"><span class="menu-icon">⇩</span><div class="list-main"><strong>Exportar backup integral do grupo</strong><small>Arquivo JSON restrito à administração da plataforma.</small></div><strong>›</strong></button>' : ""}
       ` : "";
       return `<div class="page-head"><div><span class="page-kicker">CONFIGURAÇÕES</span><h1>Mais</h1><p>Administração, suporte e dados da conta.</p></div></div><div class="list">
@@ -2400,7 +2413,7 @@
           rsvp: () => this.openRsvp(data.id || this.nextMatch()?.id),
           "home-game-response": () => this.setHomeGameResponse(data.id, data.value),
           "home-bbq-response": () => this.setHomeBbqResponse(data.id, data.value),
-          "playing-spaces": () => this.state.marketplace_pilot ? location.assign("/marketplace/?page=discover") : this.toast("Onde jogar está em construção. O acesso será liberado quando a Comunidade for conectada aos espaços parceiros."),
+          "playing-spaces": () => this.state.marketplace_pilot ? location.assign(marketplaceUrl("?page=discover")) : this.toast("Onde jogar está em construção. O acesso será liberado quando a Comunidade for conectada aos espaços parceiros."),
           "draw-teams": () => this.openTeamsForMatch(data.id),
           "configure-teams": () => this.drawTeams(data.id, Number($("#teamCountSelect")?.value || 2)),
           "clear-teams": () => this.undoTeamSeparation(data.id),
@@ -2664,9 +2677,9 @@
     openInviteModal() {
       const group = this.currentGroup();
       if (!group) return this.openGroupModal();
-      const url = new URL(appBaseUrl());
+      const url = new URL("https://tamoon.app.br/baixar");
       url.searchParams.set("invite", group.invite_code);
-      const message = `⚽ Você foi convidado para o grupo ${group.name} no Tâmo On!\n\nCódigo de convite: ${group.invite_code}\n\nAcesse ${url.href}\nEntre na sua conta e informe o código para participar.`;
+      const message = `⚽ Você foi convidado para o grupo ${group.name} no Tâmo On!\n\nCódigo de convite: ${group.invite_code}\n\nAbra ou baixe o aplicativo: ${url.href}\nDepois de instalar, volte a este link para abrir o convite. Você também pode entrar na sua conta e informar o código em “Entrar em um grupo”.`;
       this.modal("Convidar para o grupo", `<section class="invite-card">${this.groupAvatar(group, "invite-avatar")}<h3>${escapeHtml(group.name)}</h3><p>Compartilhe o código com quem participará da pelada.</p><div class="invite-code"><strong>${escapeHtml(group.invite_code)}</strong><button id="copyInviteCode" aria-label="Copiar código">⧉</button></div><button class="btn btn-whatsapp btn-block" id="shareWhatsApp">WhatsApp</button><button class="btn btn-secondary btn-block" id="nativeShare">Compartilhar convite</button></section>`, (root) => {
         $("#copyInviteCode", root).addEventListener("click", async () => {
           await navigator.clipboard.writeText(group.invite_code);
@@ -3901,7 +3914,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
     async openDiagnostics() {
       const online = navigator.onLine;
-      const native=Boolean(window.TamoonNative?.isIOS);
+      const native=Boolean(window.TamoonNative?.isNative);
       let pushHealth;
       try {
         if(native)pushHealth=window.TamoonPushClient.diagnostic({native:true,nativeStatus:await window.TamoonNative.push.status()});
@@ -3913,7 +3926,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       try { await this.repo.session(); } catch { dbStatus = "Falha"; }
       const sync = this.lastSyncAt ? shortDate(this.lastSyncAt) : "Não registrada";
       const updateText = this.updateAvailable ? "Atualização pendente" : "Sem atualização detectada";
-      this.modal("Sobre e diagnóstico", `<div class="diagnostic-grid"><div class="diagnostic-item ${online ? "ok" : "bad"}"><span></span><div><small>Internet</small><strong>${online ? "Conectado" : "Offline"}</strong></div></div><div class="diagnostic-item ${dbStatus === "Disponível" ? "ok" : "bad"}"><span></span><div><small>Banco e sessão</small><strong>${dbStatus}</strong></div></div><div class="diagnostic-item ${pushHealth.tone}"><span></span><div><small>Push deste aparelho</small><strong>${escapeHtml(pushHealth.label)}</strong></div></div><div class="diagnostic-item ${this.updateAvailable ? "warn" : "ok"}"><span></span><div><small>Atualização</small><strong>${escapeHtml(updateText)}</strong></div></div></div><div class="system-info-card"><div><span>Aplicativo</span><strong>${APP_RELEASE.version}</strong></div><div><span>Build do aplicativo</span><strong>${APP_RELEASE.build} · ${APP_RELEASE.integration}</strong></div><div><span>Build do HTML</span><strong>${this.htmlBuild() || "—"}</strong></div><div><span>Service worker</span><strong>${escapeHtml(String(window.tamoonPwa?.getState?.().swBuild || "verificando"))}</strong></div><div><span>Banco</span><strong>${APP_RELEASE.database}</strong></div><div><span>Última sincronização</span><strong>${escapeHtml(sync)}</strong></div><div><span>Modo</span><strong>${isStandalone() ? "Instalado" : "Navegador"}</strong></div><div><span>Dispositivo</span><strong>${escapeHtml(deviceLabel())}</strong></div></div><button class="btn btn-secondary btn-block" data-action="check-update">Verificar atualização</button><button class="btn btn-primary btn-block" data-action="report-problem">Reportar problema</button>`, () => {});
+      this.modal("Sobre e diagnóstico", `<div class="diagnostic-grid"><div class="diagnostic-item ${online ? "ok" : "bad"}"><span></span><div><small>Internet</small><strong>${online ? "Conectado" : "Offline"}</strong></div></div><div class="diagnostic-item ${dbStatus === "Disponível" ? "ok" : "bad"}"><span></span><div><small>Banco e sessão</small><strong>${dbStatus}</strong></div></div><div class="diagnostic-item ${pushHealth.tone}"><span></span><div><small>Push deste aparelho</small><strong>${escapeHtml(pushHealth.label)}</strong></div></div><div class="diagnostic-item ${this.updateAvailable ? "warn" : "ok"}"><span></span><div><small>Atualização</small><strong>${escapeHtml(updateText)}</strong></div></div></div><div class="system-info-card"><div><span>Aplicativo</span><strong>${APP_RELEASE.version}</strong></div><div><span>Build do aplicativo</span><strong>${escapeHtml(String(window.TamoonNative?.appInfo?.build || APP_RELEASE.build))} · ${APP_RELEASE.integration}</strong></div><div><span>Build do HTML</span><strong>${this.htmlBuild() || "—"}</strong></div>${native ? "" : `<div><span>Service worker</span><strong>${escapeHtml(String(window.tamoonPwa?.getState?.().swBuild || "verificando"))}</strong></div>`}<div><span>Banco</span><strong>${APP_RELEASE.database}</strong></div><div><span>Última sincronização</span><strong>${escapeHtml(sync)}</strong></div><div><span>Modo</span><strong>${native || isStandalone() ? "Instalado" : "Navegador"}</strong></div><div><span>Dispositivo</span><strong>${escapeHtml(deviceLabel())}</strong></div></div><button class="btn btn-secondary btn-block" data-action="check-update">Verificar atualização</button><button class="btn btn-primary btn-block" data-action="report-problem">Reportar problema</button>`, () => {});
     },
 
     async openPlatformAdmin() {
@@ -4192,7 +4205,10 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
     notificationAppUrl(value) {
       try {
-        const url = new URL(String(value || appBaseUrl()), document.baseURI);
+        let url = new URL(String(value || appBaseUrl()), document.baseURI);
+        if (window.TamoonNative?.isNative && url.origin === "https://app.tamoon.app.br" && ["/", "/index.html"].includes(url.pathname)) {
+          url = new URL(`${location.protocol}//${location.host}/${url.search}`);
+        }
         const base = new URL(appBaseUrl());
         if (url.origin !== location.origin || ![base.pathname, `${base.pathname}index.html`].includes(url.pathname)) return null;
         return url;
@@ -4479,6 +4495,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     async enablePushNotifications({renew=false} = {}) {
+      if (window.TamoonNative?.isNative) return window.TamoonNative.push.enable();
       if (!pushSupported()) throw new Error("Este navegador não oferece notificações push.");
       const publicKey = String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim();
       if (!publicKey) throw new Error("A chave pública VAPID ainda não foi configurada.");
@@ -4506,6 +4523,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     async disablePushNotifications(silent = false) {
+      if (window.TamoonNative?.isNative) return window.TamoonNative.push.disable();
       if (!pushSupported()) return;
       try {
         const subscription = await this.currentPushSubscription();
@@ -4520,6 +4538,16 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     async maybeShowNotificationOnboarding() {
+      if (window.TamoonNative?.isNative) {
+        const key = `tamoon-native-push-onboarding-${this.state.profile.id}`;
+        if (localStorage.getItem(key)) return;
+        try {
+          const status = await window.TamoonNative.push.status();
+          if (!status.active) await this.openNotificationSettings();
+          localStorage.setItem(key, "done");
+        } catch { /* The settings entry remains available for a later retry. */ }
+        return;
+      }
       const key = `tamoon-notification-onboarding-v3-${this.state.profile.id}`;
       if (localStorage.getItem(key) === "done") return;
       if (!pushSupported()) return;
@@ -4593,6 +4621,25 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     async openNotificationSettings() {
+      if(window.TamoonNative?.isNative) {
+        try {
+          const push = window.TamoonNative.push;
+          const status = await push.status();
+          this.modal("Notificações no celular", `<p>Receba os avisos do Tâmo On mesmo com o aplicativo fechado.</p><p><strong>${status.permission === "unavailable" ? "Não foi possível consultar a permissão" : status.active ? "Ativadas neste aparelho" : "Notificações desativadas"}</strong></p>${status.permission === "denied" ? '<p>Para permitir, abra Ajustes → Apps → Tâmo On → Notificações.</p>' : ''}<div class="form-grid"><button class="btn btn-primary btn-block" data-native-push="enable">${status.active ? "Atualizar vínculo do aparelho" : "Ativar notificações"}</button>${status.active ? '<button class="btn btn-secondary btn-block" data-native-push="test">Enviar teste para este aparelho</button><button class="btn btn-secondary btn-block" data-native-push="disable">Desativar neste aparelho</button>' : ''}</div>`, (root, close) => {
+            root.querySelectorAll('[data-native-push]').forEach(button => button.addEventListener('click', async () => {
+              button.disabled = true;
+              try {
+                await push[button.dataset.nativePush]();
+                close();
+                if(button.dataset.nativePush !== 'test') await this.openNotificationSettings();
+                this.toast(button.dataset.nativePush === 'test' ? 'Teste aceito pelo serviço de notificações. Confira neste aparelho.' : button.dataset.nativePush === 'disable' ? 'Notificações desativadas neste aparelho.' : 'Notificações ativadas neste aparelho.');
+              } catch (error) { this.toast(error.message || 'Não foi possível atualizar as notificações.', true); }
+              finally { button.disabled = false; }
+            }));
+          });
+        } catch (error) { this.toast(error.message || "Não foi possível consultar as notificações. Tente novamente.", true); }
+        return;
+      }
       const {supported,subscription,record:dbSubscription,permission}=await this.currentWebPushState();
       const configured = Boolean(String(window.TAMOON_CONFIG?.vapidPublicKey || "").trim());
       const endpoint = subscription?.endpoint || "";
@@ -4766,6 +4813,10 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
       if (!group?.id) return this.toast("Selecione um grupo antes de exportar.", true);
       try {
         const exported = await this.repo.platformGroupExport(group.id);
+        if(window.TamoonNative?.isNative) {
+          await window.TamoonNative.saveJson({release: APP_RELEASE,currentGroupId:group.id,...exported},"tamo-on-backup.json");
+          return;
+        }
         const blob = new Blob([JSON.stringify({ release: APP_RELEASE, currentGroupId: group.id, ...exported }, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");

@@ -2,3 +2,5 @@
 verify_jwt = false
 [functions.delete-beta-user]
 verify_jwt = false
+[functions.apple-sign-in]
+verify_jwt = false

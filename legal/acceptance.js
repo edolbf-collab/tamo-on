@@ -17,6 +17,7 @@
   };
   const documentsHtml = docs => docs.map(d=>`<details><summary>${esc(d.title)} · v${esc(d.version)}</summary><p class="legal-meta">Vigência: ${esc(date(d.effective_at))}</p><article class="legal-document">${d.content_html}</article><p><a href="${esc(d.public_url)}" target="_blank" rel="noopener">Abrir para imprimir ou salvar</a></p></details>`).join('');
   const download = (data,name) => {
+    if(window.TamoonNative?.isIOS)return window.TamoonNative.saveJson(data,name).catch(error=>window.App.toast(error.message,true));
     const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };

@@ -1,0 +1,32 @@
+{
+  "appId": "br.app.tamoon",
+  "appName": "Tâmo On",
+  "webDir": "www",
+  "ios": {
+    "backgroundColor": "#061820",
+    "preferredContentMode": "mobile"
+  },
+  "server": {
+    "hostname": "localhost",
+    "iosScheme": "capacitor"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "banner",
+        "list"
+      ]
+    },
+    "SystemBars": {
+      "insetsHandling": "native",
+      "style": "LIGHT"
+    }
+  },
+  "android": {
+    "backgroundColor": "#061820",
+    "allowMixedContent": false,
+    "minWebViewVersion": 105
+  }
+}

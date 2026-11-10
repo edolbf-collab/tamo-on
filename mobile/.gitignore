@@ -1,0 +1,12 @@
+node_modules/
+www/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/App/Assets.xcassets/AppIcon.appiconset/.DS_Store
+ios/**/xcuserdata/
+ios/**/DerivedData/
+*.p8
+*.p12
+*.mobileprovision
+.env*
+!.env.example

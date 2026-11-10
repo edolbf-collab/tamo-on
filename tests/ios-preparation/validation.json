@@ -1,0 +1,81 @@
+{
+  "build": 165,
+  "date": "2026-10-27",
+  "source_commit": "704a625b1e297599b64dee61c6c544099a700a52",
+  "database": {
+    "passed": 28,
+    "checks": [
+      "Explicit confirmation required",
+      "Authenticated request saved",
+      "Thirty-day deadline stored",
+      "Receipt contains no identity",
+      "Retry returns same receipt",
+      "Email comes from Auth, never client or JWT metadata",
+      "Other account cannot read private request",
+      "Direct request table read denied",
+      "Direct mutation denied",
+      "Apple credential table inaccessible to clients",
+      "Internal security helper inaccessible",
+      "Non-admin cannot view queue",
+      "Admin can process queue",
+      "Revoked or missing session refused",
+      "Anonymous Auth accounts refused",
+      "Anonymous request refused",
+      "Private receipt capability works after logout without exposing identity",
+      "Unknown receipt gives no information",
+      "Deletion endpoint exempt from legal gate; own RPC still checks identity",
+      "Other data remains behind legal gate",
+      "Migration is idempotent and preserves requests",
+      "Completion removes request PII atomically",
+      "Deletion cleans announcements",
+      "Deletion cleans system_announcements",
+      "Deletion cleans user_notifications",
+      "Deletion cleans apple_auth_grants",
+      "Deleted account with stale JWT refused",
+      "Completion confirmation available without deleted account"
+    ]
+  },
+  "browser": {
+    "passed": 20,
+    "checks": [
+      "Deletion remains accessible when legal document fetch fails",
+      "Deadline shown before confirmation",
+      "Unchecked confirmation cannot submit",
+      "Failure preserves retry without false confirmation",
+      "Server receipt displayed",
+      "Receipt retained for post-deletion lookup",
+      "Deletion has no horizontal overflow at 320",
+      "Deletion has no horizontal overflow at 390",
+      "Deletion has no horizontal overflow at 430",
+      "Blocked account has deletion entry point",
+      "Web Google login preserved",
+      "Apple not offered on web without native configuration",
+      "Logged-out screen links to receipt",
+      "Native Google callback exchanges PKCE code",
+      "Foreign authorization URL rejected",
+      "Wrong callback rejected",
+      "Provider denial handled",
+      "Native session adapter reads Keychain bridge",
+      "Native Apple and Google offered together",
+      "Apple failure restores both login controls"
+    ]
+  },
+  "apple_mock_tests": {
+    "passed": 6,
+    "failed": 0
+  },
+  "edge_typecheck": "passed (Deno 2.9.6, locked npm dependencies)",
+  "native_asset_checks": "passed",
+  "swift_compilation": "not run: macOS/Xcode unavailable",
+  "real_apple_login": "not run: Apple configuration required",
+  "signed_ipa": "not generated",
+  "production_mutations": false,
+  "pending": [
+    "Apple Developer membership/Team ID and key",
+    "Supabase Apple provider/secrets and staged deployment",
+    "Xcode build and iPhone validation",
+    "APNs push integration",
+    "Privacy policy revision and activation",
+    "TestFlight"
+  ]
+}

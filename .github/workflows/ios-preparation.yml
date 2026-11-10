@@ -1,0 +1,108 @@
+name: Validar preparação iOS
+on:
+  workflow_dispatch:
+  push:
+    branches: [ios-build-165]
+permissions:
+  contents: read
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci --cache ../.ios-npm-cache --no-audit --no-fund
+      - run: npm run build
+      - run: npx playwright install --with-deps webkit
+      - name: Validar limites da tela e navegação local em sete tamanhos
+        run: node tests/home-layout.test.mjs
+      - name: Validar cifragem e revogação Apple
+        working-directory: supabase/functions
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx --yes deno@2.9.6 test --node-modules-dir=manual --no-remote --no-lock --allow-env ../../tests/ios-preparation/apple.test.ts
+      - name: Preparar dependências macOS ARM no Linux
+        run: node scripts/cache-darwin.mjs ../.ios-npm-cache
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-npm-cache
+          path: .ios-npm-cache/_cacache
+          include-hidden-files: true
+          retention-days: 1
+  simulator:
+    needs: layout
+    # Use the macOS 15 ARM pool while macOS 26 runner capacity is constrained.
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Verificar macOS ARM e Xcode 26.3
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          test -d "$DEVELOPER_DIR"
+          xcode_version=$(xcodebuild -version)
+          printf '%s\n' "$xcode_version"
+          test "${xcode_version%%$'\n'*}" = 'Xcode 26.3'
+      - name: Iniciar simulador iOS 26.2 durante a compilação
+        run: |
+          set -euo pipefail
+          # iOS 18.5 has a known libswiftWebKit loader issue; use the Xcode 26.3 runtime.
+          simulator_id=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; devices=json.load(sys.stdin)["devices"]; runtime="com.apple.CoreSimulator.SimRuntime.iOS-26-2"; matches=[d for d in devices.get(runtime,[]) if d["name"].startswith("iPhone")]; assert matches, "iOS 26.2 iPhone simulator unavailable"; print(matches[0]["udid"])')
+          echo "Simulador iOS 26.2: $simulator_id"
+          echo "TAMOON_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
+          xcrun simctl boot "$simulator_id"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-npm-cache
+          path: .ios-npm-cache/_cacache
+      - run: npm ci --offline --cache ../.ios-npm-cache --no-audit --no-fund
+      - run: npm run sync
+      - run: npm run check
+      - run: npm run test:auth
+      - name: Validar integração e autorização
+        run: node --test ../integration/auth/tests/*.test.mjs ../integration/marketplace/tests/*.test.mjs ../integration/community/tests/*.test.mjs
+      - name: Compilar para simulador (sem assinatura ou envio)
+        run: >-
+          xcodebuild -project ios/App/App.xcodeproj -scheme App
+          -configuration Debug -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Validar archive Release para iPhone (sem assinatura ou envio)
+        run: |
+          set -euo pipefail
+          build=$(node -p "require('../version.json').build")
+          xcodebuild -project ios/App/App.xcodeproj -scheme App \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Tamoon.xcarchive" CODE_SIGNING_ALLOWED=NO archive
+          python3 scripts/verify-archive.py "$RUNNER_TEMP/Tamoon.xcarchive" "$build"
+      - name: Abrir o app no simulador e validar a ponte nativa e o Keychain
+        run: |
+          gem install --user-install --no-document xcodeproj --version 1.27.0
+          bash scripts/native-startup-test.sh
+      - name: Guardar evidência de inicialização nativa
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-native-startup
+          path: |
+            mobile/build/NativeStartup.xcresult
+            mobile/build/native-startup.png

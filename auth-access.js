@@ -35,7 +35,7 @@
   }
   function create({client, config = {}, flags = {}, native = null, storage = global.sessionStorage,
     location = global.location, history = global.history, now = Date.now} = {}) {
-    const enabled = provider => provider === 'google' || (provider === 'apple' && flags.appleEnabled === true);
+    const enabled = provider => provider === 'google' || (provider === 'apple' && flags.appleEnabled === true && !native?.isAndroid);
     let busy = false;
     const removePending = () => { try { storage.removeItem(PENDING_KEY); } catch {} };
     const readPending = () => {
@@ -49,7 +49,7 @@
       return data.user;
     };
     const linked = (user, provider) => user.identities?.some(i => i.provider === provider) === true;
-    const redirectTo = () => native?.isIOS ? 'br.app.tamoon://auth/callback' : config.authRedirectUrl || new URL('./', location.href).href;
+    const redirectTo = () => native?.isNative ? 'br.app.tamoon://auth/callback' : config.authRedirectUrl || new URL('./', location.href).href;
     const options = provider => ({redirectTo: redirectTo(), skipBrowserRedirect: true,
       ...(provider === 'google' ? {queryParams: {prompt: 'select_account'}} : {})});
     async function navigate(url, provider, linking) {
@@ -59,7 +59,7 @@
       const external = linking && ((provider === 'google' && target.hostname === 'accounts.google.com' && /^\/o\/oauth2\/(v2\/)?auth$/.test(target.pathname)) ||
         (provider === 'apple' && target.hostname === 'appleid.apple.com' && target.pathname === '/auth/authorize'));
       if (target.protocol !== 'https:' || target.username || target.password || (!supabase && !external)) throw Error('INVALID_AUTH_URL');
-      if (native?.isIOS) { await native.finishOAuth(client, target.href, provider, linking); return false; }
+      if (native?.isNative) { await native.finishOAuth(client, target.href, provider, linking); return false; }
       location.assign(target.href);
       return true;
     }

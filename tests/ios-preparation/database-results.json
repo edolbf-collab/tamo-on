@@ -1,0 +1,33 @@
+{
+  "passed": 28,
+  "checks": [
+    "Explicit confirmation required",
+    "Authenticated request saved",
+    "Thirty-day deadline stored",
+    "Receipt contains no identity",
+    "Retry returns same receipt",
+    "Email comes from Auth, never client or JWT metadata",
+    "Other account cannot read private request",
+    "Direct request table read denied",
+    "Direct mutation denied",
+    "Apple credential table inaccessible to clients",
+    "Internal security helper inaccessible",
+    "Non-admin cannot view queue",
+    "Admin can process queue",
+    "Revoked or missing session refused",
+    "Anonymous Auth accounts refused",
+    "Anonymous request refused",
+    "Private receipt capability works after logout without exposing identity",
+    "Unknown receipt gives no information",
+    "Deletion endpoint exempt from legal gate; own RPC still checks identity",
+    "Other data remains behind legal gate",
+    "Migration is idempotent and preserves requests",
+    "Completion removes request PII atomically",
+    "Deletion cleans announcements",
+    "Deletion cleans system_announcements",
+    "Deletion cleans user_notifications",
+    "Deletion cleans apple_auth_grants",
+    "Deleted account with stale JWT refused",
+    "Completion confirmation available without deleted account"
+  ]
+}

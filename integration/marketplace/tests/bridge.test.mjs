@@ -17,11 +17,30 @@ function fixture(overrides={}) {
 function req(action='session',headers={}) {return new Request('https://bridge.test',{method:'POST',headers:{Authorization:'Bearer community-token','Content-Type':'application/json',Origin:'https://app.tamoon.app.br',...headers},body:JSON.stringify({action,email:'attacker@example.test',marketplace_id:'attacker'})})}
 test('rejects missing bearer before any backend call',async()=>{const f=fixture();assert.equal((await f.handler(req('session',{Authorization:''}))).status,401);assert.equal(f.calls.length,0)});
 test('rejects foreign origin before auth',async()=>{const f=fixture();assert.equal((await f.handler(req('session',{Origin:'https://evil.test'}))).status,403);assert.equal(f.calls.length,0)});
+test('iOS origin still requires a verified session and private pilot mapping',async()=>{
+ const origin={Origin:'capacitor://localhost'};
+ const valid=fixture();const response=await valid.handler(req('session',origin));
+ assert.equal(response.status,200);assert.equal(response.headers.get('Access-Control-Allow-Origin'),origin.Origin);
+ for(const overrides of [{auth:{error:{message:'invalid'}}},{mapping:{error:{code:'PT403'}}}]){
+  const denied=fixture(overrides);assert.ok((await denied.handler(req('session',origin))).status>=400);
+  assert.equal(denied.calls.some(c=>c[0]==='mint'),false);
+ }
+ for(const Origin of ['capacitor://evil.test','http://localhost','null']){
+  const f=fixture();assert.equal((await f.handler(req('session',{Origin}))).status,403);assert.equal(f.calls.length,0);
+ }
+});
 test('auth failure cannot mint',async()=>{const f=fixture({auth:{error:{message:'invalid'}}});assert.equal((await f.handler(req())).status,401);assert.equal(f.calls.some(c=>c[0]==='mint'),false)});
 test('non-owner mapping cannot mint',async()=>{const f=fixture({mapping:{error:{code:'PT403'}}});assert.equal((await f.handler(req())).status,403);assert.equal(f.calls.some(c=>c[0]==='mint'),false)});
 test('rate limit cannot mint',async()=>{const f=fixture({mapping:{error:{code:'PT429'}}});assert.equal((await f.handler(req())).status,429)});
 test('email mismatch cannot mint',async()=>{const f=fixture({mapping:{data:{marketplace_id:'market-owner',email:'different@example.test'}}});assert.equal((await f.handler(req())).status,403)});
 test('supported identity and confirmed email required',async()=>{for(const patch of [{identities:[]},{email_confirmed_at:null}]){const f=fixture({auth:{data:{user:{...owner,...patch}}}});assert.equal((await f.handler(req())).status,403)}});
+test('Android native origin passes preflight but still requires authorization',async()=>{
+ const f=fixture();
+ const preflight=await f.handler(new Request('https://bridge.test',{method:'OPTIONS',headers:{Origin:'https://localhost'}}));
+ assert.equal(preflight.headers.get('access-control-allow-origin'),'https://localhost');
+ const denied=await f.handler(new Request('https://bridge.test',{method:'POST',headers:{Origin:'https://localhost'},body:JSON.stringify({action:'session'})}));
+ assert.equal(denied.status,401);assert(!f.calls.some(call=>call[0]==='mint'));
+});
 test('legal access required',async()=>{for(const patch of [{legal:false}]){const f=fixture(patch);assert.equal((await f.handler(req())).status,403);assert.equal(f.calls.some(c=>c[0]==='mint'),false)}});
 test('status validates identity without generating session',async()=>{const f=fixture();const r=await f.handler(req('status'));assert.equal(r.status,200);assert.deepEqual(await r.json(),{allowed:true,canSyncCommunity:true,environment:'staging',realMoney:false});assert.equal(f.calls.some(c=>c[0]==='mint'),false);assert.equal(f.calls.find(c=>c[0]==='mapping')[1].p_exchange,false)});
 test('session ignores supplied target and sends no email',async()=>{const f=fixture();const r=await f.handler(req());assert.equal(r.status,200);assert.deepEqual(await r.json(),{session:{access_token:'access',refresh_token:'refresh'},canSyncCommunity:true,environment:'staging',realMoney:false});assert.deepEqual(f.calls.find(c=>c[0]==='mint')[1],{type:'magiclink',email:owner.email});assert.equal(r.headers.get('cache-control'),'no-store')});

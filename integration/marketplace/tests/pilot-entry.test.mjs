@@ -7,7 +7,7 @@ const source=fs.readFileSync(new URL('../../../marketplace/pilot-entry.js',impor
 async function start(scenario,options={}) {
  const owner=scenario==='owner',allowed=['owner','customer','partner'].includes(scenario),actions=[],requests=[],classes=new Set(['pilot-locked']);
  const nodes=new Map();const node=id=>{if(!nodes.has(id))nodes.set(id,{hidden:false,textContent:'',listeners:{},addEventListener(event,fn){this.listeners[event]=fn},focus(){this.focused=true}});return nodes.get(id)};
- const signOuts=[],navigations=[],dialogs=[],timeouts=new Map(),windowEvents={},documentEvents={},emitted=[];let initialized=false,sequence=0,observer;
+ const scripts=[],clients=[];const signOuts=[],navigations=[],dialogs=[],timeouts=new Map(),windowEvents={},documentEvents={},emitted=[];let initialized=false,sequence=0,observer;
  let ready,authChanged;const finished=new Promise(resolve=>{ready=resolve});
  const current=scenario==='anonymous'?null:{user:{id:'community'},access_token:'verified-community'};
  const community={auth:{getSession:async()=>({data:{session:current}}),onAuthStateChange:fn=>{authChanged=fn},refreshSession:async()=>{}}};
@@ -16,9 +16,9 @@ async function start(scenario,options={}) {
   setTimeout:(fn,delay)=>{timeouts.set(++sequence,{fn,delay});return sequence},clearTimeout:id=>timeouts.delete(id),setInterval:()=>1,clearInterval(){},
   sessionStorage:{removeItem(){}},location:{assign:path=>navigations.push(path),reload(){navigations.push('reload')}},
   document:{hidden:false,visibilityState:'visible',getElementById:node,querySelector:()=>node('syncBar'),querySelectorAll:()=>dialogs.filter(x=>x.open),createElement:()=>({}),addEventListener:(event,fn)=>{documentEvents[event]=fn},
-   body:{classList:{add:c=>{classes.add(c);ready()},remove:c=>{classes.delete(c);ready()}},append:tag=>queueMicrotask(()=>options.rejectScript?.(tag.src)?tag.onerror():tag.onload())}},
+   body:{classList:{add:c=>{classes.add(c);ready()},remove:c=>{classes.delete(c);ready()}},append:tag=>{scripts.push(tag.src);queueMicrotask(()=>options.rejectScript?.(tag.src)?tag.onerror():tag.onload())}}},
   fetch:async url=>{requests.push(url);if(options.logoutDuringAssets)authChanged('SIGNED_OUT',null);return new Response(JSON.stringify(options.assets ?? []),{status:200})},
-  window:{addEventListener:(event,fn)=>{windowEvents[event]=fn},dispatchEvent:event=>emitted.push(event.type),supabase:{createClient:()=>community},TAMOON_CONFIG:{supabaseUrl:'https://community.test',supabasePublishableKey:'public'},
+  window:{addEventListener:(event,fn)=>{windowEvents[event]=fn},dispatchEvent:event=>emitted.push(event.type),TamoonNative:options.native,supabase:{createClient:(url,key,config)=>{clients.push({url,key,config});return community}},TAMOON_CONFIG:{supabaseUrl:'https://community.test',supabasePublishableKey:'public'},
    TamoonPilotAccess:{...access,fetchWithTimeout:async(url,requestOptions)=>{
     requests.push(url);const action=JSON.parse(requestOptions.body).action;actions.push(action);
     if(action==='status' && options.statusResponse)return options.statusResponse();
@@ -31,7 +31,7 @@ async function start(scenario,options={}) {
  vm.runInNewContext(source,sandbox);
  await Promise.race([finished,new Promise((_,reject)=>{const t=setTimeout(()=>reject(new Error('gate did not settle')),1000);t.unref()})]);
  await new Promise(resolve=>setImmediate(resolve));
- return {actions,requests,classes,nodes,sandbox,authChanged,signOuts,navigations,initialized,dialogs,timeouts,windowEvents,documentEvents,emitted,observer};
+ return {scripts,clients,actions,requests,classes,nodes,sandbox,authChanged,signOuts,navigations,initialized,dialogs,timeouts,windowEvents,documentEvents,emitted,observer};
 }
 for(const scenario of ['customer','partner'])test(`${scenario} opens without importing or syncing owner group`,async()=>{
  const f=await start(scenario);assert.equal(f.classes.has('pilot-locked'),false);assert.equal(f.nodes.get('syncBar').hidden,true);
@@ -125,4 +125,19 @@ test('checks are deduplicated on resume and a hidden app does not query access',
  f.sandbox.document.hidden=true;f.windowEvents.online();assert.deepEqual(f.actions,['session']);
  f.sandbox.document.hidden=false;f.windowEvents.online();f.documentEvents.visibilitychange();await new Promise(r=>setImmediate(r));
  assert.deepEqual(f.actions,['session','status']);resolve(new Response('{"allowed":true}',{status:200}));await new Promise(r=>setImmediate(r));
+});
+
+
+test('native apps reuse protected session without fetching the remote SDK; denied accounts stay locked',async()=>{
+ const storage={getItem:async()=>null,setItem:async()=>{},removeItem:async()=>{}};
+ for(const platform of ['ios','android'])for(const scenario of ['customer','anonymous','denied']){
+  const f=await start(scenario,{native:{isNative:true,isIOS:platform==='ios',isAndroid:platform==='android',storage}});
+  assert.equal(f.scripts.some(src=>src.startsWith('https:')),false);
+  assert.equal(f.clients[0].config.auth.storage,storage);
+  assert.equal(f.clients[0].config.auth.flowType,'pkce');
+  assert.equal(f.initialized,scenario==='customer');
+ }
+ const web=await start('customer');
+ assert.equal(web.scripts.some(src=>src.includes('cdn.jsdelivr.net')),true);
+ assert.equal(web.clients[0].config.auth.storage,undefined);
 });

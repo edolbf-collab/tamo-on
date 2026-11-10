@@ -1,0 +1,9 @@
+{
+  "name": "tamoon-edge-preparation",
+  "version": "1.0.165",
+  "private": true,
+  "dependencies": {
+    "@supabase/supabase-js": "2.110.7",
+    "jose": "6.2.13"
+  }
+}

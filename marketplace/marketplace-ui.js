@@ -5,6 +5,8 @@
   function compatible(a,b){return a.nodeType===b.nodeType && (a.nodeType!==1 || (a.tagName===b.tagName && key(a)===key(b)));}
   function patch(current,next){
     if(current.nodeType!==1){if(current.nodeValue!==next.nodeValue)current.nodeValue=next.nodeValue;return;}
+    // Separately mounted components own their DOM and event handlers.
+    if(current.hasAttribute('data-ui-owned') && next.hasAttribute('data-ui-owned'))return;
     const active=current===document.activeElement;
     const editing=active && current.matches('input:not([type=checkbox]):not([type=radio]),textarea');
     const retainDraft=editing && current.getAttribute('value')===next.getAttribute('value') && (current.tagName!=='TEXTAREA'||current.defaultValue===next.defaultValue);

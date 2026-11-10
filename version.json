@@ -1,11 +1,11 @@
 {
   "channel": "beta",
   "version": "1.0",
-  "build": 168,
+  "build": 171,
   "database": 152,
-  "edge": 116,
+  "edge": 117,
   "mandatory": false,
-  "notes": "Permissão de notificações verificada novamente após vincular; tela atualizada e teste local sempre acessível no Android.",
-  "label": "Tâmo On 1.0 Build 168",
-  "integration": "168-R6"
+  "notes": "Novo painel administrativo: grupos, usuários, eventos, notificações e operações do marketplace.",
+  "label": "Tâmo On 1.0 Build 171",
+  "integration": "171-ADMIN1"
 }
