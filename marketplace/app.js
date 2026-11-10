@@ -5425,7 +5425,7 @@
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
-    if(backendIsOnline() && !(state.role==="admin" && state.activePage.admin==="refunds"))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
+    if(backendIsOnline() && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 

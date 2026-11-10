@@ -6,7 +6,7 @@ const mobile=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const root=path.dirname(mobile),target=path.join(mobile,'www');
 await rm(target,{recursive:true,force:true});await mkdir(target,{recursive:true});
 // Lista explícita: SQL, código servidor, credenciais e arquivos administrativos nunca vão ao IPA.
-const files=['index.html','auth-config.js','auth-access.js','auth-access.css','app.js','admin-community.js','push-client.js','account-deletion.js','community-safety.js','styles.css','supabase-config.js','group-avatars-data.js','marketplace-access.js','brand','assets','icons','apple-touch-icon.png','tamo-on-icon-192.png','legal','version.json'];
+const files=['index.html','auth-config.js','auth-access.js','auth-access.css','app.js','admin-community.js','admin-notifications.js','admin-notifications.css','push-client.js','account-deletion.js','community-safety.js','styles.css','supabase-config.js','group-avatars-data.js','marketplace-access.js','brand','assets','icons','apple-touch-icon.png','tamo-on-icon-192.png','legal','version.json'];
 for(const file of files)await cp(path.join(root,file),path.join(target,file),{recursive:true});
 await build({entryPoints:[path.join(mobile,'src/native.js')],bundle:true,format:'iife',target:['safari15','chrome105'],outfile:path.join(target,'native.js'),minify:true,legalComments:'eof'});
 let html=await readFile(path.join(target,'index.html'),'utf8');

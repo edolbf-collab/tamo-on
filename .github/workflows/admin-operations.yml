@@ -1,7 +1,7 @@
 name: Administrative operations validation
 on:
   pull_request:
-    paths: ['admin-community.js', 'marketplace/**', 'supabase/migrations/*admin_operations.sql', 'supabase/migrations/*admin_daily_operations.sql', 'integration/marketplace/supabase/migrations/*admin_operations.sql', 'integration/marketplace/supabase/migrations/*admin_financial_operations.sql', 'integration/marketplace/supabase/migrations/*admin_daily_operations.sql', 'mobile/tests/admin-*', 'tests/admin/**', '.github/workflows/admin-operations.yml']
+    paths: ['admin-notifications.*', 'admin-community.js', 'marketplace/**', 'supabase/migrations/*admin_operations.sql', 'supabase/migrations/*admin_daily_operations.sql', 'supabase/migrations/*admin_notification_monitor.sql', 'supabase/functions/publish-announcement/**', 'integration/marketplace/supabase/migrations/*admin_operations.sql', 'integration/marketplace/supabase/migrations/*admin_financial_operations.sql', 'integration/marketplace/supabase/migrations/*admin_daily_operations.sql', 'mobile/tests/admin-*', 'tests/admin/**', '.github/workflows/admin-operations.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,10 @@ jobs:
       - run: npm ci --prefix mobile --no-audit --no-fund
       - run: npm ci --prefix tests/admin --no-audit --no-fund && npm test --prefix tests/admin
       - run: node --test mobile/tests/admin-*.test.mjs integration/marketplace/tests/navigation.test.mjs
+      - run: node --test tests/push/*.test.mjs integration/community/tests/*.test.mjs mobile/tests/android-database.test.mjs
+      - name: Typecheck push server
+        run: npx --yes deno@2.9.6 check --node-modules-dir=auto --no-lock publish-announcement/index.ts
+        working-directory: supabase/functions
       - run: npm run build --prefix mobile && npm run check --prefix mobile
       - run: npx playwright install --with-deps chromium
         working-directory: mobile

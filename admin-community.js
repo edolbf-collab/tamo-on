@@ -1,5 +1,10 @@
 (function(){
 'use strict';const app=window.App;if(!app)return;const diagnostics=app.openPlatformAdmin;app.openPlatformDiagnostics=diagnostics;
+app.openPlatformNotifications=function(initial={}){if(!this.state.is_platform_admin)return this.toast('Acesso restrito à administração.',true);this.adminOperations?.dispose();this.notificationMonitor?.dispose();
+ this.modal('Notificações da plataforma','<button class="btn btn-secondary" data-notification-back>Voltar à administração</button><div id="platformNotificationMonitor"></div>',root=>{
+ root.querySelector('[data-notification-back]').onclick=()=>this.openPlatformAdmin();
+ this.notificationMonitor=window.TamoonAdminNotifications.mount(root.querySelector('#platformNotificationMonitor'),{initial,identity:()=>this.state.is_platform_admin?this.state.profile?.id||'':'',rpc:async(name,args)=>{const r=await this.repo.client.rpc(name,args);if(r.error)throw r.error;return r.data;}});
+ });};
 app.openPlatformAdmin=function(){if(!this.state.is_platform_admin)return this.toast('Acesso restrito à administração.',true);this.adminOperations?.dispose();
 this.modal('Administração','<div class="admin-toolbar"><button class="btn btn-secondary" data-admin-diagnostics>Saúde e suporte</button><button class="btn btn-secondary" data-admin-moderation>Denúncias</button></div><div id="communityAdminOperations"></div>',root=>{
 root.querySelector('[data-admin-diagnostics]').onclick=()=>{this.adminOperations?.dispose();diagnostics.call(this);};

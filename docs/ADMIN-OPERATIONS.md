@@ -74,6 +74,21 @@ Migrações aplicadas: Comunidade `20261110192433_admin_daily_operations.sql`; M
 
 Validação: 8 cenários de banco/navegação e 6 de DOM; navegador automatizado com larguras 320/390/768/1280 e capturas da visão geral, suporte e agenda; build/check do pacote web. A verificação real de uso será feita na web pelo titular. Esta entrega não é uma submissão às lojas.
 
+## Quarta entrega — navegação e notificações (171-ADMIN4)
+
+Terceira entrega validada pelo titular em 10/11/2026. Ajustes solicitados: quatro acessos com igual destaque em grade fixa de duas colunas, com Consultas detalhadas na primeira linha; remoção do atalho duplicado de cancelamentos somente da Central de operações. Devoluções permanece no menu e nas fichas pertinentes.
+
+- Monitor de notificações acessível em Consultas detalhadas → Notificações e em Saúde e suporte. O painel legado agora usa os mesmos indicadores de Android, iOS e Web Push.
+- Vínculos atuais e histórico técnico separados. Filtros por plataforma, usuário/aparelho selecionado, busca, situação e período. Paginação no servidor; indicadores calculados sobre todos os resultados filtrados.
+- Aceite pelo provedor não comprova exibição no aparelho; vínculo ativo não comprova a permissão atual do sistema. Apple Web Push continua classificado como Web, separado de APNs.
+- Novo histórico nativo, a partir desta implantação. Não reconstrói tentativas anteriores; os últimos resultados existentes permanecem nos vínculos. Registra sucesso, falha intermediária/final e repetição, sem tokens, endpoints, conteúdo da mensagem ou erro bruto do provedor.
+- Registro exclusivo do serviço, idempotente por plataforma/envio/tentativa e protegido contra resultados de uma inscrição antiga após rotação ou troca de conta. Falha intermediária não substitui o resultado final. A falha do registro técnico não transforma um envio aceito em falha.
+- Retenção operacional de 90 dias para o novo histórico nativo, com limpeza diária no banco e exclusão em cascata ao apagar a conta. Web Push mantém sua política existente.
+
+Migração Comunidade: `20261110200601_admin_notification_monitor.sql`. Consultas e gravações sintéticas verificadas no servidor com ROLLBACK; nenhum push de teste enviado. A atualização de publish-announcement altera somente o registro de evidências; destinatários, autenticação, conteúdo, provedor e regras de envio permanecem os mesmos. Baseline hospedada v37 conferida contra os arquivos locais antes da alteração.
+
+Verificações locais: 10 testes de banco/navegação/telemetria, 9 de DOM, 72 de regressão do push e fluxos relacionados; build/check do pacote. CI inclui conferência visual em 320/390/768/1280 px e validação de tipos do servidor. Layout e registros em telefone real permanecem sujeitos à validação prática do titular. Esta é uma publicação web/servidor; não gera submissão às lojas.
+
 ## Próximas entregas
 
 A primeira entrega é a base de consulta, não toda a auditoria:
@@ -81,6 +96,6 @@ A primeira entrega é a base de consulta, não toda a auditoria:
 - Evoluir a conferência financeira conforme os casos observados na homologação; os dossiês e referências iniciais já estão na segunda entrega.
 - Histórico de convites, exportações completas e relatórios de crescimento.
 - Papéis administrativos e trilha das intervenções; configurações persistidas no servidor.
-- O diagnóstico legado de Saúde/suporte ainda possui contadores de Web Push. A nova Central de Notificações inclui Android/iOS/Web; unificar os indicadores legados na próxima entrega.
+- Exportação operacional legada ainda mantém seu formato anterior; consolidar as exportações das novas consultas na etapa de relatórios.
 
 Aceite pelo provedor não comprova exibição no telefone. O período da lista filtra criação do registro; data do jogo, competência e liquidação aparecem na ficha quando aplicáveis.

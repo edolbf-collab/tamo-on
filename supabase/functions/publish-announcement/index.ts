@@ -1,6 +1,7 @@
 // Tâmo On publish-announcement — Build 116
 import { createClient } from "npm:@supabase/supabase-js@2.110.7";
 import { sendNotification } from "npm:web-push-neo@0.1.2";
+import { recordNativeAttempt } from "./native-telemetry.mjs";
 import { rescheduleAndNotify } from "./match-reschedule.mjs";
 import { createFcmSender } from "./fcm.mjs";
 import { createApnsSender } from "./apns.mjs";
@@ -283,13 +284,8 @@ Deno.serve(async (req) => {
     }) => {
       try {
         if (options.subscription.native) {
-          const now = new Date().toISOString();
-          const {error} = await adminClient.from(options.subscription.android ? "android_push_subscriptions" : "native_push_subscriptions").update({
-            last_attempt_at: now,
-            ...(options.success ? {last_success_at:now, consecutive_failures:0, last_failure_reason:null, last_failure_status:null} : {last_failure_at:now, last_failure_reason:cleanText(options.technicalReason,120), last_failure_status:options.statusCode}),
-            ...(options.statusCode === 410 ? {enabled:false} : {})
-          }).eq("id", options.subscription.id).eq("user_id", options.subscription.user_id).eq("updated_at", options.subscription.updated_at!);
-          if (error) console.warn("Não foi possível registrar a entrega nativa.");
+          const {error} = await recordNativeAttempt(adminClient, options);
+          if (error) console.warn("Não foi possível registrar a tentativa nativa de push.");
           return;
         }
         const { error } = await adminClient.rpc("record_push_delivery_attempt_v2", {
