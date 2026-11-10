@@ -1,4 +1,4 @@
-# Central administrativa — primeira entrega
+# Central administrativa — entregas web
 
 Base: 1.0.171 (177), commit 71848dc. Branch isolada: `feat/admin-operations`.
 
@@ -42,11 +42,27 @@ O schema `tamoon_admin` permanece privado, fora da Data API. A função pública
 - `npm run build --prefix mobile && npm run check --prefix mobile`: recursos nativos, política de conteúdo e separação de segredos. Não substitui compilação Swift/Android nem testes físicos.
 - Suíte de regressão + banco: 244 testes; DOM simulado: 3 testes. Recuperação das alterações e nova execução após restauração do ambiente em 10/11/2026.
 
+## Segunda entrega — controle financeiro (171-ADMIN2)
+
+Aprovação da primeira entrega e autorização para prosseguir em 10/11/2026. As funcionalidades continuam sendo validadas na web; o envio às lojas será consolidado após a aprovação do conjunto.
+
+- Fichas financeiras por reserva com os cálculos oficiais de `private.reservation_financial_snapshot`, sem duplicar regras no navegador.
+- Pendências: devoluções, resolução, excedentes, revisão financeira e pedidos ao provedor rejeitados ou incertos.
+- Navegação da ficha para cobranças, pagamentos, cotas, etapas mensais, datas, movimentos, vouchers, créditos comprovados e pedidos de devolução.
+- Créditos de liquidação e de split são identificados pela evidência existente; não representam saldo para saque. Datas de referência do split são explicitamente identificadas.
+- Retornos do provedor mostram situação, tentativas, recebimento/processamento e vínculos encontrados. Payloads, erros arbitrários, chaves, URLs de cobrança, carteiras e tokens não são retornados.
+- Integrações por parceiro e configurações efetivas do servidor, somente para consulta. As configurações não são substituídas por preferências locais.
+- Datas dos filtros refletem o tipo de registro: criação, vencimento, ocorrência, movimento, recebimento ou atualização.
+
+Migração `integration/marketplace/supabase/migrations/20261110182151_admin_financial_operations.sql` aplicada exclusivamente no Marketplace de homologação. As 13 novas seções foram consultadas com identidade administrativa e paginação de 20; nenhuma operação financeira foi executada.
+
+Validação adicional: PostgreSQL/PGlite com cálculo oficial, excedente, voucher, mensalidade parcial, devolução pendente, vínculos, datas, permissão negada e ausência de campos privados; DOM e Chromium com navegação financeira e larguras 320/390/768/1280. As fixtures financeiras contêm apenas definições de schema e dados fictícios. A view de validade de vouchers é uma dependência existente e usa fixture de contrato; suas regras não foram alteradas.
+
 ## Próximas entregas
 
 A primeira entrega é a base de consulta, não toda a auditoria:
 - Indicadores consolidados, fila de pendências/SLA, agenda global e reconciliação financeira.
-- Dossiês financeiros completos, taxas/comissões, repasses comprovados, vouchers e webhooks.
+- Evoluir a conferência financeira conforme os casos observados na homologação; os dossiês e referências iniciais já estão na segunda entrega.
 - Suporte com responsável/prazo, histórico de convites, exportações completas e relatórios de crescimento.
 - Papéis administrativos e trilha das intervenções; configurações persistidas no servidor.
 - O diagnóstico legado de Saúde/suporte ainda possui contadores de Web Push. A nova Central de Notificações inclui Android/iOS/Web; unificar os indicadores legados na próxima entrega.
