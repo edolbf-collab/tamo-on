@@ -12,14 +12,23 @@ Base: 1.0.171 (177), commit 71848dc. Branch isolada: `feat/admin-operations`.
 - Auditoria informa autor, ação, registro e campos alterados; não expõe valores antigos/novos, metadados arbitrários, tokens ou credenciais.
 - Saúde/suporte, denúncias e devoluções existentes permanecem acessíveis. Esta central consulta informações; não executa cobranças, estornos, repasses ou mudanças de permissões.
 
-## Implantação posterior à validação
+## Implantação web e fluxo de aprovação
 
-Nenhuma migração foi aplicada aos bancos hospedados. Nenhuma nova versão foi publicada nas lojas.
-1. Aplicar `supabase/migrations/20261110151314_admin_operations.sql` na Comunidade (`xvwgrpnioaqyijhzqxqh`).
-2. Aplicar `integration/marketplace/supabase/migrations/20261110151321_admin_operations.sql` no Marketplace staging (`owybghlwcohfyapvsfdo`).
-3. Executar advisors e smoke tests autenticados: admin autorizado, usuário comum negado; conferir totais com consultas de referência.
-4. Publicar frontend após migrações. Incrementar versão/build, reconstruir pacotes nativos e validar Android/iPhone antes do envio às lojas.
-5. Validar operacionalmente um grupo (responsáveis, participantes e eventos), os três canais de push e um caso do marketplace.
+Autorização de 10/11/2026: publicar na web para validação do titular. Revisão web `171-ADMIN1`, preservando a numeração dos pacotes já enviados às lojas.
+
+1. Migração da Comunidade aplicada em `xvwgrpnioaqyijhzqxqh`.
+2. Migração do Marketplace aplicada em `owybghlwcohfyapvsfdo`, mantendo o piloto restrito e o sandbox.
+3. Smoke tests hospedados: as 11 seções responderam sob o papel authenticated com identidade administrativa; totais conferidos com as tabelas de referência. Usuário comum e anônimo negados; acesso direto às projeções negado. Transações de verificação encerradas com ROLLBACK, sem modificar registros de negócio.
+4. Advisors: nenhuma nova advertência de segurança. Apenas informação esperada de RLS sem políticas na tabela privada de origens, cujo acesso direto permanece revogado.
+5. Publicação do frontend pelo fluxo GitHub → Cloudflare Pages (`resenhafc-beta`), com confirmação em `https://app.tamoon.app.br/version.json` antes do aviso de disponibilidade.
+
+Fluxo permanente acordado:
+- Funcionalidades são publicadas e validadas primeiro na web.
+- Alterações dependentes do dispositivo usam teste Android e TestFlight iOS.
+- Envio às lojas somente após aprovação do titular.
+- Não iniciar nova submissão iOS enquanto a 1.0.171 (177) estiver pendente de publicação.
+
+Acesso na web: **Mais → Painel da plataforma**. No Marketplace: **Administração → Central de operações**. Saúde e suporte, denúncias e devoluções continuam disponíveis.
 
 O schema `tamoon_admin` permanece privado, fora da Data API. A função pública SECURITY INVOKER chama implementação privada SECURITY DEFINER com guarda explícita de administrador no banco. Nenhuma tabela de negócio recebe novas permissões.
 

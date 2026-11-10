@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Convites de grupo pela página de download, abertura no aplicativo e melhorias nas notificações.",
+  "notes": "Novo painel administrativo: grupos, usuários, eventos, notificações e operações do marketplace.",
   "label": "Tâmo On 1.0 Build 171",
-  "integration": "171-R1"
+  "integration": "171-ADMIN1"
 }
