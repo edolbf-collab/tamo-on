@@ -8116,14 +8116,14 @@
 
   let operationsConsole=null;
   function adminOperationsPage(){
-    return pageHeader('Administração','Central de operações','Consulte responsáveis, vínculos e histórico do marketplace.')
+    return pageHeader('Administração','Central de operações','Resumo, pendências e agenda para acompanhar a operação.')
       +(adminRefundContext()?'<div id="marketAdminOperations" data-ui-owned></div>':'<p class="callout">Entre com uma conta de administrador para consultar a operação.</p>');
   }
   function mountAdminOperations(){
     const host=app.querySelector('#marketAdminOperations');
     if(operationsConsole && (operationsConsole.root!==host || operationsConsole.key!==adminRefundContext())){operationsConsole.dispose();operationsConsole=null;}
-    if(host && adminRefundContext() && !operationsConsole)operationsConsole=window.TamoonAdminOperations.mount(host,{
-      mode:'market',identity:adminRefundContext,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)
+    if(host && adminRefundContext() && !operationsConsole)operationsConsole=window.TamoonAdminDaily.mount(host,{
+      mode:'market',identity:adminRefundContext,onAction:(action,id)=>{if(action==='refunds')openAdminRefunds(id);},rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)
     });
   }
   function adminView() {

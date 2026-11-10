@@ -1,7 +1,7 @@
 name: Administrative operations validation
 on:
   pull_request:
-    paths: ['admin-community.js', 'marketplace/**', 'supabase/migrations/*admin_operations.sql', 'integration/marketplace/supabase/migrations/*admin_operations.sql', 'integration/marketplace/supabase/migrations/*admin_financial_operations.sql', 'mobile/tests/admin-*', 'tests/admin/**', '.github/workflows/admin-operations.yml']
+    paths: ['admin-community.js', 'marketplace/**', 'supabase/migrations/*admin_operations.sql', 'supabase/migrations/*admin_daily_operations.sql', 'integration/marketplace/supabase/migrations/*admin_operations.sql', 'integration/marketplace/supabase/migrations/*admin_financial_operations.sql', 'integration/marketplace/supabase/migrations/*admin_daily_operations.sql', 'mobile/tests/admin-*', 'tests/admin/**', '.github/workflows/admin-operations.yml']
   workflow_dispatch:
 permissions:
   contents: read

@@ -58,12 +58,28 @@ Migração `integration/marketplace/supabase/migrations/20261110182151_admin_fin
 
 Validação adicional: PostgreSQL/PGlite com cálculo oficial, excedente, voucher, mensalidade parcial, devolução pendente, vínculos, datas, permissão negada e ausência de campos privados; DOM e Chromium com navegação financeira e larguras 320/390/768/1280. As fixtures financeiras contêm apenas definições de schema e dados fictícios. A view de validade de vouchers é uma dependência existente e usa fixture de contrato; suas regras não foram alteradas.
 
+## Terceira entrega — gestão diária (171-ADMIN3)
+
+Autorizada em 10/11/2026 após o usuário considerar a consulta completa, porém complexa. A entrada passa a ter três áreas: **Resumo**, **Pendências e suporte** e **Agenda geral**. As telas anteriores ficam disponíveis em **Consultas detalhadas**.
+
+- Resumo de cada ambiente, com quatro indicadores e até cinco pendências prioritárias. Comunidade e Marketplace mantêm fontes e permissões separadas.
+- Fila da Comunidade: relatos de problema, denúncias, falhas de envio e atendimentos internos. Fila do Marketplace: pendências financeiras oficiais, parceiros aguardando análise, falhas/atrasos de processamento e atendimentos internos.
+- Acompanhamento persistido: responsável administrativo, prazo, andamento, nota interna e histórico. O prazo é interno e opcional; não representa compromisso automático com o usuário.
+- Atendimentos internos e relatos de problema podem ser encerrados. Denúncias, financeiro e integrações seguem o estado da origem; registrar acompanhamento não altera pagamentos, estornos ou decisões de moderação. Devoluções têm atalho para o fluxo existente.
+- Agenda em ordem cronológica, por data real e duração, com busca, grupo/parceiro e situação. Inclui eventos que atravessam a meia-noite. O período inicial é de sete dias e os horários seguem o fuso do aparelho.
+- Paginação no servidor (20), descarte de dados após troca de identidade, proteção contra respostas atrasadas, versão de acompanhamento e criação idempotente de atendimentos.
+- Nenhuma comunicação externa automática. Dados técnicos arbitrários e credenciais não entram nas projeções.
+
+Migrações aplicadas: Comunidade `20261110192433_admin_daily_operations.sql`; Marketplace `20261110192442_admin_daily_operations.sql`. Leitura e gravação administrativa verificadas no servidor; usuário comum, anônimo e acesso direto negados. Gravações de teste desfeitas com ROLLBACK. Advisors sem novas advertências, somente informações esperadas de RLS fechado nas três tabelas privadas.
+
+Validação: 8 cenários de banco/navegação e 6 de DOM; navegador automatizado com larguras 320/390/768/1280 e capturas da visão geral, suporte e agenda; build/check do pacote web. A verificação real de uso será feita na web pelo titular. Esta entrega não é uma submissão às lojas.
+
 ## Próximas entregas
 
 A primeira entrega é a base de consulta, não toda a auditoria:
-- Indicadores consolidados, fila de pendências/SLA, agenda global e reconciliação financeira.
+- Evoluir indicadores e prazos operacionais conforme a experiência com a gestão diária.
 - Evoluir a conferência financeira conforme os casos observados na homologação; os dossiês e referências iniciais já estão na segunda entrega.
-- Suporte com responsável/prazo, histórico de convites, exportações completas e relatórios de crescimento.
+- Histórico de convites, exportações completas e relatórios de crescimento.
 - Papéis administrativos e trilha das intervenções; configurações persistidas no servidor.
 - O diagnóstico legado de Saúde/suporte ainda possui contadores de Web Push. A nova Central de Notificações inclui Android/iOS/Web; unificar os indicadores legados na próxima entrega.
 
