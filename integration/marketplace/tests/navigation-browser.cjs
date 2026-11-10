@@ -66,10 +66,13 @@ const financial='<header class="page-header"><div><span class="eyebrow">Administ
   assert.equal(await page.evaluate(()=>document.getElementById('infoDialog').open),true);
   assert.equal(await page.evaluate(()=>document.body.style.position),'');await page.keyboard.press('Escape');
   console.log('existing preference handlers and handover to Help dialog: PASS');
-  for(const [role,heading,count] of [['user','Usuário',6],['partner','Parceiro',8],['admin','Administração',8]]){
+  for(const [role,heading,count] of [['user','Usuário',6],['partner','Parceiro',8],['admin','Administração',9]]){
    await page.evaluate(({heading,markup})=>window.drawer.update({heading,markup}),{heading,markup:c.navigationItems(role)});
    await open();assert.equal(await page.locator('#marketplaceMenu [data-nav]').count(),count);
-   if(role==='admin')assert.equal(await page.locator('#marketplaceMenu [data-nav="refunds"]').textContent(),'↩Devoluções');
+   if(role==='admin'){
+    assert.equal(await page.locator('#marketplaceMenu [data-nav="refunds"]').textContent(),'↩Devoluções');
+    assert.equal(await page.locator('#marketplaceMenu [data-nav="operations"]').textContent(),'◎Central de operações');
+   }
    if(role==='partner')assert.equal(await page.locator('#marketplaceMenu .is-restricted').isDisabled(),true);
    await page.keyboard.press('Escape');
   }
