@@ -2,7 +2,8 @@ name: Validar preparação iOS
 on:
   workflow_dispatch:
   push:
-    branches: [ios-build-165]
+    branches: [main]
+    paths: ['mobile/**', 'integration/**', 'supabase/**', 'app.js', 'auth-access.js', 'push-client.js', 'version.json', '.github/workflows/ios-preparation.yml']
 permissions:
   contents: read
 jobs:

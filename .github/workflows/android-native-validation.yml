@@ -1,7 +1,8 @@
 name: Android native validation
 on:
   push:
-    branches: [feat/android-native]
+    branches: [main]
+    paths: ['mobile/**', 'integration/**', 'supabase/**', 'app.js', 'auth-access.js', 'push-client.js', 'deployment/site-invite/**', '.github/workflows/android-native-validation.yml']
   pull_request:
     paths: ['mobile/**', 'integration/**', 'supabase/**', 'app.js', 'auth-access.js', 'push-client.js', 'deployment/site-invite/**', '.github/workflows/android-native-validation.yml']
   workflow_dispatch:

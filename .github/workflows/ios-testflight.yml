@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Commit completo revisado da branch ios-build-165
+        description: Commit completo revisado e integrado à branch main
         required: true
         type: string
       build_number:
@@ -31,14 +31,14 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ios-build-165
+          ref: main
           fetch-depth: 0
           persist-credentials: false
       - name: Fixar o código revisado
         run: |
           set -euo pipefail
           [[ "$TF_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
-          git merge-base --is-ancestor "$TF_SOURCE_SHA" origin/ios-build-165
+          git merge-base --is-ancestor "$TF_SOURCE_SHA" origin/main
           git checkout --detach "$TF_SOURCE_SHA"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -67,7 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ios-build-165
+          ref: main
           fetch-depth: 0
           persist-credentials: false
       - name: Fixar o código revisado e validar a versão
@@ -76,7 +76,7 @@ jobs:
           set -euo pipefail
           [[ "$TF_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$TF_BUILD_NUMBER" =~ ^[1-9][0-9]{0,3}(\.[0-9]{1,2}){0,2}$ ]]
-          git merge-base --is-ancestor "$TF_SOURCE_SHA" origin/ios-build-165
+          git merge-base --is-ancestor "$TF_SOURCE_SHA" origin/main
           git checkout --detach "$TF_SOURCE_SHA"
           test "$(git rev-parse HEAD)" = "$TF_SOURCE_SHA"
           test -f mobile/ExportOptions-TestFlight.plist

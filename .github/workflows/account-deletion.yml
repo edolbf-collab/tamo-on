@@ -1,7 +1,7 @@
 name: Account deletion validation
 on:
   push:
-    branches: [main, ios-build-165]
+    branches: [main]
     paths:
       - 'account-deletion.js'
       - 'legal/**'

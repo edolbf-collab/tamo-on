@@ -29,7 +29,7 @@ O upload de **1.0.168 (168)** foi concluído em **4/11/2026 às 13:09 UTC (10:09
 
 A Apple concluiu o processamento e exibiu o build como **Pronto para testar**. O build foi associado ao grupo **Piloto interno**. Nenhum tester foi convidado; a inclusão do destinatário está pendente de autorização explícita do titular. A instalação no iPhone ainda não foi validada.
 
-Para um novo envio, no workflow **Preparar ou enviar iOS ao TestFlight**, executar a versão da `main`, informar o SHA revisado da `ios-build-165`, um número de build Apple ainda não utilizado e `upload=true`. O build 168 já foi enviado e não deve ser reutilizado. O fluxo instala as dependências fixadas, recompõe os recursos locais, executa os testes, arquiva para iPhone e pede ao Xcode que assine e envie à Apple.
+Para um novo envio, no workflow **Preparar ou enviar iOS ao TestFlight**, executar a versão da `main`, informar um SHA revisado já integrado à `main`, um número de build Apple ainda não utilizado e `upload=true`. Desde a consolidação de branches em 10/11/2026, não há dependência da antiga `ios-build-165`. O build 168 já foi enviado e não deve ser reutilizado. O fluxo instala as dependências fixadas, recompõe os recursos locais, executa os testes, arquiva para iPhone e pede ao Xcode que assine e envie à Apple.
 
 O arquivo de exportação define `testFlightInternalTestingOnly=true`; esse primeiro build não poderá ser usado para revisão externa nem publicação na App Store. Uma distribuição externa posterior exigirá outro build e a preparação específica de revisão.
 
