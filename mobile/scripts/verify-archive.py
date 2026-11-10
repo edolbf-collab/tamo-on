@@ -27,7 +27,7 @@ binary = app / info["CFBundleExecutable"]
 assert subprocess.check_output(["lipo", "-archs", str(binary)], text=True).strip() == "arm64"
 assert (app / "PrivacyInfo.xcprivacy").is_file()
 assert (app / "Assets.car").is_file()
-for name in ["index.html", "native.js", "auth-access.js", "account-deletion.js", "marketplace/index.html"]:
+for name in ["index.html", "native.js", "auth-access.js", "account-deletion.js", "admin-community.js", "admin-notifications.js", "admin-notifications.css", "marketplace/index.html", "marketplace/admin-daily.js", "marketplace/admin-daily.css", "marketplace/admin-operations.js"]:
     assert (app / "public" / name).is_file(), name
 flags = (app / "public/auth-config.js").read_text()
 assert "appleEnabled: true" in flags and "linkingEnabled: true" in flags
