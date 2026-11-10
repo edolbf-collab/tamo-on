@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Administração financeira e centralização do círculo do campo no cartão da próxima pelada.",
+  "notes": "Gestão diária: resumo da operação, pendências e suporte com acompanhamento, e agenda geral.",
   "label": "Tâmo On 1.0 Build 171",
-  "integration": "171-ADMIN2-R1"
+  "integration": "171-ADMIN3"
 }

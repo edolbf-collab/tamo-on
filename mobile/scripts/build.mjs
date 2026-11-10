@@ -23,7 +23,7 @@ await mkdir(marketTarget,{recursive:true});
 const marketHtml=await readFile(path.join(root,'marketplace/index.html'),'utf8');
 const bundled=JSON.parse(await readFile(path.join(root,'marketplace/pilot-assets.json'),'utf8'));
 if(bundled.length!==1||!/^assets\/pilot-[a-f0-9]{12}\.js$/.test(bundled[0]))throw Error('Expected one versioned Marketplace bundle');
-const marketFiles=new Set(['index.html','pilot-entry.js','pilot-assets.json','admin-operations.js','manifest.webmanifest',bundled[0],...Array.from(marketHtml.matchAll(/href="([^"?#]+\.css)(?:[?#][^"]*)?"/g),m=>m[1])]);
+const marketFiles=new Set(['index.html','pilot-entry.js','pilot-assets.json','admin-operations.js','admin-daily.js','manifest.webmanifest',bundled[0],...Array.from(marketHtml.matchAll(/href="([^"?#]+\.css)(?:[?#][^"]*)?"/g),m=>m[1])]);
 for(const file of marketFiles){
  if(file.startsWith('/')||file.includes('..'))throw Error('Unsafe Marketplace asset path');
  await mkdir(path.dirname(path.join(marketTarget,file)),{recursive:true});

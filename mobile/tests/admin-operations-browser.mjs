@@ -23,4 +23,24 @@ for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:
 await page.screenshot({path:'/tmp/admin-preview/finance-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});await page.locator('.ops-row').first().click();await page.locator('[data-ops-related=quotas]').waitFor();await page.screenshot({path:'/tmp/admin-preview/finance-mobile.png',fullPage:true});await page.locator('[data-ops-related=quotas]').click();await page.locator('.ops-row').first().waitFor();assert.equal(await page.evaluate(()=>window.calls.at(-1).p_section),'quotas');
 await page.evaluate(()=>window.delay=true);await page.locator('[data-ops-refresh]').click();await page.evaluate(()=>{window.who='another';window.controller.dispose();window.late.shift()({items:[{id:'late',title:'PRIVATE'}],total:1,statuses:{}});});assert.equal(await page.locator('#console').innerText(),'');assert.deepEqual(errors,[]);
 console.log('PASS: mobile/desktop, pagination, related records, XSS, late responses, errors, identity isolation and owned DOM');
+await page.addStyleTag({content:await readFile(new URL('marketplace/admin-daily.css',root),'utf8')});await page.addScriptTag({content:await readFile(new URL('marketplace/admin-daily.js',root),'utf8')});
+await page.evaluate(()=>{
+ window.who='admin';window.dailyCalls=[];
+ window.daily=TamoonAdminDaily.mount(document.querySelector('#console'),{mode:'market',identity:()=>window.who,rpc:async(name,a)=>{
+  window.dailyCalls.push({name,a});if(name==='admin_daily_save')return {id:'task:001'};
+  const row={id:'task:001',kind:'support',title:'Conferir reserva do parceiro',subtitle:'Arena Curitiba',status:'open',active:true,created_at:'2026-11-10T13:00Z',updated_at:'2026-11-10T13:00Z',due_at:'2026-11-11T15:00Z',owner_id:'admin',owner_name:'Edo Batista',stage:'working',version:1,note:'Confirmar os detalhes com o parceiro.',description:'Acompanhar o atendimento e registrar o próximo passo.',overdue:false};
+  if(a.p_view==='agenda')return {items:[{id:'occurrence:001',title:'RES-1082',subtitle:'Arena Curitiba · Quadra 1',location:'Curitiba',status:'active',starts_at:'2026-11-11T21:00Z',ends_at:'2026-11-11T22:30Z',target_section:'reservations',target_id:'reservation-1'}],total:1,scopes:[{id:'partner-1',name:'Arena Curitiba'}]};
+  return {items:[row],total:1,stats:{partners:2,users:24,reservations:18,upcoming:9,pending:3,overdue:0,unassigned:1},admins:[{id:'admin',name:'Edo Batista'}],history:[{actor:'Edo Batista',action:'created',created_at:'2026-11-10T13:00Z',changes:{}}],checked_at:'2026-11-10T19:30Z'};
+ }});
+});
+await page.locator('.daily-metrics').waitFor();assert.equal(await page.locator('.daily-tabs button').count(),3);
+for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Daily overview no overflow at ${width}`);}
+await page.screenshot({path:'/tmp/admin-preview/daily-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/admin-preview/daily-mobile.png',fullPage:true});
+await page.locator('.daily-item').click();await page.locator('.daily-editor').waitFor();await page.locator('[name=note]').fill('Acompanhamento conferido');await page.locator('.daily-editor button[type=submit]').click();await page.locator('.daily-editor').waitFor();assert.equal(await page.evaluate(()=>window.dailyCalls.find(c=>c.name==='admin_daily_save').a.p_command.note),'Acompanhamento conferido');
+await page.screenshot({path:'/tmp/admin-preview/daily-support-mobile.png',fullPage:true});
+await page.locator('[data-daily-view=agenda]').click();await page.locator('[data-daily-agenda]').waitFor();
+for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Daily agenda no overflow at ${width}`);}
+await page.screenshot({path:'/tmp/admin-preview/daily-agenda-desktop.png',fullPage:true});
+await page.evaluate(()=>{window.who='other';});await page.locator('[data-daily-refresh]').click();assert.equal(await page.locator('#console').innerText(),'');assert.deepEqual(errors,[]);
+console.log('PASS: daily overview, support save, agenda and responsive layouts');
 }finally{await browser.close();}
