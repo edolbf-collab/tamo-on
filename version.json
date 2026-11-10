@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Administração financeira: fichas de reservas, cobranças, cotas, pendências, devoluções e integrações.",
+  "notes": "Administração financeira e centralização do círculo do campo no cartão da próxima pelada.",
   "label": "Tâmo On 1.0 Build 171",
-  "integration": "171-ADMIN2"
+  "integration": "171-ADMIN2-R1"
 }
