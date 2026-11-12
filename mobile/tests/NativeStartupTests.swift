@@ -42,6 +42,17 @@ final class NativeStartupTests: XCTestCase {
             const notificationStatus = await native.push.status();
             if (!['prompt', 'granted', 'denied'].includes(notificationStatus.permission))
                 throw new Error('Native notification permission bridge failed');
+            if (!native.badge) throw new Error('Native badge sync missing');
+            const bridge = window.Capacitor.Plugins.TamoonNative;
+            let rejected = false;
+            try { await bridge.setBadgeCount({count:-1}); }
+            catch (error) { rejected = error.message === 'Contador de avisos inválido.'; }
+            if (!rejected) throw new Error('Badge bridge must reject invalid counts');
+            try { await bridge.setBadgeCount({count:0}); }
+            catch (error) {
+                // A clean simulator may not yet authorize badges. Bridge errors are failures.
+                if (error.message !== 'Não foi possível atualizar o contador de avisos.') throw error;
+            }
             const key = 'tamoon-native-startup-test-' + crypto.randomUUID();
             try {
                 if (await native.storage.getItem(key) !== null) throw new Error('Expected empty test key');

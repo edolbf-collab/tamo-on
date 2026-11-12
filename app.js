@@ -1799,6 +1799,7 @@
       if (count > 0) navigator.setAppBadge?.(count).catch?.(() => {});
       else navigator.clearAppBadge?.().catch?.(() => {});
       this.syncServiceWorkerBadgeCount(count);
+      window.TamoonNative?.badge?.sync(count).catch(() => {});
     },
     player(id) { return (this.state?.players || []).find(player => player.id === id); },
     memberPlayer(member) { return this.player(member?.player_id) || (this.state?.players || []).find(player => player.user_id === member?.user_id); },

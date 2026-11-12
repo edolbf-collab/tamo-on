@@ -8,13 +8,15 @@ export function fcmToken(endpoint) {
   return match[1];
 }
 export function fcmPayload(endpoint, notification) {
-  const url = new URL(notification.data?.url || '/', 'https://app.tamoon.app.br');
+  let url;
+  try { url = new URL(notification.data?.url || '/', 'https://app.tamoon.app.br'); }
+  catch { throw failure(400,'INVALID_NOTIFICATION_URL'); }
   if (url.origin !== 'https://app.tamoon.app.br' || !['/', '/index.html'].includes(url.pathname)) throw failure(400,'INVALID_NOTIFICATION_URL');
   return {message:{
     token:fcmToken(endpoint),
     notification:{title:String(notification.title || 'Tâmo On').slice(0,160),body:String(notification.body || '').slice(0,240)},
     data:{url:url.href},
-    android:{priority:'high',ttl:'86400s',restricted_package_name:'br.app.tamoon',notification:{channel_id:'tamoon-alerts',sound:'default',icon:'ic_stat_notification',color:'#00A878',visibility:'PRIVATE'}}
+    android:{priority:'high',ttl:'86400s',restricted_package_name:'br.app.tamoon',notification:{channel_id:'tamoon-alerts',sound:'default',icon:'ic_stat_notification',color:'#00A878',visibility:'PRIVATE',...(Number.isInteger(notification.badgeCount) && notification.badgeCount >= 0 && notification.badgeCount <= 200 ? {notification_count:notification.badgeCount} : {})}}
   }};
 }
 export function createFcmSender({env, request=fetch, now=()=>Date.now()}) {

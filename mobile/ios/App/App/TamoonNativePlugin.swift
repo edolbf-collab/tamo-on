@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import UserNotifications
 import AuthenticationServices
 import CryptoKit
 import Security
@@ -17,6 +18,7 @@ public class TamoonNativePlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationCon
     public let identifier = "TamoonNativePlugin"
     public let jsName = "TamoonNative"
     public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "setBadgeCount", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "signInWithApple", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "appleCredentialState", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "authenticate", returnType: CAPPluginReturnPromise),
@@ -40,6 +42,23 @@ public class TamoonNativePlugin: CAPPlugin, CAPBridgedPlugin, ASAuthorizationCon
         }
     }
     deinit { if let observer = credentialObserver { NotificationCenter.default.removeObserver(observer) } }
+
+    @objc func setBadgeCount(_ call: CAPPluginCall) {
+        guard let count = call.getInt("count"), (0...200).contains(count) else {
+            call.reject("Contador de avisos inválido."); return
+        }
+        DispatchQueue.main.async {
+            if #available(iOS 16.0, *) {
+                UNUserNotificationCenter.current().setBadgeCount(count) { error in
+                    if error != nil { call.reject("Não foi possível atualizar o contador de avisos.") }
+                    else { call.resolve() }
+                }
+            } else {
+                UIApplication.shared.applicationIconBadgeNumber = count
+                call.resolve()
+            }
+        }
+    }
 
     @objc func appleCredentialState(_ call: CAPPluginCall) {
         guard let userID = call.getString("userId"), !userID.isEmpty else { call.reject("Identidade Apple ausente."); return }

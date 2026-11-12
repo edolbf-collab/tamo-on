@@ -8,7 +8,7 @@ export function nativeNotificationURL(value, origin = 'capacitor://localhost') {
   } catch { return null; }
 }
 
-export function createNativePush({plugin, storage, environment = 'production', platform = 'ios', origin = 'capacitor://localhost', notificationStatus, navigate, getApp, uuid = () => crypto.randomUUID()}) {
+export function createNativePush({plugin, storage, clearBadge, activateBadge, environment = 'production', platform = 'ios', origin = 'capacitor://localhost', notificationStatus, navigate, getApp, uuid = () => crypto.randomUUID()}) {
   const android = platform === 'android';
   const table = android ? 'android_push_subscriptions' : 'native_push_subscriptions';
   const saveRPC = android ? 'save_android_push_subscription' : 'save_native_push_subscription';
@@ -93,6 +93,7 @@ export function createNativePush({plugin, storage, environment = 'production', p
     flush,
     async initialize(authClient, accountId) {
       client = authClient; userId = accountId; generation += 1;
+      activateBadge?.();
       registration?.reject(Error('Registro reiniciado.'));
       await listeners();
       installationId = await storage.getItem(installationKey);
@@ -109,6 +110,7 @@ export function createNativePush({plugin, storage, environment = 'production', p
       if (requested.receive !== 'granted' || checked !== 'granted') throw Error('Permita as notificações em Ajustes → Apps → Tâmo On → Notificações.');
       if (android) await plugin.createChannel({id:'tamoon-alerts',name:'Avisos do Tâmo On',importance:4,sound:'default',visibility:0});
       desired = true;
+      activateBadge?.();
       return register();
     },
     async disable() {
@@ -119,8 +121,8 @@ export function createNativePush({plugin, storage, environment = 'production', p
       endpoint = ''; pendingURL = '';
       registration?.reject(Error('Notificações desativadas.'));
       await storage.setItem(preference, 'no');
-      await plugin.unregister();
-      await plugin.removeAllDeliveredNotifications().catch(() => {});
+      try { await plugin.unregister(); }
+      finally { await (clearBadge ? clearBadge() : plugin.removeAllDeliveredNotifications()).catch(() => {}); }
     },
     async status() {
       const permissionValue = await permission();

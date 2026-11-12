@@ -3,13 +3,15 @@ const encode = value => btoa(String.fromCharCode(...new Uint8Array(value))).repl
 const json64 = value => encode(new TextEncoder().encode(JSON.stringify(value)));
 export function apnsDestination(endpoint) {
   const match = /^apns:\/\/(production|sandbox)\/([a-f0-9]{64,512})$/.exec(endpoint);
-  if (!match) throw Error('INVALID_APNS_ENDPOINT');
+  if (!match) throw Object.assign(Error('INVALID_APNS_ENDPOINT'), {statusCode:400, body:'INVALID_APNS_ENDPOINT'});
   return `https://${match[1] === 'sandbox' ? 'api.sandbox.push.apple.com' : 'api.push.apple.com'}/3/device/${match[2]}`;
 }
 export function apnsPayload(notification) {
-  const url = new URL(notification.data?.url || '/', 'https://app.tamoon.app.br');
-  if (url.origin !== 'https://app.tamoon.app.br' || !['/', '/index.html'].includes(url.pathname)) throw Error('INVALID_NOTIFICATION_URL');
-  return {aps:{alert:{title:String(notification.title || 'Tâmo On').slice(0,160), body:String(notification.body || '').slice(0,240)}, sound:'default'}, url:url.href};
+  let url;
+  try { url = new URL(notification.data?.url || '/', 'https://app.tamoon.app.br'); }
+  catch { throw Object.assign(Error('INVALID_NOTIFICATION_URL'), {statusCode:400, body:'INVALID_NOTIFICATION_URL'}); }
+  if (url.origin !== 'https://app.tamoon.app.br' || !['/', '/index.html'].includes(url.pathname)) throw Object.assign(Error('INVALID_NOTIFICATION_URL'), {statusCode:400, body:'INVALID_NOTIFICATION_URL'});
+  return {aps:{alert:{title:String(notification.title || 'Tâmo On').slice(0,160), body:String(notification.body || '').slice(0,240)}, sound:'default', ...(Number.isInteger(notification.badgeCount) && notification.badgeCount >= 0 && notification.badgeCount <= 200 ? {badge:notification.badgeCount} : {})}, url:url.href};
 }
 export function createApnsSender({env, request = fetch, now = () => Date.now()}) {
   let cached, signing;

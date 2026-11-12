@@ -168,11 +168,29 @@ Deno.serve(async (req) => {
       group = data;
     }
 
-    const requestedOrigin = String(Deno.env.get("APP_BASE_URL") || req.headers.get("Origin") || "").trim().replace(/\/+$/, "");
-    // Packaged Android/iOS origins are internal to the device, never push destinations.
-    const isNativeOrigin = requestedOrigin.startsWith("capacitor:") || /^https?:\/\/localhost(?::\d+)?$/.test(requestedOrigin);
-    const appOrigin = isNativeOrigin ? "https://app.tamoon.app.br" : requestedOrigin;
+    // One public destination for web, legacy web and packaged clients. Request Origin
+    // and stale deployment settings must never control notification links.
+    const appOrigin = "https://app.tamoon.app.br";
 
+    // Match the inbox's 90-day window and 200-unread display limit. Query after
+    // inserting this event, once per recipient (including users with two devices).
+    const badgeCounts = new Map<string, Promise<number | undefined>>();
+    const unreadBadgeCount = (recipientId: string) => {
+      if (!badgeCounts.has(recipientId)) badgeCounts.set(recipientId, (async () => {
+        try {
+          const { data, error } = await adminClient.from("user_notifications")
+            .select("id").eq("user_id", recipientId).is("read_at", null)
+            .gte("created_at", new Date(Date.now() - 90 * 86400000).toISOString()).limit(200);
+          if (error || !Array.isArray(data)) throw error || new Error("Unread count unavailable");
+          return data.length;
+        } catch {
+          // A badge outage must not prevent delivery or erase the existing badge.
+          console.warn("Não foi possível consultar o contador de avisos.");
+          return undefined;
+        }
+      })());
+      return badgeCounts.get(recipientId)!;
+    };
 
     const eventIdFromData = (data: Record<string, unknown>, fallback: string) => cleanText(
       data.announcementId || data.systemAnnouncementId || data.matchId || data.chargeId || data.playerId || fallback,
@@ -330,7 +348,9 @@ Deno.serve(async (req) => {
             const {data: current, error} = await adminClient.from(subscription.android ? "android_push_subscriptions" : "native_push_subscriptions").select("id").eq("id", subscription.id).eq("user_id", subscription.user_id).eq("updated_at", subscription.updated_at!).eq("enabled", true).maybeSingle();
             if (error) throw error;
             if (!current) throw Object.assign(new Error("Registro de aparelho desativado."), {statusCode:410});
-            await (subscription.android ? sendFcm : sendApns)(subscription.endpoint, JSON.parse(notificationPayload), deliveryId);
+            const notification = JSON.parse(notificationPayload);
+            notification.badgeCount = await unreadBadgeCount(subscription.user_id);
+            await (subscription.android ? sendFcm : sendApns)(subscription.endpoint, notification, deliveryId);
           } else await sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh!, auth: subscription.auth! } }, notificationPayload, {
             vapidDetails: { subject: vapidSubject, publicKey: vapidPublicKey, privateKey: vapidPrivateKey },
             TTL: 86400,

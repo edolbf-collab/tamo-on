@@ -13,25 +13,47 @@ const source = await readFile(new URL('../../../supabase/functions/publish-annou
 const code = stripTypeScriptTypes(source.replace(/^import .*;\r?\n/gm, ''), {mode:'strip'});
 const user = {id:'user-test', email:'test@example.test'};
 
-function fixture({origin, baseURL, provider='android', authenticated=true, telemetryUnavailable=false}) {
+function fixture({origin, baseURL, provider='android', authenticated=true, telemetryUnavailable=false, action='test-push', countUnavailable=false, unread=3}) {
   let handler;
-  const sent=[], updates=[], attempts=[];
+  const sent=[], updates=[], attempts=[], badgeQueries=[];
+  const recipient = action === 'test-push' ? user.id : 'recipient-test';
   const table = provider === 'android' ? 'android_push_subscriptions' : 'native_push_subscriptions';
   const endpoint = provider === 'android' ? 'fcm://Android_Test_0123456789:Token' : `apns://production/${'a'.repeat(64)}`;
-  const subscription = {id:'device-test', user_id:user.id, endpoint, updated_at:'2026-11-08T12:00:00Z'};
-  const rows = {beta_access:[{status:'active',user_id:user.id}], group_members:[{role:'owner'}], groups:[{id:'group-test',name:'Grupo teste'}],
-    push_subscriptions:[], native_push_subscriptions:[], android_push_subscriptions:[], [table]:[subscription]};
+  const subscription = {id:'device-test', user_id:recipient, enabled:true, endpoint, updated_at:'2026-11-08T12:00:00Z'};
+  const fresh = new Date().toISOString();
+  const rows = {
+    beta_access:[{email:user.email,status:'active',user_id:user.id},{status:'active',user_id:recipient}],
+    group_members:[{role:'owner',user_id:user.id,group_id:'group-test'},{role:'member',user_id:recipient,group_id:'group-test'}],
+    groups:[{id:'group-test',name:'Grupo teste'}],
+    matches:[{id:'match-test',group_id:'group-test',title:'Partida',starts_at:fresh,location:'Quadra'}],
+    players:[{id:'player-test',group_id:'group-test',user_id:recipient,name:'Membro'}],
+    match_attendance:[{id:'attendance-test',group_id:'group-test',match_id:'match-test',player_id:'player-test',status:'confirmed'}],
+    charges:[{id:'charge-test',group_id:'group-test',player_id:'player-test',description:'Cota',amount:10}],
+    user_notifications:[
+      ...Array.from({length:unread},(_,i)=>({id:`unread-${i}`,user_id:recipient,read_at:null,created_at:fresh})),
+      {id:'read',user_id:recipient,read_at:fresh,created_at:fresh},
+      {id:'old',user_id:recipient,read_at:null,created_at:'2020-01-01T00:00:00Z'},
+      {id:'other',user_id:'unrelated',read_at:null,created_at:fresh}
+    ],
+    push_subscriptions:[], native_push_subscriptions:[], android_push_subscriptions:[], [table]:[subscription]
+  };
   const client = {
     auth:{getUser:async()=>({data:{user:authenticated ? user : null}})},
-    rpc:async(name,args)=>{if(name==='record_native_push_attempt'){attempts.push(args.p_event);return {error:telemetryUnavailable?{message:'unavailable'}:null};}return {data:name==='community_legal_access_for_user'?true:[user.id]};},
+    rpc:async(name,args)=>{if(name==='record_native_push_attempt'){attempts.push(args.p_event);return {error:telemetryUnavailable?{message:'unavailable'}:null};}return {data:name==='community_legal_access_for_user'?true:args.p_recipients};},
     from(name) {
       assert(name in rows, `Unexpected table ${name}`);
-      let values=rows[name];
+      let values=rows[name], badgeQuery=false;
       return {
-        select(){return this;}, in(){return this;}, eq(){return this;},
+        select(columns){if(name==='user_notifications'&&columns==='id'){badgeQuery=true;badgeQueries.push(name);}return this;},
+        in(key,ids){values=values.filter(v=>ids.includes(v[key]));return this;},
+        eq(key,value){values=values.filter(v=>v[key]===value);return this;},
+        is(key,value){values=values.filter(v=>v[key]===value);return this;},
+        gte(key,value){values=values.filter(v=>v[key]>=value);return this;},
+        limit(n){values=values.slice(0,n);return this;},
+        insert(items){values=items.map(v=>({...v,read_at:null,created_at:fresh}));rows[name].push(...values);return this;},
         update(value){updates.push({table:name,...value}); values=[]; return this;},
         maybeSingle:async()=>({data:values[0]||null}), single:async()=>({data:values[0]||null}),
-        then(resolve,reject){return Promise.resolve({data:values}).then(resolve,reject);}
+        then(resolve,reject){return Promise.resolve({data:values,error:badgeQuery&&countUnavailable?{message:'count unavailable'}:null}).then(resolve,reject);}
       };
     }
   };
@@ -46,17 +68,17 @@ function fixture({origin, baseURL, provider='android', authenticated=true, telem
     createClient:()=>client, createFcmSender:()=>send, createApnsSender:()=>send, recordNativeAttempt,
     sendNotification:()=>{throw Error('Unexpected Web Push');},
     Response,URL,crypto,AbortSignal,setTimeout,console:{warn(){},error(){}}});
-  return {sent,updates,attempts, async request(withAuthorization=true) {
+  return {sent,updates,attempts,rows,badgeQueries, async request(withAuthorization=true) {
     const headers={'Content-Type':'application/json'};
     if(origin)headers.Origin=origin;
     if(withAuthorization)headers.Authorization='Bearer test-session';
     return handler(new Request('https://test.supabase.co/functions/v1/publish-announcement', {
-      method:'POST',headers,body:JSON.stringify({action:'test-push',groupId:'group-test',endpoint})
+      method:'POST',headers,body:JSON.stringify({action,groupId:'group-test',endpoint,matchId:'match-test',playerId:'player-test',chargeId:'charge-test',badgeCount:199})
     }));
   }};
 }
 
-for(const origin of ['https://localhost','http://localhost','https://localhost:8443','capacitor://localhost','https://app.tamoon.app.br',undefined]) {
+for(const origin of ['https://localhost','http://localhost','https://localhost:8443','capacitor://localhost','https://app.tamoon.app.br','https://resenhafc-beta.pages.dev','https://localhost.evil.test',undefined]) {
   for(const provider of ['android','ios']) {
     test(`${origin || 'no Origin'} creates a valid ${provider} notification and records success`, async()=>{
       const f=fixture({origin,provider});
@@ -73,18 +95,9 @@ for(const origin of ['https://localhost','http://localhost','https://localhost:8
     });
   }
 }
-test('configured public URL takes precedence over request Origin',async()=>{
-  const f=fixture({origin:'https://other.test',baseURL:'https://app.tamoon.app.br/'});
+test('stale configuration and request Origin cannot override the canonical URL',async()=>{
+  const f=fixture({origin:'https://other.test',baseURL:'https://resenhafc-beta.pages.dev/'});
   assert.equal((await (await f.request()).json()).sent,1);
-});
-test('foreign URLs remain rejected and do not disable the device',async()=>{
-  const f=fixture({origin:'https://localhost.evil.test'});
-  const result=await (await f.request()).json();
-  assert.equal(result.sent,0);assert.equal(result.failed,1);assert.equal(result.failureStatus,400);
-  assert.equal(f.sent.length,0);
-  assert(f.attempts.some(row=>row.success===false&&row.is_final===true&&row.status_code===400));
-  assert.ok(!JSON.stringify(f.attempts).includes('INVALID_NOTIFICATION_URL'));
-  assert(!f.updates.some(row=>row.enabled===false));
 });
 test('native request Origin never bypasses session authentication',async()=>{
   for(const authenticated of [true,false]){
@@ -95,3 +108,29 @@ test('native request Origin never bypasses session authentication',async()=>{
 });
 
 test('telemetry outage never turns an accepted native push into a failed send',async()=>{const f=fixture({origin:'https://localhost',telemetryUnavailable:true});const result=await(await f.request()).json();assert.equal(result.sent,1);assert.equal(result.failed,0);assert.equal(f.attempts.length,1);});
+
+for (const provider of ['ios','android']) {
+  for (const action of ['attendance-confirmed','match-created','charge-created']) {
+    test(`${provider} ${action}: legacy origin delivers canonical link and recipient unread count`,async()=>{
+      const f=fixture({origin:'https://resenhafc-beta.pages.dev',provider,action});
+      const response=await f.request();const result=await response.json();
+      assert.equal(response.status,200,JSON.stringify(result));assert.equal(result.sent,1);assert.equal(result.failed,0);
+      const {notification,payload}=f.sent[0];
+      assert.equal(new URL(notification.data.url).origin,'https://app.tamoon.app.br');
+      assert.equal(notification.badgeCount,4); // three unread + newly inserted; excludes old/read/other users
+      assert.equal(provider==='ios'?payload.aps.badge:payload.message.android.notification.notification_count,4);
+      assert(f.rows.user_notifications.some(row=>row.target_url===notification.data.url&&row.user_id==='recipient-test'));
+      assert.equal(f.badgeQueries.length,1);
+    });
+  }
+  test(`${provider} badge lookup failure does not block push or clear an existing badge`,async()=>{
+    const f=fixture({provider,countUnavailable:true});
+    assert.equal((await(await f.request()).json()).sent,1);
+    assert.equal(f.sent[0].notification.badgeCount,undefined);
+  });
+  test(`${provider} badge count matches the 200-item inbox limit`,async()=>{
+    const f=fixture({provider,unread:250});
+    assert.equal((await(await f.request()).json()).sent,1);
+    assert.equal(f.sent[0].notification.badgeCount,200);
+  });
+}

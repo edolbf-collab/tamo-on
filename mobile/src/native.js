@@ -4,6 +4,7 @@ import {Share} from '@capacitor/share';
 import {Clipboard} from '@capacitor/clipboard';
 import {PushNotifications} from '@capacitor/push-notifications';
 import {createNativePush} from './push.mjs';
+import {createNativeBadge, refreshNativeInbox} from './badge.mjs';
 import {nativeBack} from './back.mjs';
 import {createInviteReceiver} from './invite.mjs';
 import {createClient} from '@supabase/supabase-js';
@@ -90,12 +91,15 @@ window.TamoonNative={
   async saveJson(data,name){await Bridge.shareFile({name,contents:JSON.stringify(data,null,2)});}
 };
 if(isNative){
+  const badge = createNativeBadge({plugin:PushNotifications, setCount:isIOS ? count=>Bridge.setBadgeCount({count}) : null, getApp:()=>window.App});
+  window.TamoonNative.badge = badge;
+  NativeApp.addListener('appStateChange',({isActive})=>{if(isActive)refreshNativeInbox(()=>window.App).catch(()=>{});}).catch(()=>{});
   const receiveInvite=createInviteReceiver({storage:localStorage,session:sessionStorage,getApp:()=>window.App,location});
   NativeApp.addListener('appUrlOpen',({url})=>receiveInvite(url)).catch(()=>{});
   NativeApp.getLaunchUrl().then(launch=>{if(launch?.url)receiveInvite(launch.url,{launch:true});}).catch(()=>{});
   NativeApp.getInfo().then(info=>{window.TamoonNative.appInfo=info;}).catch(()=>{});
   if(isAndroid)NativeApp.addListener('backButton',({canGoBack})=>nativeBack({document,app:window.App,marketplace:window.TamoonMarketplacePilot,location,history,canGoBack,minimize:()=>NativeApp.minimizeApp()}).catch(()=>{})).catch(()=>{});
-  const push = createNativePush({plugin:PushNotifications, storage:window.TamoonNative.storage, environment:'production', platform:Capacitor.getPlatform(), origin:isAndroid?'https://localhost':'capacitor://localhost', notificationStatus:()=>Bridge.notificationStatus(), navigate:url=>{if(location.pathname.startsWith('/marketplace/')){location.assign(url);return true;}return false;}, getApp:()=>window.App});
+  const push = createNativePush({plugin:PushNotifications, clearBadge:()=>badge.clear(), activateBadge:()=>badge.activate(), storage:window.TamoonNative.storage, environment:'production', platform:Capacitor.getPlatform(), origin:isAndroid?'https://localhost':'capacitor://localhost', notificationStatus:()=>Bridge.notificationStatus(), navigate:url=>{if(location.pathname.startsWith('/marketplace/')){location.assign(url);return true;}return false;}, getApp:()=>window.App});
   window.TamoonNative.push = push;
   push.listen().catch(()=>{});
   if(isIOS)Bridge.addListener('appleCredentialRevoked',async()=>{
