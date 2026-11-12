@@ -1,11 +1,11 @@
 {
   "channel": "beta",
   "version": "1.0",
-  "build": 172,
+  "build": 173,
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Administração: quatro acessos em duas colunas e monitor unificado de notificações Android, iOS e web.",
-  "label": "Tâmo On 1.0 Build 172",
-  "integration": "172-R1"
+  "notes": "Correções nas notificações e atualização dos indicadores de avisos no iPhone e Android.",
+  "label": "Tâmo On 1.0 Build 173",
+  "integration": "173-R1"
 }
