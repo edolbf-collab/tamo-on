@@ -4,18 +4,20 @@
 
 O servidor usava o Origin da requisição para montar links. Avisos enviados pela instalação web antiga (`resenhafc-beta.pages.dev`) falhavam nos validadores nativos, antes de chegar à Apple ou ao Google. Todos os novos links agora usam `https://app.tamoon.app.br`. A validação dos destinos permanece restrita à Comunidade.
 
-O APNs e o FCM passam a receber o total de avisos não lidos do destinatário, consultado no servidor após a criação do aviso. A consulta segue a janela de 90 dias e o limite de 200 avisos do painel. O contador não vem do cliente. Se sua consulta falhar, o envio continua sem alterar o contador existente.
+O APNs passa a receber o total de avisos não lidos do destinatário, consultado no servidor após a criação do aviso. A consulta segue a janela de 90 dias e o limite de 200 avisos do painel. O contador não vem do cliente. Se sua consulta falhar, o envio continua sem alterar o contador existente.
 
 Erros locais de URL no iOS agora são classificados como payload inválido (400), sem três tentativas indevidas nem diagnóstico de falha de transporte.
 
-O pacote móvel inclui uma ponte iOS para atualizar/zerar o contador após leitura ou saída e atualiza a caixa de avisos ao voltar ao app. Android remove as notificações já lidas da bandeja; o indicador do ícone depende do launcher. As remoções preservam avisos recém-chegados que não constavam da consulta. A fila descarta atualizações da conta anterior ao sair ou trocar de conta.
+No Android, cada entrada na bandeja representa um aviso (`notification_count: 1`). Não se repete o total global em cada entrada, pois launchers podem somar esses números. A documentação FCM define esse campo como a quantidade representada por uma notificação: https://firebase.google.com/docs/reference/fcm/rest/v1/projects.messages#androidnotification.
+
+O pacote móvel inclui uma ponte iOS para atualizar/zerar o contador após leitura ou saída e atualiza a caixa de avisos ao voltar ao app. Android identifica cada aviso pelo tag do servidor e remove as notificações já lidas da bandeja; o indicador do ícone depende do launcher. As remoções preservam avisos recém-chegados que não constavam da consulta. A fila descarta atualizações da conta anterior ao sair ou trocar de conta.
 
 ## Verificação executada
 
-- 272 testes de regressão passaram, incluindo o handler real com I/O simulado para presença, nova partida e cobrança originados no domínio antigo, ambos os provedores, isolamento do contador por destinatário, falha de consulta e validação de URLs.
+- 271 testes de regressão passaram, incluindo o handler real com I/O simulado para presença, nova partida e cobrança originados no domínio antigo, ambos os provedores, isolamento do contador por destinatário, falha de consulta e validação de URLs.
 - Pacote local Android gerado e checagens estruturais iOS/Android aprovadas.
 - Teste de inicialização Swift ampliado para chamar a ponte do contador; compilação e execução dependem do CI macOS.
-- Edge Function `publish-announcement` publicada como versão 39. A chamada sem sessão continua respondendo 401.
+- Edge Function `publish-announcement` publicada como versão 41. A chamada sem sessão continua respondendo 401.
 
 ## Validação física antes de publicar os pacotes móveis
 

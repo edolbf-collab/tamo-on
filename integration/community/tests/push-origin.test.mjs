@@ -117,18 +117,18 @@ for (const provider of ['ios','android']) {
       assert.equal(response.status,200,JSON.stringify(result));assert.equal(result.sent,1);assert.equal(result.failed,0);
       const {notification,payload}=f.sent[0];
       assert.equal(new URL(notification.data.url).origin,'https://app.tamoon.app.br');
-      assert.equal(notification.badgeCount,4); // three unread + newly inserted; excludes old/read/other users
-      assert.equal(provider==='ios'?payload.aps.badge:payload.message.android.notification.notification_count,4);
+      assert.equal(notification.badgeCount,provider==='ios'?4:undefined); // three unread + newly inserted; excludes old/read/other users
+      assert.equal(provider==='ios'?payload.aps.badge:payload.message.android.notification.notification_count,provider==='ios'?4:1);
       assert(f.rows.user_notifications.some(row=>row.target_url===notification.data.url&&row.user_id==='recipient-test'));
-      assert.equal(f.badgeQueries.length,1);
+      assert.equal(f.badgeQueries.length,provider==='ios'?1:0);
     });
   }
-  test(`${provider} badge lookup failure does not block push or clear an existing badge`,async()=>{
+  if (provider==='ios') test(`${provider} badge lookup failure does not block push or clear an existing badge`,async()=>{
     const f=fixture({provider,countUnavailable:true});
     assert.equal((await(await f.request()).json()).sent,1);
     assert.equal(f.sent[0].notification.badgeCount,undefined);
   });
-  test(`${provider} badge count matches the 200-item inbox limit`,async()=>{
+  if (provider==='ios') test(`${provider} badge count matches the 200-item inbox limit`,async()=>{
     const f=fixture({provider,unread:250});
     assert.equal((await(await f.request()).json()).sent,1);
     assert.equal(f.sent[0].notification.badgeCount,200);

@@ -349,7 +349,7 @@ Deno.serve(async (req) => {
             if (error) throw error;
             if (!current) throw Object.assign(new Error("Registro de aparelho desativado."), {statusCode:410});
             const notification = JSON.parse(notificationPayload);
-            notification.badgeCount = await unreadBadgeCount(subscription.user_id);
+            notification.badgeCount = subscription.android ? undefined : await unreadBadgeCount(subscription.user_id);
             await (subscription.android ? sendFcm : sendApns)(subscription.endpoint, notification, deliveryId);
           } else await sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh!, auth: subscription.auth! } }, notificationPayload, {
             vapidDetails: { subject: vapidSubject, publicKey: vapidPublicKey, privateKey: vapidPrivateKey },

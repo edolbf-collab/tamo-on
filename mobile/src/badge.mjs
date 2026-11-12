@@ -25,6 +25,10 @@ export function createNativeBadge({plugin, setCount, getApp}) {
         const {notifications} = await plugin.getDeliveredNotifications();
         if (!current()) return;
         const read = (notifications || []).filter(notification => {
+          // FCM custom data lives in the tap intent, not necessarily in the tray
+          // extras returned by Capacitor. The server's stable tag identifies it.
+          if (typeof notification.tag === 'string' && notification.tag.startsWith('tamoon-inbox:'))
+            return readIds.has(notification.tag.slice('tamoon-inbox:'.length));
           try {
             const url = new URL(notification.data?.url || '', 'https://app.tamoon.app.br');
             return url.origin === 'https://app.tamoon.app.br' && readIds.has(url.searchParams.get('notification'));

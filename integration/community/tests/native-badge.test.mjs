@@ -9,7 +9,7 @@ for (const count of [0,1,200,undefined,-1,201,1.2,'3',null]) {
     const notification={badgeCount:count,data:{url:'/',badgeCount:99,secret:'hidden'}};
     const expected=Number.isInteger(count)&&count>=0&&count<=200?count:undefined;
     assert.equal(apnsPayload(notification).aps.badge,expected);
-    assert.equal(fcmPayload('fcm://Android_Test_0123456789:Token',notification).message.android.notification.notification_count,expected);
+    assert.equal(fcmPayload('fcm://Android_Test_0123456789:Token',notification).message.android.notification.notification_count,1);
   });
 }
 test('invalid iOS destinations fail locally with 400, without credentials or network',async()=>{
@@ -23,7 +23,7 @@ function fixture({android=false}={}) {
   const app={ready:true,state:{profile:{id:'one'},user_notifications:[{id:'read',read_at:'today'},{id:'unread',read_at:null}]},repo:{loadUserNotifications:async()=>{calls.push('reload');}},updateNotificationBadge:()=>calls.push('refresh')};
   const plugin={
     getDeliveredNotifications:async()=>({notifications:[
-      {id:'a',data:{url:'https://app.tamoon.app.br/?notification=read'}},
+      android ? {id:'a',tag:'tamoon-inbox:read',data:{'android.title':'Aviso'}} : {id:'a',data:{url:'https://app.tamoon.app.br/?notification=read'}},
       {id:'b',data:{url:'https://app.tamoon.app.br/?notification=unread'}},
       {id:'c',data:{url:'https://app.tamoon.app.br/?notification=new-arrival'}},
       {id:'d',data:{url:'https://evil.test/?notification=read'}}
@@ -58,4 +58,12 @@ test('resume reloads inbox and refreshes badge; logout during reload does not re
   const f=fixture();await refreshNativeInbox(()=>f.app);assert.deepEqual(f.calls,['reload','refresh']);f.calls.length=0;
   f.app.repo.loadUserNotifications=async()=>{f.app.state.profile=null;};
   await refreshNativeInbox(()=>f.app);assert.deepEqual(f.calls,[]);
+});
+
+test('FCM identifies each inbox entry in the Android tray without relying on tap-intent data',()=>{
+  const id='bcb632e4-a6be-4dd2-9554-ce5409ab0754';
+  const payload=fcmPayload('fcm://Android_Test_0123456789:Token',{badgeCount:40,data:{url:'/',notificationId:id}});
+  assert.equal(payload.message.android.notification.tag,`tamoon-inbox:${id}`);
+  assert.equal(payload.message.android.notification.notification_count,1);
+  assert.equal(fcmPayload('fcm://Android_Test_0123456789:Token',{data:{url:'/'}}).message.android.notification.tag,undefined);
 });
