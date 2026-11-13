@@ -5,6 +5,7 @@ const BADGE_DB_VERSION = 1;
 const BADGE_STORE_NAME = "app-state";
 const BADGE_COUNT_KEY = "unread-notification-count";
 const ASSETS = [
+  "/marketplace/mobile-layout.css?v=mobile1",
   "/admin-notifications.js?v=admin4",
   "/admin-notifications.css?v=admin4",
   "/marketplace/admin-daily.js?v=admin4",

@@ -1,0 +1,164 @@
+/* Shared by Community and Marketplace, including the packaged Android/iOS app.
+   Fixed UI labels and amounts stay whole. Free-form messages, names, IDs and
+   explanatory copy retain their own wrapping rules. Desktop is unchanged. */
+@media (max-width: 900px) {
+  .modal:has(.daily-root), .modal:has(.ops-layout), .modal:has(.notify-monitor) { max-width: 100%; }
+  /* Intrinsic button widths: wrap the buttons, never the words inside them. */
+  .ops-layout { grid-template-columns: minmax(0, 1fr); }
+  .ops-nav, .daily-tabs, .notify-tabs {
+    display: flex;
+    flex-flow: row wrap;
+    gap: 8px;
+    min-width: 0;
+  }
+  .ops-nav button, .daily-tabs button, .notify-tabs button {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: max-content;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+    text-align: center;
+    min-height: 44px;
+  }
+  .ops-related, .pf-tabs, .metrics-controls { flex-wrap: wrap; }
+  .ops-related button, .pf-tabs button, .metrics-controls button {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+
+  /* A narrow numeric tile is not made legible by splitting its currency.
+     Use fewer columns, sized from the actual available container width. */
+  .metrics-cards, .pf-metrics, .pf-summary .pf-metrics,
+  .daily-metrics, .notify-metrics, .stats-grid,
+  .pf-reservation-values {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  }
+  .admin-stats, .admin-stats.compact, .push-metrics-grid,
+  .balance-grid, .finance-summary-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  }
+  .metrics { grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); }
+  .metrics-cards .card, .pf-metric, .daily-metrics article,
+  .notify-metrics article, .stat, .admin-stat, .balance-grid > div,
+  .finance-summary-grid > div, .pf-reservation-values > div { min-width: 0; }
+
+  .metrics-cards .card > span, .pf-metric > span,
+  .daily-metrics article > span, .notify-metrics article > span,
+  .stat > span, .admin-stat > small, .metric > small,
+  .balance-grid small, .finance-summary-grid small,
+  .pf-reservation-values dt {
+    display: block;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+    max-width: 100%;
+    overflow-x: auto;
+    text-overflow: clip;
+  }
+  .metrics-cards .card > span { font-size: 13px; }
+  .metrics-cards strong, .pf-metric > strong, .pf-availability dd,
+  .pf-reservation-values dd, .daily-metrics strong, .notify-metrics strong,
+  .stat strong, .admin-stat strong, .metric strong, .balance-card h2,
+  .balance-grid strong, .finance-summary-grid strong, .refund-row-value strong,
+  .reservation-total-line strong, .monthly-preview-heading > span,
+  .monthly-period-price > strong {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+    font-variant-numeric: tabular-nums;
+    /* Extreme values or enlarged system text remain accessible, never ellipsized. */
+    overflow-x: auto;
+    text-overflow: clip;
+  }
+  .metrics-cards strong, .pf-metric > strong { font-size: 24px; }
+  .pf-availability dl > div, .pf-lines > div, .finance-line-list > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 12px;
+    min-width: 0;
+  }
+  .pf-availability dt, .pf-lines dt, .finance-line-list dt {
+    flex: 1 1 100%;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+  .pf-availability dd, .pf-lines dd, .finance-line-list dd {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow-x: auto;
+  }
+  .reservation-total-line { flex-wrap: wrap; }
+  .refund-row { grid-template-columns: minmax(0, 1fr); }
+  .refund-row-dates { text-align: left; }
+  .refund-row > .button { justify-self: stretch; }
+
+  /* Reservation/payment actions must not inherit the old two-column split. */
+  .reservation-list .reservation-card-actions,
+  .monthly-customer-card > .item-actions,
+  .monthly-period-next .item-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .reservation-list .reservation-card-actions .button,
+  .monthly-customer-card > .item-actions .button,
+  .monthly-period-next .item-actions .button {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: max-content;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+  .finance-period-toolbar > .item-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .finance-period-toolbar .item-actions > .button {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: max-content;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  .marketplace-menu .subnav-label, .role-chip,
+  .home-quick-grid .quick-card strong, .finance-tabs button span {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+  .role-switcher { display: flex; flex-wrap: wrap; }
+  .role-chip { flex: 1 1 auto; min-width: max-content; }
+  .finance-row { flex-wrap: wrap; }
+  .finance-value-bubble { max-width: 100%; margin-left: auto; }
+  .finance-value-bubble small { max-width: 100%; white-space: nowrap; overflow-wrap: normal; }
+  .finance-row .money { max-width: 100%; overflow-x: auto; text-overflow: clip; }
+  .reservation-list .reservation-card-heading { display: flex; flex-direction: column; }
+  .reservation-list .reservation-card-heading > .status,
+  .ops-badge, .daily-badge, .notify-badge, .pf-reservation-status {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+  }
+  .ops-layout .ops-row, .daily-root .daily-item,
+  .notify-rowhead, .notify-row summary { flex-wrap: wrap; }
+  .ops-row > span:first-child, .daily-item > span:first-child,
+  .notify-rowhead > span:first-child, .notify-row summary > span:first-child {
+    flex-basis: 160px;
+  }
+}
