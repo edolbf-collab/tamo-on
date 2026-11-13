@@ -1,11 +1,11 @@
 {
   "channel": "beta",
   "version": "1.0",
-  "build": 173,
+  "build": 174,
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Correções nas notificações e atualização dos indicadores de avisos no iPhone e Android.",
-  "label": "Tâmo On 1.0 Build 173",
-  "integration": "173-R1"
+  "notes": "Melhorias de leitura no celular, métricas mensais e ajustes na administração, com correções de notificações preservadas.",
+  "label": "Tâmo On 1.0 Build 174",
+  "integration": "174-R1"
 }
