@@ -1,0 +1,35 @@
+name: Marketplace metrics validation
+on:
+  push:
+    branches: [main]
+    paths: ['marketplace/metrics.*', 'marketplace/app.js', 'marketplace/partner-operations.js', 'integration/marketplace/supabase/migrations/*marketplace_metrics*.sql', 'mobile/tests/admin-metrics*', '.github/workflows/marketplace-metrics.yml']
+  pull_request:
+    paths: ['marketplace/metrics.*', 'marketplace/app.js', 'marketplace/partner-operations.js', 'integration/marketplace/supabase/migrations/*marketplace_metrics*.sql', 'mobile/tests/admin-metrics*', '.github/workflows/marketplace-metrics.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci --prefix mobile --no-audit --no-fund
+      - run: node --test mobile/tests/admin-metrics.test.mjs integration/marketplace/tests/*.test.mjs
+        env:
+          METRICS_FIXTURE: /tmp/metrics-fixture.json
+      - run: npm run build --prefix integration/marketplace
+      - run: npx playwright install --with-deps chromium
+        working-directory: mobile
+      - run: node mobile/tests/admin-metrics-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: marketplace-metrics-preview
+          path: /tmp/metrics-preview/*.png
+          if-no-files-found: ignore

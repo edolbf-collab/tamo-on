@@ -15,7 +15,7 @@ function fixture(){
 }
 test('navigation retains the exact destinations and current page for each role',()=>{
  const c=fixture();
- for(const [role,count] of [['user',6],['admin',9]]){
+ for(const [role,count] of [['user',6],['admin',10]]){
   const html=c.navigationItems(role);
   assert.equal((html.match(/data-nav=/g)||[]).length,count);
   assert.equal((html.match(/aria-current="page"/g)||[]).length,1);
@@ -26,9 +26,9 @@ test('navigation retains the exact destinations and current page for each role',
 });
 test('restricted partner destinations cannot be navigated from the shared menu',()=>{
  const c=fixture(),html=c.navigationItems('partner');
- assert.equal((html.match(/disabled aria-disabled="true"/g)||[]).length,8);
+ assert.equal((html.match(/disabled aria-disabled="true"/g)||[]).length,9);
  assert.deepEqual([...html.matchAll(/data-nav="([^"]+)"/g)].map(x=>x[1]),['registration']);
- assert.doesNotMatch(html,/data-nav="finance"/);
+ assert.doesNotMatch(html,/data-nav="(?:finance|metrics)"/);
  c.partnerAccessPending=true;
  assert.match(c.navigationItems('partner'),/Atualizando…/);
 });

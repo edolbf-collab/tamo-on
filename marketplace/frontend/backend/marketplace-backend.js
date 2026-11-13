@@ -131,7 +131,7 @@
     window.TamoonMarketplacePilot?.leave();
   }
 
-  const readonlyRpcNames = new Set(["marketplace_financial_period","marketplace_financial_receipts","reservation_payment_audit","partner_readonly_status","partner_readonly_bootstrap","monthly_link_request_messages","occurrence_transfer_available_slots","occurrence_transfer_conversation","community_marketplace_notifications","admin_search_reservations","reservation_cancellation_preview"]);
+  const readonlyRpcNames = new Set(["marketplace_metrics","marketplace_financial_period","marketplace_financial_receipts","reservation_payment_audit","partner_readonly_status","partner_readonly_bootstrap","monthly_link_request_messages","occurrence_transfer_available_slots","occurrence_transfer_conversation","community_marketplace_notifications","admin_search_reservations","reservation_cancellation_preview"]);
 
   async function assertWritable() {
     const c=requireClient();

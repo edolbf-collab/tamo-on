@@ -122,6 +122,7 @@
       ["team", "♙", "Equipe"],
       ["vouchers", "%", "Vouchers"],
       ["finance", "$", "Financeiro"],
+      ["metrics", "▥", "Métricas"],
       ["registration", "≡", "Cadastro"]
     ],
     admin: [
@@ -131,6 +132,7 @@
       ["reservations", "▣", "Reservas"],
       ["users", "◎", "Usuários"],
       ["finance", "$", "Financeiro"],
+      ["metrics", "▥", "Métricas"],
       ["refunds", "↩", "Devoluções"],
       ["vouchers", "%", "Vouchers"],
       ["settings", "⚙", "Configurações"]
@@ -7572,7 +7574,7 @@
       return navShell("partner",partial[state.activePage.partner] && partnerPageAllowed(state.activePage.partner) ? partial[state.activePage.partner]() : partnerRestrictedSection("Cadastro em validação"));
     }
     if (!access.allowed) return partnerRestrictedView(access);
-    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, registration: partnerRegistration };
+    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, metrics: metricsPage, registration: partnerRegistration };
     const page=state.activePage.partner;
     if(partnerAccessPending)return navShell("partner",partnerRestrictedSection("Atualizando permissões"));
     if(!partnerPageAllowed(page))return navShell("partner",partnerRestrictedSection((menus.partner.find(item=>item[0]===page)||[])[2]||"Esta área"));
@@ -8114,6 +8116,26 @@
   }
 
 
+  let metricsConsole=null;
+  function metricsIdentity(){
+    if(state.activePage?.[state.role]!=="metrics" || !backendRuntime.enabled || !backendIsOnline())return '';
+    if(state.role==='admin')return adminRefundContext()?JSON.stringify([adminRefundContext(),'admin']):'';
+    const id=backendRuntime.identityId;
+    if(state.role!=='partner'||!id||!currentPartnerAccessStatus().allowed||!hasPartnerPermission('manage_finance')
+      ||backendRuntime.bootstrap?.profile?.status!=='active'||backendRuntime.bootstrap?.profile?.id!==id
+      ||backendRuntime.session?.user?.id!==id||window.MarketplaceBackend?.session?.user?.id!==id
+      ||window.TamoonMarketplacePilot?.blocked||window.TamoonMarketplacePilot?.leaving)return '';
+    return JSON.stringify([id,'partner',state.partnerProfile.backendPartnerId,partnerReadonlyActive()]);
+  }
+  function metricsPage(){return pageHeader(state.role==='admin'?'Administração':'Portal do parceiro','Métricas','Ocupação, recebimentos e recorrência para acompanhar o seu espaço.')
+    +(metricsIdentity()?'<div id="marketMetrics" data-ui-owned></div>':'<p class="callout">As métricas consultam os dados oficiais. Entre com uma conta autorizada e conectada ao Marketplace.</p>');}
+  function mountMetrics(){
+    const host=app.querySelector('#marketMetrics'),key=metricsIdentity();
+    if(metricsConsole&&(metricsConsole.root!==host||metricsConsole.key!==key)){metricsConsole.dispose();metricsConsole=null;}
+    if(host&&key&&!metricsConsole)metricsConsole=window.TamoonMetrics.mount(host,{identity:metricsIdentity,admin:state.role==='admin',
+      partnerId:state.role==='partner'?state.partnerProfile.backendPartnerId:null,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)});
+  }
+
   let operationsConsole=null;
   function adminOperationsPage(){
     return pageHeader('Administração','Central de operações','Resumo, pendências e agenda para acompanhar a operação.')
@@ -8127,13 +8149,14 @@
     });
   }
   function adminView() {
-    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
+    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, metrics: metricsPage, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
     return navShell("admin", (views[state.activePage.admin] || adminOverview)());
   }
 
   function render() {
     if(window.TamoonMarketplacePilot?.leaving)return;
     if(operationsConsole && operationsConsole.key!==adminRefundContext()){operationsConsole.dispose();operationsConsole=null;}
+    if(metricsConsole&&metricsConsole.key!==metricsIdentity()){metricsConsole.dispose();metricsConsole=null;}
     adminRefundStore.get();
     if(!adminRefundContext() && ['admin-refund-details','asaas-refund','admin-refunds'].includes(detailDialog.dataset.view)){
       stopAsaasRefundMonitor();detailReturnContext=null;if(detailDialog.open)detailDialog.close();
@@ -8190,6 +8213,7 @@
       if(summaryHost)summaryHost.financeMarkup=financialPeriodPanel(true);
     }
     mountAdminOperations();
+    mountMetrics();
     applyPartnerReadonlyControls();
     window.MarketplaceAgendaNavigation.showSelected(app);
     updateBackendRoleAccess();

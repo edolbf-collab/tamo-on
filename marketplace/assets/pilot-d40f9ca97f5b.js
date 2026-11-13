@@ -361,7 +361,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     window.TamoonMarketplacePilot?.leave();
   }
 
-  const readonlyRpcNames = new Set(["marketplace_financial_period","marketplace_financial_receipts","reservation_payment_audit","partner_readonly_status","partner_readonly_bootstrap","monthly_link_request_messages","occurrence_transfer_available_slots","occurrence_transfer_conversation","community_marketplace_notifications","admin_search_reservations","reservation_cancellation_preview"]);
+  const readonlyRpcNames = new Set(["marketplace_metrics","marketplace_financial_period","marketplace_financial_receipts","reservation_payment_audit","partner_readonly_status","partner_readonly_bootstrap","monthly_link_request_messages","occurrence_transfer_available_slots","occurrence_transfer_conversation","community_marketplace_notifications","admin_search_reservations","reservation_cancellation_preview"]);
 
   async function assertWritable() {
     const c=requireClient();
@@ -1936,7 +1936,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 /* Regras de apresentacao. A autorizacao efetiva e conferida novamente pelo servidor. */
 (function(root){
   'use strict';
-  const pages={overview:[],agenda:['manage_schedule'],reservations:['manage_schedule'],spaces:['manage_spaces'],clients:['manage_schedule'],team:['manage_team'],vouchers:['manage_finance'],finance:['manage_finance'],registration:['manage_profile','manage_documents']};
+  const pages={overview:[],agenda:['manage_schedule'],reservations:['manage_schedule'],spaces:['manage_spaces'],clients:['manage_schedule'],team:['manage_team'],vouchers:['manage_finance'],finance:['manage_finance'],metrics:['manage_finance'],registration:['manage_profile','manage_documents']};
   const actions={
     manage_spaces:['new-space','edit-space','toggle-space'],
     manage_team:['new-team-member','edit-team-member','toggle-team-member'],
@@ -2491,48 +2491,204 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 (function(global){
 'use strict';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const sections={community:[['groups','Grupos'],['users','Usuários'],['members','Participações'],['events','Eventos'],['devices','Notificações']],market:[['partners','Parceiros'],['reservations','Reservas'],['payments','Pagamentos'],['monthly','Mensalistas'],['cycles','Mensalidades'],['audit','Auditoria']]};
+const sections={community:[['groups','Grupos'],['users','Usuários'],['members','Participações'],['events','Eventos'],['devices','Notificações']],market:[['partners','Parceiros'],['reservations','Reservas'],['payments','Pagamentos'],['monthly','Mensalistas'],['cycles','Mensalidades'],['audit','Auditoria'],['finance','Fichas financeiras'],['financial_alerts','Pendências financeiras'],['charges','Cobranças'],['vouchers','Vouchers'],['integrations','Integrações'],['webhooks','Retornos do provedor'],['settings','Configurações oficiais']]};
+const linkedSections=[['quotas','Cotas da reserva'],['stages','Etapas de pagamento'],['occurrences','Datas da reserva'],['movements','Movimentos financeiros'],['refund_requests','Pedidos de devolução'],['credits','Créditos comprovados']];
+const dateLabels={stages:['Vencimento desde','Vencimento'],occurrences:['Evento desde','Evento'],movements:['Movimento desde','Movimento'],credits:['Data de referência desde','Referência'],webhooks:['Recebido desde','Recebimento'],settings:['Atualizado desde','Atualização']};
+const notes={finance:'Valores calculados pelas regras financeiras oficiais. Abra a ficha para consultar cobranças, cotas, datas, movimentos e devoluções.',financial_alerts:'Reservas com devolução pendente, excedente, revisão financeira, resolução pendente ou pedido de devolução rejeitado/incerto. Esta lista não altera pagamentos.',charges:'Cobrança criada não significa pagamento recebido. Confira os pagamentos vinculados e os retornos do provedor.',credits:'Créditos comprovados ao parceiro e comissões liquidadas. Crédito em subconta não comprova saldo disponível para saque. Para split, o filtro usa a data do pagamento; a data exata do crédito deve ser conferida nos movimentos e no provedor.',movements:'Registros financeiros por data do movimento. A ficha informa a fonte da evidência e a precisão da data. Tipos diferentes não devem ser somados como receita.',refund_requests:'Histórico de pedidos ao provedor. Pedido enviado não comprova devolução concluída. As ações de análise continuam na área Devoluções.',webhooks:'Retornos recebidos do provedor, com situação, tentativas e vínculos identificados. Eventos sem correspondência permanecem visíveis na lista geral.',settings:'Configurações efetivamente registradas no servidor. As tarifas exibidas são referências; a tarifa efetiva de cada pagamento está na ficha financeira.',integrations:'Situação da integração e meios habilitados por parceiro. Identificadores de carteira, chaves e credenciais não são exibidos.',vouchers:'Situação e validade efetivas, incluindo as regras de prorrogação já existentes.'};
 const labels={active:'Ativo',invited:'Convidado',blocked:'Bloqueado',unregistered:'Sem acesso registrado',with_upcoming:'Com evento futuro',without_upcoming:'Sem evento futuro',owner:'Responsável',admin:'Administrador',member:'Participante',accepted:'Aceite registrado',untested:'Sem aceite registrado',attention:'Com falhas',disabled:'Desativado',pending:'Pendente',confirmed:'Confirmado',cancelled:'Cancelado',completed:'Concluído',paid:'Pago',refunded:'Devolvido',partially_refunded:'Devolvido parcialmente',approved:'Aprovado',suspended:'Suspenso',open:'Aberto',closed:'Encerrado',scheduled:'Agendado',draft:'Rascunho',expired:'Expirado',awaiting_payment:'Aguardando pagamento',awaiting_acceptance:'Aguardando aceite',insert:'Inclusão',update:'Alteração',delete:'Exclusão'};
+Object.assign(labels,{voucher_settled:'Quitada por voucher',liquidated:'Liquidado',partial_liquidated:'Parcialmente liquidado',blocked:'Bloqueado',closed:'Encerrado',refund_pending:'Devolução pendente',resolution_pending:'Resolução pendente',excess_received:'Excedente a conferir',payment_review:'Recebimento em conferência',created:'Criado',processing:'Em processamento',processed:'Processado',failed:'Falhou',ignored:'Ignorado',submitted:'Enviado ao provedor',unknown:'Resultado incerto',rejected:'Rejeitado',requesting:'Solicitando',not_configured:'Não configurada',simulation:'Homologação',real_money:'Dinheiro real habilitado',received:'Recebido',fee:'Tarifa',refund:'Devolução',commission:'Comissão reconhecida',commission_paid:'Comissão liquidada',partner_paid:'Crédito ao parceiro',initial:'Inicial',balance:'Saldo',guarantee:'Garantia',external:'Pagamento externo',asaas_pix:'Pix Asaas',asaas_card:'Cartão Asaas',credit_card_asaas:'Cartão Asaas',pix_direct_partner:'Pix',event:'Evento confirmado',legacy_ledger:'Registro histórico',exact:'Exata',recorded:'Data do registro'});
 const label=v=>labels[String(v).toLowerCase()]||v||'Não informado';
 const date=v=>v&&Number.isFinite(Date.parse(v))?new Date(v).toLocaleString('pt-BR'):'Não informado';
-const value=(k,v)=>v==null?'Não informado':typeof v==='number'&&/valor|taxa|líquido|devolvido|mensalidade|total pago|garantia|pagamento devido/i.test(k)?v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T/.test(v)?date(v):String(v);
-function mount(root,{mode='community',rpc,identity}){
- const key=identity();let epoch=0,disposed=false,data=null,detail=null;
+const value=(k,v)=>v==null?'Não informado':typeof v==='boolean'?(v?'Sim':'Não'):typeof v==='number'&&k.includes('(%)')?v.toLocaleString('pt-BR')+'%':typeof v==='number'&&/valor|taxa|tarifa|líquido|devolvido|mensalidade|total pago|garantia|pagamento devido/i.test(k)?v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T/.test(v)?date(v):label(String(v));
+function mount(root,{mode='community',rpc,identity,initial={}}){
+ const catalog=[...sections[mode],...(mode==='market'?linkedSections:[])];
+ const key=identity();let epoch=0,disposed=false,data=null,detail=null,monitor=null;
  if(!key){root.textContent='Acesso restrito à administração.';return {root,key,dispose:()=>root.replaceChildren()};}
- const state={section:sections[mode][0][0],search:'',status:'',from:'',to:'',scope:null,scopeLabel:'',page:1};
+ const state={section:catalog.some(s=>s[0]===initial.section)?initial.section:sections[mode][0][0],search:'',status:'',from:'',to:'',scope:null,scopeLabel:'',page:1,recordId:initial.id||null};
  const current=v=>!disposed&&root.isConnected&&identity()===key&&v===epoch;
- function links(row){const link=(section,title)=>({section,title,id:row.id});switch(state.section){
- case 'groups':return [link('members','Ver participantes'),link('events','Ver eventos')];
- case 'users':return [link('members','Ver grupos'),link('devices','Ver notificações')];
- case 'partners':return [link('reservations','Ver reservas'),link('monthly','Ver mensalistas'),link('payments','Ver pagamentos')];
- case 'reservations':return [link('payments','Ver pagamentos'),link('cycles','Ver mensalidades')];
- case 'monthly':return [link('cycles','Ver mensalidades')];default:return [];}}
- function shell(){root.innerHTML=`<div class="ops-layout"><nav class="ops-nav" aria-label="Áreas administrativas">${sections[mode].map(([id,title])=>`<button type="button" data-ops-section="${id}" aria-current="${state.section===id?'page':'false'}">${title}</button>`).join('')}</nav><main class="ops-main"><header class="ops-heading"><div><small>ADMINISTRAÇÃO · ${mode==='market'?'MARKETPLACE':'COMUNIDADE'}</small><h2>${sections[mode].find(s=>s[0]===state.section)[1]}</h2></div><button type="button" data-ops-refresh>Atualizar</button></header>${state.scope?`<p class="ops-scope">Vinculado a ${esc(state.scopeLabel)} <button type="button" data-ops-clear>Limpar vínculo</button></p>`:''}
+ function links(row){const link=(section,title,id=row.id)=>({section,title,id});const reservation=row.details?.['Reserva ID'];
+ if(mode==='market'){
+  if(['reservations','finance','financial_alerts'].includes(state.section))return [link('finance','Ficha financeira'),link('charges','Ver cobranças'),link('payments','Ver pagamentos'),link('quotas','Ver cotas'),link('occurrences','Ver datas'),link('cycles','Ver mensalidades'),link('stages','Ver etapas'),link('movements','Ver movimentos'),link('refund_requests','Ver devoluções'),link('credits','Ver créditos'),link('vouchers','Ver vouchers'),link('webhooks','Ver retornos do provedor')].filter(l=>l.section!==state.section);
+  if(['partners','integrations'].includes(state.section))return [link('reservations','Ver reservas'),link('finance','Ver financeiro'),link('financial_alerts','Ver pendências'),link('monthly','Ver mensalistas'),link('charges','Ver cobranças'),link('payments','Ver pagamentos'),link('integrations','Ver integração')].filter(l=>l.section!==state.section);
+  if(state.section==='cycles')return [link('stages','Ver etapas'),link('quotas','Ver cotas'),link('occurrences','Ver datas'),...(reservation?[link('finance','Ficha financeira',reservation)]:[])];
+  if(state.section==='stages')return [link('quotas','Ver cotas'),link('charges','Ver cobranças'),...(reservation?[link('finance','Ficha financeira',reservation)]:[])];
+  if(reservation)return [link('finance','Ficha financeira',reservation),link('payments','Pagamentos da reserva',reservation)].filter(l=>l.section!==state.section);
+ }
+ switch(state.section){case 'groups':return [link('members','Ver participantes'),link('events','Ver eventos')];case 'users':return [link('members','Ver grupos'),link('devices','Ver notificações')];case 'monthly':return [link('cycles','Ver mensalidades')];default:return [];}}
+ function shell(){monitor?.dispose();monitor=null;root.innerHTML=`<div class="ops-layout"><nav class="ops-nav" aria-label="Áreas administrativas">${sections[mode].map(([id,title])=>`<button type="button" data-ops-section="${id}" aria-current="${state.section===id?'page':'false'}">${title}</button>`).join('')}</nav><main class="ops-main"><header class="ops-heading"><div><small>ADMINISTRAÇÃO · ${mode==='market'?'MARKETPLACE':'COMUNIDADE'}</small><h2>${catalog.find(s=>s[0]===state.section)[1]}</h2></div><button type="button" data-ops-refresh>Atualizar</button></header>${state.recordId?'<p class="ops-scope">Registro selecionado <button type="button" data-ops-clear>Ver todos</button></p>':''}${state.scope?`<p class="ops-scope">Vinculado a ${esc(state.scopeLabel)} <button type="button" data-ops-clear>Limpar vínculo</button></p>`:''}
+ ${notes[state.section]?`<p class="ops-note">${esc(notes[state.section])}</p>`:''}
  ${state.section==='devices'?'<p class="ops-note">Android, iOS e web. O aceite pelo provedor não comprova a exibição no aparelho.</p>':''}
  ${state.section==='audit'?'<p class="ops-note">Autor, ação, registro e campos alterados. Valores privados do histórico não são expostos nesta lista.</p>':''}
- <form class="ops-filters"><label>Buscar<input name="search" maxlength="120" value="${esc(state.search)}" placeholder="Nome, e-mail, código ou ID"></label><label>Situação<select name="status"><option value="">Todas</option></select></label><label>Criado desde<input name="from" type="date" value="${esc(state.from)}"></label><label>Até<input name="to" type="date" value="${esc(state.to)}"></label><button type="submit">Aplicar filtros</button></form><div class="ops-results" aria-live="polite"></div><section class="ops-detail" tabindex="-1" hidden></section></main></div>`;}
+ <form class="ops-filters"><label>Buscar<input name="search" maxlength="120" value="${esc(state.search)}" placeholder="Nome, e-mail, código ou ID"></label><label>Situação<select name="status"><option value="">Todas</option></select></label><label>${dateLabels[state.section]?.[0]||'Criado desde'}<input name="from" type="date" value="${esc(state.from)}"></label><label>Até<input name="to" type="date" value="${esc(state.to)}"></label><button type="submit">Aplicar filtros</button></form><div class="ops-results" aria-live="polite"></div><section class="ops-detail" tabindex="-1" hidden></section></main></div>`;}
  function results(){const select=root.querySelector('[name=status]'),statuses={...data.statuses};if(state.status&&!Object.hasOwn(statuses,state.status))statuses[state.status]=0;
  select.innerHTML='<option value="">Todas</option>'+Object.entries(statuses).map(([s,n])=>`<option value="${esc(s)}" ${s===state.status?'selected':''}>${esc(label(s))} (${n})</option>`).join('');
- const total=Number(data.total),pages=Math.max(1,Math.ceil(total/20));root.querySelector('.ops-results').innerHTML=`<div class="ops-summary"><strong>${total.toLocaleString('pt-BR')} registro(s)</strong><small>Consultado em ${esc(date(data.checked_at))}</small></div><div class="ops-list">${data.items.length?data.items.map(r=>`<button type="button" class="ops-row" data-ops-id="${esc(r.id)}"><span><strong>${esc(r.title||'Sem nome')}</strong><small>${esc(r.subtitle||'Sem vínculo identificado')}</small><small>Criado em ${esc(date(r.created_at))}</small></span><span class="ops-badge">${esc(label(r.status))}</span><span aria-hidden="true">›</span></button>`).join(''):'<p class="ops-empty">Nenhum registro encontrado para estes filtros.</p>'}</div><footer class="ops-pagination"><button type="button" data-ops-page="${state.page-1}" ${state.page<=1?'disabled':''}>Anterior</button><span>Página ${state.page} de ${pages}</span><button type="button" data-ops-page="${state.page+1}" ${state.page>=pages?'disabled':''}>Próxima</button></footer>`;}
- function args(extra={}){let from=null,to=null;if(state.from)from=new Date(state.from+'T00:00:00').toISOString();if(state.to){const end=new Date(state.to+'T00:00:00');end.setDate(end.getDate()+1);to=end.toISOString();}return {p_section:state.section,p_search:state.search,p_status:state.status||null,p_from:from,p_to:to,p_scope:state.scope,p_page:state.page,p_size:20,...extra};}
+ const total=Number(data.total),pages=Math.max(1,Math.ceil(total/20));root.querySelector('.ops-results').innerHTML=`<div class="ops-summary"><strong>${total.toLocaleString('pt-BR')} registro(s)</strong><small>Consultado em ${esc(date(data.checked_at))}</small></div><div class="ops-list">${data.items.length?data.items.map(r=>`<button type="button" class="ops-row" data-ops-id="${esc(r.id)}"><span><strong>${esc(r.title||'Sem nome')}</strong><small>${esc(r.subtitle||'Sem vínculo identificado')}</small><small>${dateLabels[state.section]?.[1]||'Criação'}: ${esc(date(r.created_at))}</small></span><span class="ops-badge">${esc(label(r.status))}</span><span aria-hidden="true">›</span></button>`).join(''):'<p class="ops-empty">Nenhum registro encontrado para estes filtros.</p>'}</div><footer class="ops-pagination"><button type="button" data-ops-page="${state.page-1}" ${state.page<=1?'disabled':''}>Anterior</button><span>Página ${state.page} de ${pages}</span><button type="button" data-ops-page="${state.page+1}" ${state.page>=pages?'disabled':''}>Próxima</button></footer>`;}
+ function args(extra={}){let from=null,to=null;if(state.from)from=new Date(state.from+'T00:00:00').toISOString();if(state.to){const end=new Date(state.to+'T00:00:00');end.setDate(end.getDate()+1);to=end.toISOString();}return {p_section:state.section,p_search:state.search,p_status:state.status||null,p_from:from,p_to:to,p_scope:state.scope,p_page:state.page,p_size:20,p_id:state.recordId,...extra};}
  function failure(host){host.innerHTML='<p class="ops-error" role="alert">Não foi possível consultar os dados. Verifique sua conexão e o acesso administrativo. Se esta atualização ainda não foi ativada, aguarde a implantação.</p><button type="button" data-ops-refresh>Tentar novamente</button>';}
- async function load(){if(disposed||identity()!==key)return dispose();const version=++epoch;detail=null;data=null;const host=root.querySelector('.ops-results');root.querySelector('.ops-detail').hidden=true;host.innerHTML='<p class="ops-empty" role="status">Consultando registros…</p>';
- try{const response=await rpc('admin_operations_directory',args());if(!current(version))return;data=response;if(!Array.isArray(data?.items)||!Number.isFinite(Number(data.total)))throw Error('Invalid directory');if(state.page>1&&!data.items.length){state.page=1;return load();}results();}catch(error){if(current(version)){data=null;failure(host);}}}
+ async function load(){if(disposed||identity()!==key)return dispose();
+ if(mode==='community'&&state.section==='devices'&&global.TamoonAdminNotifications){
+  ++epoch;data=null;detail=null;monitor?.dispose();
+  root.querySelector('.ops-filters').hidden=true;root.querySelector('.ops-detail').hidden=true;
+  root.querySelector('.ops-heading').hidden=true;
+  monitor=global.TamoonAdminNotifications.mount(root.querySelector('.ops-results'),{rpc,identity,initial:{userId:state.scope,deviceId:state.recordId}});return;
+ }
+ const version=++epoch;detail=null;data=null;const host=root.querySelector('.ops-results');root.querySelector('.ops-detail').hidden=true;host.innerHTML='<p class="ops-empty" role="status">Consultando registros…</p>';
+ try{const response=await rpc('admin_operations_directory',args());if(!current(version))return;data=response;if(!Array.isArray(data?.items)||!Number.isFinite(Number(data.total)))throw Error('Invalid directory');if(state.page>1&&!data.items.length){state.page=1;return load();}results();if(state.recordId&&data.items[0])await show(data.items[0].id);}catch(error){if(current(version)){data=null;failure(host);}}}
  async function show(id){if(!data?.items.some(r=>r.id===id))return;const version=++epoch,host=root.querySelector('.ops-detail');detail=null;host.hidden=false;host.innerHTML='<p>Consultando ficha atual…</p>';host.focus();
  try{const response=await rpc('admin_operations_directory',args({p_id:id,p_page:1}));if(!current(version))return;const row=response.items?.[0];if(!row){host.innerHTML='<p>Este registro não está mais disponível para estes filtros. Atualize a lista.</p>';return;}detail=row;host.innerHTML=`<div class="ops-heading"><h3>${esc(row.title)}</h3><button type="button" data-ops-close>Fechar ficha</button></div><p>${esc(label(row.status))} · ${esc(row.subtitle)}</p><dl><dt>ID</dt><dd>${esc(row.id)}</dd>${Object.entries(row.details||{}).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(value(k,v))}</dd>`).join('')}</dl><div class="ops-related">${links(row).map(l=>`<button type="button" data-ops-related="${l.section}">${l.title}</button>`).join('')}</div>`;}catch(error){if(current(version))failure(host);}}
  function click(event){const b=event.target.closest('button');if(!b||!root.contains(b))return;if(identity()!==key)return dispose();
- if(b.hasAttribute('data-ops-section')){Object.assign(state,{section:b.dataset.opsSection,page:1,status:'',scope:null,scopeLabel:'',search:'',from:'',to:''});shell();load();}
+ if(b.hasAttribute('data-ops-section')){if(!catalog.some(s=>s[0]===b.dataset.opsSection))return;Object.assign(state,{section:b.dataset.opsSection,page:1,status:'',scope:null,scopeLabel:'',search:'',from:'',to:'',recordId:null});shell();load();}
  else if(b.hasAttribute('data-ops-refresh'))load();else if(b.hasAttribute('data-ops-id'))show(b.dataset.opsId);else if(b.hasAttribute('data-ops-page')){state.page=Number(b.dataset.opsPage);load();}
  else if(b.hasAttribute('data-ops-close')){++epoch;detail=null;root.querySelector('.ops-detail').hidden=true;}
- else if(b.hasAttribute('data-ops-clear')){state.scope=null;state.scopeLabel='';state.page=1;shell();load();}
- else if(b.hasAttribute('data-ops-related')&&detail){const link=links(detail).find(l=>l.section===b.dataset.opsRelated);if(link){Object.assign(state,{section:link.section,scope:link.id,scopeLabel:detail.title,page:1,search:'',status:'',from:'',to:''});shell();load();}}}
+ else if(b.hasAttribute('data-ops-clear')){state.scope=null;state.recordId=null;state.scopeLabel='';state.page=1;shell();load();}
+ else if(b.hasAttribute('data-ops-related')&&detail){const link=links(detail).find(l=>l.section===b.dataset.opsRelated);if(link){Object.assign(state,{section:link.section,scope:link.id,scopeLabel:detail.title,recordId:null,page:1,search:'',status:'',from:'',to:''});shell();load();}}}
  function submit(event){if(!event.target.matches('.ops-filters'))return;event.preventDefault();const f=new FormData(event.target);if(f.get('from')&&f.get('to')&&f.get('from')>f.get('to')){event.target.querySelector('[name=to]').setCustomValidity('Escolha uma data igual ou posterior ao início.');event.target.reportValidity();return;}Object.assign(state,{search:String(f.get('search')).trim(),status:String(f.get('status')),from:String(f.get('from')),to:String(f.get('to')),page:1});load();}
  function input(event){event.target.setCustomValidity?.('');}
  const observer=new MutationObserver(()=>{if(!root.isConnected)dispose();});observer.observe(document.body,{childList:true,subtree:true});
- function dispose(){observer.disconnect();disposed=true;++epoch;data=null;detail=null;root.replaceChildren();root.removeEventListener('click',click);root.removeEventListener('submit',submit);root.removeEventListener('input',input);}
+ function dispose(){monitor?.dispose();monitor=null;observer.disconnect();disposed=true;++epoch;data=null;detail=null;root.replaceChildren();root.removeEventListener('click',click);root.removeEventListener('submit',submit);root.removeEventListener('input',input);}
  root.addEventListener('click',click);root.addEventListener('submit',submit);root.addEventListener('input',input);shell();load();return {dispose,key,root};
 }
 global.TamoonAdminOperations={mount};
+})(window);
+
+;
+
+;/* admin-daily.js */
+/* Daily administration. Memory only; every query and write is authorized on the server. */
+(function(global){
+'use strict';
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const names={support:'Atendimento interno',feedback:'Relato de problema',report:'Denúncia',push:'Notificações',finance:'Financeiro',partner:'Parceiro',integration:'Integração',open:'Aberto',working:'Em atendimento',reviewing:'Em análise',waiting:'Aguardando retorno',resolved:'Resolvido',dismissed:'Encerrado',scheduled:'Agendado',active:'Ativo',confirmed:'Confirmado',cancelled:'Cancelado',completed:'Concluído',expired:'Expirado',refunded:'Devolvido',refund_pending:'Devolução pendente',payment_review:'Conferir recebimento',excess_received:'Conferir excedente',resolution_pending:'Resolução pendente',pending_payment:'Aguardando pagamento',pending:'Pendente',under_review:'Em análise',failed:'Falha',processing:'Em processamento',attention:'Com falhas',accepted:'Aceito pelo provedor',disabled:'Desativado',created:'Criado',updated:'Acompanhamento atualizado'};
+const label=v=>names[v]||v||'Não informado';
+const date=v=>v&&Number.isFinite(Date.parse(v))?new Date(v).toLocaleString('pt-BR'):'Sem data';
+const day=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const localTime=v=>v?`${day(new Date(v))}T${String(new Date(v).getHours()).padStart(2,'0')}:${String(new Date(v).getMinutes()).padStart(2,'0')}`:'';
+function mount(root,{mode='community',rpc,identity,onAction=()=>{},directory=global.TamoonAdminOperations}){
+ const key=identity();let epoch=0,disposed=false,detail=null,consoleView=null,data=null;
+ const start=new Date(),end=new Date();end.setDate(end.getDate()+6);
+ const state={view:'overview',page:1,search:'',status:'pending',scope:'',kind:'',from:day(start),to:day(end),id:null};
+ if(!key){root.textContent='Acesso restrito à administração.';return {key,root,dispose:()=>root.replaceChildren()};}
+ const current=e=>!disposed&&root.isConnected&&identity()===key&&epoch===e;
+ const valid=()=>{if(identity()!==key){dispose();return false;}return !disposed;};
+ const options=(entries,selected)=>entries.map(([v,t])=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(t)}</option>`).join('');
+ function args(){const until=new Date(state.to+'T00:00:00');until.setDate(until.getDate()+1);return {p_view:state.view,p_page:state.page,p_search:state.search,p_status:state.status,p_scope:state.scope||null,p_kind:state.kind||null,p_id:state.id,p_from:new Date(state.from+'T00:00:00').toISOString(),p_to:until.toISOString()};}
+ function shell(){consoleView?.dispose();consoleView=null;root.innerHTML=`<div class="daily-root"><header class="daily-heading"><div><small>ADMINISTRAÇÃO · ${mode==='market'?'MARKETPLACE':'COMUNIDADE'}</small><h2>Gestão do dia a dia</h2></div></header><nav class="daily-tabs" aria-label="Gestão diária">${[['overview','Resumo'],['details','Consultas detalhadas'],['queue','Pendências e suporte'],['agenda','Agenda geral']].map(([v,t])=>`<button type="button" data-daily-view="${v}" aria-current="${state.view===v?'page':'false'}">${t}</button>`).join('')}</nav><div class="daily-content" aria-live="polite"></div></div>`;}
+ const host=()=>root.querySelector('.daily-content');
+ function fail(error){const conflict=String(error?.message||error).includes('CONFLICT');return `<p class="daily-error" role="alert">${conflict?'Este acompanhamento mudou em outra sessão. Reabra a ficha antes de salvar.':'Não foi possível concluir. Atualize a consulta para conferir o estado atual e tente novamente.'}</p><button type="button" data-daily-refresh>Atualizar consulta</button>`;}
+ function item(r){return `<button type="button" class="daily-item" data-daily-item="${esc(r.id)}"><span><small>${esc(label(r.kind))}</small><strong>${esc(r.title)}</strong><small>${esc(r.subtitle)}</small><small>${r.owner_name?'Responsável: '+esc(r.owner_name):'Sem responsável'}${r.due_at?' · Prazo: '+esc(date(r.due_at)):''}</small></span><span class="daily-badge ${r.overdue?'daily-late':''}">${r.overdue?'Prazo vencido':esc(label(r.status))}</span><span aria-hidden="true">›</span></button>`;}
+ function overview(){const s=data.stats;const metrics=mode==='market'?[['Parceiros aprovados',s.partners],['Usuários cadastrados',s.users],['Reservas confirmadas',s.reservations],['Datas nos próximos 7 dias',s.upcoming]]:[['Grupos cadastrados',s.groups],['Usuários cadastrados',s.users],['Usuários ativos em 30 dias',s.active_users_30d],['Jogos nos próximos 7 dias',s.upcoming]];
+ host().innerHTML=`<div class="daily-summaryline"><p>O essencial para acompanhar a operação.</p><button type="button" data-daily-refresh>Atualizar</button></div><section class="daily-metrics" aria-label="Resumo da operação">${metrics.map(([t,v])=>`<article><strong>${Number(v||0).toLocaleString('pt-BR')}</strong><span>${t}</span></article>`).join('')}</section><div class="daily-attention"><div><h3>Precisa da sua atenção</h3><p>${Number(s.pending)} pendência(s) · ${Number(s.overdue)} com prazo vencido · ${Number(s.unassigned)} sem responsável</p></div><button type="button" data-daily-view="queue">Ver pendências</button></div><div class="daily-list">${data.items.length?data.items.map(item).join(''):'<p class="daily-empty">Nenhuma pendência aberta nas fontes acompanhadas.</p>'}</div><div class="daily-footer"><button type="button" data-daily-view="agenda">Ver agenda geral</button><small>Consultado em ${esc(date(data.checked_at))}</small></div>`;
+ }
+ function filters(){const agenda=state.view==='agenda';return `<form class="daily-filters"><label>Buscar<input name="search" value="${esc(state.search)}" maxlength="120" placeholder="${agenda?'Nome, grupo, parceiro ou reserva':'Título, grupo, parceiro ou código'}"></label><label>Situação<select name="status">${options(agenda?[['pending','Ativos'],['all','Todos'],['closed','Cancelados e encerrados']]:[['pending','Pendentes'],['overdue','Prazo vencido'],['mine','Sob minha responsabilidade'],['unassigned','Sem responsável'],['closed','Encerrados'],['all','Todos']],state.status)}</select></label>${agenda?`<label>${mode==='market'?'Parceiro':'Grupo'}<select name="scope"><option value="">Todos</option>${options((data.scopes||[]).map(s=>[s.id,s.name]),state.scope)}</select></label><label>De<input type="date" name="from" required value="${esc(state.from)}"></label><label>Até<input type="date" name="to" required value="${esc(state.to)}"></label>`:`<label>Tipo<select name="kind"><option value="">Todos</option>${options((mode==='market'?['support','finance','partner','integration']:['support','feedback','report','push']).map(k=>[k,label(k)]),state.kind)}</select></label>`}<button type="submit">Aplicar filtros</button></form>`;}
+ function pagination(){return `<footer class="daily-footer"><button type="button" data-daily-page="${state.page-1}" ${state.page===1?'disabled':''}>Anterior</button><span>Página ${state.page} de ${Math.max(1,Math.ceil(data.total/20))}</span><button type="button" data-daily-page="${state.page+1}" ${state.page*20>=data.total?'disabled':''}>Próxima</button></footer>`;}
+ function listing(){const agenda=state.view==='agenda';host().innerHTML=`<div class="daily-summaryline"><h3>${agenda?'Agenda geral':'Pendências e suporte'}</h3>${agenda?'<button type="button" data-daily-today>Hoje</button><button type="button" data-daily-week>Próximos 7 dias</button>':'<button type="button" data-daily-new>Novo atendimento</button>'}</div>${filters()}<div class="daily-summaryline"><strong>${Number(data.total)} registro(s)</strong><button type="button" data-daily-refresh>Atualizar</button></div><div class="daily-list">${data.items.length?(agenda?data.items.map(r=>`<button type="button" class="daily-item" data-daily-agenda="${esc(r.id)}"><span><small>${esc(date(r.starts_at))} até ${esc(date(r.ends_at))}</small><strong>${esc(r.title)}</strong><small>${esc(r.subtitle)}</small><small>${esc(r.location)}</small></span><span class="daily-badge">${esc(label(r.status))}</span><span aria-hidden="true">›</span></button>`).join(''):data.items.map(item).join('')):'<p class="daily-empty">Nenhum registro para estes filtros.</p>'}</div>${pagination()}${agenda?'<p class="daily-help">O período considera a data e a duração do jogo ou da reserva. Todos os horários seguem o fuso deste aparelho.</p>':'<p class="daily-help">Acompanhamento interno. Alertas financeiros, denúncias e integrações são encerrados pelo fluxo de origem.</p>'}`;}
+ function showDetail(){const r=data.items[0];detail=r;if(!r){host().innerHTML='<p class="daily-empty">Este registro não está mais disponível.</p><button data-daily-back>Voltar</button>';return;}
+ const editable=['support','feedback'].includes(r.kind);
+ host().innerHTML=`<div class="daily-summaryline"><button type="button" data-daily-back>Voltar à lista</button><button type="button" data-daily-refresh>Atualizar ficha</button></div><section class="daily-record" tabindex="-1"><small>${esc(label(r.kind))}</small><h3>${esc(r.title)}</h3><p>${esc(r.subtitle)}</p><p><span class="daily-badge ${r.overdue?'daily-late':''}">${esc(label(r.status))}</span> · Aberto em ${esc(date(r.created_at))}</p><p class="daily-description">${esc(r.description)}</p>${r.target_section?'<button type="button" data-daily-source>'+ (r.target_section==='moderation'?'Abrir moderação':'Abrir ficha de origem')+'</button>':''}${r.kind==='finance'&&r.status==='refund_pending'?'<button type="button" data-daily-refunds>Acompanhar devolução</button>':''}<form class="daily-editor"><label>Responsável<select name="owner_id"><option value="">Sem responsável</option>${options((data.admins||[]).map(a=>[a.id,a.name]),r.owner_id)}</select></label><label>Prazo interno<input name="due_at" type="datetime-local" value="${esc(localTime(r.due_at))}"></label><label>Acompanhamento<select name="stage">${options([['open','A iniciar'],['working','Em atendimento'],['waiting','Aguardando retorno']],r.stage)}</select></label>${editable?`<label>Situação do atendimento<select name="status">${options([['open','Aberto'],['working','Em atendimento'],['waiting','Aguardando retorno'],['resolved','Resolvido']],r.status==='reviewing'?r.stage==='waiting'?'waiting':'working':r.status==='dismissed'?'resolved':r.status)}</select></label>`:''}<label class="daily-wide">Nota interna<textarea name="note" rows="3" maxlength="2000" placeholder="Registre o próximo passo. Evite dados pessoais desnecessários.">${esc(r.note)}</textarea></label><p class="daily-help daily-wide">${editable?'Este registro é interno; salvar não envia mensagens ao usuário.':'O acompanhamento não altera a situação da origem nem executa devoluções ou medidas de moderação.'}</p><div class="daily-form-error daily-wide"></div><button type="submit" class="daily-primary">Salvar acompanhamento</button></form><details class="daily-history"><summary>Histórico do acompanhamento</summary>${data.history.length?data.history.map(h=>`<p><strong>${esc(label(h.action))}</strong> · ${esc(h.actor)}<br><small>${esc(date(h.created_at))}${h.changes?.stage?' · '+esc(label(h.changes.stage)):''}${h.changes?.due_at?' · Prazo '+esc(date(h.changes.due_at)):''}${h.changes?.note_changed?' · Nota interna alterada':''}</small></p>`).join(''):'<p>Nenhuma alteração de acompanhamento registrada.</p>'}</details></section>`;host().querySelector('.daily-record').focus();
+ }
+ async function load(){if(!valid())return;const e=++epoch;detail=null;data=null;host().innerHTML='<p class="daily-empty" role="status">Consultando operação…</p>';try{const r=await rpc('admin_daily_read',args());if(!current(e))return;if(!Array.isArray(r?.items))throw Error('Invalid response');data=r;if(!state.id&&state.page>1&&!r.items.length){state.page=1;return load();}state.id?showDetail():state.view==='overview'?overview():listing();}catch(error){if(current(e))host().innerHTML=fail(error);}}
+ function change(view,extra={}){if(!valid())return;++epoch;detail=null;data=null;Object.assign(state,{view,page:1,id:null,search:'',status:'pending',scope:'',kind:''},extra);shell();if(view==='details'){host().innerHTML='<div data-daily-directory></div>';consoleView=directory.mount(host().firstElementChild,{mode,rpc,identity,initial:extra.initial||{}});}else load();}
+ function showNew(){if(!valid())return;++epoch;detail=null;host().innerHTML=`<button type="button" data-daily-back>Voltar à lista</button><form class="daily-new"><h3>Novo atendimento interno</h3><label>Título<input name="title" required minlength="3" maxlength="160"></label><label>Descrição<textarea name="description" rows="4" maxlength="2000"></textarea></label><p class="daily-help">Registro exclusivo da administração. Não envia mensagens e não substitui o canal de denúncias.</p><div class="daily-form-error"></div><button type="submit" class="daily-primary">Criar atendimento</button></form>`;host().querySelector('form').dataset.id=global.crypto.randomUUID();host().querySelector('input').focus();}
+ function click(ev){const b=ev.target.closest('button');if(!b||!root.contains(b)||!valid())return;
+ if(b.hasAttribute('data-daily-view'))change(b.dataset.dailyView);
+ else if(b.hasAttribute('data-daily-refresh'))load();
+ else if(b.hasAttribute('data-daily-item')){change('queue',{id:b.dataset.dailyItem,status:'all'});}
+ else if(b.hasAttribute('data-daily-back'))change('queue');
+ else if(b.hasAttribute('data-daily-new'))showNew();
+ else if(b.hasAttribute('data-daily-page')){state.page=Number(b.dataset.dailyPage);load();}
+ else if(b.hasAttribute('data-daily-today')||b.hasAttribute('data-daily-week')){const d=new Date(),t=new Date();if(b.hasAttribute('data-daily-week'))t.setDate(t.getDate()+6);Object.assign(state,{from:day(d),to:day(t),page:1});load();}
+ else if(b.hasAttribute('data-daily-source')&&detail){if(detail.target_section==='moderation'){onAction('moderation',detail.target_id);}else change('details',{initial:{section:detail.target_section,id:detail.target_id}});}
+ else if(b.hasAttribute('data-daily-refunds')&&detail){onAction('refunds',detail.target_id);}
+ else if(b.hasAttribute('data-daily-agenda')){const r=data?.items.find(r=>r.id===b.dataset.dailyAgenda);if(r)change('details',{initial:{section:r.target_section,id:r.target_id}});}
+ }
+ async function submit(ev){const form=ev.target;if(!form.matches('.daily-filters,.daily-editor,.daily-new'))return;ev.preventDefault();if(!valid()||!form.reportValidity())return;const f=new FormData(form);
+ if(form.matches('.daily-filters')){const from=f.get('from'),to=f.get('to');if(from&&to&&(to<from||(new Date(to)-new Date(from))/86400000>365)){form.querySelector('[name=to]').setCustomValidity('Escolha um período de até 366 dias, com fim após o início.');form.reportValidity();return;}Object.assign(state,{search:String(f.get('search')||'').trim(),status:String(f.get('status')||'pending'),kind:String(f.get('kind')||''),scope:String(f.get('scope')||''),page:1,...(from?{from,to}:{})});load();return;}
+ const creating=form.matches('.daily-new');if(!creating&&!detail)return;const e=++epoch;const command=creating?{action:'create',id:form.dataset.id,title:String(f.get('title')).trim(),description:String(f.get('description')||'').trim()}:{action:'update',id:detail.id,source_updated_at:detail.updated_at,version:detail.version,owner_id:f.get('owner_id')||null,due_at:f.get('due_at')?new Date(f.get('due_at')).toISOString():null,stage:f.get('stage'),note:String(f.get('note')||'').trim(),...(['support','feedback'].includes(detail.kind)?{status:f.get('status')}:{})};
+ form.querySelectorAll('button').forEach(b=>b.disabled=true);form.querySelector('.daily-form-error').textContent='Salvando…';
+ try{const result=await rpc('admin_daily_save',{p_command:command});if(!current(e))return;change('queue',{id:result.id,status:'all'});}catch(error){if(current(e)){form.querySelector('.daily-form-error').innerHTML=fail(error);form.querySelectorAll('button').forEach(b=>b.disabled=false);}}
+ }
+ const input=ev=>ev.target.setCustomValidity?.('');
+ const observer=new MutationObserver(()=>{if(!root.isConnected)dispose();});
+ function dispose(){if(disposed)return;disposed=true;++epoch;detail=null;data=null;consoleView?.dispose();observer.disconnect();root.replaceChildren();root.removeEventListener('click',click);root.removeEventListener('submit',submit);root.removeEventListener('input',input);}
+ observer.observe(document.body,{childList:true,subtree:true});root.addEventListener('click',click);root.addEventListener('submit',submit);root.addEventListener('input',input);shell();load();return {root,key,dispose};
+}
+global.TamoonAdminDaily={mount};
+})(window);
+
+;
+
+;/* metrics.js */
+/* Read-only metrics; no financial or personal records are cached in the browser. */
+(function(global){
+'use strict';
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
+const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const pct=v=>v==null?'Sem agenda':num(v)+'%';
+const date=v=>String(v||'').slice(0,10).split('-').reverse().join('/');
+const days=['','Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+function month(){const d=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const [y,m]=d.split('-').map(Number);return {from:`${y}-${String(m).padStart(2,'0')}-01`,to:new Date(Date.UTC(y,m,0)).toISOString().slice(0,10)};}
+function mount(root,{rpc,identity,admin=false,partnerId=null}){
+ const key=identity();let epoch=0,disposed=false,options=[],spaces=[],observer;
+ const initial=month();let filters={...initial,partner:partnerId||'',space:''};
+ const valid=()=>{if(disposed)return false;if(!key||identity()!==key){dispose();return false;}return true;};
+ const current=e=>!disposed&&root.isConnected&&identity()===key&&epoch===e;
+ const option=(value,text,selected)=>`<option value="${esc(value)}" ${value===selected?'selected':''}>${esc(text)}</option>`;
+ function shell(){root.innerHTML=`<section class="market-metrics"><form class="metrics-filters">
+ <label class="field"><span>De</span><input aria-label="Data inicial" type="date" name="from" required min="2000-01-01" max="2100-12-31" value="${filters.from}"></label>
+ <label class="field"><span>Até</span><input aria-label="Data final" type="date" name="to" required min="2000-01-01" max="2100-12-31" value="${filters.to}"></label>
+ ${admin?`<label class="field"><span>Parceiro</span><select name="partner">${option('','Todos os parceiros',filters.partner)}${options.map(p=>option(p.id,p.name,filters.partner)).join('')}</select></label>`:''}
+ <label class="field"><span>Quadra / espaço</span><select name="space">${option('','Todos os espaços',filters.space)}${spaces.filter(s=>!filters.partner||s.partner_id===filters.partner).map(s=>option(s.id,s.name,filters.space)).join('')}</select></label>
+ <div class="metrics-controls"><button class="button primary" type="submit">Atualizar métricas</button><button class="button ghost" type="button" data-metrics-month>Mês atual</button></div>
+ </form><div class="metrics-status" role="status" aria-live="polite"></div><div class="metrics-results"></div></section>`;}
+ const results=()=>root.querySelector('.metrics-results');
+ const status=()=>root.querySelector('.metrics-status');
+ const delta=(a,b,suffix='')=>b==null||a==null?'Sem base comparável':`${a-b>0?'+':''}${num(a-b)}${suffix} frente ao período anterior`;
+ const card=(title,value,note)=>`<article class="card"><span>${esc(title)}</span><strong>${esc(value)}</strong><small>${esc(note)}</small></article>`;
+ function show(d){
+ const c=d.current,p=d.previous,h=c.hours,b=c.bookings,cash=c.cash,m=d.monthly;
+ const row=s=>`<tr><td>${esc(s.name)}<br><small>${esc(s.partner)} · ${esc(s.venue)}</small></td><td>${s.occupancy==null?'Sem agenda':`<progress max="100" value="${Number(s.occupancy)}" aria-label="Ocupação de ${esc(s.name)}"></progress>${pct(s.occupancy)}`}</td><td>${num(s.booked)} h</td><td>${num(s.free)} h</td><td>${num(s.held)} h</td><td>${num(s.blocked)} h</td></tr>`;
+ const heat=c.heat.filter(x=>x.available>0).sort((a,b)=>b.occupancy-a.occupancy||b.booked-a.booked||a.weekday-b.weekday||a.hour-b.hour).slice(0,10);
+ results().innerHTML=`${d.test_mode?'<div class="metrics-test"><strong>Ambiente de testes</strong><br>Estes indicadores incluem os registros fictícios usados na homologação.</div>':''}
+ <div class="metrics-heading"><h2>Visão do período</h2><span class="metrics-note">${date(c.from)} a ${date(c.to)}</span></div>
+ <p class="metrics-note">Comparação: ${date(p.from)} a ${date(p.to)} · mesmo número de dias. Horários de Brasília.</p>
+ <div class="metrics-cards">${card('Ocupação',pct(h.occupancy),delta(h.occupancy,p.hours.occupancy,' p.p.'))}${card('Horas reservadas',num(h.booked)+' h',delta(h.booked,p.hours.booked,' h'))}${card('Recebimentos',money(cash.received),'Anterior: '+money(p.cash.received))}${card('Reservas criadas',num(b.created),delta(b.created,p.bookings.created))}</div>
+ <section class="card metrics-section"><h2>Uso dos espaços</h2><p class="metrics-note">${num(h.available)} h ofertadas · ${num(h.free)} h livres · ${num(h.held)} h aguardando pagamento · ${num(h.blocked)} h bloqueadas.</p>
+ <div class="metrics-scroll"><table class="metrics-table"><thead><tr><th>Espaço</th><th>Ocupação</th><th>Reservadas</th><th>Livres</th><th>Em espera</th><th>Bloqueadas</th></tr></thead><tbody>${c.spaces.map(row).join('')||'<tr><td colspan="6">Nenhum espaço cadastrado neste filtro.</td></tr>'}</tbody></table></div>
+ ${h.available===0?'<p class="metrics-empty">Nenhuma hora ofertada neste período. Cadastre a agenda para medir a ocupação.</p>':''}</section>
+ <div class="metrics-grid metrics-section"><article class="card"><h2>Dias e horários mais ocupados</h2><p class="metrics-note">Até dez faixas, somadas por dia da semana e hora. A base em horas ajuda a avaliar o tamanho da amostra.</p><div class="metrics-scroll"><table class="metrics-table"><thead><tr><th>Faixa</th><th>Ocupação</th><th>Reservadas / ofertadas</th></tr></thead><tbody>${heat.map(x=>`<tr><td>${days[x.weekday]} · ${String(x.hour).padStart(2,'0')}h</td><td>${pct(x.occupancy)}</td><td>${num(x.booked)} / ${num(x.available)} h</td></tr>`).join('')||'<tr><td colspan="3">Sem agenda no período.</td></tr>'}</tbody></table></div></article>
+ <article class="card"><h2>Reservas e cancelamentos</h2><p class="metrics-note">Situação atual das reservas criadas no período.</p><div class="metrics-cards" style="grid-template-columns:repeat(2,minmax(0,1fr))">${card('Confirmadas / concluídas',num(b.confirmed),'Aguardando pagamento: '+num(b.pending))}${card('Canceladas',num(b.cancelled),(b.cancellation_rate==null?'Sem reservas':num(b.cancellation_rate)+'% das criadas')+' · expiradas: '+num(b.expired))}${card('Valor contratado',money(b.contracted),'Somente confirmadas / concluídas')}${card('Valor médio por reserva',b.average==null?'Sem reservas':money(b.average),'Reservas avulsas e mensais juntas')}</div></article></div>
+ <section class="metrics-section"><h2>Financeiro do período</h2><p class="metrics-note">Movimentações pela data em que foram registradas financeiramente, incluindo recebimentos de reservas de outros períodos.</p>
+ <div class="metrics-cards">${card('Devolvido',money(cash.refunded),'Anterior: '+money(p.cash.refunded))}${card('Recebido menos devoluções',money(cash.received-cash.refunded),'Não representa lucro nem saldo disponível')}${card('Taxas registradas',money(cash.fees),'Custos do provedor registrados no histórico')}${card('Comissão reconhecida',money(cash.commission),'Comissão Tâmo On registrada no histórico')}</div>
+ ${cash.legacy?'<p class="metrics-test">Parte do histórico financeiro usa datas reconstruídas de registros antigos. Consulte o Financeiro para conferir os lançamentos.</p>':''}
+ <div class="metrics-cards">${card('Saldo a receber',money(c.balances.pending),'Posição atual das reservas criadas no período')}${card('Devolução pendente',money(c.balances.refund_pending),'Posição atual das reservas criadas no período')}${card('Jogos confirmados',num(c.services.occurrences),'Ocorrências com início no período')}${card('Valor alocado aos jogos',money(c.services.value),'Valor das ocorrências; não é recebimento')}</div></section>
+ <section class="metrics-section"><h2>Mensalistas e recorrência</h2><div class="metrics-cards">${card('Vínculos mensais ativos',num(m.active),'Situação atual, independentemente do período')}${card('Mensalidades dos ativos',money(m.monthly_value),'Soma dos valores cadastrados; não é receita garantida')}${card('Organizadores novos',num(c.customers.new),'Primeira reserva confirmada / concluída com o parceiro')}${card('Organizadores recorrentes',num(c.customers.returning),'Já possuíam reserva confirmada / concluída antes do período')}</div><p class="metrics-note">Vínculos suspensos: ${num(m.suspended)} · outros vínculos não cancelados: ${num(m.other)}. Organizadores contados uma vez por parceiro; participantes das cotas não entram nessa contagem.</p></section>
+ <details class="card metrics-details"><summary>Como os indicadores são calculados</summary><p>Ocupação = horas confirmadas ou concluídas ÷ horas ofertadas. A base vem da agenda cadastrada e das ocorrências das reservas. Bloqueios são excluídos da oferta; horários aguardando pagamento permanecem na base, mas não contam como ocupados. Sobreposições no mesmo espaço são contadas uma única vez. Uma reserva mensal ocupa apenas as datas efetivamente registradas.</p><p>Os intervalos são recortados nas datas selecionadas. Os valores dos jogos usam a data de início de cada ocorrência. Sem agenda, a ocupação aparece como indisponível; não presumimos que o espaço funcione 24 horas.</p><p>Cancelamentos consideram as reservas criadas no período que hoje estão canceladas, aguardando devolução ou devolvidas. Expiração sem pagamento é mostrada separadamente. As comparações refletem o estado atual dos registros, não uma fotografia histórica. Valores médios incluem reservas mensais e avulsas.</p><p>O Financeiro continua sendo a referência para conferir cada lançamento, disponibilidade e repasses. Estes números não incluem despesas operacionais do estabelecimento. Os dados são recalculados a cada consulta; a futura limpeza dos testes também os retirará das métricas.</p></details>`;
+ status().textContent='Atualizado em '+new Date(d.generated_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})+' (Brasília).';
+ }
+ function capture(){const f=new FormData(root.querySelector('form'));filters={from:String(f.get('from')),to:String(f.get('to')),partner:admin?String(f.get('partner')||''):partnerId||'',space:String(f.get('space')||'')};}
+ async function load(){
+ if(!valid())return;capture();const e=++epoch;results().replaceChildren();
+ const span=(Date.parse(filters.to)-Date.parse(filters.from))/86400000;
+ if(!Number.isFinite(span)||span<0||span>365){status().textContent='Selecione um período de até 366 dias, com a data final igual ou posterior à inicial.';return;}
+ status().textContent='Calculando métricas…';root.querySelector('button[type=submit]').disabled=true;
+ try{const d=await rpc('marketplace_metrics',{p_from:filters.from,p_to:filters.to,p_partner_id:filters.partner||null,p_space_id:filters.space||null});
+ if(!current(e))return;if(!d?.current?.hours||!Array.isArray(d.spaces)||!Array.isArray(d.partners))throw Error('INVALID_METRICS');
+ options=d.partners;spaces=d.spaces;shell();show(d);
+ }catch(error){if(current(e)){status().textContent='';results().innerHTML='<p class="metrics-error" role="alert">Não foi possível consultar as métricas. Confira sua conexão e permissão de acesso, depois toque em Atualizar métricas.</p>';}}
+ finally{if(current(e))root.querySelector('button[type=submit]').disabled=false;}
+ }
+ function submit(e){if(e.target.matches('.metrics-filters')){e.preventDefault();load();}}
+ function change(e){if(!e.target.closest('.metrics-filters')||!valid())return;capture();++epoch;results().replaceChildren();status().textContent='Filtros alterados. Toque em Atualizar métricas.';root.querySelector('button[type=submit]').disabled=false;
+ if(e.target.name==='partner'){filters.space='';const select=root.querySelector('[name=space]');select.innerHTML=option('','Todos os espaços','')+spaces.filter(s=>!filters.partner||s.partner_id===filters.partner).map(s=>option(s.id,s.name,'')).join('');}}
+ function click(e){if(e.target.closest('[data-metrics-month]')&&valid()){filters={...filters,...month()};shell();load();}}
+ function dispose(){if(disposed)return;disposed=true;++epoch;options=[];spaces=[];observer?.disconnect();root.removeEventListener('submit',submit);root.removeEventListener('change',change);root.removeEventListener('click',click);root.replaceChildren();}
+ if(!key){root.textContent='Conecte-se com acesso financeiro para consultar as métricas.';return {root,key,dispose};}
+ root.addEventListener('submit',submit);root.addEventListener('change',change);root.addEventListener('click',click);
+ observer=new MutationObserver(()=>{if(!root.isConnected||identity()!==key)dispose();});observer.observe(document.body,{childList:true,subtree:true});
+ shell();load();return {root,key,dispose};
+}
+global.TamoonMetrics=Object.freeze({mount});
 })(window);
 
 ;
@@ -2662,6 +2818,7 @@ global.TamoonAdminOperations={mount};
       ["team", "♙", "Equipe"],
       ["vouchers", "%", "Vouchers"],
       ["finance", "$", "Financeiro"],
+      ["metrics", "▥", "Métricas"],
       ["registration", "≡", "Cadastro"]
     ],
     admin: [
@@ -2671,6 +2828,7 @@ global.TamoonAdminOperations={mount};
       ["reservations", "▣", "Reservas"],
       ["users", "◎", "Usuários"],
       ["finance", "$", "Financeiro"],
+      ["metrics", "▥", "Métricas"],
       ["refunds", "↩", "Devoluções"],
       ["vouchers", "%", "Vouchers"],
       ["settings", "⚙", "Configurações"]
@@ -7965,7 +8123,7 @@ global.TamoonAdminOperations={mount};
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
-    if(backendIsOnline() && !(state.role==="admin" && state.activePage.admin==="refunds"))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
+    if(backendIsOnline() && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
@@ -10112,7 +10270,7 @@ global.TamoonAdminOperations={mount};
       return navShell("partner",partial[state.activePage.partner] && partnerPageAllowed(state.activePage.partner) ? partial[state.activePage.partner]() : partnerRestrictedSection("Cadastro em validação"));
     }
     if (!access.allowed) return partnerRestrictedView(access);
-    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, registration: partnerRegistration };
+    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, metrics: metricsPage, registration: partnerRegistration };
     const page=state.activePage.partner;
     if(partnerAccessPending)return navShell("partner",partnerRestrictedSection("Atualizando permissões"));
     if(!partnerPageAllowed(page))return navShell("partner",partnerRestrictedSection((menus.partner.find(item=>item[0]===page)||[])[2]||"Esta área"));
@@ -10654,26 +10812,47 @@ global.TamoonAdminOperations={mount};
   }
 
 
+  let metricsConsole=null;
+  function metricsIdentity(){
+    if(state.activePage?.[state.role]!=="metrics" || !backendRuntime.enabled || !backendIsOnline())return '';
+    if(state.role==='admin')return adminRefundContext()?JSON.stringify([adminRefundContext(),'admin']):'';
+    const id=backendRuntime.identityId;
+    if(state.role!=='partner'||!id||!currentPartnerAccessStatus().allowed||!hasPartnerPermission('manage_finance')
+      ||backendRuntime.bootstrap?.profile?.status!=='active'||backendRuntime.bootstrap?.profile?.id!==id
+      ||backendRuntime.session?.user?.id!==id||window.MarketplaceBackend?.session?.user?.id!==id
+      ||window.TamoonMarketplacePilot?.blocked||window.TamoonMarketplacePilot?.leaving)return '';
+    return JSON.stringify([id,'partner',state.partnerProfile.backendPartnerId,partnerReadonlyActive()]);
+  }
+  function metricsPage(){return pageHeader(state.role==='admin'?'Administração':'Portal do parceiro','Métricas','Ocupação, recebimentos e recorrência para acompanhar o seu espaço.')
+    +(metricsIdentity()?'<div id="marketMetrics" data-ui-owned></div>':'<p class="callout">As métricas consultam os dados oficiais. Entre com uma conta autorizada e conectada ao Marketplace.</p>');}
+  function mountMetrics(){
+    const host=app.querySelector('#marketMetrics'),key=metricsIdentity();
+    if(metricsConsole&&(metricsConsole.root!==host||metricsConsole.key!==key)){metricsConsole.dispose();metricsConsole=null;}
+    if(host&&key&&!metricsConsole)metricsConsole=window.TamoonMetrics.mount(host,{identity:metricsIdentity,admin:state.role==='admin',
+      partnerId:state.role==='partner'?state.partnerProfile.backendPartnerId:null,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)});
+  }
+
   let operationsConsole=null;
   function adminOperationsPage(){
-    return pageHeader('Administração','Central de operações','Consulte responsáveis, vínculos e histórico do marketplace.')
+    return pageHeader('Administração','Central de operações','Resumo, pendências e agenda para acompanhar a operação.')
       +(adminRefundContext()?'<div id="marketAdminOperations" data-ui-owned></div>':'<p class="callout">Entre com uma conta de administrador para consultar a operação.</p>');
   }
   function mountAdminOperations(){
     const host=app.querySelector('#marketAdminOperations');
     if(operationsConsole && (operationsConsole.root!==host || operationsConsole.key!==adminRefundContext())){operationsConsole.dispose();operationsConsole=null;}
-    if(host && adminRefundContext() && !operationsConsole)operationsConsole=window.TamoonAdminOperations.mount(host,{
-      mode:'market',identity:adminRefundContext,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)
+    if(host && adminRefundContext() && !operationsConsole)operationsConsole=window.TamoonAdminDaily.mount(host,{
+      mode:'market',identity:adminRefundContext,onAction:(action,id)=>{if(action==='refunds')openAdminRefunds(id);},rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)
     });
   }
   function adminView() {
-    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
+    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, metrics: metricsPage, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
     return navShell("admin", (views[state.activePage.admin] || adminOverview)());
   }
 
   function render() {
     if(window.TamoonMarketplacePilot?.leaving)return;
     if(operationsConsole && operationsConsole.key!==adminRefundContext()){operationsConsole.dispose();operationsConsole=null;}
+    if(metricsConsole&&metricsConsole.key!==metricsIdentity()){metricsConsole.dispose();metricsConsole=null;}
     adminRefundStore.get();
     if(!adminRefundContext() && ['admin-refund-details','asaas-refund','admin-refunds'].includes(detailDialog.dataset.view)){
       stopAsaasRefundMonitor();detailReturnContext=null;if(detailDialog.open)detailDialog.close();
@@ -10730,6 +10909,7 @@ global.TamoonAdminOperations={mount};
       if(summaryHost)summaryHost.financeMarkup=financialPeriodPanel(true);
     }
     mountAdminOperations();
+    mountMetrics();
     applyPartnerReadonlyControls();
     window.MarketplaceAgendaNavigation.showSelected(app);
     updateBackendRoleAccess();

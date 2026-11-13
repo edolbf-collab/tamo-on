@@ -1,7 +1,7 @@
 /* Regras de apresentacao. A autorizacao efetiva e conferida novamente pelo servidor. */
 (function(root){
   'use strict';
-  const pages={overview:[],agenda:['manage_schedule'],reservations:['manage_schedule'],spaces:['manage_spaces'],clients:['manage_schedule'],team:['manage_team'],vouchers:['manage_finance'],finance:['manage_finance'],registration:['manage_profile','manage_documents']};
+  const pages={overview:[],agenda:['manage_schedule'],reservations:['manage_schedule'],spaces:['manage_spaces'],clients:['manage_schedule'],team:['manage_team'],vouchers:['manage_finance'],finance:['manage_finance'],metrics:['manage_finance'],registration:['manage_profile','manage_documents']};
   const actions={
     manage_spaces:['new-space','edit-space','toggle-space'],
     manage_team:['new-team-member','edit-team-member','toggle-team-member'],
