@@ -1,4 +1,4 @@
-name: Preparar ou enviar iOS ao TestFlight
+name: Preparar ou enviar iOS ao App Store Connect
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +12,7 @@ on:
         default: '168'
         type: string
       upload:
-        description: Assinar e enviar somente ao TestFlight interno
+        description: Assinar e enviar ao App Store Connect (apto para App Store)
         required: true
         default: false
         type: boolean
