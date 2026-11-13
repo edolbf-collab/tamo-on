@@ -361,7 +361,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     window.TamoonMarketplacePilot?.leave();
   }
 
-  const readonlyRpcNames = new Set(["marketplace_financial_period","marketplace_financial_receipts","reservation_payment_audit","partner_readonly_status","partner_readonly_bootstrap","monthly_link_request_messages","occurrence_transfer_available_slots","occurrence_transfer_conversation","community_marketplace_notifications","admin_search_reservations","reservation_cancellation_preview"]);
+  const readonlyRpcNames = new Set(["marketplace_metrics","marketplace_financial_period","marketplace_financial_receipts","reservation_payment_audit","partner_readonly_status","partner_readonly_bootstrap","monthly_link_request_messages","occurrence_transfer_available_slots","occurrence_transfer_conversation","community_marketplace_notifications","admin_search_reservations","reservation_cancellation_preview"]);
 
   async function assertWritable() {
     const c=requireClient();
@@ -1936,7 +1936,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 /* Regras de apresentacao. A autorizacao efetiva e conferida novamente pelo servidor. */
 (function(root){
   'use strict';
-  const pages={overview:[],agenda:['manage_schedule'],reservations:['manage_schedule'],spaces:['manage_spaces'],clients:['manage_schedule'],team:['manage_team'],vouchers:['manage_finance'],finance:['manage_finance'],registration:['manage_profile','manage_documents']};
+  const pages={overview:[],agenda:['manage_schedule'],reservations:['manage_schedule'],spaces:['manage_spaces'],clients:['manage_schedule'],team:['manage_team'],vouchers:['manage_finance'],finance:['manage_finance'],metrics:['manage_finance'],registration:['manage_profile','manage_documents']};
   const actions={
     manage_spaces:['new-space','edit-space','toggle-space'],
     manage_team:['new-team-member','edit-team-member','toggle-team-member'],
@@ -2617,6 +2617,99 @@ global.TamoonAdminDaily={mount};
 
 ;
 
+;/* metrics.js */
+/* Read-only metrics; no financial or personal records are cached in the browser. */
+(function(global){
+'use strict';
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
+const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const pct=v=>v==null?'Sem agenda':num(v)+'%';
+const date=v=>String(v||'').slice(0,10).split('-').reverse().join('/');
+const days=['','Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+function currentMonth(now=new Date()){
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit'}).formatToParts(now);
+ return parts.find(p=>p.type==='year').value+'-'+parts.find(p=>p.type==='month').value;
+}
+function monthRange(value){
+ if(!/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(value))return null;
+ const [y,m]=value.split('-').map(Number);
+ return {from:value+'-01',to:new Date(Date.UTC(y,m,0)).toISOString().slice(0,10)};
+}
+function adjacentMonth(value,step){const [y,m]=value.split('-').map(Number);return new Date(Date.UTC(y,m-1+step,1)).toISOString().slice(0,7);}
+function mount(root,{rpc,identity,admin=false,partnerId=null}){
+ const key=identity();let epoch=0,disposed=false,options=[],spaces=[],observer;
+ let filters={month:currentMonth(),partner:partnerId||'',space:''};
+ const valid=()=>{if(disposed)return false;if(!key||identity()!==key){dispose();return false;}return true;};
+ const current=e=>!disposed&&root.isConnected&&identity()===key&&epoch===e;
+ const option=(value,text,selected)=>`<option value="${esc(value)}" ${value===selected?'selected':''}>${esc(text)}</option>`;
+ function shell(){root.innerHTML=`<section class="market-metrics"><form class="metrics-filters">
+ <label class="field"><span>Mês e ano</span><input aria-label="Mês e ano" type="month" name="month" required min="2000-01" max="${currentMonth()}" value="${filters.month}"></label>
+ ${admin?`<label class="field"><span>Parceiro</span><select name="partner">${option('','Todos os parceiros',filters.partner)}${options.map(p=>option(p.id,p.name,filters.partner)).join('')}</select></label>`:''}
+ <label class="field"><span>Quadra / espaço</span><select name="space">${option('','Todos os espaços',filters.space)}${spaces.filter(s=>!filters.partner||s.partner_id===filters.partner).map(s=>option(s.id,s.name,filters.space)).join('')}</select></label>
+ <div class="metrics-controls"><button class="button primary" type="submit">Atualizar métricas</button><button class="button ghost" type="button" data-metrics-prev aria-label="Mês anterior" ${filters.month<='2000-01'?'disabled':''}>‹</button><button class="button ghost" type="button" data-metrics-month>Mês atual</button><button class="button ghost" type="button" data-metrics-next aria-label="Próximo mês" ${filters.month>=currentMonth()?'disabled':''}>›</button></div>
+ </form><div class="metrics-status" role="status" aria-live="polite"></div><div class="metrics-results"></div></section>`;}
+ const results=()=>root.querySelector('.metrics-results');
+ const status=()=>root.querySelector('.metrics-status');
+ const delta=(a,b,suffix='')=>b==null||a==null?'Sem base comparável':`${a-b>0?'+':''}${num(a-b)}${suffix} frente ao período anterior`;
+ const card=(title,value,note)=>`<article class="card"><span>${esc(title)}</span><strong>${esc(value)}</strong><small>${esc(note)}</small></article>`;
+ function show(d){
+ const c=d.current,p=d.previous,h=c.hours,b=c.bookings,cash=c.cash,m=d.monthly;
+ const row=s=>`<tr><td>${esc(s.name)}<br><small>${esc(s.partner)} · ${esc(s.venue)}</small></td><td>${s.occupancy==null?'Sem agenda':`<progress max="100" value="${Number(s.occupancy)}" aria-label="Ocupação de ${esc(s.name)}"></progress>${pct(s.occupancy)}`}</td><td>${num(s.booked)} h</td><td>${num(s.free)} h</td><td>${num(s.held)} h</td><td>${num(s.blocked)} h</td></tr>`;
+ const offered=c.heat.filter(x=>x.available>0);
+ const heat=offered.slice().sort((a,b)=>b.occupancy-a.occupancy||b.booked-a.booked||a.weekday-b.weekday||a.hour-b.hour).slice(0,10);
+ const quiet=offered.slice().sort((a,b)=>a.occupancy-b.occupancy||(b.available-b.booked)-(a.available-a.booked)||a.weekday-b.weekday||a.hour-b.hour).slice(0,10);
+ const scheduleTable=(title,items,kind)=>`<article class="card metrics-${kind}"><h2>${title}</h2><p class="metrics-note">Até dez faixas por dia da semana e hora, considerando apenas a agenda ofertada.</p><div class="metrics-scroll"><table class="metrics-table"><thead><tr><th>Faixa</th><th>Ocupação</th><th>Reservadas / ofertadas</th></tr></thead><tbody>${items.map(x=>`<tr><td>${days[x.weekday]} · ${String(x.hour).padStart(2,'0')}h</td><td>${pct(x.occupancy)}</td><td>${num(x.booked)} / ${num(x.available)} h</td></tr>`).join('')||'<tr><td colspan="3">Sem agenda no mês.</td></tr>'}</tbody></table></div></article>`;
+ results().innerHTML=`${d.test_mode?'<div class="metrics-test"><strong>Ambiente de testes</strong><br>Estes indicadores incluem os registros fictícios usados na homologação.</div>':''}
+ <div class="metrics-heading"><h2>Visão do período</h2><span class="metrics-note">${date(c.from)} a ${date(c.to)}</span></div>
+ <p class="metrics-note">Comparação: ${date(p.from)} a ${date(p.to)} · mês anterior completo. Horários de Brasília.</p>
+ <p class="metrics-note">${d.month_open?'Mês em andamento: inclui dias e horários ainda em aberto. Os números podem mudar até o encerramento do mês.':'Mês encerrado: análise de todos os dias do mês selecionado.'}</p>
+ <div class="metrics-cards">${card('Ocupação',pct(h.occupancy),delta(h.occupancy,p.hours.occupancy,' p.p.'))}${card('Horas reservadas',num(h.booked)+' h',delta(h.booked,p.hours.booked,' h'))}${card('Recebimentos',money(cash.received),'Anterior: '+money(p.cash.received))}${card('Reservas criadas',num(b.created),delta(b.created,p.bookings.created))}</div>
+ <section class="card metrics-section"><h2>Uso dos espaços</h2><p class="metrics-note">${num(h.available)} h ofertadas · ${num(h.free)} h livres · ${num(h.held)} h aguardando pagamento · ${num(h.blocked)} h bloqueadas.</p>
+ <div class="metrics-scroll"><table class="metrics-table"><thead><tr><th>Espaço</th><th>Ocupação</th><th>Reservadas</th><th>Livres</th><th>Em espera</th><th>Bloqueadas</th></tr></thead><tbody>${c.spaces.map(row).join('')||'<tr><td colspan="6">Nenhum espaço cadastrado neste filtro.</td></tr>'}</tbody></table></div>
+ ${h.available===0?'<p class="metrics-empty">Nenhuma hora ofertada neste período. Cadastre a agenda para medir a ocupação.</p>':''}</section>
+ <div class="metrics-grid metrics-section">${scheduleTable('Dias e horários mais ocupados',heat,'busy')}${scheduleTable('Dias e horários menos ocupados',quiet,'quiet')}</div>
+ <section class="metrics-section metrics-bookings"><h2>Reservas e cancelamentos</h2><p class="metrics-note">Situação atual das reservas criadas no mês.</p><div class="metrics-cards">${card('Confirmadas / concluídas',num(b.confirmed),'Aguardando pagamento: '+num(b.pending))}${card('Canceladas',num(b.cancelled),(b.cancellation_rate==null?'Sem reservas':num(b.cancellation_rate)+'% das criadas')+' · expiradas: '+num(b.expired))}${card('Valor contratado',money(b.contracted),'Somente confirmadas / concluídas')}${card('Valor médio por reserva',b.average==null?'Sem reservas':money(b.average),'Reservas avulsas e mensais juntas')}</div></section>
+ <section class="metrics-section"><h2>Financeiro do período</h2><p class="metrics-note">Movimentações pela data em que foram registradas financeiramente, incluindo recebimentos de reservas de outros períodos.</p>
+ <div class="metrics-cards">${card('Devolvido',money(cash.refunded),'Anterior: '+money(p.cash.refunded))}${card('Recebido menos devoluções',money(cash.received-cash.refunded),'Não representa lucro nem saldo disponível')}${card('Taxas registradas',money(cash.fees),'Custos do provedor registrados no histórico')}${card('Comissão reconhecida',money(cash.commission),'Comissão Tâmo On registrada no histórico')}</div>
+ ${cash.legacy?'<p class="metrics-test">Parte do histórico financeiro usa datas reconstruídas de registros antigos. Consulte o Financeiro para conferir os lançamentos.</p>':''}
+ <div class="metrics-cards">${card('Saldo a receber',money(c.balances.pending),'Posição atual das reservas criadas no período')}${card('Devolução pendente',money(c.balances.refund_pending),'Posição atual das reservas criadas no período')}${card('Jogos confirmados',num(c.services.occurrences),'Ocorrências com início no período')}${card('Valor alocado aos jogos',money(c.services.value),'Valor das ocorrências; não é recebimento')}</div></section>
+ <section class="metrics-section"><h2>Mensalistas e recorrência</h2><div class="metrics-cards">${card('Vínculos mensais ativos',num(m.active),'Situação atual, independentemente do período')}${card('Mensalidades dos ativos',money(m.monthly_value),'Soma dos valores cadastrados; não é receita garantida')}${card('Organizadores novos',num(c.customers.new),'Primeira reserva confirmada / concluída com o parceiro')}${card('Organizadores recorrentes',num(c.customers.returning),'Já possuíam reserva confirmada / concluída antes do período')}</div><p class="metrics-note">Vínculos suspensos: ${num(m.suspended)} · outros vínculos não cancelados: ${num(m.other)}. Organizadores contados uma vez por parceiro; participantes das cotas não entram nessa contagem.</p></section>
+ <details class="card metrics-details"><summary>Como os indicadores são calculados</summary><p>Ocupação = horas confirmadas ou concluídas ÷ horas ofertadas. A base vem da agenda cadastrada e das ocorrências das reservas. Bloqueios são excluídos da oferta; horários aguardando pagamento permanecem na base, mas não contam como ocupados. Sobreposições no mesmo espaço são contadas uma única vez. Uma reserva mensal ocupa apenas as datas efetivamente registradas.</p><p>A análise considera o mês inteiro selecionado, do primeiro ao último dia. O mês corrente inclui os dias ainda em aberto. A comparação usa o mês anterior completo, mesmo que os meses tenham números diferentes de dias. Horários sem oferta ou totalmente bloqueados não entram na lista dos menos ocupados; faixas ofertadas com nenhuma reserva aparecem com 0%. Os valores dos jogos usam a data de início de cada ocorrência. Sem agenda, a ocupação aparece como indisponível; não presumimos que o espaço funcione 24 horas.</p><p>Cancelamentos consideram as reservas criadas no período que hoje estão canceladas, aguardando devolução ou devolvidas. Expiração sem pagamento é mostrada separadamente. As comparações refletem o estado atual dos registros, não uma fotografia histórica. Valores médios incluem reservas mensais e avulsas.</p><p>O Financeiro continua sendo a referência para conferir cada lançamento, disponibilidade e repasses. Estes números não incluem despesas operacionais do estabelecimento. Os dados são recalculados a cada consulta; a futura limpeza dos testes também os retirará das métricas.</p></details>`;
+ status().textContent='Atualizado em '+new Date(d.generated_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})+' (Brasília).';
+ }
+ function capture(){const f=new FormData(root.querySelector('form'));filters={month:String(f.get('month')||''),partner:admin?String(f.get('partner')||''):partnerId||'',space:String(f.get('space')||'')};}
+ async function load(){
+ if(!valid())return;capture();const e=++epoch;results().replaceChildren();
+ const range=monthRange(filters.month);
+ if(!range||filters.month>currentMonth()){status().textContent='Selecione o mês corrente ou um mês anterior, a partir de janeiro de 2000.';return;}
+ status().textContent='Calculando métricas…';root.querySelector('button[type=submit]').disabled=true;
+ try{const d=await rpc('marketplace_metrics',{p_from:range.from,p_to:range.to,p_partner_id:filters.partner||null,p_space_id:filters.space||null});
+ if(!current(e))return;if(!d?.current?.hours||!Array.isArray(d.spaces)||!Array.isArray(d.partners))throw Error('INVALID_METRICS');
+ options=d.partners;spaces=d.spaces;shell();show(d);
+ }catch(error){if(current(e)){status().textContent='';results().innerHTML='<p class="metrics-error" role="alert">Não foi possível consultar as métricas. Confira sua conexão e permissão de acesso, depois toque em Atualizar métricas.</p>';}}
+ finally{if(current(e))root.querySelector('button[type=submit]').disabled=false;}
+ }
+ function submit(e){if(e.target.matches('.metrics-filters')){e.preventDefault();load();}}
+ function change(e){if(!e.target.closest('.metrics-filters')||!valid())return;capture();++epoch;results().replaceChildren();status().textContent='Filtros alterados. Toque em Atualizar métricas.';root.querySelector('button[type=submit]').disabled=false;
+ if(e.target.name==='partner'){filters.space='';const select=root.querySelector('[name=space]');select.innerHTML=option('','Todos os espaços','')+spaces.filter(s=>!filters.partner||s.partner_id===filters.partner).map(s=>option(s.id,s.name,'')).join('');}}
+ function click(e){
+ if(!e.target.closest('[data-metrics-month],[data-metrics-prev],[data-metrics-next]')||!valid())return;
+ capture();const selected=monthRange(filters.month)?filters.month:currentMonth();filters.month=e.target.closest('[data-metrics-month]')?currentMonth():adjacentMonth(selected,e.target.closest('[data-metrics-prev]')?-1:1);
+ if(filters.month<'2000-01'||filters.month>currentMonth())return;
+ shell();load();
+ }
+ function dispose(){if(disposed)return;disposed=true;++epoch;options=[];spaces=[];observer?.disconnect();root.removeEventListener('submit',submit);root.removeEventListener('change',change);root.removeEventListener('click',click);root.replaceChildren();}
+ if(!key){root.textContent='Conecte-se com acesso financeiro para consultar as métricas.';return {root,key,dispose};}
+ root.addEventListener('submit',submit);root.addEventListener('change',change);root.addEventListener('click',click);
+ observer=new MutationObserver(()=>{if(!root.isConnected||identity()!==key)dispose();});observer.observe(document.body,{childList:true,subtree:true});
+ shell();load();return {root,key,dispose};
+}
+global.TamoonMetrics=Object.freeze({mount,currentMonth,monthRange,adjacentMonth});
+})(window);
+
+;
+
 ;/* app.js */
 (function () {
   "use strict";
@@ -2742,6 +2835,7 @@ global.TamoonAdminDaily={mount};
       ["team", "♙", "Equipe"],
       ["vouchers", "%", "Vouchers"],
       ["finance", "$", "Financeiro"],
+      ["metrics", "▥", "Métricas"],
       ["registration", "≡", "Cadastro"]
     ],
     admin: [
@@ -2751,6 +2845,7 @@ global.TamoonAdminDaily={mount};
       ["reservations", "▣", "Reservas"],
       ["users", "◎", "Usuários"],
       ["finance", "$", "Financeiro"],
+      ["metrics", "▥", "Métricas"],
       ["refunds", "↩", "Devoluções"],
       ["vouchers", "%", "Vouchers"],
       ["settings", "⚙", "Configurações"]
@@ -8045,7 +8140,7 @@ global.TamoonAdminDaily={mount};
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
-    if(backendIsOnline() && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
+    if(backendIsOnline() && state.activePage?.[state.role]!=="metrics" && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
@@ -10192,7 +10287,7 @@ global.TamoonAdminDaily={mount};
       return navShell("partner",partial[state.activePage.partner] && partnerPageAllowed(state.activePage.partner) ? partial[state.activePage.partner]() : partnerRestrictedSection("Cadastro em validação"));
     }
     if (!access.allowed) return partnerRestrictedView(access);
-    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, registration: partnerRegistration };
+    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, metrics: metricsPage, registration: partnerRegistration };
     const page=state.activePage.partner;
     if(partnerAccessPending)return navShell("partner",partnerRestrictedSection("Atualizando permissões"));
     if(!partnerPageAllowed(page))return navShell("partner",partnerRestrictedSection((menus.partner.find(item=>item[0]===page)||[])[2]||"Esta área"));
@@ -10734,6 +10829,26 @@ global.TamoonAdminDaily={mount};
   }
 
 
+  let metricsConsole=null;
+  function metricsIdentity(){
+    if(state.activePage?.[state.role]!=="metrics" || !backendRuntime.enabled || !backendIsOnline())return '';
+    if(state.role==='admin')return adminRefundContext()?JSON.stringify([adminRefundContext(),'admin']):'';
+    const id=backendRuntime.identityId;
+    if(state.role!=='partner'||!id||!currentPartnerAccessStatus().allowed||!hasPartnerPermission('manage_finance')
+      ||backendRuntime.bootstrap?.profile?.status!=='active'||backendRuntime.bootstrap?.profile?.id!==id
+      ||backendRuntime.session?.user?.id!==id||window.MarketplaceBackend?.session?.user?.id!==id
+      ||window.TamoonMarketplacePilot?.blocked||window.TamoonMarketplacePilot?.leaving)return '';
+    return JSON.stringify([id,'partner',state.partnerProfile.backendPartnerId,partnerReadonlyActive()]);
+  }
+  function metricsPage(){return pageHeader(state.role==='admin'?'Administração':'Portal do parceiro','Métricas','Ocupação, recebimentos e recorrência para acompanhar o seu espaço.')
+    +(metricsIdentity()?'<div id="marketMetrics" data-ui-owned></div>':'<p class="callout">As métricas consultam os dados oficiais. Entre com uma conta autorizada e conectada ao Marketplace.</p>');}
+  function mountMetrics(){
+    const host=app.querySelector('#marketMetrics'),key=metricsIdentity();
+    if(metricsConsole&&(metricsConsole.root!==host||metricsConsole.key!==key)){metricsConsole.dispose();metricsConsole=null;}
+    if(host&&key&&!metricsConsole)metricsConsole=window.TamoonMetrics.mount(host,{identity:metricsIdentity,admin:state.role==='admin',
+      partnerId:state.role==='partner'?state.partnerProfile.backendPartnerId:null,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)});
+  }
+
   let operationsConsole=null;
   function adminOperationsPage(){
     return pageHeader('Administração','Central de operações','Resumo, pendências e agenda para acompanhar a operação.')
@@ -10747,13 +10862,14 @@ global.TamoonAdminDaily={mount};
     });
   }
   function adminView() {
-    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
+    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, metrics: metricsPage, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
     return navShell("admin", (views[state.activePage.admin] || adminOverview)());
   }
 
   function render() {
     if(window.TamoonMarketplacePilot?.leaving)return;
     if(operationsConsole && operationsConsole.key!==adminRefundContext()){operationsConsole.dispose();operationsConsole=null;}
+    if(metricsConsole&&metricsConsole.key!==metricsIdentity()){metricsConsole.dispose();metricsConsole=null;}
     adminRefundStore.get();
     if(!adminRefundContext() && ['admin-refund-details','asaas-refund','admin-refunds'].includes(detailDialog.dataset.view)){
       stopAsaasRefundMonitor();detailReturnContext=null;if(detailDialog.open)detailDialog.close();
@@ -10810,6 +10926,7 @@ global.TamoonAdminDaily={mount};
       if(summaryHost)summaryHost.financeMarkup=financialPeriodPanel(true);
     }
     mountAdminOperations();
+    mountMetrics();
     applyPartnerReadonlyControls();
     window.MarketplaceAgendaNavigation.showSelected(app);
     updateBackendRoleAccess();

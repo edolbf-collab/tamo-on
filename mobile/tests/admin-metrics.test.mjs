@@ -57,6 +57,7 @@ test('Marketplace metrics: periods, capacity, movements, monthly occurrences and
  ('${id(83)}','${id(11)}','${id(53)}','received',90,'2026-11-02 12:00Z','exact'),
  ('${id(84)}','${id(10)}','${id(50)}','received',999,'2026-12-01 03:00Z','exact');`);
  await file('integration/marketplace/supabase/migrations/20261113021757_marketplace_metrics.sql');
+ await file('integration/marketplace/supabase/migrations/20261113133406_marketplace_metrics_months.sql');
  await role(id(1),'anon');await assert.rejects(call(),/permission denied/);
  await role(id(2));await assert.rejects(call(),/METRICS_PARTNER_REQUIRED/);await assert.rejects(call(id(11)),/METRICS_PARTNER_FORBIDDEN/);await assert.rejects(call(id(10),id(31)),/METRICS_SPACE_FORBIDDEN/);
  await assert.rejects(db.query('select tamoon_admin.metrics_period($1,$2,$3,$4)',['2026-11-01','2026-11-30',[id(11)],null]),/permission denied/);
@@ -64,7 +65,14 @@ test('Marketplace metrics: periods, capacity, movements, monthly occurrences and
  await role(id(2));const a=await call(id(10));assert.equal(a.admin,false);assert.equal(a.partners.length,1);assert.equal(a.current.hours.available,5);assert.equal(a.current.hours.booked,2);assert.equal(a.current.hours.held,1);assert.equal(a.current.hours.free,2);assert.equal(a.current.hours.blocked,1);assert.equal(a.current.hours.occupancy,40);
  assert.equal(a.current.bookings.created,3);assert.equal(a.current.bookings.cancelled,1);assert.equal(a.current.bookings.cancellation_rate,33.3);assert.equal(a.current.bookings.contracted,200);assert.equal(a.current.services.occurrences,2);assert.equal(a.current.services.value,200);
  assert.equal(a.current.cash.received,200);assert.equal(a.current.cash.refunded,40);assert.equal(a.monthly.active,1);assert.equal(a.monthly.monthly_value,1380);assert.equal(a.current.customers.returning,1);assert.equal(a.current.customers.new,0);
- assert.equal(a.previous.from,'2026-10-02');assert.equal(a.previous.to,'2026-10-31');
+ assert.equal(a.previous.from,'2026-10-01');assert.equal(a.previous.to,'2026-10-31');
+ assert.equal(a.previous.bookings.confirmed,1,'October 1 must not be dropped from the comparison');
+ const leap=await call(id(10),null,'2024-02-01','2024-02-29');assert.equal(leap.previous.from,'2024-01-01');assert.equal(leap.previous.to,'2024-01-31');assert.equal(leap.month_open,false);
+ const feb=await call(id(10),null,'2026-02-01','2026-02-28');assert.equal(feb.previous.to,'2026-01-31');
+ const jan=await call(id(10),null,'2026-01-01','2026-01-31');assert.equal(jan.previous.from,'2025-12-01');assert.equal(jan.previous.to,'2025-12-31');
+ await assert.rejects(call(id(10),null,'2026-10-02','2026-10-31'),/METRICS_INVALID_MONTH/);
+ await assert.rejects(call(id(10),null,'2026-10-01','2026-10-30'),/METRICS_INVALID_MONTH/);
+ await assert.rejects(call(id(10),null,'2099-01-01','2099-01-31'),/METRICS_INVALID_MONTH/);
  assert.equal(a.current.heat.reduce((sum,h)=>sum+h.available,0),5);assert.equal(a.current.heat.reduce((sum,h)=>sum+h.booked,0),2);
  assert.ok(!JSON.stringify(a).includes('Arena B'));
  await assert.rejects(call(id(10),null,'2026-11-30','2026-11-01'),/METRICS_INVALID_PERIOD/);await assert.rejects(call(id(10),null,'2025-01-01','2026-11-01'),/METRICS_INVALID_PERIOD/);await assert.rejects(call(id(10),null,'infinity','infinity'),/METRICS_INVALID_PERIOD/);

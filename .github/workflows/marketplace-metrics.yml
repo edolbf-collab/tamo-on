@@ -2,9 +2,9 @@ name: Marketplace metrics validation
 on:
   push:
     branches: [main]
-    paths: ['marketplace/metrics.*', 'marketplace/app.js', 'marketplace/partner-operations.js', 'integration/marketplace/supabase/migrations/*marketplace_metrics*.sql', 'mobile/tests/admin-metrics*', '.github/workflows/marketplace-metrics.yml']
+    paths: ['marketplace/metrics.*', 'marketplace/admin-daily.css', 'marketplace/admin-operations.css', 'marketplace/app.js', 'marketplace/partner-operations.js', 'integration/marketplace/supabase/migrations/*marketplace_metrics*.sql', 'mobile/tests/admin-metrics*', '.github/workflows/marketplace-metrics.yml']
   pull_request:
-    paths: ['marketplace/metrics.*', 'marketplace/app.js', 'marketplace/partner-operations.js', 'integration/marketplace/supabase/migrations/*marketplace_metrics*.sql', 'mobile/tests/admin-metrics*', '.github/workflows/marketplace-metrics.yml']
+    paths: ['marketplace/metrics.*', 'marketplace/admin-daily.css', 'marketplace/admin-operations.css', 'marketplace/app.js', 'marketplace/partner-operations.js', 'integration/marketplace/supabase/migrations/*marketplace_metrics*.sql', 'mobile/tests/admin-metrics*', '.github/workflows/marketplace-metrics.yml']
   workflow_dispatch:
 permissions:
   contents: read

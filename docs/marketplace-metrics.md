@@ -5,7 +5,7 @@ Acesso pelo menu **Métricas** da administração e do parceiro. No parceiro exi
 ## Indicadores
 
 - Ocupação por horas, com intervalos recortados no período e sem duplicar sobreposições. Prioridade: reserva confirmada/concluída, espera de pagamento, bloqueio, livre. Bloqueios não compõem a oferta. Sem agenda, o percentual fica indisponível.
-- Espaços comparáveis e dez faixas de dia da semana/hora mais ocupadas, com base de horas exibida.
+- Espaços comparáveis e dez faixas de dia da semana/hora mais e menos ocupadas, com base de horas exibida.
 - Reservas por data de criação, posição atual: confirmadas/concluídas, canceladas/devolvidas, expiradas, pendentes, valor contratado e média. Cancelamentos não incluem expiração sem pagamento.
 - Histórico financeiro oficial por data da movimentação: recebimento, devolução, taxas e comissão. Recebido menos devoluções não representa lucro ou saldo disponível.
 - Saldo atual a receber e devoluções pendentes das reservas criadas no período, reutilizando `reservation_financial_snapshot`.
@@ -13,7 +13,7 @@ Acesso pelo menu **Métricas** da administração e do parceiro. No parceiro exi
 - Vínculos mensais pelo estado atual e soma dos valores cadastrados dos ativos. Não é promessa de receita futura.
 - Organizadores novos/recorrentes por parceiro, usando histórico de reservas hoje confirmadas/concluídas. Cotas e participantes não contam como novos clientes.
 
-Datas inclusivas, fuso America/Sao_Paulo, máximo 366 dias. Comparação com intervalo anterior de igual duração. Histórico recalculado na consulta, sem fotografia histórica de estados anteriores. Filtros de parceiro e espaço afetam todos os indicadores; vínculos mensais explicitamente não são filtrados por data.
+Seleção de mês e ano, do primeiro ao último dia, fuso America/Sao_Paulo. Meses anteriores completos; mês corrente inclui dias em aberto e mostra aviso. Meses futuros não são selecionáveis. Comparação com o mês anterior completo, inclusive quando os meses têm durações diferentes. Histórico recalculado na consulta, sem fotografia histórica de estados anteriores. Filtros de parceiro e espaço afetam todos os indicadores; vínculos mensais explicitamente não são filtrados por data.
 
 ## Validação
 
@@ -29,7 +29,11 @@ Datas inclusivas, fuso America/Sao_Paulo, máximo 366 dias. Comparação com int
 1. Abrir Marketplace → Administração → Métricas. Conferir novembro e outubro, consolidado e cada uma das duas quadras fictícias.
 2. Comparar recebimentos/devoluções com Financeiro no mesmo período; jogos podem ter competência diferente do recebimento.
 3. Usar Visualizar como parceiro e abrir Métricas; confirmar que só aparece aquele parceiro.
-4. Mudar datas e espaço, atualizar, testar um período sem agenda e voltar ao mês atual.
+4. Mudar mês e espaço, atualizar, testar um mês sem agenda e voltar ao mês atual.
 5. Validar no navegador do celular. Nenhuma publicação nas lojas é feita por este workflow.
 
 A futura remoção dos dados fictícios remove-os automaticamente dos agregados. Esta entrega não apaga nem cria reservas, pagamentos, usuários, vínculos ou horários.
+
+## Ajustes da validação — 13/11/2026
+
+Seletor mensal e navegação semelhantes ao Financeiro. Ranking de menor ocupação ao lado do maior, incluindo faixas ofertadas com 0% e excluindo horários sem oferta/bloqueados. Reservas e cancelamentos em quatro cartões abaixo dos rankings, antes do Financeiro. Atalho de cancelamentos/restituições removido somente da tela Métricas (ambos os perfis). Central de operações e consultas detalhadas acompanham cores do tema; folhas CSS com novas versões. Migração adicional `20261113133406_marketplace_metrics_months.sql` mantém os controles de acesso e ajusta limites/comparação para meses completos.
