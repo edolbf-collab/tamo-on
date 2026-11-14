@@ -123,6 +123,7 @@
       ["vouchers", "%", "Vouchers"],
       ["finance", "$", "Financeiro"],
       ["metrics", "▥", "Métricas"],
+      ["commercial", "$", "Plano Tâmo On"],
       ["registration", "≡", "Cadastro"]
     ],
     admin: [
@@ -133,6 +134,7 @@
       ["users", "◎", "Usuários"],
       ["finance", "$", "Financeiro"],
       ["metrics", "▥", "Métricas"],
+      ["commercial", "$", "Planos e mensalidades"],
       ["refunds", "↩", "Devoluções"],
       ["vouchers", "%", "Vouchers"],
       ["settings", "⚙", "Configurações"]
@@ -1626,6 +1628,8 @@
         voucherAppliedValue:Number(reservation.voucher_discount || voucherUsage?.consumed_value || voucherUsage?.reserved_value || 0),
         promotionalVoucherId:["admin_promo","partner_promo"].includes(voucherRow?.origin) ? voucherRow.id : "",
         groupId:reservation.group_id || "",
+        commissionRate:reservation.finance_commission_rate==null?null:Number(reservation.finance_commission_rate),
+        commercialBasis:reservation.commercial_basis || "",
         groupName:reservation.group_name || group?.name || (reservation.group_id ? "Grupo Tâmo On" : "Reserva pessoal"),
         groupRole:reservation.group_role ? backendGroupRoleLabel(reservation.group_role) : isCurrentUser ? state.userGroups.find((item) => item.id === reservation.group_id)?.role || "" : "",
         eventId:reservation.event_id || "",
@@ -2319,6 +2323,11 @@
   function backendErrorMessage(error) {
     if(String(error?.message||error).includes("AGENDA_INITIAL_"))return window.MarketplaceAgendaInitial.errorMessage(error);
     const message = String(error?.message || error || "");
+    if(message.includes('PLAN_REQUIRED')||message.includes('PLAN_REVIEW_REQUIRED'))return 'O estabelecimento precisa concluir a configuração do Plano Tâmo On antes de iniciar as reservas em produção.';
+    if(message.includes('PLAN_NOT_STARTED'))return 'Este estabelecimento inicia a operação no dia 01 do mês contratado. As novas reservas serão liberadas a partir dessa data.';
+    if(message.includes('PLAN_FIRST_PAYMENT_REQUIRED'))return 'O estabelecimento aguarda a confirmação da primeira mensalidade Tâmo On para iniciar a operação.';
+    if(message.includes('PLAN_RESERVATION_CONTRACT_IMMUTABLE'))return 'O grupo e as condições comerciais desta reserva já estão definidos. Crie uma nova reserva para outro grupo.';
+    if(message.includes('PLAN_VENUE_MISMATCH'))return 'Confira o estabelecimento e a quadra selecionados.';
     if(message==="SIMULATION_DISABLED")return "Esta versão usa o Asaas Sandbox. Atualize o aplicativo e reabra o pagamento em Minhas reservas.";
     if(/PREBOOKING_DETAILS_STALE/.test(message))return "Os dados da reserva mudaram. Feche esta janela e abra novamente para conferir o grupo e os participantes antes de continuar.";
     if(/PREBOOKING_EDIT_PAYMENT_LOCKED/.test(message))return "O pagamento já foi configurado. Os dados da reserva estão bloqueados para alteração.";
@@ -3019,7 +3028,7 @@
       profile.declaredActivity = partner.activity;
       profile.contractStatus = partner.contract;
       profile.fiscalIssuer = partner.fiscal;
-      profile.commissionRate = Number(partner.commission || profile.commissionRate || state.settings.defaultCommission);
+      profile.commissionRate = Number(partner.commission ?? profile.commissionRate ?? state.settings.defaultCommission);
       profile.termsStatus = partner.terms || profile.termsStatus;
       profile.privacyStatus = partner.privacy || profile.privacyStatus;
       profile.adminStatus = partner.status;
@@ -3049,7 +3058,7 @@
       partner.contract = profile.contractStatus;
       partner.fiscal = profile.fiscalIssuer;
       partner.banking = profile.bank ? `${profile.bank} · ${profile.pixApiStatus || "Configuração pendente"}` : partner.banking;
-      partner.commission = Number(profile.commissionRate || state.settings.defaultCommission);
+      partner.commission = Number(profile.commissionRate ?? state.settings.defaultCommission);
       partner.terms = profile.termsStatus;
       partner.privacy = profile.privacyStatus;
       updateApplicationFromAdminPartner(partner);
@@ -7104,7 +7113,7 @@
       const venue=venues.get(reservation.venueId);
       const adminPartner=state.adminPartners.find((partner)=>partner.venueId===reservation.venueId);
       const partnerId=venue?.backendPartnerId||adminPartner?.backendPartnerId||adminPartner?.id||reservation.venueId;
-      if(!groups.has(partnerId))groups.set(partnerId,{partnerId,venueId:reservation.venueId,partnerName:reservation.venue||venue?.name||"Parceiro",recognizedReservations:0,grossValue:0,voucherDiscount:0,commissionBase:0,commissionRate:Number(adminPartner?.commission||state.settings.defaultCommission||0),asaasProcessed:0,externalReceived:0,asaasPixCount:0,asaasCardCount:0,asaasFeeEstimated:0});
+      if(!groups.has(partnerId))groups.set(partnerId,{partnerId,venueId:reservation.venueId,partnerName:reservation.venue||venue?.name||"Parceiro",recognizedReservations:0,grossValue:0,voucherDiscount:0,commissionBase:0,commissionTotal:0,commissionRate:Number(adminPartner?.commission??state.settings.defaultCommission??0),asaasProcessed:0,externalReceived:0,asaasPixCount:0,asaasCardCount:0,asaasFeeEstimated:0});
       const row=groups.get(partnerId);
       const net=Number(reservation.accountingRecognizedValue||0);
       const provider=String(reservation.paymentProvider||"").toUpperCase();
@@ -7114,6 +7123,7 @@
       row.grossValue+=Number(reservation.value||net);
       row.voucherDiscount+=Number(reservation.voucherAppliedValue||0);
       row.commissionBase+=net;
+      row.commissionTotal+=roundFinancial(net*Number(reservation.commissionRate??row.commissionRate)/100);
       if(throughAsaas){
         row.asaasProcessed+=net;
         if(card){
@@ -7126,7 +7136,7 @@
       }else row.externalReceived+=net;
     });
     return [...groups.values()].map((row)=>{
-      const commissionTotal=roundFinancial(row.commissionBase*row.commissionRate/100);
+      const commissionTotal=roundFinancial(row.commissionTotal);
       const available=Math.max(0,roundFinancial(row.asaasProcessed-row.asaasFeeEstimated));
       const commissionRetained=Math.min(commissionTotal,available);
       return {...row,grossValue:roundFinancial(row.grossValue),voucherDiscount:roundFinancial(row.voucherDiscount),commissionBase:roundFinancial(row.commissionBase),asaasProcessed:roundFinancial(row.asaasProcessed),externalReceived:roundFinancial(row.externalReceived),asaasFeeEstimated:roundFinancial(row.asaasFeeEstimated),commissionTotal,commissionRetained:roundFinancial(commissionRetained),commissionPending:roundFinancial(Math.max(0,commissionTotal-commissionRetained)),asaasPartnerPayout:roundFinancial(Math.max(0,available-commissionTotal)),backendOfficial:false};
@@ -7369,7 +7379,7 @@
     const outside=view.outsideContract!==0?`<span>${view.outsideContract>0?"−":"+"} ${money(Math.abs(view.outsideContract))} ${view.outsideContract>0?"fora do contrato vigente":"ajuste do contratado"}</span>`:"";
     const history=`<dl class="finance-line-list">${line("Contratado original",finance.contractedValue||0)}${line("Encerrado ou cancelado",finance.cancelledValue||0)}${line("Valor contratado vigente",view.contracted)}${line("Devoluções concluídas",view.returned)}${line("Restituições pendentes",finance.refundPending||0)}</dl><p class="field-help">O contratado vigente já considera os descontos aplicados e exclui obrigações encerradas ou canceladas. Recebimentos para restituição ou excedentes permanecem no histórico, sem aumentar esse contrato.</p>`;
     const feeNote=Number(finance.asaasFeeEstimated||0)!==0?`Inclui ${money(finance.asaasFeeEstimated)} em tarifas estimadas.`:"Tarifas registradas na conciliação.";
-    const rules=`<p>A comissão incide uma única vez sobre o valor liquidado após vouchers. Recebimento externo não gera novo repasse.</p><dl class="finance-line-list">${line("Liquidado",view.liquidated)}${line("Comissão provisória — ainda não descontada",finance.commissionProvisional||0)}${line("Comissão com saldo elegível para retenção",finance.commissionRetained||0)}${line("Comissão transferida",finance.commissionSettled||0)}${line("Comissão a quitar pelo parceiro",finance.commissionPending||0)}${line("Crédito da instituição ainda não disponível ou comprovado",finance.asaasAwaitingCredit||0)}</dl><p class="field-help">${esc(feeNote)} Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%.</p>`;
+    const rules=`<p>A comissão respeita a condição registrada em cada reserva e incide uma única vez sobre o valor liquidado após vouchers. No novo plano, grupos da carteira inicial têm 0% e novos grupos têm 5%. A mensalidade do estabelecimento é apresentada em Plano Tâmo On. Recebimento externo não gera novo repasse.</p><dl class="finance-line-list">${line("Liquidado",view.liquidated)}${line("Comissão provisória — ainda não descontada",finance.commissionProvisional||0)}${line("Comissão com saldo elegível para retenção",finance.commissionRetained||0)}${line("Comissão transferida",finance.commissionSettled||0)}${line("Comissão a quitar pelo parceiro",finance.commissionPending||0)}${line("Crédito da instituição ainda não disponível ou comprovado",finance.asaasAwaitingCredit||0)}</dl><p class="field-help">${esc(feeNote)} Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%.</p>`;
     return `${adminCommissionHighlight(view.commission)}<section class="finance-kpis" aria-label="Resumo financeiro">
       ${stat(money(view.contracted),"Valor contratado","obrigações vigentes")}
       ${stat(money(view.received),"Recebido bruto","antes de devoluções e descontos")}
@@ -7551,7 +7561,7 @@
         ${group("Responsável", backendMode ? [["Nome",p.responsibleName],["E-mail da conta",p.email],["E-mail secundário",p.secondaryEmail || "Não informado"],["Telefone",p.phone]] : [["Nome",p.responsibleName],["CPF",p.responsibleCpf],["Função",p.responsibleRole],["E-mail",p.email],["Telefone",p.phone],["WhatsApp",p.whatsapp]], "edit-responsible-data")}
         ${group("Endereço", [["Logradouro",p.address],["Bairro",p.neighborhood],["Cidade/UF",`${p.city}/${p.state}`],["CEP",p.zip]], "edit-address-data")}
         ${group("Contratos e regras", [["Contrato",p.contractStatus],["Termos",p.termsStatus],["LGPD",p.privacyStatus],...(backendMode ? [] : [["Cancelamento",p.cancellationPolicy]])], backendMode ? "" : "edit-contract-data")}
-        ${group(backendMode ? "Condições comerciais" : "Fiscal e financeiro", backendMode ? [["Comissão",`${p.commissionRate}%`]] : [["Documento ao usuário",p.fiscalIssuer],["NFS-e da comissão",p.commissionInvoice],["Pagamento",p.paymentModel],["Comissão",`${p.commissionRate}%`]], backendMode ? "" : "edit-fiscal-data")}
+        ${group(backendMode ? "Condições comerciais" : "Fiscal e financeiro", backendMode ? [["Plano por estabelecimento","Consulte Plano Tâmo On"],["Carteira inicial","Incluída na mensalidade"],["Novos grupos","5% após ativação do plano"]] : [["Documento ao usuário",p.fiscalIssuer],["NFS-e da comissão",p.commissionInvoice],["Pagamento",p.paymentModel],["Comissão",`${p.commissionRate}%`]], backendMode ? "" : "edit-fiscal-data")}
         ${group("Integrações de pagamento", backendMode ? [["Situação","Prevista para etapa específica"],["Dados locais","Não utilizados com o backend ativo"]] : [["Banco Pix",`${bankProvider.label} · ${bankProvider.mode === "api" ? "API" : "manual"}`],["Status API Pix",p.pixApiStatus],["Baixa automática",p.pixAutoReconciliation ? "Preparada" : "Desativada"],["Webhook Pix",p.pixWebhookStatus],["Cartão",p.asaasCardStatus],["Subconta Asaas",p.asaasSubaccount]], backendMode ? "" : "edit-payment-integrations")}
       </section>` : partnerRestrictedSection("Dados do cadastro")}
       <section class="details-grid">
@@ -7574,7 +7584,7 @@
       return navShell("partner",partial[state.activePage.partner] && partnerPageAllowed(state.activePage.partner) ? partial[state.activePage.partner]() : partnerRestrictedSection("Cadastro em validação"));
     }
     if (!access.allowed) return partnerRestrictedView(access);
-    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, metrics: metricsPage, registration: partnerRegistration };
+    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, metrics: metricsPage, commercial: commercialPage, registration: partnerRegistration };
     const page=state.activePage.partner;
     if(partnerAccessPending)return navShell("partner",partnerRestrictedSection("Atualizando permissões"));
     if(!partnerPageAllowed(page))return navShell("partner",partnerRestrictedSection((menus.partner.find(item=>item[0]===page)||[])[2]||"Esta área"));
@@ -8110,15 +8120,25 @@
     const settings = state.settings;
     const toggle = (key,title,help,locked=false) => `<div class="toggle-row"><div class="toggle-copy"><strong>${esc(title)}</strong><small>${esc(help)}</small></div><button class="switch ${settings[key] ? "on" : ""}" data-action="toggle-setting" data-key="${esc(key)}" aria-pressed="${settings[key]}" ${locked ? "disabled" : ""}></button></div>`;
     return `${pageHeader("Administração", "Configurações", "Controles do ambiente de homologação. Pagamentos reais permanecem bloqueados.", `<button class="button ghost" data-action="edit-commercial-settings">Editar regras comerciais</button>`)}
-      <section class="grid two"><article class="card"><h2>Operação</h2>${toggle("marketplaceEnabled","Área de parceiros","Exibe as áreas demonstrativas.")}${toggle("newPartners","Novos cadastros","Permite incluir parceiros fictícios.")}${toggle("vouchersEnabled","Vouchers","Exibe créditos de cancelamento e vouchers promocionais.")}${toggle("notificationEmails","Avisos por e-mail","Simulação de comunicações operacionais.")}</article><article class="card"><h2>Regras comerciais</h2><div class="detail-list" style="margin-top:14px"><div class="detail-line"><span>Comissão Tâmo On</span><strong>${esc(settings.defaultCommission)}%</strong></div><div class="detail-line"><span>Tarifa Pix Asaas</span><strong>${money(settings.asaasPixFixedFee)} por transação</strong></div><div class="detail-line"><span>Tarifa cartão Asaas</span><strong>${money(settings.asaasCardFixedFee)} + ${String(settings.asaasCardPercentageFee).replace(".",",")}%</strong></div><div class="detail-line"><span>Prazo do usuário</span><strong>${esc(settings.cancellationHours)} horas</strong></div><div class="detail-line"><span>Validade nominal</span><strong>${esc(settings.voucherValidityDays)} dias</strong></div><div class="detail-line"><span>Faixa compatível</span><strong>± ${esc(settings.voucherCompatibilityWindowHours)} horas</strong></div><div class="detail-line"><span>Mínimo de datas</span><strong>${esc(settings.voucherMinimumCompatibleDates)}</strong></div><div class="detail-line"><span>Prorrogação</span><strong>${esc(settings.voucherExtensionDays)} dias</strong></div><div class="detail-line"><span>Persistência</span><strong>LocalStorage do navegador</strong></div></div></article></section>
+      <section class="grid two"><article class="card"><h2>Operação</h2>${toggle("marketplaceEnabled","Área de parceiros","Exibe as áreas demonstrativas.")}${toggle("newPartners","Novos cadastros","Permite incluir parceiros fictícios.")}${toggle("vouchersEnabled","Vouchers","Exibe créditos de cancelamento e vouchers promocionais.")}${toggle("notificationEmails","Avisos por e-mail","Simulação de comunicações operacionais.")}</article><article class="card"><h2>Regras comerciais</h2><div class="detail-list" style="margin-top:14px"><div class="detail-line"><span>Taxa anterior ao plano</span><strong>${esc(settings.defaultCommission)}%</strong></div><div class="detail-line"><span>Tarifa Pix Asaas</span><strong>${money(settings.asaasPixFixedFee)} por transação</strong></div><div class="detail-line"><span>Tarifa cartão Asaas</span><strong>${money(settings.asaasCardFixedFee)} + ${String(settings.asaasCardPercentageFee).replace(".",",")}%</strong></div><div class="detail-line"><span>Prazo do usuário</span><strong>${esc(settings.cancellationHours)} horas</strong></div><div class="detail-line"><span>Validade nominal</span><strong>${esc(settings.voucherValidityDays)} dias</strong></div><div class="detail-line"><span>Faixa compatível</span><strong>± ${esc(settings.voucherCompatibilityWindowHours)} horas</strong></div><div class="detail-line"><span>Mínimo de datas</span><strong>${esc(settings.voucherMinimumCompatibleDates)}</strong></div><div class="detail-line"><span>Prorrogação</span><strong>${esc(settings.voucherExtensionDays)} dias</strong></div><div class="detail-line"><span>Persistência</span><strong>LocalStorage do navegador</strong></div></div></article></section>
       <section class="card section"><h2>Canais de recebimento</h2><p>Pix e cartão de crédito pelo Asaas, ou pagamento externo diretamente ao parceiro. O valor repassável é uma apuração financeira; transferências realizadas aparecem separadamente como repasse comprovado.</p></section>
       <section class="section"><button class="button danger" data-action="reset-local-data">Restaurar dados iniciais</button></section>`;
   }
 
 
+  let commercialConsole=null;
+  function commercialIdentity(){return metricsIdentity('commercial');}
+  function commercialPage(){return pageHeader(state.role==='admin'?'Administração':'Portal do parceiro',state.role==='admin'?'Planos e mensalidades':'Plano Tâmo On','Mensalidade por estabelecimento, carteira inicial e vencimentos.')
+    +(commercialIdentity()?'<div id="marketCommercial" data-ui-owned></div>':'<p class="callout">Entre com uma conta autorizada e conectada ao Marketplace para consultar os planos.</p>');}
+  function mountCommercial(){
+    const host=app.querySelector('#marketCommercial'),key=commercialIdentity();
+    if(commercialConsole&&(commercialConsole.root!==host||commercialConsole.key!==key)){commercialConsole.dispose();commercialConsole=null;}
+    if(host&&key&&!commercialConsole)commercialConsole=window.TamoonCommercialPlans.mount(host,{identity:commercialIdentity,
+      partnerId:state.role==='partner'?state.partnerProfile.backendPartnerId:null,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)});
+  }
   let metricsConsole=null;
-  function metricsIdentity(){
-    if(state.activePage?.[state.role]!=="metrics" || !backendRuntime.enabled || !backendIsOnline())return '';
+  function metricsIdentity(page='metrics'){
+    if(state.activePage?.[state.role]!==page || !backendRuntime.enabled || !backendIsOnline())return '';
     if(state.role==='admin')return adminRefundContext()?JSON.stringify([adminRefundContext(),'admin']):'';
     const id=backendRuntime.identityId;
     if(state.role!=='partner'||!id||!currentPartnerAccessStatus().allowed||!hasPartnerPermission('manage_finance')
@@ -8149,7 +8169,7 @@
     });
   }
   function adminView() {
-    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, metrics: metricsPage, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
+    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, metrics: metricsPage, commercial: commercialPage, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
     return navShell("admin", (views[state.activePage.admin] || adminOverview)());
   }
 
@@ -8157,6 +8177,7 @@
     if(window.TamoonMarketplacePilot?.leaving)return;
     if(operationsConsole && operationsConsole.key!==adminRefundContext()){operationsConsole.dispose();operationsConsole=null;}
     if(metricsConsole&&metricsConsole.key!==metricsIdentity()){metricsConsole.dispose();metricsConsole=null;}
+    if(commercialConsole&&commercialConsole.key!==commercialIdentity()){commercialConsole.dispose();commercialConsole=null;}
     adminRefundStore.get();
     if(!adminRefundContext() && ['admin-refund-details','asaas-refund','admin-refunds'].includes(detailDialog.dataset.view)){
       stopAsaasRefundMonitor();detailReturnContext=null;if(detailDialog.open)detailDialog.close();
@@ -8214,6 +8235,7 @@
     }
     mountAdminOperations();
     mountMetrics();
+    mountCommercial();
     applyPartnerReadonlyControls();
     window.MarketplaceAgendaNavigation.showSelected(app);
     updateBackendRoleAccess();
@@ -8605,7 +8627,7 @@
     return `${onboarding ? partnerOnboardingPanel(onboarding,true) : ""}<div class="details-grid">${facilities}
       <div class="detail-group"><h3>Empresa</h3><div class="detail-list"><div class="detail-line"><span>Razão social</span><strong>${esc(partner.legalName)}</strong></div><div class="detail-line"><span>CNPJ</span><strong>${esc(partner.cnpj)}</strong></div><div class="detail-line"><span>Cidade</span><strong>${esc(partner.city)}</strong></div>${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Atividade declarada</span><strong>${esc(partner.activity)}</strong></div>`}${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Regime tributário</span><strong>${esc(partner.taxRegime)}</strong></div>`}</div></div>
       <div class="detail-group"><h3>Responsável</h3><div class="detail-list"><div class="detail-line"><span>Nome</span><strong>${esc(partner.responsible)}</strong></div><div class="detail-line"><span>E-mail da conta</span><strong>${esc(partner.email)}</strong></div><div class="detail-line"><span>E-mail secundário</span><strong>${esc(partner.secondaryEmail || "Não informado")}</strong></div><div class="detail-line"><span>Telefone</span><strong>${esc(partner.phone)}</strong></div><div class="detail-line"><span>Tipos de espaço</span><strong>${esc(partner.types)}</strong></div></div></div>
-      <div class="detail-group"><h3>Contrato e aceites</h3><div class="detail-list"><div class="detail-line"><span>Contrato</span><strong>${esc(partner.contract)}</strong></div><div class="detail-line"><span>Termos</span><strong>${esc(partner.terms || "Pendente")}</strong></div><div class="detail-line"><span>Privacidade</span><strong>${esc(partner.privacy || "Pendente")}</strong></div>${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Documento fiscal</span><strong>${esc(partner.fiscal)}</strong></div>`}<div class="detail-line"><span>Comissão</span><strong>${esc(partner.commission)}%</strong></div></div></div>
+      <div class="detail-group"><h3>Contrato e aceites</h3><div class="detail-list"><div class="detail-line"><span>Contrato</span><strong>${esc(partner.contract)}</strong></div><div class="detail-line"><span>Termos</span><strong>${esc(partner.terms || "Pendente")}</strong></div><div class="detail-line"><span>Privacidade</span><strong>${esc(partner.privacy || "Pendente")}</strong></div>${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Documento fiscal</span><strong>${esc(partner.fiscal)}</strong></div>`}<div class="detail-line"><span>Taxa anterior ao plano</span><strong>${esc(partner.commission)}%</strong></div></div></div>
       <div class="detail-group"><h3>Homologação</h3><div class="detail-list"><div class="detail-line"><span>Origem</span><strong>${esc(partner.source || "Administração")}</strong></div>${application ? `<div class="detail-line"><span>Solicitação</span><strong>${esc(application.id)} · ${esc(application.requestedAt || "")}</strong></div>` : ""}<div class="detail-line"><span>Dados bancários</span><strong>${esc(partner.banking)}</strong></div><div class="detail-line"><span>Status</span><strong>${esc(partner.status)}</strong></div><div class="detail-line"><span>Completude</span><strong>${esc(partner.score)}%</strong></div><div class="detail-line"><span>Vouchers ativos</span><strong>${esc(activeVoucherLiability(partner.venueId).count)} · ${money(activeVoucherLiability(partner.venueId).value)}</strong></div><div class="progress"><span style="width:${Math.min(100,partner.score)}%"></span></div></div></div>
       <div class="detail-group"><h3>Documentos do Portal</h3><div class="detail-list">${docs.map((doc) => `<div class="toggle-row partner-document-row"><div class="toggle-copy"><strong>${esc(doc.name)}</strong><small>${esc(doc.originalName || "Arquivo protegido")} · ${esc(doc.uploadedAt || "")}${doc.reviewNotes ? ` · parecer: ${esc(doc.reviewNotes)}` : ""}</small></div><span class="status ${statusClass(doc.status)}">${esc(doc.status)}</span>${doc.backendId ? `<div class="item-actions"><button type="button" class="button ghost small" data-action="open-partner-document" data-id="${esc(doc.id)}">Visualizar</button>${partnerOnboardingForPartner(partnerId)?.flow === "22x" && ["Contrato de parceria","Termos de uso","Política de privacidade","Dados bancários"].includes(doc.name) ? "" : `<button class="button secondary small" data-action="review-partner-document" data-id="${esc(doc.id)}" data-partner-id="${esc(partnerId)}">Revisar</button>`}</div>` : ""}</div>`).join("") || `<p class="dialog-description">Nenhum documento enviado ao staging.</p>`}</div></div>
       <div class="detail-group"><h3>Equipe e acessos</h3><div class="detail-list">${team.map((member)=>`<div class="toggle-row"><div class="toggle-copy"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${esc(member.email)}<br>${esc(member.permission)}</small></div><span class="status ${statusClass(member.status)}">${esc(member.status)}</span></div>`).join("") || `<p class="dialog-description">Nenhum membro vinculado ao parceiro.</p>`}</div></div>
@@ -9507,7 +9529,7 @@
         {name:"privacy",label:"Privacidade / LGPD",type:"select",value:item?.privacy||"Pendente",options:["Pendente","Aceita"]},
         {name:"fiscal",label:"Emissão fiscal",value:item?.fiscal||"A validar"},
         {name:"banking",label:"Dados bancários",value:item?.banking||"Pendente"},
-        {name:"commission",label:"Comissão (%)",type:"number",step:"0.1",value:item?.commission??state.settings.defaultCommission},
+        {name:"commission",label:"Taxa anterior ao plano (%)",type:"number",step:"0.1",value:item?.commission??state.settings.defaultCommission},
         {name:"score",label:"Completude (%)",type:"number",min:0,max:100,value:item?.score||30}
       ].filter((field)=>(!backendIsOnline()||!["cnpj","taxRegime","activity","score"].includes(field.name)) && !(item?.onboardingVersion > 0 && ["email","status","contract","terms","privacy","fiscal","banking"].includes(field.name))),onSubmit:async(data)=>{
         if(backendRuntime.enabled){
