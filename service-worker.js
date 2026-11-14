@@ -1,5 +1,5 @@
 const SW_BUILD = 174;
-const CACHE = "tamo-on-1.0-build-174-r1";
+const CACHE = "tamo-on-1.0-build-174-r2";
 const BADGE_DB_NAME = "tamoon-pwa-state";
 const BADGE_DB_VERSION = 1;
 const BADGE_STORE_NAME = "app-state";
