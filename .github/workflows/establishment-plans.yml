@@ -27,7 +27,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: mobile
       - run: node mobile/tests/admin-commercial-browser.mjs
-      - run: npx --yes deno@2.9.6 check --no-lock integration/marketplace/asaas/functions/establishment-billing/index.ts
+      - run: npx --yes deno@2.9.6 check --no-lock --node-modules-dir=manual ../integration/marketplace/asaas/functions/establishment-billing/index.ts
+        working-directory: mobile
       - uses: actions/upload-artifact@v4
         if: always()
         with:

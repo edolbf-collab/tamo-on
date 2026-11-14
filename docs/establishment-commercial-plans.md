@@ -8,7 +8,7 @@ Início no dia 01, sem proporcionalidade. Primeira mensalidade integral com venc
 
 O identificador estável é `marketplace_groups.id`, associado ao estabelecimento. Nome, administrador, horário, quadra interna ou encerramento de vínculo não alteram a classificação. Não se usa origem de aquisição do cliente, data de criação da comunidade ou CPF/CNPJ do organizador como critério. Não se confia no `external_group_id` editável para conceder isenção.
 
-Administração → **Planos e mensalidades**: escolher estabelecimento, preparar início, conferir vínculos importados, selecionar os grupos e revisar calendário. A importação existente continua disponível; o botão de seleção usa os vínculos já importados. Fechamento bloqueado enquanto há entradas protegidas sem associação confirmada, ou grupos aprovados/importados ausentes da carteira. A carteira fica congelada ao confirmar o fechamento. Finalizar a importação antes de fechar; correções posteriores exigem um procedimento administrativo auditado específico, ainda não exposto.
+Administração → **Planos e mensalidades**: escolher estabelecimento, preparar início, conferir vínculos importados, selecionar os grupos e revisar calendário. A importação existente continua disponível; o botão de seleção usa os vínculos já importados. Fechamento bloqueado enquanto há entradas protegidas sem associação confirmada, grupos aprovados/importados ausentes da carteira ou alterações do formulário ainda não salvas. A carteira fica congelada ao confirmar o fechamento. Finalizar a importação antes de fechar; correções posteriores exigem um procedimento administrativo auditado específico, ainda não exposto.
 
 Parceiro → **Plano Tâmo On**: consulta com permissão financeira, valores, carteira, vencimentos e cobranças. Modo “visualizar como parceiro” só permite consulta e respeita o parceiro selecionado.
 
@@ -24,6 +24,10 @@ O parceiro é cadastrado como **cliente da conta principal**; não se cobra dire
 
 `establishment-billing` é o emissor e conciliador preparado, **desabilitado até validação da conta emissora**. Usa chave exclusiva da conta principal, valida carteira (`/wallets`), cria/localiza cliente pelo documento e registra uma cobrança por estabelecimento/mês. Não usa split nem transferência. Reexecução busca referência antes de criar. POST com resultado incerto permanece em conferência; não é reenviado automaticamente mesmo quando busca imediata não encontra resultado. A conciliação lê o estado atual no Asaas (evita eventos fora de ordem). Obrigações iniciais futuras só são emitidas no mês de início. Cobranças posteriores não são multiplicadas por visitas à tela.
 
+Uma falha na consulta de uma cobrança é registrada sem interromper as demais. Consultas incompletas ou paginadas não comprovam ausência/unicidade e impedem novos POSTs. A fila de conciliação avança mesmo com um registro pendente de conferência. Juros e multa são enviados explicitamente como zero para impedir que configurações globais da conta acrescentem encargos não definidos.
+
+Sandbox e produção têm obrigações separadas por estabelecimento/competência/ambiente. O histórico de simulação é preservado e nunca quita a obrigação de produção. O emissor seleciona somente o ambiente configurado. A passagem de testes para lançamento deve incluir revisão da data de início e dos dados de teste; não há conversão automática de mensalidades de teste em pagamentos reais.
+
 Para habilitar após homologação:
 
 1. Confirmar conta principal, documento do parceiro e capacidade de emissão em Sandbox, depois produção.
@@ -31,10 +35,12 @@ Para habilitar após homologação:
 3. Agendar chamada autenticada POST à função com `x-billing-job-secret`, por exemplo a cada hora, e monitorar resultados/itens em conferência. O agendamento e a emissão real **não estão ativados** nesta entrega. O botão de teste apenas simula a primeira mensalidade em ambiente com dinheiro real desativado.
 4. Validar emissão, pagamento, atualização, timeout, duplicidade e devolução com movimentação pequena. Depois habilitar produção conforme o lançamento do Marketplace. Pagamento Sandbox/simulado não libera operação real.
 
-As tabelas são privadas com RLS, sem acesso direto do navegador. RPCs têm validação de perfil/admin/parceiro e escopo; funções do emissor são exclusivas de `service_role`. Auditoria registra preparação, carteira congelada, calendário e conciliação. Uma obrigação tem chave única estabelecimento/competência.
+As tabelas são privadas com RLS, sem acesso direto do navegador. RPCs têm validação de perfil/admin/parceiro e escopo; funções do emissor são exclusivas de `service_role`. Auditoria registra preparação, carteira congelada, calendário e conciliação. Uma obrigação tem chave única estabelecimento/competência/ambiente.
 
 ## Validação
 
 `mobile/tests/admin-commercial.test.mjs`: SQL real em PostgreSQL/PGlite, 0/5%, várias quadras e unidades, retomada de vínculo, histórico, isolamento, perfil bloqueado, preview, vencimentos, feriados, primeira mensalidade, separação de ambientes, repetição e integridade de retorno do provedor.
 
 `admin-commercial-provider.test.mjs`: payload conta principal, reutilização de cliente/referência e timeout sem duplicação. `admin-commercial-browser.mjs`: 320/390/768/1280 px, permissões, confirmação da carteira, erros e troca de identidade. Workflow `establishment-plans.yml` executa os testes e publica capturas de validação. A emissão real na conta Asaas não foi testada por estes testes internos.
+
+Continuação de 14/11/2026: retomada do commit `7ed54b4` na branch `work/establishment-plans-20261114`. A consulta somente de estrutura do Marketplace Staging confirmou as colunas e dependências utilizadas; a tabela de planos ainda não estava implantada. A migration desta branch continua inédita no banco remoto. Não houve publicação, alteração de dados remotos ou emissão de cobranças nesta revisão.

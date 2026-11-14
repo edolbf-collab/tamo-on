@@ -4,11 +4,47 @@ const bill={id:'a',reference:'tamoon-plan:a',amount:300,due_on:'2027-01-01',comp
 test('Main-account bill uses partner customer, exact due date and no split/transfer',async()=>{
  const calls=[],results=[];let claimed=false;
  await runBilling({environment:'sandbox',rpc:async(name,args)=>{if(name.endsWith('_pending'))return [];if(name.endsWith('_claim')){if(claimed)return null;claimed=true;return bill;}results.push(args);},request:async(method,path,body)=>{calls.push({method,path,body});if(method==='GET')return {data:path.startsWith('/customers')?[{id:'cus_partner'}]:[]};return {id:'pay_x',...body};}});
- const payment=calls.find(c=>c.path==='/payments');assert.equal(payment.body.value,300);assert.equal(payment.body.dueDate,'2027-01-01');assert.equal(payment.body.customer,'cus_partner');assert.equal(payment.body.billingType,'PIX');assert.equal(payment.body.split,undefined);assert.ok(!calls.some(c=>c.path.includes('transfer')));assert.equal(results[0].p_payment.id,'pay_x');
+ const payment=calls.find(c=>c.path==='/payments');assert.equal(payment.body.value,300);assert.equal(payment.body.dueDate,'2027-01-01');assert.equal(payment.body.customer,'cus_partner');assert.equal(payment.body.billingType,'PIX');assert.deepEqual(payment.body.interest,{value:0});assert.deepEqual(payment.body.fine,{value:0});assert.equal(payment.body.split,undefined);assert.ok(!calls.some(c=>c.path.includes('transfer')));assert.equal(results[0].p_payment.id,'pay_x');
+});
+
+test('An individual reconciliation failure cannot stop other establishments or new invoices',async()=>{
+ const results=[];let claimed=false,posts=0;
+ const outcome=await runBilling({environment:'sandbox',rpc:async(name,args)=>{
+  if(name.endsWith('_pending'))return [{id:'broken',provider_id:'pay_missing'},{id:'healthy',provider_id:'pay_healthy'}];
+  if(name.endsWith('_claim')){if(claimed)return null;claimed=true;return bill;}
+  results.push(args);
+ },request:async(method,path,body)=>{
+  if(path==='/payments/pay_missing')throw Error('ASAAS_REQUEST_FAILED');
+  if(path==='/payments/pay_healthy')return {id:'pay_healthy',status:'RECEIVED'};
+  if(method==='GET')return {data:path.startsWith('/customers')?[{id:'cus_x'}]:[],hasMore:false};
+  posts++;return {id:'pay_new',...body};
+ }});
+ assert.deepEqual(outcome,{issued:1,reconciled:1,review:1});assert.equal(posts,1);
+ assert.equal(results[0].p_error,'ASAAS_REQUEST_FAILED');assert.equal(results[1].p_payment.id,'pay_healthy');
+});
+
+for(const response of [{},{data:null},{data:[],hasMore:true},{data:[{id:'pay_1'}],totalCount:2}]){
+ test('Incomplete provider listing never authorizes a payment POST: '+JSON.stringify(response),async()=>{
+  let claimed=false,posts=0,saved;
+  await runBilling({environment:'sandbox',rpc:async(n,a)=>{if(n.endsWith('_pending'))return [];if(n.endsWith('_claim')){if(claimed)return null;claimed=true;return bill;}saved=a;},request:async(m)=>{if(m==='POST')posts++;return response;}});
+  assert.equal(posts,0);assert.ok(saved.p_error);assert.equal(saved.p_payment,null);
+ });
+}
+
+test('An incomplete customer search cannot create a second customer or charge',async()=>{
+ let claimed=false,posts=0,saved;
+ await runBilling({environment:'sandbox',rpc:async(n,a)=>{if(n.endsWith('_pending'))return [];if(n.endsWith('_claim')){if(claimed)return null;claimed=true;return bill;}saved=a;},request:async(m,path)=>{if(m==='POST')posts++;return path.startsWith('/customers')?{data:[{id:'cus_x'}],hasMore:true}:{data:[]};}});
+ assert.equal(posts,0);assert.equal(saved.p_error,'CUSTOMER_REVIEW_REQUIRED');
+});
+
+test('An uncertain payment remains in review when its reference is absent',async()=>{
+ let saved;
+ const result=await runBilling({environment:'sandbox',rpc:async(n,a)=>{if(n.endsWith('_pending'))return [{id:'a',reference:bill.reference}];if(n.endsWith('_claim'))return null;saved=a;},request:async(m)=>{assert.equal(m,'GET');return {data:[]};}});
+ assert.equal(saved.p_error,'PROVIDER_RESULT_NOT_FOUND');assert.deepEqual(result,{issued:0,reconciled:0,review:1});
 });
 test('Ambiguous creation is held for reconciliation; a retry does not POST again',async()=>{
  let phase='planned',posts=0;const pending=[];
- const rpc=async(name,args)=>{if(name.endsWith('_pending'))return pending;if(name.endsWith('_claim')){if(phase!=='planned')return null;phase='issuing';return bill;}if(args.p_error){phase='review';pending.push({id:'a',reference:bill.reference});}};
+ const rpc=async(name,args)=>{if(name.endsWith('_pending'))return [...pending];if(name.endsWith('_claim')){if(phase!=='planned')return null;phase='issuing';return bill;}if(args.p_error){phase='review';if(!pending.length)pending.push({id:'a',reference:bill.reference});}};
  const request=async(method,path)=>{if(method==='POST'){posts++;throw Error('timeout');}return {data:path.startsWith('/customers')?[{id:'cus_x'}]:[]};};
  await runBilling({environment:'sandbox',rpc,request});await runBilling({environment:'sandbox',rpc,request});assert.equal(posts,1);assert.equal(phase,'review');
 });

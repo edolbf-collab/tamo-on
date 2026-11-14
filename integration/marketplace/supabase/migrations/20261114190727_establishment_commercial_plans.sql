@@ -26,7 +26,7 @@ create table private.establishment_invoices (
  environment text not null default 'sandbox' check(environment in('sandbox','production')),
  simulated boolean not null default false, paid_at timestamptz,
  attempted_at timestamptz, last_error text, created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
- unique(venue_id,competence)
+ unique(venue_id,competence,environment)
 );
 create index establishment_invoices_queue on private.establishment_invoices(status,competence);
 create table private.establishment_plan_audit (
@@ -119,8 +119,10 @@ begin
  if exists(select 1 from public.monthly_customer_links l where l.venue_id=p_venue_id and l.origin='legacy' and l.group_id is not null and l.status not in('cancelled','ended')
  and not exists(select 1 from private.establishment_initial_groups g where g.venue_id=l.venue_id and g.group_id=l.group_id)) then raise exception 'PLAN_IMPORTED_GROUP_MISSING';end if;
  update private.establishment_plans set state='ready',frozen_at=now(),frozen_by=auth.uid(),updated_at=now() where venue_id=p_venue_id;
- insert into private.establishment_invoices(venue_id,competence,due_on,amount)
- values(p_venue_id,v.starts_on,v.starts_on,v.monthly_value) on conflict(venue_id,competence) do nothing;
+ insert into private.establishment_invoices(venue_id,competence,due_on,amount,environment)
+ values(p_venue_id,v.starts_on,v.starts_on,v.monthly_value,
+ case when exists(select 1 from public.marketplace_settings where real_money_enabled) then 'production' else 'sandbox' end)
+ on conflict(venue_id,competence,environment) do nothing;
  insert into private.establishment_plan_audit(venue_id,actor_id,action) values(p_venue_id,auth.uid(),'portfolio_frozen');
  return jsonb_build_object('ok',true);
 end;$$;
@@ -235,9 +237,9 @@ begin
  insert into private.establishment_invoices(venue_id,competence,due_on,amount,environment)
  select p.venue_id,m,private.plan_due_date(p.starts_on,m,p.holidays),p.monthly_value,p_environment
  from private.establishment_plans p where p.state='ready' and p.starts_on<=m and extract(year from m)::integer=any(p.calendar_years)
- on conflict(venue_id,competence) do nothing;
+ on conflict(venue_id,competence,environment) do nothing;
  select x.* into i from private.establishment_invoices x join private.establishment_plans p on p.venue_id=x.venue_id
- where x.status='planned' and x.competence<=m and extract(year from x.competence)::integer=any(p.calendar_years)
+ where x.status='planned' and x.environment=p_environment and x.competence<=m and extract(year from x.competence)::integer=any(p.calendar_years)
  and x.attempted_at is null order by x.due_on,x.id for update of x skip locked limit 1;
  if not found then return null;end if;
  update private.establishment_invoices set status='issuing',attempted_at=now(),environment=p_environment,updated_at=now() where id=i.id;
@@ -254,7 +256,10 @@ begin
  select * into i from private.establishment_invoices where id=p_id for update;
  if not found or i.environment<>p_environment or i.simulated then raise exception 'PLAN_INVOICE_MISMATCH';end if;
  if p_error is not null then
-  if i.provider_id is null then update private.establishment_invoices set status='review',last_error=left(p_error,200),updated_at=now() where id=i.id;end if;
+  -- Keep the last verified payment state during transient failures, but rotate the
+  -- reconciliation queue so a missing/ambiguous item cannot starve other venues.
+  update private.establishment_invoices set status=case when provider_id is null then 'review' else status end,
+   last_error=left(p_error,200),updated_at=now() where id=i.id;
   return;
  end if;
  if p_payment->>'externalReference' is distinct from 'tamoon-plan:'||i.id or (p_payment->>'value')::numeric is distinct from i.amount

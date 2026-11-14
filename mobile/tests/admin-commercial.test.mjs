@@ -83,6 +83,16 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  const result=p=>rpc('select public.establishment_billing_result($1,$2,$3)',[bill.id,'sandbox',p]);
  await assert.rejects(result({...payment,value:299}),/PLAN_PAYMENT_MISMATCH/);await assert.rejects(result({...payment,invoiceUrl:'javascript:alert(1)'}),/PLAN_INVALID_PAYMENT_URL/);await result(payment);await result({...payment,status:'RECEIVED'});await result({...payment,status:'RECEIVED'});
  await role(1);d=(await read()).r;assert.equal(d.venues.find(v=>v.id===id(21)).invoices.length,1);assert.equal(d.venues.find(v=>v.id===id(21)).invoices[0].status,'paid');
+ // A failed provider read retains the last verified status and records the issue.
+ await role(0,'service_role');await rpc('select public.establishment_billing_result($1,$2,null,$3)',[bill.id,'sandbox','ASAAS_REQUEST_FAILED']);
+ await db.exec('reset role');let persisted=await rpc('select status,last_error from private.establishment_invoices where id=$1',[bill.id]);assert.equal(persisted.status,'paid');assert.equal(persisted.last_error,'ASAAS_REQUEST_FAILED');
+ // Sandbox history cannot settle or prevent creating a separate production bill.
+ await db.exec('update public.marketplace_settings set real_money_enabled=true');await assert.rejects(reserve(67),/PLAN_FIRST_PAYMENT_REQUIRED/);
+ await role(0,'service_role');await assert.rejects(rpc("select public.establishment_billing_claim('sandbox') r"),/PLAN_SANDBOX_DISABLED/);
+ const production=[];for(let n=0;n<2;n++){const b=(await rpc("select public.establishment_billing_claim('production') r")).r;assert.ok(b);assert.notEqual(b.id,bill.id);production.push(b);
+  await rpc('select public.establishment_billing_result($1,$2,$3)',[b.id,'production',{id:'pay_production_'+n,customer:'cus_partner',externalReference:b.reference,dueDate:b.due_on,value:300,status:'RECEIVED',invoiceUrl:'https://www.asaas.com/i/test'}]);}
+ assert.equal((await rpc("select public.establishment_billing_claim('production') r")).r,null);
+ await db.exec('reset role');assert.equal((await rpc("select count(*)::int n from private.establishment_invoices where environment='sandbox'")).n,2);assert.equal((await rpc("select count(*)::int n from private.establishment_invoices where environment='production'")).n,2);assert.equal((await reserve(67)).rows[0].r,'0');
  await db.exec('reset role');await db.exec(`insert into private.partner_readonly_context values('${id(1)}','${id(10)}','test')`);await role(1);assert.equal((await read()).r.admin,false);assert.equal((await read()).r.venues.length,2);await assert.rejects(activate(20),/PLAN_READ_ONLY/);await assert.rejects(read(11),/PLAN_ACCESS_DENIED/);
  await db.exec('reset role');await db.exec(`delete from private.partner_readonly_context;update public.profiles set status='blocked' where id='${id(1)}'`);await role(1);await assert.rejects(read(),/PLAN_ACCESS_DENIED/);
  await db.exec('reset role');assert.equal((await rpc('select count(*)::int n from private.establishment_initial_groups')).n,1);
