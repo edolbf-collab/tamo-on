@@ -43,4 +43,10 @@ As tabelas são privadas com RLS, sem acesso direto do navegador. RPCs têm vali
 
 `admin-commercial-provider.test.mjs`: payload conta principal, reutilização de cliente/referência e timeout sem duplicação. `admin-commercial-browser.mjs`: 320/390/768/1280 px, permissões, confirmação da carteira, erros e troca de identidade. Workflow `establishment-plans.yml` executa os testes e publica capturas de validação. A emissão real na conta Asaas não foi testada por estes testes internos.
 
-Continuação de 14/11/2026: retomada do commit `7ed54b4` na branch `work/establishment-plans-20261114`. A consulta somente de estrutura do Marketplace Staging confirmou as colunas e dependências utilizadas; a tabela de planos ainda não estava implantada. A migration desta branch continua inédita no banco remoto. Não houve publicação, alteração de dados remotos ou emissão de cobranças nesta revisão.
+## Implantação web 174-R2 — 15/11/2026
+
+A migration `establishment_commercial_plans` foi aplicada no Marketplace Staging (`owybghlwcohfyapvsfdo`) e registrada pelo servidor como `20261115150144`. As quatro tabelas privadas estão com RLS e sem acesso direto de `anon` ou `authenticated`; as RPCs administrativas exigem identidade e autorização, e as três RPCs do emissor permitem apenas `service_role`. A consulta autenticada do administrador foi validada no banco remoto, com `test_mode=true`, sem criar planos ou cobranças.
+
+Foram aprovados 151 testes locais, a verificação Deno e os seis workflows de validação da PR #24, incluindo o navegador nas quatro larguras previstas. Os vencimentos remotos conferidos foram 01/12/2026 para o início, 11/01/2027 para a recorrência de janeiro e 10/02/2027 ao excluir os dias 08 e 09 do calendário de fevereiro.
+
+Esta versão publica a interface web de testes e o banco necessário à simulação. `real_money_enabled` permanece falso. O emissor Asaas está preparado no repositório, mas sua implantação, credenciais e agendamento ficam para a homologação da conta principal; nenhuma cobrança real foi emitida. A publicação nas lojas permanece uma etapa posterior.
