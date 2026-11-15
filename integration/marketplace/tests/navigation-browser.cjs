@@ -66,14 +66,19 @@ const financial='<header class="page-header"><div><span class="eyebrow">Administ
   assert.equal(await page.evaluate(()=>document.getElementById('infoDialog').open),true);
   assert.equal(await page.evaluate(()=>document.body.style.position),'');await page.keyboard.press('Escape');
   console.log('existing preference handlers and handover to Help dialog: PASS');
-  for(const [role,heading,count] of [['user','Usuário',6],['partner','Parceiro',8],['admin','Administração',9]]){
+  for(const [role,heading,destinations] of [
+   ['user','Usuário',['discover','reservations','shares','favorites','promotions','profile']],
+   ['partner','Parceiro',['overview','agenda','reservations','spaces','clients','vouchers','finance','metrics','commercial','registration']],
+   ['admin','Administração',['operations','overview','partners','reservations','users','finance','metrics','commercial','refunds','vouchers','settings']]
+  ]){
    await page.evaluate(({heading,markup})=>window.drawer.update({heading,markup}),{heading,markup:c.navigationItems(role)});
-   await open();assert.equal(await page.locator('#marketplaceMenu [data-nav]').count(),count);
+   await open();assert.deepEqual(await page.locator('#marketplaceMenu [data-nav]').evaluateAll(nodes=>nodes.map(node=>node.dataset.nav)),destinations);
    if(role==='admin'){
+    assert.match(await page.locator('#marketplaceMenu [data-nav="commercial"]').textContent(),/Planos e mensalidades/);
     assert.equal(await page.locator('#marketplaceMenu [data-nav="refunds"]').textContent(),'↩Devoluções');
     assert.equal(await page.locator('#marketplaceMenu [data-nav="operations"]').textContent(),'◎Central de operações');
    }
-   if(role==='partner')assert.equal(await page.locator('#marketplaceMenu .is-restricted').isDisabled(),true);
+   if(role==='partner'){assert.equal(await page.locator('#marketplaceMenu .is-restricted').isDisabled(),true);assert.match(await page.locator('#marketplaceMenu [data-nav="commercial"]').textContent(),/Plano Tâmo On/);}
    await page.keyboard.press('Escape');
   }
   await open();await page.evaluate(()=>window.drawer.update({heading:'Quero ser parceiro',markup:''}));

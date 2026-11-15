@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Melhorias de leitura no celular, métricas mensais e ajustes na administração, com correções de notificações preservadas.",
+  "notes": "Planos por estabelecimento, carteira inicial e mensalidades no sexto dia útil disponíveis para testes web. Cobrança real permanece desativada.",
   "label": "Tâmo On 1.0 Build 174",
-  "integration": "174-R1"
+  "integration": "174-R2"
 }

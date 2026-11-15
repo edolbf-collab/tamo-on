@@ -1936,7 +1936,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 /* Regras de apresentacao. A autorizacao efetiva e conferida novamente pelo servidor. */
 (function(root){
   'use strict';
-  const pages={overview:[],agenda:['manage_schedule'],reservations:['manage_schedule'],spaces:['manage_spaces'],clients:['manage_schedule'],team:['manage_team'],vouchers:['manage_finance'],finance:['manage_finance'],metrics:['manage_finance'],registration:['manage_profile','manage_documents']};
+  const pages={overview:[],agenda:['manage_schedule'],reservations:['manage_schedule'],spaces:['manage_spaces'],clients:['manage_schedule'],team:['manage_team'],vouchers:['manage_finance'],finance:['manage_finance'],metrics:['manage_finance'],commercial:['manage_finance'],registration:['manage_profile','manage_documents']};
   const actions={
     manage_spaces:['new-space','edit-space','toggle-space'],
     manage_team:['new-team-member','edit-team-member','toggle-team-member'],
@@ -2627,19 +2627,27 @@ const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'B
 const pct=v=>v==null?'Sem agenda':num(v)+'%';
 const date=v=>String(v||'').slice(0,10).split('-').reverse().join('/');
 const days=['','Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
-function month(){const d=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const [y,m]=d.split('-').map(Number);return {from:`${y}-${String(m).padStart(2,'0')}-01`,to:new Date(Date.UTC(y,m,0)).toISOString().slice(0,10)};}
+function currentMonth(now=new Date()){
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit'}).formatToParts(now);
+ return parts.find(p=>p.type==='year').value+'-'+parts.find(p=>p.type==='month').value;
+}
+function monthRange(value){
+ if(!/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(value))return null;
+ const [y,m]=value.split('-').map(Number);
+ return {from:value+'-01',to:new Date(Date.UTC(y,m,0)).toISOString().slice(0,10)};
+}
+function adjacentMonth(value,step){const [y,m]=value.split('-').map(Number);return new Date(Date.UTC(y,m-1+step,1)).toISOString().slice(0,7);}
 function mount(root,{rpc,identity,admin=false,partnerId=null}){
  const key=identity();let epoch=0,disposed=false,options=[],spaces=[],observer;
- const initial=month();let filters={...initial,partner:partnerId||'',space:''};
+ let filters={month:currentMonth(),partner:partnerId||'',space:''};
  const valid=()=>{if(disposed)return false;if(!key||identity()!==key){dispose();return false;}return true;};
  const current=e=>!disposed&&root.isConnected&&identity()===key&&epoch===e;
  const option=(value,text,selected)=>`<option value="${esc(value)}" ${value===selected?'selected':''}>${esc(text)}</option>`;
  function shell(){root.innerHTML=`<section class="market-metrics"><form class="metrics-filters">
- <label class="field"><span>De</span><input aria-label="Data inicial" type="date" name="from" required min="2000-01-01" max="2100-12-31" value="${filters.from}"></label>
- <label class="field"><span>Até</span><input aria-label="Data final" type="date" name="to" required min="2000-01-01" max="2100-12-31" value="${filters.to}"></label>
+ <label class="field"><span>Mês e ano</span><input aria-label="Mês e ano" type="month" name="month" required min="2000-01" max="${currentMonth()}" value="${filters.month}"></label>
  ${admin?`<label class="field"><span>Parceiro</span><select name="partner">${option('','Todos os parceiros',filters.partner)}${options.map(p=>option(p.id,p.name,filters.partner)).join('')}</select></label>`:''}
  <label class="field"><span>Quadra / espaço</span><select name="space">${option('','Todos os espaços',filters.space)}${spaces.filter(s=>!filters.partner||s.partner_id===filters.partner).map(s=>option(s.id,s.name,filters.space)).join('')}</select></label>
- <div class="metrics-controls"><button class="button primary" type="submit">Atualizar métricas</button><button class="button ghost" type="button" data-metrics-month>Mês atual</button></div>
+ <div class="metrics-controls"><button class="button primary" type="submit">Atualizar métricas</button><button class="button ghost" type="button" data-metrics-prev aria-label="Mês anterior" ${filters.month<='2000-01'?'disabled':''}>‹</button><button class="button ghost" type="button" data-metrics-month>Mês atual</button><button class="button ghost" type="button" data-metrics-next aria-label="Próximo mês" ${filters.month>=currentMonth()?'disabled':''}>›</button></div>
  </form><div class="metrics-status" role="status" aria-live="polite"></div><div class="metrics-results"></div></section>`;}
  const results=()=>root.querySelector('.metrics-results');
  const status=()=>root.querySelector('.metrics-status');
@@ -2648,31 +2656,35 @@ function mount(root,{rpc,identity,admin=false,partnerId=null}){
  function show(d){
  const c=d.current,p=d.previous,h=c.hours,b=c.bookings,cash=c.cash,m=d.monthly;
  const row=s=>`<tr><td>${esc(s.name)}<br><small>${esc(s.partner)} · ${esc(s.venue)}</small></td><td>${s.occupancy==null?'Sem agenda':`<progress max="100" value="${Number(s.occupancy)}" aria-label="Ocupação de ${esc(s.name)}"></progress>${pct(s.occupancy)}`}</td><td>${num(s.booked)} h</td><td>${num(s.free)} h</td><td>${num(s.held)} h</td><td>${num(s.blocked)} h</td></tr>`;
- const heat=c.heat.filter(x=>x.available>0).sort((a,b)=>b.occupancy-a.occupancy||b.booked-a.booked||a.weekday-b.weekday||a.hour-b.hour).slice(0,10);
+ const offered=c.heat.filter(x=>x.available>0);
+ const heat=offered.slice().sort((a,b)=>b.occupancy-a.occupancy||b.booked-a.booked||a.weekday-b.weekday||a.hour-b.hour).slice(0,10);
+ const quiet=offered.slice().sort((a,b)=>a.occupancy-b.occupancy||(b.available-b.booked)-(a.available-a.booked)||a.weekday-b.weekday||a.hour-b.hour).slice(0,10);
+ const scheduleTable=(title,items,kind)=>`<article class="card metrics-${kind}"><h2>${title}</h2><p class="metrics-note">Até dez faixas por dia da semana e hora, considerando apenas a agenda ofertada.</p><div class="metrics-scroll"><table class="metrics-table"><thead><tr><th>Faixa</th><th>Ocupação</th><th>Reservadas / ofertadas</th></tr></thead><tbody>${items.map(x=>`<tr><td>${days[x.weekday]} · ${String(x.hour).padStart(2,'0')}h</td><td>${pct(x.occupancy)}</td><td>${num(x.booked)} / ${num(x.available)} h</td></tr>`).join('')||'<tr><td colspan="3">Sem agenda no mês.</td></tr>'}</tbody></table></div></article>`;
  results().innerHTML=`${d.test_mode?'<div class="metrics-test"><strong>Ambiente de testes</strong><br>Estes indicadores incluem os registros fictícios usados na homologação.</div>':''}
  <div class="metrics-heading"><h2>Visão do período</h2><span class="metrics-note">${date(c.from)} a ${date(c.to)}</span></div>
- <p class="metrics-note">Comparação: ${date(p.from)} a ${date(p.to)} · mesmo número de dias. Horários de Brasília.</p>
+ <p class="metrics-note">Comparação: ${date(p.from)} a ${date(p.to)} · mês anterior completo. Horários de Brasília.</p>
+ <p class="metrics-note">${d.month_open?'Mês em andamento: inclui dias e horários ainda em aberto. Os números podem mudar até o encerramento do mês.':'Mês encerrado: análise de todos os dias do mês selecionado.'}</p>
  <div class="metrics-cards">${card('Ocupação',pct(h.occupancy),delta(h.occupancy,p.hours.occupancy,' p.p.'))}${card('Horas reservadas',num(h.booked)+' h',delta(h.booked,p.hours.booked,' h'))}${card('Recebimentos',money(cash.received),'Anterior: '+money(p.cash.received))}${card('Reservas criadas',num(b.created),delta(b.created,p.bookings.created))}</div>
  <section class="card metrics-section"><h2>Uso dos espaços</h2><p class="metrics-note">${num(h.available)} h ofertadas · ${num(h.free)} h livres · ${num(h.held)} h aguardando pagamento · ${num(h.blocked)} h bloqueadas.</p>
  <div class="metrics-scroll"><table class="metrics-table"><thead><tr><th>Espaço</th><th>Ocupação</th><th>Reservadas</th><th>Livres</th><th>Em espera</th><th>Bloqueadas</th></tr></thead><tbody>${c.spaces.map(row).join('')||'<tr><td colspan="6">Nenhum espaço cadastrado neste filtro.</td></tr>'}</tbody></table></div>
  ${h.available===0?'<p class="metrics-empty">Nenhuma hora ofertada neste período. Cadastre a agenda para medir a ocupação.</p>':''}</section>
- <div class="metrics-grid metrics-section"><article class="card"><h2>Dias e horários mais ocupados</h2><p class="metrics-note">Até dez faixas, somadas por dia da semana e hora. A base em horas ajuda a avaliar o tamanho da amostra.</p><div class="metrics-scroll"><table class="metrics-table"><thead><tr><th>Faixa</th><th>Ocupação</th><th>Reservadas / ofertadas</th></tr></thead><tbody>${heat.map(x=>`<tr><td>${days[x.weekday]} · ${String(x.hour).padStart(2,'0')}h</td><td>${pct(x.occupancy)}</td><td>${num(x.booked)} / ${num(x.available)} h</td></tr>`).join('')||'<tr><td colspan="3">Sem agenda no período.</td></tr>'}</tbody></table></div></article>
- <article class="card"><h2>Reservas e cancelamentos</h2><p class="metrics-note">Situação atual das reservas criadas no período.</p><div class="metrics-cards" style="grid-template-columns:repeat(2,minmax(0,1fr))">${card('Confirmadas / concluídas',num(b.confirmed),'Aguardando pagamento: '+num(b.pending))}${card('Canceladas',num(b.cancelled),(b.cancellation_rate==null?'Sem reservas':num(b.cancellation_rate)+'% das criadas')+' · expiradas: '+num(b.expired))}${card('Valor contratado',money(b.contracted),'Somente confirmadas / concluídas')}${card('Valor médio por reserva',b.average==null?'Sem reservas':money(b.average),'Reservas avulsas e mensais juntas')}</div></article></div>
+ <div class="metrics-grid metrics-section">${scheduleTable('Dias e horários mais ocupados',heat,'busy')}${scheduleTable('Dias e horários menos ocupados',quiet,'quiet')}</div>
+ <section class="metrics-section metrics-bookings"><h2>Reservas e cancelamentos</h2><p class="metrics-note">Situação atual das reservas criadas no mês.</p><div class="metrics-cards">${card('Confirmadas / concluídas',num(b.confirmed),'Aguardando pagamento: '+num(b.pending))}${card('Canceladas',num(b.cancelled),(b.cancellation_rate==null?'Sem reservas':num(b.cancellation_rate)+'% das criadas')+' · expiradas: '+num(b.expired))}${card('Valor contratado',money(b.contracted),'Somente confirmadas / concluídas')}${card('Valor médio por reserva',b.average==null?'Sem reservas':money(b.average),'Reservas avulsas e mensais juntas')}</div></section>
  <section class="metrics-section"><h2>Financeiro do período</h2><p class="metrics-note">Movimentações pela data em que foram registradas financeiramente, incluindo recebimentos de reservas de outros períodos.</p>
  <div class="metrics-cards">${card('Devolvido',money(cash.refunded),'Anterior: '+money(p.cash.refunded))}${card('Recebido menos devoluções',money(cash.received-cash.refunded),'Não representa lucro nem saldo disponível')}${card('Taxas registradas',money(cash.fees),'Custos do provedor registrados no histórico')}${card('Comissão reconhecida',money(cash.commission),'Comissão Tâmo On registrada no histórico')}</div>
  ${cash.legacy?'<p class="metrics-test">Parte do histórico financeiro usa datas reconstruídas de registros antigos. Consulte o Financeiro para conferir os lançamentos.</p>':''}
  <div class="metrics-cards">${card('Saldo a receber',money(c.balances.pending),'Posição atual das reservas criadas no período')}${card('Devolução pendente',money(c.balances.refund_pending),'Posição atual das reservas criadas no período')}${card('Jogos confirmados',num(c.services.occurrences),'Ocorrências com início no período')}${card('Valor alocado aos jogos',money(c.services.value),'Valor das ocorrências; não é recebimento')}</div></section>
  <section class="metrics-section"><h2>Mensalistas e recorrência</h2><div class="metrics-cards">${card('Vínculos mensais ativos',num(m.active),'Situação atual, independentemente do período')}${card('Mensalidades dos ativos',money(m.monthly_value),'Soma dos valores cadastrados; não é receita garantida')}${card('Organizadores novos',num(c.customers.new),'Primeira reserva confirmada / concluída com o parceiro')}${card('Organizadores recorrentes',num(c.customers.returning),'Já possuíam reserva confirmada / concluída antes do período')}</div><p class="metrics-note">Vínculos suspensos: ${num(m.suspended)} · outros vínculos não cancelados: ${num(m.other)}. Organizadores contados uma vez por parceiro; participantes das cotas não entram nessa contagem.</p></section>
- <details class="card metrics-details"><summary>Como os indicadores são calculados</summary><p>Ocupação = horas confirmadas ou concluídas ÷ horas ofertadas. A base vem da agenda cadastrada e das ocorrências das reservas. Bloqueios são excluídos da oferta; horários aguardando pagamento permanecem na base, mas não contam como ocupados. Sobreposições no mesmo espaço são contadas uma única vez. Uma reserva mensal ocupa apenas as datas efetivamente registradas.</p><p>Os intervalos são recortados nas datas selecionadas. Os valores dos jogos usam a data de início de cada ocorrência. Sem agenda, a ocupação aparece como indisponível; não presumimos que o espaço funcione 24 horas.</p><p>Cancelamentos consideram as reservas criadas no período que hoje estão canceladas, aguardando devolução ou devolvidas. Expiração sem pagamento é mostrada separadamente. As comparações refletem o estado atual dos registros, não uma fotografia histórica. Valores médios incluem reservas mensais e avulsas.</p><p>O Financeiro continua sendo a referência para conferir cada lançamento, disponibilidade e repasses. Estes números não incluem despesas operacionais do estabelecimento. Os dados são recalculados a cada consulta; a futura limpeza dos testes também os retirará das métricas.</p></details>`;
+ <details class="card metrics-details"><summary>Como os indicadores são calculados</summary><p>Ocupação = horas confirmadas ou concluídas ÷ horas ofertadas. A base vem da agenda cadastrada e das ocorrências das reservas. Bloqueios são excluídos da oferta; horários aguardando pagamento permanecem na base, mas não contam como ocupados. Sobreposições no mesmo espaço são contadas uma única vez. Uma reserva mensal ocupa apenas as datas efetivamente registradas.</p><p>A análise considera o mês inteiro selecionado, do primeiro ao último dia. O mês corrente inclui os dias ainda em aberto. A comparação usa o mês anterior completo, mesmo que os meses tenham números diferentes de dias. Horários sem oferta ou totalmente bloqueados não entram na lista dos menos ocupados; faixas ofertadas com nenhuma reserva aparecem com 0%. Os valores dos jogos usam a data de início de cada ocorrência. Sem agenda, a ocupação aparece como indisponível; não presumimos que o espaço funcione 24 horas.</p><p>Cancelamentos consideram as reservas criadas no período que hoje estão canceladas, aguardando devolução ou devolvidas. Expiração sem pagamento é mostrada separadamente. As comparações refletem o estado atual dos registros, não uma fotografia histórica. Valores médios incluem reservas mensais e avulsas.</p><p>O Financeiro continua sendo a referência para conferir cada lançamento, disponibilidade e repasses. Estes números não incluem despesas operacionais do estabelecimento. Os dados são recalculados a cada consulta; a futura limpeza dos testes também os retirará das métricas.</p></details>`;
  status().textContent='Atualizado em '+new Date(d.generated_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})+' (Brasília).';
  }
- function capture(){const f=new FormData(root.querySelector('form'));filters={from:String(f.get('from')),to:String(f.get('to')),partner:admin?String(f.get('partner')||''):partnerId||'',space:String(f.get('space')||'')};}
+ function capture(){const f=new FormData(root.querySelector('form'));filters={month:String(f.get('month')||''),partner:admin?String(f.get('partner')||''):partnerId||'',space:String(f.get('space')||'')};}
  async function load(){
  if(!valid())return;capture();const e=++epoch;results().replaceChildren();
- const span=(Date.parse(filters.to)-Date.parse(filters.from))/86400000;
- if(!Number.isFinite(span)||span<0||span>365){status().textContent='Selecione um período de até 366 dias, com a data final igual ou posterior à inicial.';return;}
+ const range=monthRange(filters.month);
+ if(!range||filters.month>currentMonth()){status().textContent='Selecione o mês corrente ou um mês anterior, a partir de janeiro de 2000.';return;}
  status().textContent='Calculando métricas…';root.querySelector('button[type=submit]').disabled=true;
- try{const d=await rpc('marketplace_metrics',{p_from:filters.from,p_to:filters.to,p_partner_id:filters.partner||null,p_space_id:filters.space||null});
+ try{const d=await rpc('marketplace_metrics',{p_from:range.from,p_to:range.to,p_partner_id:filters.partner||null,p_space_id:filters.space||null});
  if(!current(e))return;if(!d?.current?.hours||!Array.isArray(d.spaces)||!Array.isArray(d.partners))throw Error('INVALID_METRICS');
  options=d.partners;spaces=d.spaces;shell();show(d);
  }catch(error){if(current(e)){status().textContent='';results().innerHTML='<p class="metrics-error" role="alert">Não foi possível consultar as métricas. Confira sua conexão e permissão de acesso, depois toque em Atualizar métricas.</p>';}}
@@ -2681,14 +2693,79 @@ function mount(root,{rpc,identity,admin=false,partnerId=null}){
  function submit(e){if(e.target.matches('.metrics-filters')){e.preventDefault();load();}}
  function change(e){if(!e.target.closest('.metrics-filters')||!valid())return;capture();++epoch;results().replaceChildren();status().textContent='Filtros alterados. Toque em Atualizar métricas.';root.querySelector('button[type=submit]').disabled=false;
  if(e.target.name==='partner'){filters.space='';const select=root.querySelector('[name=space]');select.innerHTML=option('','Todos os espaços','')+spaces.filter(s=>!filters.partner||s.partner_id===filters.partner).map(s=>option(s.id,s.name,'')).join('');}}
- function click(e){if(e.target.closest('[data-metrics-month]')&&valid()){filters={...filters,...month()};shell();load();}}
+ function click(e){
+ if(!e.target.closest('[data-metrics-month],[data-metrics-prev],[data-metrics-next]')||!valid())return;
+ capture();const selected=monthRange(filters.month)?filters.month:currentMonth();filters.month=e.target.closest('[data-metrics-month]')?currentMonth():adjacentMonth(selected,e.target.closest('[data-metrics-prev]')?-1:1);
+ if(filters.month<'2000-01'||filters.month>currentMonth())return;
+ shell();load();
+ }
  function dispose(){if(disposed)return;disposed=true;++epoch;options=[];spaces=[];observer?.disconnect();root.removeEventListener('submit',submit);root.removeEventListener('change',change);root.removeEventListener('click',click);root.replaceChildren();}
  if(!key){root.textContent='Conecte-se com acesso financeiro para consultar as métricas.';return {root,key,dispose};}
  root.addEventListener('submit',submit);root.addEventListener('change',change);root.addEventListener('click',click);
  observer=new MutationObserver(()=>{if(!root.isConnected||identity()!==key)dispose();});observer.observe(document.body,{childList:true,subtree:true});
  shell();load();return {root,key,dispose};
 }
-global.TamoonMetrics=Object.freeze({mount});
+global.TamoonMetrics=Object.freeze({mount,currentMonth,monthRange,adjacentMonth});
+})(window);
+
+;
+
+;/* commercial-plans.js */
+(function(global){
+'use strict';
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const date=v=>String(v||'').slice(0,10).split('-').reverse().join('/');
+const labels={planned:'Aguardando emissão',issuing:'Em processamento',pending:'Aguardando pagamento',paid:'Pago',overdue:'Vencido',cancelled:'Cancelado',refunded:'Devolvido',review:'Conferência necessária'};
+const errors={PLAN_DUPLICATE_ADDRESS:'Já existe um plano deste parceiro no mesmo endereço. As quadras desse local devem usar um único estabelecimento.',PLAN_IMPORT_PENDING:'Há mensalistas importados aguardando associação ao grupo. Conclua os convites antes de fechar a carteira.',PLAN_IMPORTED_GROUP_MISSING:'Inclua na carteira todos os grupos já confirmados na importação.',PLAN_FROZEN:'A carteira inicial já foi fechada. Atualize a tela.',PLAN_START_FIRST_FUTURE_MONTH:'O início deve ser no dia 01 de um mês que ainda não começou.',PLAN_ACCESS_DENIED:'Sua conta não tem acesso a estes planos.',PLAN_READ_ONLY:'A visualização como parceiro permite apenas consulta.',PLAN_INVALID_GROUP:'Há um grupo indisponível na seleção. Atualize a tela.',PLAN_INVALID_CALENDAR:'Confira o ano e as datas dos feriados.',PLAN_REVIEW_START_AND_CALENDAR:'Revise a data de início e o calendário antes de ativar.',PLAN_SIMULATION_DISABLED:'A simulação está desativada neste ambiente.',PLAN_NOT_SIMULATABLE:'Esta cobrança não permite simulação.'};
+function mount(root,{rpc,identity,partnerId=null}){
+ const key=identity();let epoch=0,disposed=false,data=null,selected='',busy=false,savedPreparation='';
+ const preparation=()=>{const f=root.querySelector('.plan-form');return f?JSON.stringify([...new FormData(f)].filter(([name])=>name!=='reviewed')):'';};
+ const valid=e=>!disposed&&root.isConnected&&identity()===key&&(e===undefined||e===epoch);
+ const fail=error=>{if(!valid())return;const msg=String(error?.message||error||'');root.querySelector('[role=status]').textContent=Object.entries(errors).find(([code])=>msg.includes(code))?.[1]||'Não foi possível concluir. Atualize a tela e tente novamente.';};
+ const chosen=()=>data?.venues.find(v=>v.id===selected);
+ function shell(){root.innerHTML='<section class="commercial-plans"><div class="plan-toolbar"><label class="field"><span>Estabelecimento</span><select name="venue" aria-label="Estabelecimento"></select></label><button class="button ghost" data-plan="refresh">Atualizar</button></div><p role="status" aria-live="polite"></p><div class="plan-content"></div></section>';}
+ function show(){
+ const select=root.querySelector('[name=venue]');select.innerHTML=(data.venues||[]).map(v=>`<option value="${esc(v.id)}" ${v.id===selected?'selected':''}>${esc(v.partner)} · ${esc(v.name)}</option>`).join('');
+ const host=root.querySelector('.plan-content'),v=chosen();if(!v){host.innerHTML='<p class="callout">Nenhum estabelecimento disponível.</p>';return;}
+ const p=v.plan,edit=data.admin&&p?.state!=='ready';
+ const month=p?.starts_on?.slice(0,7)||new Date(Date.UTC(Number(data.today.slice(0,4)),Number(data.today.slice(5,7))-(data.today.endsWith('-01')?1:0),1)).toISOString().slice(0,7);
+ const year=Number(month.slice(0,4));
+ host.innerHTML=`<section class="card"><h2>${esc(v.name)}</h2><p>${esc(v.address)} · ${esc(v.spaces)} quadra(s) / espaço(s)</p><div class="plan-summary"><div><span>Mensalidade</span><strong>${money(p?.monthly_value??300)}</strong></div><div><span>Carteira inicial</span><strong>0%</strong></div><div><span>Novos grupos</span><strong>5%</strong></div></div><p>Uma mensalidade por estabelecimento físico, independentemente da quantidade de quadras. Unidades em endereços diferentes têm planos separados, mesmo com o mesmo CNPJ. As tarifas de pagamento são do parceiro.</p><p><strong>${p?.state==='ready'?'Carteira inicial fechada · início em '+date(p.starts_on):p?'Plano em preparação':'Plano ainda não configurado'}</strong></p><p>A primeira mensalidade vence no dia 01 de início. As seguintes vencem no sexto dia útil: segunda a sexta, descontando feriados nacionais e os cadastrados para este estabelecimento.</p></section>
+ ${data.admin?`<form class="card plan-form"><h2>${edit?'Preparar operação':'Calendário de vencimentos'}</h2>
+ ${edit?`<label class="field"><span>Mês de início</span><input name="start" type="month" required value="${esc(month)}"></label><h3>Grupos da carteira inicial</h3><p>Confira os vínculos importados e selecione os grupos que já atendem neste estabelecimento. O código será mantido mesmo após troca de horário ou encerramento de um vínculo.</p><button type="button" class="button ghost" data-plan="suggest">Selecionar vínculos já importados</button><div class="plan-groups">${data.group_options.map(g=>`<label><input type="checkbox" name="group" value="${esc(g.id)}" ${v.groups.some(x=>x.id===g.id)?'checked':''}><span>${esc(g.name)}<small>Código: ${esc(g.id)}</small></span></label>`).join('')||'<p>Nenhum grupo cadastrado. Conclua a importação primeiro.</p>'}</div>`:`<p>Carteira preservada: ${v.groups.length} grupo(s). O calendário pode ser revisado sem mudar a classificação dos grupos.</p>`}
+ <label class="field"><span>Ano do calendário</span><input name="year" type="number" min="${Number(data.today.slice(0,4))}" max="${Number(data.today.slice(0,4))+3}" required value="${year}"></label>
+ <label class="field"><span>Feriados locais e dias sem expediente bancário</span><textarea name="holidays" rows="4" placeholder="Uma data por linha: AAAA-MM-DD">${esc((p?.holidays||[]).filter(d=>d.startsWith(year+'-')).join('\n'))}</textarea></label><p class="plan-note">Feriados nacionais fixos já são considerados. Inclua os feriados estaduais, municipais e bancários móveis aplicáveis ao estabelecimento.</p>
+ <label class="plan-check"><input name="reviewed" type="checkbox" required>Conferi o calendário deste ano e os dados acima.</label><button class="button primary" type="submit">${edit?'Salvar preparação':'Salvar calendário'}</button>
+ </form>${edit&&p?`<section class="card"><h3>Fechar a carteira inicial</h3><p>Conclua a importação e a conferência dos grupos antes de fechar. A partir daí a carteira fica preservada, e novos grupos seguem a comissão de 5%. O início depende do pagamento da primeira mensalidade.</p><label class="plan-check"><input type="checkbox" name="freeze">Concluí a importação e conferi todos os grupos iniciais.</label><button class="button primary" data-plan="activate">Fechar carteira inicial</button></section>`:''}`:''}
+ <section class="card"><h2>Grupos incluídos na mensalidade</h2><div class="plan-groups">${v.groups.map(g=>`<p><strong>${esc(g.name)}</strong><small>Código: ${esc(g.id)}</small></p>`).join('')||'<p>Nenhum grupo incluído.</p>'}</div></section>
+ <section class="card"><h2>Mensalidades do estabelecimento</h2><p>As mensalidades Tâmo On são separadas dos valores das reservas. A emissão automática no Asaas será habilitada após a validação da conta emissora.</p>
+ ${v.invoices.map(i=>`<article class="plan-invoice"><div><strong>${esc(i.competence.slice(0,7).split('-').reverse().join('/'))} · ${money(i.amount)}</strong><small>Vencimento: ${date(i.due_on)} · ${esc(labels[i.status]||i.status)}${i.simulated?' · Simulação':i.environment==='sandbox'?' · Teste Asaas':''}</small></div>${i.invoice_url&&/^https:\/\/(www\.|sandbox\.)?asaas\.com\//.test(i.invoice_url)?`<a class="button ghost" href="${esc(i.invoice_url)}" target="_blank" rel="noopener noreferrer">Abrir cobrança</a>`:''}</article>`).join('')||'<p>A cobrança inicial será preparada após o fechamento da carteira.</p>'}
+ ${data.admin&&data.test_mode&&v.invoices.some(i=>i.status==='planned'&&i.competence===p?.starts_on)?'<button class="button secondary" data-plan="simulate">Simular primeiro pagamento (teste)</button>':''}
+ </section>${p?`<details class="card"><summary>Previsão de vencimentos — 12 meses</summary><div class="table-wrap"><table><thead><tr><th>Mês</th><th>Vencimento</th><th>Valor</th><th>Calendário</th></tr></thead><tbody>${v.forecast.map(f=>`<tr><td>${esc(f.month.slice(0,7))}</td><td>${date(f.due_on)}</td><td class="plan-money">${money(f.amount)}</td><td>${f.calendar_reviewed?'Revisado':'Revisão pendente'}</td></tr>`).join('')}</tbody></table></div><p>Previsão, sem novas cobranças emitidas. Datas futuras dependem da revisão dos feriados. Cobranças já emitidas mantêm seu vencimento.</p></details>`:''}`;
+ savedPreparation=preparation();
+ }
+ async function load(){const e=++epoch;if(!valid())return;shell();root.querySelector('[role=status]').textContent='Carregando planos…';try{const d=await rpc('establishment_plans_read',{p_partner_id:partnerId});if(!valid(e))return;data=d;selected=data.venues.some(v=>v.id===selected)?selected:data.venues[0]?.id||'';show();root.querySelector('[role=status]').textContent='';}catch(error){if(valid(e))fail(error);}}
+ async function mutate(name,args){if(busy||!valid())return;busy=true;const e=epoch;root.querySelectorAll('button,input,select,textarea').forEach(x=>x.disabled=true);try{await rpc(name,args);if(valid(e))await load();}catch(error){if(valid(e))fail(error);}finally{busy=false;if(valid())root.querySelectorAll('button,input,select,textarea').forEach(x=>x.disabled=false);}}
+ function click(event){const action=event.target.closest('[data-plan]')?.dataset.plan;if(!action||busy||!valid())return;
+ if(action==='refresh')load();
+ if(action==='suggest')for(const input of root.querySelectorAll('[name=group]'))if(chosen()?.suggested_groups.includes(input.value))input.checked=true;
+ if(action==='activate'){if(preparation()!==savedPreparation){root.querySelector('[role=status]').textContent='Salve a preparação antes de fechar a carteira. Há alterações de início, grupos ou calendário ainda não salvas.';return;}if(!root.querySelector('[name=freeze]')?.checked){fail(Error('Conferência'));root.querySelector('[role=status]').textContent='Confirme que a importação e a conferência da carteira foram concluídas.';return;}mutate('establishment_plan_activate',{p_venue_id:selected});}
+ if(action==='simulate')mutate('establishment_plan_simulate',{p_venue_id:selected});
+ }
+ function submit(event){if(!event.target.matches('.plan-form'))return;event.preventDefault();if(busy||!valid())return;const f=new FormData(event.target),year=Number(f.get('year')),days=String(f.get('holidays')||'').split(/[\s,;]+/).filter(Boolean);
+ if(days.some(d=>!/^\d{4}-\d{2}-\d{2}$/.test(d)||!d.startsWith(year+'-'))){fail(Error('PLAN_INVALID_CALENDAR'));return;}
+ const args={p_venue_id:selected,p_holidays:days};
+ if(chosen().plan?.state==='ready')mutate('establishment_plan_calendar',{...args,p_year:year});
+ else mutate('establishment_plan_save',{...args,p_starts_on:f.get('start')+'-01',p_groups:f.getAll('group'),p_calendar_year:year});
+ }
+ function change(event){if(busy)return;if(event.target.name==='venue'){selected=event.target.value;show();}
+ if(event.target.name==='year'){root.querySelector('[name=holidays]').value=(chosen().plan?.holidays||[]).filter(d=>d.startsWith(event.target.value+'-')).join('\n');root.querySelector('[name=reviewed]').checked=false;}}
+ const observer=new MutationObserver(()=>{if(!valid())dispose();});observer.observe(document.body,{subtree:true,childList:true});
+ function dispose(){if(disposed)return;disposed=true;epoch++;observer.disconnect();root.removeEventListener('click',click);root.removeEventListener('submit',submit);root.removeEventListener('change',change);root.replaceChildren();}
+ root.addEventListener('click',click);root.addEventListener('submit',submit);root.addEventListener('change',change);load();return {root,key,dispose};
+}
+global.TamoonCommercialPlans={mount};
 })(window);
 
 ;
@@ -2819,6 +2896,7 @@ global.TamoonMetrics=Object.freeze({mount});
       ["vouchers", "%", "Vouchers"],
       ["finance", "$", "Financeiro"],
       ["metrics", "▥", "Métricas"],
+      ["commercial", "$", "Plano Tâmo On"],
       ["registration", "≡", "Cadastro"]
     ],
     admin: [
@@ -2829,6 +2907,7 @@ global.TamoonMetrics=Object.freeze({mount});
       ["users", "◎", "Usuários"],
       ["finance", "$", "Financeiro"],
       ["metrics", "▥", "Métricas"],
+      ["commercial", "$", "Planos e mensalidades"],
       ["refunds", "↩", "Devoluções"],
       ["vouchers", "%", "Vouchers"],
       ["settings", "⚙", "Configurações"]
@@ -4322,6 +4401,8 @@ global.TamoonMetrics=Object.freeze({mount});
         voucherAppliedValue:Number(reservation.voucher_discount || voucherUsage?.consumed_value || voucherUsage?.reserved_value || 0),
         promotionalVoucherId:["admin_promo","partner_promo"].includes(voucherRow?.origin) ? voucherRow.id : "",
         groupId:reservation.group_id || "",
+        commissionRate:reservation.finance_commission_rate==null?null:Number(reservation.finance_commission_rate),
+        commercialBasis:reservation.commercial_basis || "",
         groupName:reservation.group_name || group?.name || (reservation.group_id ? "Grupo Tâmo On" : "Reserva pessoal"),
         groupRole:reservation.group_role ? backendGroupRoleLabel(reservation.group_role) : isCurrentUser ? state.userGroups.find((item) => item.id === reservation.group_id)?.role || "" : "",
         eventId:reservation.event_id || "",
@@ -5015,6 +5096,11 @@ global.TamoonMetrics=Object.freeze({mount});
   function backendErrorMessage(error) {
     if(String(error?.message||error).includes("AGENDA_INITIAL_"))return window.MarketplaceAgendaInitial.errorMessage(error);
     const message = String(error?.message || error || "");
+    if(message.includes('PLAN_REQUIRED')||message.includes('PLAN_REVIEW_REQUIRED'))return 'O estabelecimento precisa concluir a configuração do Plano Tâmo On antes de iniciar as reservas em produção.';
+    if(message.includes('PLAN_NOT_STARTED'))return 'Este estabelecimento inicia a operação no dia 01 do mês contratado. As novas reservas serão liberadas a partir dessa data.';
+    if(message.includes('PLAN_FIRST_PAYMENT_REQUIRED'))return 'O estabelecimento aguarda a confirmação da primeira mensalidade Tâmo On para iniciar a operação.';
+    if(message.includes('PLAN_RESERVATION_CONTRACT_IMMUTABLE'))return 'O grupo e as condições comerciais desta reserva já estão definidos. Crie uma nova reserva para outro grupo.';
+    if(message.includes('PLAN_VENUE_MISMATCH'))return 'Confira o estabelecimento e a quadra selecionados.';
     if(message==="SIMULATION_DISABLED")return "Esta versão usa o Asaas Sandbox. Atualize o aplicativo e reabra o pagamento em Minhas reservas.";
     if(/PREBOOKING_DETAILS_STALE/.test(message))return "Os dados da reserva mudaram. Feche esta janela e abra novamente para conferir o grupo e os participantes antes de continuar.";
     if(/PREBOOKING_EDIT_PAYMENT_LOCKED/.test(message))return "O pagamento já foi configurado. Os dados da reserva estão bloqueados para alteração.";
@@ -5715,7 +5801,7 @@ global.TamoonMetrics=Object.freeze({mount});
       profile.declaredActivity = partner.activity;
       profile.contractStatus = partner.contract;
       profile.fiscalIssuer = partner.fiscal;
-      profile.commissionRate = Number(partner.commission || profile.commissionRate || state.settings.defaultCommission);
+      profile.commissionRate = Number(partner.commission ?? profile.commissionRate ?? state.settings.defaultCommission);
       profile.termsStatus = partner.terms || profile.termsStatus;
       profile.privacyStatus = partner.privacy || profile.privacyStatus;
       profile.adminStatus = partner.status;
@@ -5745,7 +5831,7 @@ global.TamoonMetrics=Object.freeze({mount});
       partner.contract = profile.contractStatus;
       partner.fiscal = profile.fiscalIssuer;
       partner.banking = profile.bank ? `${profile.bank} · ${profile.pixApiStatus || "Configuração pendente"}` : partner.banking;
-      partner.commission = Number(profile.commissionRate || state.settings.defaultCommission);
+      partner.commission = Number(profile.commissionRate ?? state.settings.defaultCommission);
       partner.terms = profile.termsStatus;
       partner.privacy = profile.privacyStatus;
       updateApplicationFromAdminPartner(partner);
@@ -8123,7 +8209,7 @@ global.TamoonMetrics=Object.freeze({mount});
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
-    if(backendIsOnline() && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
+    if(backendIsOnline() && state.activePage?.[state.role]!=="metrics" && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
@@ -9800,7 +9886,7 @@ global.TamoonMetrics=Object.freeze({mount});
       const venue=venues.get(reservation.venueId);
       const adminPartner=state.adminPartners.find((partner)=>partner.venueId===reservation.venueId);
       const partnerId=venue?.backendPartnerId||adminPartner?.backendPartnerId||adminPartner?.id||reservation.venueId;
-      if(!groups.has(partnerId))groups.set(partnerId,{partnerId,venueId:reservation.venueId,partnerName:reservation.venue||venue?.name||"Parceiro",recognizedReservations:0,grossValue:0,voucherDiscount:0,commissionBase:0,commissionRate:Number(adminPartner?.commission||state.settings.defaultCommission||0),asaasProcessed:0,externalReceived:0,asaasPixCount:0,asaasCardCount:0,asaasFeeEstimated:0});
+      if(!groups.has(partnerId))groups.set(partnerId,{partnerId,venueId:reservation.venueId,partnerName:reservation.venue||venue?.name||"Parceiro",recognizedReservations:0,grossValue:0,voucherDiscount:0,commissionBase:0,commissionTotal:0,commissionRate:Number(adminPartner?.commission??state.settings.defaultCommission??0),asaasProcessed:0,externalReceived:0,asaasPixCount:0,asaasCardCount:0,asaasFeeEstimated:0});
       const row=groups.get(partnerId);
       const net=Number(reservation.accountingRecognizedValue||0);
       const provider=String(reservation.paymentProvider||"").toUpperCase();
@@ -9810,6 +9896,7 @@ global.TamoonMetrics=Object.freeze({mount});
       row.grossValue+=Number(reservation.value||net);
       row.voucherDiscount+=Number(reservation.voucherAppliedValue||0);
       row.commissionBase+=net;
+      row.commissionTotal+=roundFinancial(net*Number(reservation.commissionRate??row.commissionRate)/100);
       if(throughAsaas){
         row.asaasProcessed+=net;
         if(card){
@@ -9822,7 +9909,7 @@ global.TamoonMetrics=Object.freeze({mount});
       }else row.externalReceived+=net;
     });
     return [...groups.values()].map((row)=>{
-      const commissionTotal=roundFinancial(row.commissionBase*row.commissionRate/100);
+      const commissionTotal=roundFinancial(row.commissionTotal);
       const available=Math.max(0,roundFinancial(row.asaasProcessed-row.asaasFeeEstimated));
       const commissionRetained=Math.min(commissionTotal,available);
       return {...row,grossValue:roundFinancial(row.grossValue),voucherDiscount:roundFinancial(row.voucherDiscount),commissionBase:roundFinancial(row.commissionBase),asaasProcessed:roundFinancial(row.asaasProcessed),externalReceived:roundFinancial(row.externalReceived),asaasFeeEstimated:roundFinancial(row.asaasFeeEstimated),commissionTotal,commissionRetained:roundFinancial(commissionRetained),commissionPending:roundFinancial(Math.max(0,commissionTotal-commissionRetained)),asaasPartnerPayout:roundFinancial(Math.max(0,available-commissionTotal)),backendOfficial:false};
@@ -10065,7 +10152,7 @@ global.TamoonMetrics=Object.freeze({mount});
     const outside=view.outsideContract!==0?`<span>${view.outsideContract>0?"−":"+"} ${money(Math.abs(view.outsideContract))} ${view.outsideContract>0?"fora do contrato vigente":"ajuste do contratado"}</span>`:"";
     const history=`<dl class="finance-line-list">${line("Contratado original",finance.contractedValue||0)}${line("Encerrado ou cancelado",finance.cancelledValue||0)}${line("Valor contratado vigente",view.contracted)}${line("Devoluções concluídas",view.returned)}${line("Restituições pendentes",finance.refundPending||0)}</dl><p class="field-help">O contratado vigente já considera os descontos aplicados e exclui obrigações encerradas ou canceladas. Recebimentos para restituição ou excedentes permanecem no histórico, sem aumentar esse contrato.</p>`;
     const feeNote=Number(finance.asaasFeeEstimated||0)!==0?`Inclui ${money(finance.asaasFeeEstimated)} em tarifas estimadas.`:"Tarifas registradas na conciliação.";
-    const rules=`<p>A comissão incide uma única vez sobre o valor liquidado após vouchers. Recebimento externo não gera novo repasse.</p><dl class="finance-line-list">${line("Liquidado",view.liquidated)}${line("Comissão provisória — ainda não descontada",finance.commissionProvisional||0)}${line("Comissão com saldo elegível para retenção",finance.commissionRetained||0)}${line("Comissão transferida",finance.commissionSettled||0)}${line("Comissão a quitar pelo parceiro",finance.commissionPending||0)}${line("Crédito da instituição ainda não disponível ou comprovado",finance.asaasAwaitingCredit||0)}</dl><p class="field-help">${esc(feeNote)} Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%.</p>`;
+    const rules=`<p>A comissão respeita a condição registrada em cada reserva e incide uma única vez sobre o valor liquidado após vouchers. No novo plano, grupos da carteira inicial têm 0% e novos grupos têm 5%. A mensalidade do estabelecimento é apresentada em Plano Tâmo On. Recebimento externo não gera novo repasse.</p><dl class="finance-line-list">${line("Liquidado",view.liquidated)}${line("Comissão provisória — ainda não descontada",finance.commissionProvisional||0)}${line("Comissão com saldo elegível para retenção",finance.commissionRetained||0)}${line("Comissão transferida",finance.commissionSettled||0)}${line("Comissão a quitar pelo parceiro",finance.commissionPending||0)}${line("Crédito da instituição ainda não disponível ou comprovado",finance.asaasAwaitingCredit||0)}</dl><p class="field-help">${esc(feeNote)} Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%.</p>`;
     return `${adminCommissionHighlight(view.commission)}<section class="finance-kpis" aria-label="Resumo financeiro">
       ${stat(money(view.contracted),"Valor contratado","obrigações vigentes")}
       ${stat(money(view.received),"Recebido bruto","antes de devoluções e descontos")}
@@ -10247,7 +10334,7 @@ global.TamoonMetrics=Object.freeze({mount});
         ${group("Responsável", backendMode ? [["Nome",p.responsibleName],["E-mail da conta",p.email],["E-mail secundário",p.secondaryEmail || "Não informado"],["Telefone",p.phone]] : [["Nome",p.responsibleName],["CPF",p.responsibleCpf],["Função",p.responsibleRole],["E-mail",p.email],["Telefone",p.phone],["WhatsApp",p.whatsapp]], "edit-responsible-data")}
         ${group("Endereço", [["Logradouro",p.address],["Bairro",p.neighborhood],["Cidade/UF",`${p.city}/${p.state}`],["CEP",p.zip]], "edit-address-data")}
         ${group("Contratos e regras", [["Contrato",p.contractStatus],["Termos",p.termsStatus],["LGPD",p.privacyStatus],...(backendMode ? [] : [["Cancelamento",p.cancellationPolicy]])], backendMode ? "" : "edit-contract-data")}
-        ${group(backendMode ? "Condições comerciais" : "Fiscal e financeiro", backendMode ? [["Comissão",`${p.commissionRate}%`]] : [["Documento ao usuário",p.fiscalIssuer],["NFS-e da comissão",p.commissionInvoice],["Pagamento",p.paymentModel],["Comissão",`${p.commissionRate}%`]], backendMode ? "" : "edit-fiscal-data")}
+        ${group(backendMode ? "Condições comerciais" : "Fiscal e financeiro", backendMode ? [["Plano por estabelecimento","Consulte Plano Tâmo On"],["Carteira inicial","Incluída na mensalidade"],["Novos grupos","5% após ativação do plano"]] : [["Documento ao usuário",p.fiscalIssuer],["NFS-e da comissão",p.commissionInvoice],["Pagamento",p.paymentModel],["Comissão",`${p.commissionRate}%`]], backendMode ? "" : "edit-fiscal-data")}
         ${group("Integrações de pagamento", backendMode ? [["Situação","Prevista para etapa específica"],["Dados locais","Não utilizados com o backend ativo"]] : [["Banco Pix",`${bankProvider.label} · ${bankProvider.mode === "api" ? "API" : "manual"}`],["Status API Pix",p.pixApiStatus],["Baixa automática",p.pixAutoReconciliation ? "Preparada" : "Desativada"],["Webhook Pix",p.pixWebhookStatus],["Cartão",p.asaasCardStatus],["Subconta Asaas",p.asaasSubaccount]], backendMode ? "" : "edit-payment-integrations")}
       </section>` : partnerRestrictedSection("Dados do cadastro")}
       <section class="details-grid">
@@ -10270,7 +10357,7 @@ global.TamoonMetrics=Object.freeze({mount});
       return navShell("partner",partial[state.activePage.partner] && partnerPageAllowed(state.activePage.partner) ? partial[state.activePage.partner]() : partnerRestrictedSection("Cadastro em validação"));
     }
     if (!access.allowed) return partnerRestrictedView(access);
-    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, metrics: metricsPage, registration: partnerRegistration };
+    const views = { overview: partnerOverview, agenda: partnerAgenda, reservations: partnerReservations, spaces: partnerSpaces, clients: partnerClients, team: partnerTeam, vouchers: partnerVouchers, finance: partnerFinance, metrics: metricsPage, commercial: commercialPage, registration: partnerRegistration };
     const page=state.activePage.partner;
     if(partnerAccessPending)return navShell("partner",partnerRestrictedSection("Atualizando permissões"));
     if(!partnerPageAllowed(page))return navShell("partner",partnerRestrictedSection((menus.partner.find(item=>item[0]===page)||[])[2]||"Esta área"));
@@ -10806,15 +10893,25 @@ global.TamoonMetrics=Object.freeze({mount});
     const settings = state.settings;
     const toggle = (key,title,help,locked=false) => `<div class="toggle-row"><div class="toggle-copy"><strong>${esc(title)}</strong><small>${esc(help)}</small></div><button class="switch ${settings[key] ? "on" : ""}" data-action="toggle-setting" data-key="${esc(key)}" aria-pressed="${settings[key]}" ${locked ? "disabled" : ""}></button></div>`;
     return `${pageHeader("Administração", "Configurações", "Controles do ambiente de homologação. Pagamentos reais permanecem bloqueados.", `<button class="button ghost" data-action="edit-commercial-settings">Editar regras comerciais</button>`)}
-      <section class="grid two"><article class="card"><h2>Operação</h2>${toggle("marketplaceEnabled","Área de parceiros","Exibe as áreas demonstrativas.")}${toggle("newPartners","Novos cadastros","Permite incluir parceiros fictícios.")}${toggle("vouchersEnabled","Vouchers","Exibe créditos de cancelamento e vouchers promocionais.")}${toggle("notificationEmails","Avisos por e-mail","Simulação de comunicações operacionais.")}</article><article class="card"><h2>Regras comerciais</h2><div class="detail-list" style="margin-top:14px"><div class="detail-line"><span>Comissão Tâmo On</span><strong>${esc(settings.defaultCommission)}%</strong></div><div class="detail-line"><span>Tarifa Pix Asaas</span><strong>${money(settings.asaasPixFixedFee)} por transação</strong></div><div class="detail-line"><span>Tarifa cartão Asaas</span><strong>${money(settings.asaasCardFixedFee)} + ${String(settings.asaasCardPercentageFee).replace(".",",")}%</strong></div><div class="detail-line"><span>Prazo do usuário</span><strong>${esc(settings.cancellationHours)} horas</strong></div><div class="detail-line"><span>Validade nominal</span><strong>${esc(settings.voucherValidityDays)} dias</strong></div><div class="detail-line"><span>Faixa compatível</span><strong>± ${esc(settings.voucherCompatibilityWindowHours)} horas</strong></div><div class="detail-line"><span>Mínimo de datas</span><strong>${esc(settings.voucherMinimumCompatibleDates)}</strong></div><div class="detail-line"><span>Prorrogação</span><strong>${esc(settings.voucherExtensionDays)} dias</strong></div><div class="detail-line"><span>Persistência</span><strong>LocalStorage do navegador</strong></div></div></article></section>
+      <section class="grid two"><article class="card"><h2>Operação</h2>${toggle("marketplaceEnabled","Área de parceiros","Exibe as áreas demonstrativas.")}${toggle("newPartners","Novos cadastros","Permite incluir parceiros fictícios.")}${toggle("vouchersEnabled","Vouchers","Exibe créditos de cancelamento e vouchers promocionais.")}${toggle("notificationEmails","Avisos por e-mail","Simulação de comunicações operacionais.")}</article><article class="card"><h2>Regras comerciais</h2><div class="detail-list" style="margin-top:14px"><div class="detail-line"><span>Taxa anterior ao plano</span><strong>${esc(settings.defaultCommission)}%</strong></div><div class="detail-line"><span>Tarifa Pix Asaas</span><strong>${money(settings.asaasPixFixedFee)} por transação</strong></div><div class="detail-line"><span>Tarifa cartão Asaas</span><strong>${money(settings.asaasCardFixedFee)} + ${String(settings.asaasCardPercentageFee).replace(".",",")}%</strong></div><div class="detail-line"><span>Prazo do usuário</span><strong>${esc(settings.cancellationHours)} horas</strong></div><div class="detail-line"><span>Validade nominal</span><strong>${esc(settings.voucherValidityDays)} dias</strong></div><div class="detail-line"><span>Faixa compatível</span><strong>± ${esc(settings.voucherCompatibilityWindowHours)} horas</strong></div><div class="detail-line"><span>Mínimo de datas</span><strong>${esc(settings.voucherMinimumCompatibleDates)}</strong></div><div class="detail-line"><span>Prorrogação</span><strong>${esc(settings.voucherExtensionDays)} dias</strong></div><div class="detail-line"><span>Persistência</span><strong>LocalStorage do navegador</strong></div></div></article></section>
       <section class="card section"><h2>Canais de recebimento</h2><p>Pix e cartão de crédito pelo Asaas, ou pagamento externo diretamente ao parceiro. O valor repassável é uma apuração financeira; transferências realizadas aparecem separadamente como repasse comprovado.</p></section>
       <section class="section"><button class="button danger" data-action="reset-local-data">Restaurar dados iniciais</button></section>`;
   }
 
 
+  let commercialConsole=null;
+  function commercialIdentity(){return metricsIdentity('commercial');}
+  function commercialPage(){return pageHeader(state.role==='admin'?'Administração':'Portal do parceiro',state.role==='admin'?'Planos e mensalidades':'Plano Tâmo On','Mensalidade por estabelecimento, carteira inicial e vencimentos.')
+    +(commercialIdentity()?'<div id="marketCommercial" data-ui-owned></div>':'<p class="callout">Entre com uma conta autorizada e conectada ao Marketplace para consultar os planos.</p>');}
+  function mountCommercial(){
+    const host=app.querySelector('#marketCommercial'),key=commercialIdentity();
+    if(commercialConsole&&(commercialConsole.root!==host||commercialConsole.key!==key)){commercialConsole.dispose();commercialConsole=null;}
+    if(host&&key&&!commercialConsole)commercialConsole=window.TamoonCommercialPlans.mount(host,{identity:commercialIdentity,
+      partnerId:state.role==='partner'?state.partnerProfile.backendPartnerId:null,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)});
+  }
   let metricsConsole=null;
-  function metricsIdentity(){
-    if(state.activePage?.[state.role]!=="metrics" || !backendRuntime.enabled || !backendIsOnline())return '';
+  function metricsIdentity(page='metrics'){
+    if(state.activePage?.[state.role]!==page || !backendRuntime.enabled || !backendIsOnline())return '';
     if(state.role==='admin')return adminRefundContext()?JSON.stringify([adminRefundContext(),'admin']):'';
     const id=backendRuntime.identityId;
     if(state.role!=='partner'||!id||!currentPartnerAccessStatus().allowed||!hasPartnerPermission('manage_finance')
@@ -10845,7 +10942,7 @@ global.TamoonMetrics=Object.freeze({mount});
     });
   }
   function adminView() {
-    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, metrics: metricsPage, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
+    const views = { operations: adminOperationsPage, overview: adminOverview, partners: adminPartners, reservations: adminReservations, users: adminUsers, finance: adminFinance, metrics: metricsPage, commercial: commercialPage, refunds: adminRefundPage, vouchers: adminVouchers, settings: adminSettings };
     return navShell("admin", (views[state.activePage.admin] || adminOverview)());
   }
 
@@ -10853,6 +10950,7 @@ global.TamoonMetrics=Object.freeze({mount});
     if(window.TamoonMarketplacePilot?.leaving)return;
     if(operationsConsole && operationsConsole.key!==adminRefundContext()){operationsConsole.dispose();operationsConsole=null;}
     if(metricsConsole&&metricsConsole.key!==metricsIdentity()){metricsConsole.dispose();metricsConsole=null;}
+    if(commercialConsole&&commercialConsole.key!==commercialIdentity()){commercialConsole.dispose();commercialConsole=null;}
     adminRefundStore.get();
     if(!adminRefundContext() && ['admin-refund-details','asaas-refund','admin-refunds'].includes(detailDialog.dataset.view)){
       stopAsaasRefundMonitor();detailReturnContext=null;if(detailDialog.open)detailDialog.close();
@@ -10910,6 +11008,7 @@ global.TamoonMetrics=Object.freeze({mount});
     }
     mountAdminOperations();
     mountMetrics();
+    mountCommercial();
     applyPartnerReadonlyControls();
     window.MarketplaceAgendaNavigation.showSelected(app);
     updateBackendRoleAccess();
@@ -11301,7 +11400,7 @@ global.TamoonMetrics=Object.freeze({mount});
     return `${onboarding ? partnerOnboardingPanel(onboarding,true) : ""}<div class="details-grid">${facilities}
       <div class="detail-group"><h3>Empresa</h3><div class="detail-list"><div class="detail-line"><span>Razão social</span><strong>${esc(partner.legalName)}</strong></div><div class="detail-line"><span>CNPJ</span><strong>${esc(partner.cnpj)}</strong></div><div class="detail-line"><span>Cidade</span><strong>${esc(partner.city)}</strong></div>${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Atividade declarada</span><strong>${esc(partner.activity)}</strong></div>`}${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Regime tributário</span><strong>${esc(partner.taxRegime)}</strong></div>`}</div></div>
       <div class="detail-group"><h3>Responsável</h3><div class="detail-list"><div class="detail-line"><span>Nome</span><strong>${esc(partner.responsible)}</strong></div><div class="detail-line"><span>E-mail da conta</span><strong>${esc(partner.email)}</strong></div><div class="detail-line"><span>E-mail secundário</span><strong>${esc(partner.secondaryEmail || "Não informado")}</strong></div><div class="detail-line"><span>Telefone</span><strong>${esc(partner.phone)}</strong></div><div class="detail-line"><span>Tipos de espaço</span><strong>${esc(partner.types)}</strong></div></div></div>
-      <div class="detail-group"><h3>Contrato e aceites</h3><div class="detail-list"><div class="detail-line"><span>Contrato</span><strong>${esc(partner.contract)}</strong></div><div class="detail-line"><span>Termos</span><strong>${esc(partner.terms || "Pendente")}</strong></div><div class="detail-line"><span>Privacidade</span><strong>${esc(partner.privacy || "Pendente")}</strong></div>${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Documento fiscal</span><strong>${esc(partner.fiscal)}</strong></div>`}<div class="detail-line"><span>Comissão</span><strong>${esc(partner.commission)}%</strong></div></div></div>
+      <div class="detail-group"><h3>Contrato e aceites</h3><div class="detail-list"><div class="detail-line"><span>Contrato</span><strong>${esc(partner.contract)}</strong></div><div class="detail-line"><span>Termos</span><strong>${esc(partner.terms || "Pendente")}</strong></div><div class="detail-line"><span>Privacidade</span><strong>${esc(partner.privacy || "Pendente")}</strong></div>${onboarding?.flow === "22x" ? "" : `<div class="detail-line"><span>Documento fiscal</span><strong>${esc(partner.fiscal)}</strong></div>`}<div class="detail-line"><span>Taxa anterior ao plano</span><strong>${esc(partner.commission)}%</strong></div></div></div>
       <div class="detail-group"><h3>Homologação</h3><div class="detail-list"><div class="detail-line"><span>Origem</span><strong>${esc(partner.source || "Administração")}</strong></div>${application ? `<div class="detail-line"><span>Solicitação</span><strong>${esc(application.id)} · ${esc(application.requestedAt || "")}</strong></div>` : ""}<div class="detail-line"><span>Dados bancários</span><strong>${esc(partner.banking)}</strong></div><div class="detail-line"><span>Status</span><strong>${esc(partner.status)}</strong></div><div class="detail-line"><span>Completude</span><strong>${esc(partner.score)}%</strong></div><div class="detail-line"><span>Vouchers ativos</span><strong>${esc(activeVoucherLiability(partner.venueId).count)} · ${money(activeVoucherLiability(partner.venueId).value)}</strong></div><div class="progress"><span style="width:${Math.min(100,partner.score)}%"></span></div></div></div>
       <div class="detail-group"><h3>Documentos do Portal</h3><div class="detail-list">${docs.map((doc) => `<div class="toggle-row partner-document-row"><div class="toggle-copy"><strong>${esc(doc.name)}</strong><small>${esc(doc.originalName || "Arquivo protegido")} · ${esc(doc.uploadedAt || "")}${doc.reviewNotes ? ` · parecer: ${esc(doc.reviewNotes)}` : ""}</small></div><span class="status ${statusClass(doc.status)}">${esc(doc.status)}</span>${doc.backendId ? `<div class="item-actions"><button type="button" class="button ghost small" data-action="open-partner-document" data-id="${esc(doc.id)}">Visualizar</button>${partnerOnboardingForPartner(partnerId)?.flow === "22x" && ["Contrato de parceria","Termos de uso","Política de privacidade","Dados bancários"].includes(doc.name) ? "" : `<button class="button secondary small" data-action="review-partner-document" data-id="${esc(doc.id)}" data-partner-id="${esc(partnerId)}">Revisar</button>`}</div>` : ""}</div>`).join("") || `<p class="dialog-description">Nenhum documento enviado ao staging.</p>`}</div></div>
       <div class="detail-group"><h3>Equipe e acessos</h3><div class="detail-list">${team.map((member)=>`<div class="toggle-row"><div class="toggle-copy"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${esc(member.email)}<br>${esc(member.permission)}</small></div><span class="status ${statusClass(member.status)}">${esc(member.status)}</span></div>`).join("") || `<p class="dialog-description">Nenhum membro vinculado ao parceiro.</p>`}</div></div>
@@ -12203,7 +12302,7 @@ global.TamoonMetrics=Object.freeze({mount});
         {name:"privacy",label:"Privacidade / LGPD",type:"select",value:item?.privacy||"Pendente",options:["Pendente","Aceita"]},
         {name:"fiscal",label:"Emissão fiscal",value:item?.fiscal||"A validar"},
         {name:"banking",label:"Dados bancários",value:item?.banking||"Pendente"},
-        {name:"commission",label:"Comissão (%)",type:"number",step:"0.1",value:item?.commission??state.settings.defaultCommission},
+        {name:"commission",label:"Taxa anterior ao plano (%)",type:"number",step:"0.1",value:item?.commission??state.settings.defaultCommission},
         {name:"score",label:"Completude (%)",type:"number",min:0,max:100,value:item?.score||30}
       ].filter((field)=>(!backendIsOnline()||!["cnpj","taxRegime","activity","score"].includes(field.name)) && !(item?.onboardingVersion > 0 && ["email","status","contract","terms","privacy","fiscal","banking"].includes(field.name))),onSubmit:async(data)=>{
         if(backendRuntime.enabled){
