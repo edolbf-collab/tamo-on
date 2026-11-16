@@ -21,7 +21,10 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  create table public.venue_spaces(id uuid primary key,venue_id uuid);
  create table public.marketplace_groups(id uuid primary key,name text,active boolean);
  create table public.monthly_customer_links(venue_id uuid,group_id uuid,status text,origin text default 'legacy');
- create table private.agenda_initial_entries(venue_id uuid,state text,approved_group_id uuid);
+ create table private.agenda_initial_entries(id uuid primary key,venue_id uuid,state text,approved_group_id uuid,label text default 'Turma importada',space_id uuid,weekday smallint default 1,start_time time default '19:00',end_time time default '20:00');
+ create function private.agenda_initial_lock() returns void language plpgsql as $$begin
+ lock table public.monthly_customer_links,public.reservations in share row exclusive mode;
+ lock table private.agenda_initial_entries in share row exclusive mode;end;$$;
  create table public.marketplace_settings(real_money_enabled boolean);
  create table public.reservations(id uuid primary key,venue_id uuid,partner_id uuid,venue_space_id uuid,group_id uuid,finance_commission_rate numeric);
  create table private.partner_readonly_context(profile_id uuid,partner_id uuid,session_id text);
@@ -35,10 +38,12 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  insert into public.venues values('${id(20)}','${id(10)}','Unidade Centro','Rua A','10','Curitiba','PR'),('${id(21)}','${id(10)}','Unidade Bairro','Rua B','20','Curitiba','PR'),('${id(22)}','${id(11)}','Arena Privada','Rua C','30','Curitiba','PR');
  insert into public.venue_spaces values('${id(30)}','${id(20)}'),('${id(31)}','${id(20)}'),('${id(32)}','${id(21)}');
  insert into public.marketplace_groups values('${id(40)}','Grupo inicial',true),('${id(41)}','Grupo novo',true);
+ insert into public.marketplace_groups values('${id(42)}','Aceite posterior',true),('${id(43)}','Importado liberado',true),('${id(44)}','Importado após fechamento',true);
  insert into public.monthly_customer_links values('${id(20)}','${id(40)}','active');insert into public.marketplace_settings values(false);
  insert into public.reservations values('${id(50)}','${id(20)}','${id(10)}','${id(30)}','${id(40)}',6);`);
  await db.exec(await readFile(migration,'utf8'));
  await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116115819_establishment_monthly_checkout.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116171152_freeze_pending_initial_imports.sql',import.meta.url),'utf8'));
  await db.exec(`create or replace function auth.jwt() returns jsonb language sql as $$select jsonb_build_object('session_id',auth.uid()::text)$$;insert into auth.sessions select id,id from auth.users;`);
  const dates=await rpc("select (date_trunc('month',now() at time zone 'America/Sao_Paulo')+interval '1 month')::date::text future,date_trunc('month',now() at time zone 'America/Sao_Paulo')::date::text current");
  const future=dates.future,year=Number(future.slice(0,4));
@@ -53,11 +58,25 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await db.exec('reset role');await db.query("update public.venues set street='Rua B',street_number='20' where id=$1",[id(21)]);await role(1);
  await save(21,[]);let d=(await read()).r;assert.equal(d.venues.find(v=>v.id===id(20)).spaces,2);assert.equal(d.venues.filter(v=>v.plan).length,2);assert.equal(d.venues.find(v=>v.id===id(20)).plan.monthly_value,300);
  const activate=v=>rpc('select public.establishment_plan_activate($1)',[id(v)]);
- await db.exec('reset role');await db.query("insert into private.agenda_initial_entries values($1,'protected',null)",[id(20)]);await role(1);await assert.rejects(activate(20),/PLAN_IMPORT_PENDING/);
- await db.exec('reset role');await db.query("update private.agenda_initial_entries set state='approved',approved_group_id=$1",[id(41)]);await role(1);await assert.rejects(activate(20),/PLAN_IMPORTED_GROUP_MISSING/);
- await db.exec('reset role');await db.query('update private.agenda_initial_entries set approved_group_id=$1',[id(40)]);await role(1);
+ await db.exec('reset role');await db.exec(`insert into private.agenda_initial_entries(id,venue_id,state,approved_group_id,space_id) values
+ ('${id(80)}','${id(20)}','protected',null,'${id(30)}'),('${id(81)}','${id(20)}','protected',null,'${id(30)}'),
+ ('${id(82)}','${id(20)}','approved','${id(41)}','${id(30)}'),('${id(83)}','${id(20)}','released',null,'${id(30)}');`);
+ await role(1);await assert.rejects(activate(20),/PLAN_IMPORTED_GROUP_MISSING/);
+ await db.exec('reset role');await db.query('update private.agenda_initial_entries set approved_group_id=$1 where id=$2',[id(40),id(82)]);await role(1);
+ const draft=(await read()).r;assert.equal(draft.venues.find(v=>v.id===id(20)).initial_imports.length,3);
  await activate(20);await activate(20);await activate(21);await assert.rejects(save(),/PLAN_FROZEN/);
  d=(await read()).r;assert.equal(d.venues.find(v=>v.id===id(20)).invoices.length,1);assert.equal(d.venues.find(v=>v.id===id(20)).invoices[0].due_on,future);
+ assert.equal(d.venues.find(v=>v.id===id(20)).initial_imports.filter(i=>i.state==='protected').length,2,'Pending associations do not block closure');
+ assert.equal(d.venues.find(v=>v.id===id(21)).initial_imports.length,0,'Imports remain scoped to their establishment');
+ await db.exec('reset role');assert.equal((await rpc('select count(*)::int n from private.establishment_initial_imports')).n,3);
+ assert.equal((await rpc("select has_table_privilege('authenticated','private.establishment_initial_imports','INSERT') allowed")).allowed,false);
+ assert.equal((await rpc("select has_table_privilege('anon','private.establishment_initial_imports','SELECT') allowed")).allowed,false);
+ await assert.rejects(db.query('delete from private.agenda_initial_entries where id=$1',[id(80)]),/PLAN_INITIAL_IMPORT_IMMUTABLE/);
+ await assert.rejects(db.query('update private.agenda_initial_entries set venue_id=$1 where id=$2',[id(21),id(80)]),/PLAN_INITIAL_IMPORT_IMMUTABLE/);
+ await db.query("update private.agenda_initial_entries set label='Nome atualizado' where id=$1",[id(80)]);
+ assert.equal((await rpc('select label from private.establishment_initial_imports where entry_id=$1',[id(80)])).label,'Turma importada');
+ await db.query("insert into private.agenda_initial_entries(id,venue_id,state,space_id) values($1,$2,'protected',$3)",[id(84),id(20),id(30)]);
+ await role(1);await activate(20);assert.equal((await read()).r.venues.find(v=>v.id===id(20)).initial_imports.length,3,'Reclosing cannot capture later imports');
  if(process.env.COMMERCIAL_FIXTURE)await writeFile(process.env.COMMERCIAL_FIXTURE,JSON.stringify(d));
  // Finance/checkout scope and simulated payments use independent invoice records.
  const finance=async(partner=null)=>(await rpc('select public.establishment_finance_read($1) r',[partner?id(partner):null])).r;
@@ -96,6 +115,24 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await assert.rejects(reserve(60),/PLAN_FIRST_PAYMENT_REQUIRED/);
  await role(1);await rpc('select public.establishment_plan_simulate($1)',[id(20)]);await rpc('select public.establishment_plan_simulate($1)',[id(21)]);
  await db.exec('reset role');assert.equal((await reserve(60)).rows[0].r,'0');assert.equal((await reserve(61,41)).rows[0].r,'5.00');assert.equal((await reserve(62,40,20,31)).rows[0].r,'0');assert.equal((await reserve(63,40,21,32)).rows[0].r,'5.00');assert.equal((await reserve(64,null)).rows[0].r,'5.00');
+ // Acceptance transfers the frozen import identity before native reservations are inserted.
+ await db.query("update private.agenda_initial_entries set state='approved',approved_group_id=$1 where id=$2",[id(42),id(80)]);
+ assert.equal((await reserve(68,42)).rows[0].r,'5.00','Approval alone does not replace responsible acceptance');
+ await db.exec('begin');await db.query("update private.agenda_initial_entries set state='linked' where id=$1",[id(80)]);
+ await assert.rejects(reserve(69,42,21,30),/PLAN_VENUE_MISMATCH/);await db.exec('rollback');
+ assert.equal((await rpc('select bound_group_id from private.establishment_initial_imports where entry_id=$1',[id(80)])).bound_group_id,null,'Failed acceptance rolls back eligibility');
+ await db.exec('begin');await db.query("update private.agenda_initial_entries set state='linked' where id=$1",[id(80)]);
+ assert.equal((await reserve(69,42)).rows[0].r,'0','First reservation after acceptance uses original portfolio');await db.exec('commit');
+ await db.query("update private.agenda_initial_entries set state='linked' where id=$1",[id(80)]);
+ assert.equal((await rpc("select count(*)::int n from private.establishment_plan_audit where action='initial_import_linked'")).n,1,'Repeat acceptance is idempotent');
+ assert.equal((await rpc('select finance_commission_rate r from public.reservations where id=$1',[id(68)])).r,'5.00','Earlier contracts retain their captured rate');
+ assert.equal((await reserve(70,42,21,32)).rows[0].r,'5.00','No exemption in another establishment');
+ await assert.rejects(db.query('update private.agenda_initial_entries set approved_group_id=$1 where id=$2',[id(41),id(80)]),/PLAN_INITIAL_IMPORT_IMMUTABLE/);
+ await db.query("update private.agenda_initial_entries set state='linked',approved_group_id=$1 where id=$2",[id(44),id(84)]);
+ assert.equal((await reserve(71,44)).rows[0].r,'5.00','Import after closing is not initial portfolio');
+ await db.query("update private.agenda_initial_entries set state='released' where id=$1",[id(81)]);
+ await assert.rejects(db.query("update private.agenda_initial_entries set state='linked',approved_group_id=$1 where id=$2",[id(43),id(81)]),/PLAN_INITIAL_IMPORT_IMMUTABLE/);
+ assert.equal((await reserve(72,43)).rows[0].r,'5.00','Released pending import cannot grant exemption to a later group');
  await db.exec(`delete from public.monthly_customer_links;insert into public.monthly_customer_links values('${id(20)}','${id(40)}','active');`);
  assert.equal((await reserve(65)).rows[0].r,'0','Recreated link retains original group identity');
  assert.equal((await rpc('select finance_commission_rate r from public.reservations where id=$1',[id(50)])).r,'6','Historical reservation unchanged');
@@ -125,6 +162,6 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await db.exec('reset role');assert.equal((await rpc("select count(*)::int n from private.establishment_invoices where environment='sandbox'")).n,2);assert.equal((await rpc("select count(*)::int n from private.establishment_invoices where environment='production'")).n,2);assert.equal((await reserve(67)).rows[0].r,'0');
  await db.exec('reset role');await db.exec(`insert into private.partner_readonly_context values('${id(1)}','${id(10)}','${id(1)}')`);await role(1);assert.equal((await read()).r.admin,false);assert.equal((await finance()).readonly,true);await assert.rejects(context(first),/PLAN_READ_ONLY/);assert.equal((await read()).r.venues.length,2);await assert.rejects(activate(20),/PLAN_READ_ONLY/);await assert.rejects(read(11),/PLAN_ACCESS_DENIED/);
  await db.exec('reset role');await db.exec(`delete from private.partner_readonly_context;update public.profiles set status='blocked' where id='${id(1)}'`);await role(1);await assert.rejects(read(),/PLAN_ACCESS_DENIED/);
- await db.exec('reset role');assert.equal((await rpc('select count(*)::int n from private.establishment_initial_groups')).n,1);
+ await db.exec('reset role');assert.equal((await rpc('select count(*)::int n from private.establishment_initial_groups')).n,2);
  }finally{await db.close();}
 });
