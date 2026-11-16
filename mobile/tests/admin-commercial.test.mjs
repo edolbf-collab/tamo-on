@@ -46,6 +46,7 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116171152_freeze_pending_initial_imports.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116173521_partner_only_monthly_simulation.sql',import.meta.url),'utf8'));
  await db.exec(`create or replace function auth.jwt() returns jsonb language sql as $$select jsonb_build_object('session_id',auth.uid()::text)$$;insert into auth.sessions select id,id from auth.users;`);
+ await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116181014_monthly_pix_sandbox_issuance.sql',import.meta.url),'utf8'));
  const dates=await rpc("select (date_trunc('month',now() at time zone 'America/Sao_Paulo')+interval '1 month')::date::text future,date_trunc('month',now() at time zone 'America/Sao_Paulo')::date::text current");
  const future=dates.future,year=Number(future.slice(0,4));
  const save=(venue=20,groups=[id(40)],start=future)=>rpc('select public.establishment_plan_save($1,$2,$3,$4,$5) r',[id(venue),start,groups,[],year]);
@@ -109,6 +110,14 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  if(process.env.MONTHLY_FIXTURE)await writeFile(process.env.MONTHLY_FIXTURE,JSON.stringify(await finance()));
 
  await db.exec('reset role');
+ // Early Sandbox initial issuance is allowed; a future recurring month is not.
+ await db.exec('begin');await role(0,'service_role');
+ assert.ok((await rpc("select public.establishment_invoice_issue_claim($1,'sandbox') r",[first])).r);
+ assert.equal((await rpc("select public.establishment_invoice_issue_claim($1,'sandbox') r",[first])).r,null);
+ await db.exec('rollback');await db.exec('reset role');await db.exec('begin');
+ await db.query("update private.establishment_invoices set competence=($1::date+interval '1 month')::date where id=$2",[future,second]);
+ await role(0,'service_role');await assert.rejects(rpc("select public.establishment_invoice_issue_claim($1,'sandbox')",[second]),/PLAN_ISSUANCE_NOT_AVAILABLE/);
+ await db.exec('rollback');await db.exec('reset role');
  assert.equal((await rpc("select private.plan_due_date('2026-12-01','2027-01-01','{}')::text d")).d,'2027-01-11');
  assert.equal((await rpc("select private.plan_due_date('2027-01-01','2027-02-01',array['2027-02-08'::date,'2027-02-09'::date])::text d")).d,'2027-02-10');
  assert.equal((await rpc("select private.plan_due_date('2027-05-01','2027-05-01','{}')::text d")).d,'2027-05-01','First payment stays on day 01, even Saturday');

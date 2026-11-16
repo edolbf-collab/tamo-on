@@ -43,7 +43,7 @@ export async function monthlyCheckout(body,{userRpc,adminRpc,request,env,now=Dat
  if(body.action==='status'&&!c.provider_id)return {...base,mode:'status',status:c.status};
  if(c.status==='planned'){
   const item=await adminRpc('establishment_invoice_issue_claim',{p_id:c.id,p_environment:'sandbox'});
-  if(item){try{const payment=await issueInvoice(item,main);await adminRpc('establishment_billing_result',{p_id:c.id,p_environment:'sandbox',p_payment:payment});}
+  if(item){try{const payment=await issueInvoice(item,main,env);await adminRpc('establishment_billing_result',{p_id:c.id,p_environment:'sandbox',p_payment:payment});}
    catch{await adminRpc('establishment_billing_result',{p_id:c.id,p_environment:'sandbox',p_payment:null,p_error:'CHECKOUT_ISSUANCE_REVIEW'});throw Error('PLAN_ISSUANCE_REVIEW');}}
   c=await userRpc('establishment_payment_context',{p_invoice_id:c.id});
  }

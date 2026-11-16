@@ -1,26 +1,51 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.110.7';
-import {runBilling} from './core.mjs';
-// Deployment is deliberately disabled until the issuer and the calendar are validated.
+import {runBilling,issueInvoice} from './core.mjs';
+import {monthlyEnvironment,sameSecret} from './config.mjs';
+import {validateMonthlyQr} from '../establishment-checkout/core.mjs';
 Deno.serve(async(req)=>{
- const secret=Deno.env.get('ESTABLISHMENT_BILLING_JOB_SECRET');
- if(req.method!=='POST'||!secret||req.headers.get('x-billing-job-secret')!==secret)return new Response('Unauthorized',{status:401});
- if(Deno.env.get('ESTABLISHMENT_BILLING_ENABLED')!=='true')return Response.json({enabled:false});
- const environment=Deno.env.get('ESTABLISHMENT_BILLING_ENVIRONMENT');
- if(!['sandbox','production'].includes(environment||''))return Response.json({error:'BILLING_ENVIRONMENT'},{status:503});
- const key=Deno.env.get('ESTABLISHMENT_BILLING_MAIN_API_KEY');
- const wallet=Deno.env.get('ESTABLISHMENT_BILLING_MAIN_WALLET_ID');
- if(!key||!wallet)return Response.json({error:'MAIN_ISSUER_NOT_CONFIGURED'},{status:503});
- const base=environment==='production'?'https://api.asaas.com/v3':'https://api-sandbox.asaas.com/v3';
- const client=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false}});
+ if(req.method!=='POST')return Response.json({error:'METHOD_NOT_ALLOWED'},{status:405});
+ const dedicated=Deno.env.get('ESTABLISHMENT_BILLING_JOB_SECRET');
+ const token=req.headers.get(dedicated?'x-billing-job-secret':'x-marketplace-cron-secret')||'';
+ if(!sameSecret(token,dedicated||Deno.env.get('MARKETPLACE_MONTHLY_CRON_SECRET')||''))return Response.json({error:'INVALID_CRON_SECRET'},{status:401});
  try{
-  const check=await fetch(base+'/wallets',{headers:{access_token:key,'User-Agent':'TamoOn-EstablishmentBilling'},redirect:'error',signal:AbortSignal.timeout(15000)});
-  if(!check.ok||!(await check.json()).data?.some((w:{id:string})=>w.id===wallet))return Response.json({error:'MAIN_ISSUER_MISMATCH'},{status:503});
-  const result=await runBilling({environment,rpc:async(name:string,args:unknown)=>{
-   const {data,error}=await client.rpc(name,args);if(error)throw Error('BILLING_DATABASE_ERROR');return data;
-  },request:async(method:string,path:string,body:unknown)=>{
-   const res=await fetch(base+path,{method,redirect:'error',headers:{access_token:key,'Content-Type':'application/json','User-Agent':'TamoOn-EstablishmentBilling'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(15000)});
-   if(!res.ok)throw Error('ASAAS_REQUEST_FAILED');return res.json();
-  }});
-  return Response.json(result);
- }catch{return Response.json({error:'BILLING_RUN_FAILED'},{status:502});}
+  const env=monthlyEnvironment((name:string)=>Deno.env.get(name));
+  if(env('ESTABLISHMENT_CHECKOUT_ENABLED')!=='true')return Response.json({error:'PLAN_CHECKOUT_NOT_CONFIGURED'},{status:503});
+  if(env('ESTABLISHMENT_BILLING_ENVIRONMENT')!=='sandbox')throw Error('PLAN_CHECKOUT_SANDBOX_ONLY');
+  const key=env('ESTABLISHMENT_BILLING_MAIN_API_KEY'),wallet=env('ESTABLISHMENT_BILLING_MAIN_WALLET_ID');
+  if(!key||!wallet)throw Error('PLAN_CHECKOUT_NOT_CONFIGURED');
+  const request=async(method:string,path:string,body?:unknown)=>{
+   const r=await fetch('https://api-sandbox.asaas.com/v3'+path,{method,redirect:'error',signal:AbortSignal.timeout(15000),
+    headers:{access_token:key,'Content-Type':'application/json','User-Agent':'TamoOn-Monthly-Sandbox'},body:body?JSON.stringify(body):undefined});
+   if(!r.ok)throw Error(r.status===401||r.status===403?'PLAN_PROVIDER_AUTH':'PLAN_PROVIDER_UNAVAILABLE');return r.json();
+  };
+  const wallets=await request('GET','/wallets');
+  if(!wallets.data?.some((w:{id:string})=>w.id===wallet))throw Error('PLAN_ISSUER_MISMATCH');
+  const body=await req.json();
+  if(body.action==='inspect'){
+   const keys=await request('GET','/pix/addressKeys?limit=100');
+   let partner=null;
+   if(body.partnerId){
+    const rows=JSON.parse(env('ASAAS_SANDBOX_ACCOUNTS')||'[]').filter((r:{partnerId:string,active:boolean})=>r.partnerId===body.partnerId&&r.active!==false);
+    if(rows.length!==1)throw Error('PLAN_PAYER_MISMATCH');
+    const account=await request('GET','/accounts/'+encodeURIComponent(rows[0].accountId));
+    if(account.id!==rows[0].accountId||account.walletId!==rows[0].walletId)throw Error('PLAN_PAYER_MISMATCH');
+    partner={linked:true,name:account.companyName||account.name,cpfCnpjPresent:!!account.cpfCnpj,documentDigits:String(account.cpfCnpj||'').replace(/\D/g,'').length};
+   }
+   return Response.json({ok:true,environment:'sandbox',mainWallet:wallet,pixKeys:keys.data?.length||0,partner,activePixKeys:keys.data?.filter((k:{status:string})=>k.status==='ACTIVE').length||0});
+  }
+  const client=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false}});
+  const rpc=async(name:string,args:Record<string,unknown>)=>{const {data,error}=await client.rpc(name,args);if(error)throw Error(error.message);return data;};
+  if(body.action==='issue'){
+   const item=await rpc('establishment_invoice_issue_claim',{p_id:body.invoiceId,p_environment:'sandbox'});
+   if(!item)return Response.json({claimed:false});
+   try{
+    const p=await issueInvoice(item,request,env);await rpc('establishment_billing_result',{p_id:item.id,p_environment:'sandbox',p_payment:p});
+    const qr=validateMonthlyQr(await request('GET','/payments/'+encodeURIComponent(p.id)+'/pixQrCode'));
+    return Response.json({issued:true,paymentId:p.id,status:p.status,qrReady:true,payloadLength:qr.payload.length,imageLength:qr.encodedImage.length});
+   }catch(error){await rpc('establishment_billing_result',{p_id:item.id,p_environment:'sandbox',p_payment:null,p_error:'PROVIDER_RESULT_REQUIRES_REVIEW'});throw error;}
+  }
+  if(body.action&&body.action!=='run')throw Error('PLAN_INVALID_REQUEST');
+  if(env('ESTABLISHMENT_BILLING_ENABLED')!=='true')return Response.json({enabled:false});
+  return Response.json(await runBilling({environment:'sandbox',rpc,request,env}));
+ }catch(error){const code=error instanceof Error&&/^[A-Z_]+$/.test(error.message)?error.message:'PLAN_PROVIDER_UNAVAILABLE';return Response.json({error:code},{status:502});}
 });
