@@ -44,6 +44,7 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await db.exec(await readFile(migration,'utf8'));
  await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116115819_establishment_monthly_checkout.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116171152_freeze_pending_initial_imports.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116173521_partner_only_monthly_simulation.sql',import.meta.url),'utf8'));
  await db.exec(`create or replace function auth.jwt() returns jsonb language sql as $$select jsonb_build_object('session_id',auth.uid()::text)$$;insert into auth.sessions select id,id from auth.users;`);
  const dates=await rpc("select (date_trunc('month',now() at time zone 'America/Sao_Paulo')+interval '1 month')::date::text future,date_trunc('month',now() at time zone 'America/Sao_Paulo')::date::text current");
  const future=dates.future,year=Number(future.slice(0,4));
@@ -83,6 +84,9 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  const first=d.venues.find(v=>v.id===id(20)).invoices[0].id;
  const second=d.venues.find(v=>v.id===id(21)).invoices[0].id;
  assert.equal((await finance()).invoices.length,2);
+ await assert.rejects(rpc('select public.establishment_plan_simulate($1)',[id(20)]),/PLAN_PARTNER_CONFIRMATION_REQUIRED/);
+ await assert.rejects(rpc("select public.establishment_invoice_simulate($1,'pix')",[first]),/PLAN_PARTNER_CONFIRMATION_REQUIRED/);
+ assert.equal((await finance()).invoices.find(i=>i.id===first).status,'planned','Admin cannot consume the partner checkout');
  await role(3);await assert.rejects(rpc('select public.establishment_payment_context($1)',[first]),/PLAN_ACCESS_DENIED/);
  await role(2);assert.equal((await finance(10)).invoices.length,2);
  const context=async invoice=>(await rpc('select public.establishment_payment_context($1) r',[invoice])).r;
@@ -113,7 +117,7 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await db.query('update private.establishment_invoices set competence=$1,due_on=$1',[dates.current]);
  const reserve=async(n,g=40,v=20,s=30)=>db.query('insert into public.reservations(id,venue_id,partner_id,venue_space_id,group_id,finance_commission_rate) values($1,$2,$3,$4,$5,99) returning finance_commission_rate r',[id(n),id(v),id(10),id(s),g?id(g):null]);
  await assert.rejects(reserve(60),/PLAN_FIRST_PAYMENT_REQUIRED/);
- await role(1);await rpc('select public.establishment_plan_simulate($1)',[id(20)]);await rpc('select public.establishment_plan_simulate($1)',[id(21)]);
+ await role(2);await rpc("select public.establishment_invoice_simulate($1,'pix')",[first]);await rpc("select public.establishment_invoice_simulate($1,'balance')",[second]);
  await db.exec('reset role');assert.equal((await reserve(60)).rows[0].r,'0');assert.equal((await reserve(61,41)).rows[0].r,'5.00');assert.equal((await reserve(62,40,20,31)).rows[0].r,'0');assert.equal((await reserve(63,40,21,32)).rows[0].r,'5.00');assert.equal((await reserve(64,null)).rows[0].r,'5.00');
  // Acceptance transfers the frozen import identity before native reservations are inserted.
  await db.query("update private.agenda_initial_entries set state='approved',approved_group_id=$1 where id=$2",[id(42),id(80)]);
@@ -139,7 +143,7 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await assert.rejects(db.query('update public.reservations set finance_commission_rate=6 where id=$1',[id(60)]),/IMMUTABLE/);
  await assert.rejects(db.query('update public.reservations set group_id=$1 where id=$2',[id(41),id(60)]),/IMMUTABLE/);
  await assert.rejects(db.query('update public.reservations set venue_space_id=$1 where id=$2',[id(32),id(60)]),/PLAN_VENUE_MISMATCH/);
- await db.exec('update public.marketplace_settings set real_money_enabled=true');await assert.rejects(reserve(66),/PLAN_FIRST_PAYMENT_REQUIRED/);await role(1);await assert.rejects(rpc('select public.establishment_plan_simulate($1)',[id(20)]),/PLAN_SIMULATION_DISABLED/);
+ await db.exec('update public.marketplace_settings set real_money_enabled=true');await assert.rejects(reserve(66),/PLAN_FIRST_PAYMENT_REQUIRED/);await role(2);await assert.rejects(rpc("select public.establishment_invoice_simulate($1,'pix')",[first]),/PLAN_ENVIRONMENT_MISMATCH/);
  await db.exec('reset role');await db.exec('update public.marketplace_settings set real_money_enabled=false');
  // A third bill exercises claim concurrency/idempotence and provider verification.
  await role(0,'service_role');await assert.rejects(rpc('select public.establishment_invoice_issue_claim($1,$2)',[second,null]),/SANDBOX_ONLY/);await db.exec('reset role');
