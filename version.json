@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Fechamento da carteira com pré-vínculos pendentes, primeira mensalidade liberada e comissão inicial preservada no aceite posterior. Dinheiro real desativado.",
+  "notes": "Pagamento da mensalidade pelo parceiro; Administração acompanha as cobranças sem baixa manual. Dinheiro real desativado.",
   "label": "Tâmo On 1.0 Build 174",
-  "integration": "174-R4"
+  "integration": "174-R5"
 }

@@ -82,3 +82,13 @@ O fechamento usa a mesma ordem de bloqueios do fluxo de importação/aceite ante
 Validação ampliada: fechamento com pendências, primeira cobrança única, aceite posterior a 0%, isolamento por estabelecimento, importação posterior a 5%, cancelamento de pré-vínculo, repetição, rollback do aceite e preservação do histórico. A interface exibe retorno de sucesso e leva as mensagens de erro para a área visível.
 
 Migration aplicada em 16/11/2026 no Marketplace Staging como `20261116171950`. A validação remota executou o fechamento da Arena de homologação dentro de transação revertida: plano pronto, uma mensalidade e o pré-vínculo ainda protegido/sem grupo. Após rollback, confirmado plano em preparação, zero novas cobranças/fotografias e dinheiro real desativado. O fechamento definitivo permanece disponível na interface para o teste do usuário. RLS ativo, sem acesso direto do navegador; nenhum novo aviso de segurança além do informativo esperado de tabela privada sem políticas de acesso direto.
+
+## Pagamento iniciado pelo parceiro — web 174-R5
+
+A Administração prepara o plano, fecha a carteira e acompanha a cobrança. O botão administrativo de simular a primeira quitação foi removido e a RPC antiga recusa a operação, inclusive para clientes que mantiverem a versão anterior aberta. No Financeiro, somente a conta do parceiro com permissão financeira acessa o pagamento/simulação; administradores e o modo de visualização não oferecem essa ação. A RPC de simulação também rejeita administradores antes de qualquer baixa ou retorno idempotente. A conciliação de recebimentos do provedor permanece disponível à Administração.
+
+A mensalidade de homologação baixada pelo atalho antigo foi reaberta após conferir a simulação identificada, sem emissão, cliente Asaas ou tentativa de débito. A correção preserva o ID/competência da obrigação, o fechamento da carteira, os pré-vínculos e a auditoria anterior; acrescenta um registro do desfazimento. Não existe reabertura automática de outras mensalidades.
+
+A confirmação simulada permanece disponível ao parceiro no ambiente de teste e exige confirmação explícita. Isso não ativa a emissão Asaas: QR Code, Copia e Cola e débito na subconta continuam condicionados à configuração e homologação das contas Sandbox.
+
+Migration aplicada no Marketplace Staging em 16/11/2026 como `20261116173823`. A obrigação identificada voltou a `planned`, com carteira `ready` e o pré-vínculo preservado. A auditoria contém tanto `first_payment_simulated` quanto `admin_simulation_reopened`. Nenhuma flag financeira foi ativada. Os 160 testes e build/check locais passaram.
