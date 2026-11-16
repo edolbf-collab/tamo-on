@@ -21,7 +21,7 @@ try{
  await page.locator('[name=freeze]').check();await page.evaluate(()=>window.fail=true);await page.getByRole('button',{name:'Fechar carteira inicial'}).click();
  await page.waitForFunction(()=>document.querySelector('[role=status]').textContent.includes('Não foi possível'));
  assert.equal(await page.getByRole('button',{name:'Fechar carteira inicial'}).count(),1,'Failure keeps closing action available');
- assert.equal(await page.getByRole('status').evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}),true,'Action feedback is brought into view');
+ await page.waitForFunction(()=>{const r=document.querySelector('[role=status]').getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;});
  await page.evaluate(()=>window.fail=false);await page.getByRole('button',{name:'Fechar carteira inicial'}).click();
  await page.getByRole('heading',{name:'Importados preservados na carteira inicial'}).waitFor();
  await page.waitForFunction(()=>document.querySelector('[role=status]').textContent.includes('Carteira inicial fechada'));
