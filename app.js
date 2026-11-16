@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const APP_RELEASE = Object.freeze({ channel: "beta", version: "1.0", build: 174, database: 152, edge: 117, integration: "174-R2" });
+  const APP_RELEASE = Object.freeze({ channel: "beta", version: "1.0", build: 174, database: 152, edge: 117, integration: "174-R3" });
   const APP_ASSET_TOKEN = "release174";
   const NOTIFICATION_VISIBLE_DAYS = 90;
   const ANNOUNCEMENT_VISIBLE_MONTHS = 12;

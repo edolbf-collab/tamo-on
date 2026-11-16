@@ -25,6 +25,17 @@ export async function runBilling({rpc,request,environment}) {
  for(let n=0;n<20;n++){
   const item=await rpc('establishment_billing_claim',{p_environment:environment});if(!item)break;
   try{
+   const payment=await issueInvoice(item,request);
+   await rpc('establishment_billing_result',{p_id:item.id,p_environment:environment,p_payment:payment});issued++;
+  }catch(error){
+   // Do not persist provider response bodies or credentials.
+   await rpc('establishment_billing_result',{p_id:item.id,p_environment:environment,p_payment:null,p_error:errorCode(error)});review++;
+  }
+ }
+ return {issued,reconciled,review};
+}
+
+export async function issueInvoice(item,request){
    let payment=uniqueResult(await request('GET','/payments?externalReference='+encodeURIComponent(item.reference)+'&limit=2'),'DUPLICATE_REFERENCE');
    if(!payment){
     const tax=String(item.cpfCnpj||'').replace(/\D/g,'');
@@ -39,11 +50,5 @@ export async function runBilling({rpc,request,environment}) {
      description:('Mensalidade Tâmo On — '+item.venue+' — '+item.competence.slice(0,7)).slice(0,500),externalReference:item.reference,
      interest:{value:0},fine:{value:0}});
    }
-   await rpc('establishment_billing_result',{p_id:item.id,p_environment:environment,p_payment:payment});issued++;
-  }catch(error){
-   // Do not persist provider response bodies or credentials.
-   await rpc('establishment_billing_result',{p_id:item.id,p_environment:environment,p_payment:null,p_error:errorCode(error)});review++;
-  }
- }
- return {issued,reconciled,review};
+ return payment;
 }

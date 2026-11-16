@@ -36,7 +36,7 @@ test('both financial pages put the metrics before exports and filters in documen
  const c={state:{filters:{},adminPartners:[]},esc:escape,backendIsOnline:()=>true,
   financeScreenIdentity:()=> 'owner',financialPeriodPanel:summary=>summary?'METRICS':'DETAILS',financePeriodToolbar:()=>'<div>PERIOD</div>'};
  vm.createContext(c);
- for(const [start,end] of [['  function pageHeader(', '  function stat('],['  function partnerFinance(', '  function partnerUploadDocumentTypes('],['  function adminFinance(', '  function adminSettings(']])vm.runInContext(between(start,end),c);
+ for(const [start,end] of [['  function monthlyFinanceSelected(', '  function monthlyFinancePage('],['  function pageHeader(', '  function stat('],['  function partnerFinance(', '  function partnerUploadDocumentTypes('],['  function adminFinance(', '  function adminSettings(']])vm.runInContext(between(start,end),c);
  for(const render of [c.partnerFinance,c.adminFinance]){
   const html=render();assert.ok(html.indexOf('Financeiro')<html.indexOf('METRICS'));
   assert.ok(html.indexOf('METRICS')<html.indexOf('Exportar posição atual'));

@@ -50,3 +50,21 @@ A migration `establishment_commercial_plans` foi aplicada no Marketplace Staging
 Foram aprovados 151 testes locais, a verificação Deno e os seis workflows de validação da PR #24, incluindo o navegador nas quatro larguras previstas. Os vencimentos remotos conferidos foram 01/12/2026 para o início, 11/01/2027 para a recorrência de janeiro e 10/02/2027 ao excluir os dias 08 e 09 do calendário de fevereiro.
 
 Esta versão publica a interface web de testes e o banco necessário à simulação. `real_money_enabled` permanece falso. O emissor Asaas está preparado no repositório, mas sua implantação, credenciais e agendamento ficam para a homologação da conta principal; nenhuma cobrança real foi emitida. A publicação nas lojas permanece uma etapa posterior.
+
+## Financeiro e checkout da mensalidade — web 174-R3
+
+Financeiro → **Mensalidades Tâmo On** apresenta totais e histórico por competência, estabelecimento, situação e ambiente. Vencidas são parte do total em aberto; pagamentos cancelados/devolvidos não integram o total pago. Datas de pagamento são exibidas em Brasília. Histórico de simulação não se mistura com produção nem com comissões/GMV das reservas. O menu dos planos oferece acesso direto a esta área. A visualização como parceiro permite somente leitura.
+
+O botão **Pagar mensalidade** consulta `establishment-checkout`. Por padrão, sem habilitação do emissor, oferece apenas simulação explícita para obrigações Sandbox ainda não emitidas. Não apresenta QR Code ou payload fictícios. A simulação exige confirmação, registra método e data no histórico e não movimenta saldo. Registros com emissão/tentativa real no Sandbox não podem receber baixa simulada.
+
+O checkout suporta a emissão individual na conta principal, consulta do QR Code dinâmico/Copia e Cola da mesma cobrança e conciliação por consulta autenticada ao Asaas. Só emite no mês da competência, com plano e calendário revisados. Enquanto a janela está aberta, consulta a cada 20 segundos; **Atualizar mensalidades** reconcilia cobranças já emitidas do estabelecimento/mês selecionados. O recebimento confirmado na conta principal é a evidência para a baixa. A resposta ao pedido de débito na subconta não quita a mensalidade. O emissor agendado existente deve ser homologado/ativado para conciliação contínua sem navegador aberto.
+
+A integração desta etapa é restrita por código ao Sandbox, além das flags e da configuração do banco. Nenhuma credencial, flag financeira ou cron é alterado por esta entrega. Para homologar com o provedor, configurar no servidor:
+
+- `ESTABLISHMENT_CHECKOUT_ENABLED=true`, `ESTABLISHMENT_BILLING_ENVIRONMENT=sandbox`, `ESTABLISHMENT_BILLING_MAIN_API_KEY` e `ESTABLISHMENT_BILLING_MAIN_WALLET_ID` da conta principal Sandbox.
+- Para débito comandado pelo parceiro: `ESTABLISHMENT_BALANCE_ENABLED=true` e `ESTABLISHMENT_BILLING_SANDBOX_ACCOUNTS`, uma lista privada de `{partnerId, accountId, walletId, apiKey, active}`. Validam-se vínculo da subconta, carteiras de origem/destino e saldo disponível; nenhuma chave é retornada ao cliente.
+- Configurar as autorizações de saída exigidas pelo Asaas antes do teste de débito, conforme https://docs.asaas.com/docs/mecanismo-para-validacao-de-saque-via-webhooks. A integração acompanha operações pendentes; não desativa nem aprova automaticamente esses controles.
+
+O saldo exige confirmação explícita por responsável financeiro do parceiro; administrador e modo de visualização não podem comandar o débito. Uma tentativa persistida por mensalidade impede reenvios concorrentes/cegos. Timeout ou falha depois do envio fica em conferência e requer conciliação; não existe repetição automática. Sessão revogada, perfil bloqueado, parceiro sem permissão, ambiente diferente e IDs de terceiros são rejeitados no servidor. O identificador e o valor da cobrança vêm do banco; o navegador não define destinatário, QR Code ou valor do débito.
+
+Antes do lançamento: homologar as duas contas Sandbox, QR dinâmico, pagamento externo, débito com saldo, saldo insuficiente, autorização de saída, recebimento, devolução e resultado incerto; então revisar a ativação de produção separadamente. Os testes automatizados usam SQL real/PGlite e respostas controladas do provedor; não comprovam habilitação da conta Asaas.
