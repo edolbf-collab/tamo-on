@@ -26,7 +26,7 @@ test('navigation retains the exact destinations and current page for each role',
 });
 test('restricted partner destinations cannot be navigated from the shared menu',()=>{
  const c=fixture(),html=c.navigationItems('partner');
- assert.equal((html.match(/disabled aria-disabled="true"/g)||[]).length,10);
+ assert.equal((html.match(/disabled aria-disabled="true"/g)||[]).length,11);
  assert.deepEqual([...html.matchAll(/data-nav="([^"]+)"/g)].map(x=>x[1]),['registration']);
  assert.doesNotMatch(html,/data-nav="(?:finance|metrics)"/);
  c.partnerAccessPending=true;

@@ -122,6 +122,7 @@
       ["team", "♙", "Equipe"],
       ["vouchers", "%", "Vouchers"],
       ["finance", "$", "Financeiro"],
+      ["refunds", "↩", "Devoluções"],
       ["metrics", "▥", "Métricas"],
       ["commercial", "$", "Plano Tâmo On"],
       ["registration", "≡", "Cadastro"]
@@ -5402,6 +5403,10 @@
 
   async function nav(role, page) {
     if(!await waitForInitialDetails())return;
+    if(role==="partner" && page==="refunds"){
+      if(state.role===role && backendIsOnline() && partnerPageAllowed(page))await openCancellationCases();
+      return;
+    }
     state.activePage[role] = page;
     saveState();
     render();
@@ -5436,7 +5441,7 @@
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
-    if(backendIsOnline() && state.activePage?.[state.role]!=="metrics" && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
+    if(backendIsOnline() && state.role!=="partner" && state.activePage?.[state.role]!=="metrics" && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 

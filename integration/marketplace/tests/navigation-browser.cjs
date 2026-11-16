@@ -68,7 +68,7 @@ const financial='<header class="page-header"><div><span class="eyebrow">Administ
   console.log('existing preference handlers and handover to Help dialog: PASS');
   for(const [role,heading,destinations] of [
    ['user','Usuário',['discover','reservations','shares','favorites','promotions','profile']],
-   ['partner','Parceiro',['overview','agenda','reservations','spaces','clients','vouchers','finance','metrics','commercial','registration']],
+   ['partner','Parceiro',['overview','agenda','reservations','spaces','clients','vouchers','finance','refunds','metrics','commercial','registration']],
    ['admin','Administração',['operations','overview','partners','reservations','users','finance','metrics','commercial','refunds','vouchers','settings']]
   ]){
    await page.evaluate(({heading,markup})=>window.drawer.update({heading,markup}),{heading,markup:c.navigationItems(role)});
@@ -112,7 +112,7 @@ const financial='<header class="page-header"><div><span class="eyebrow">Administ
      const extra=destination==='shares'?'<button data-nav="reservations">Ver minhas reservas</button>':'';
      const html=c.navShell(role,c.pageHeader('',destination,'',extra));
      await page.locator('#app').evaluate((app,markup)=>{app.innerHTML=markup;},html);
-     const visible=(role!=='user'||destination==='reservations')&&!(role==='admin'&&destination==='refunds');
+     const visible=role!=='partner'&&(role!=='user'||destination==='reservations')&&!(role==='admin'&&destination==='refunds');
      assert.equal(await page.locator('#app [data-action="cancellation-cases"]').isVisible(),visible,role+'/'+destination);
      assert.equal(await page.locator('#app .page-actions').isVisible(),visible||Boolean(extra));
      if(extra)assert.ok(await page.getByRole('button',{name:'Ver minhas reservas'}).isVisible());

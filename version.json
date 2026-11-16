@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Webhook das mensalidades corrigido e atualização automática do Financeiro nas contas da Administração e do parceiro.",
+  "notes": "Cancelamentos e restituições centralizados no menu Devoluções do parceiro, sem repetir o botão no cabeçalho das telas.",
   "label": "Tâmo On 1.0 Build 174",
-  "integration": "174-R7"
+  "integration": "174-R8"
 }
