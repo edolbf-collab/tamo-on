@@ -1,3 +1,4 @@
+import {processWebhookEvent} from '../_shared/webhook-processing.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2.110.7';
 import {runBilling,issueInvoice} from './core.mjs';
 import {monthlyEnvironment,sameSecret} from './config.mjs';
@@ -35,6 +36,17 @@ Deno.serve(async(req)=>{
   }
   const client=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false}});
   const rpc=async(name:string,args:Record<string,unknown>)=>{const {data,error}=await client.rpc(name,args);if(error)throw Error(error.message);return data;};
+  if(body.action==='webhook-health'){
+   const hooks=await request('GET','/webhooks?limit=100');
+   return Response.json({webhooks:(hooks.data||[]).filter((h:{url:string})=>h.url===Deno.env.get('SUPABASE_URL')+'/functions/v1/asaas-webhook').map((h:{id:string,name:string,enabled:boolean,interrupted:boolean})=>({id:h.id,name:h.name,enabled:h.enabled,interrupted:h.interrupted}))});
+  }
+  if(body.action==='retry-monthly-event'){
+   if(!/^[0-9a-f-]{36}$/.test(body.eventId||''))throw Error('PLAN_INVALID_REQUEST');
+   const {data:event,error}=await client.from('webhook_events').select('*').eq('id',body.eventId).eq('provider','asaas').single();
+   if(error||!event||!String(event.payload?.payment?.externalReference||'').startsWith('tamoon-plan:'))throw Error('PLAN_INVALID_REQUEST');
+   if(['processed','ignored'].includes(event.status))return Response.json({status:event.status,duplicate:true});
+   const result=await processWebhookEvent(client,event);return Response.json(result,{status:result.status==='failed'?503:200});
+  }
   if(body.action==='issue'){
    const item=await rpc('establishment_invoice_issue_claim',{p_id:body.invoiceId,p_environment:'sandbox'});
    if(!item)return Response.json({claimed:false});

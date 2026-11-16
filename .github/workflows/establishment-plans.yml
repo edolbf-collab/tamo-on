@@ -29,7 +29,8 @@ jobs:
         working-directory: mobile
       - run: node mobile/tests/admin-commercial-browser.mjs
       - run: node mobile/tests/admin-monthly-browser.mjs
-      - run: npx --yes deno@2.9.6 check --no-lock --node-modules-dir=manual ../integration/marketplace/asaas/functions/establishment-billing/index.ts ../integration/marketplace/asaas/functions/establishment-checkout/index.ts
+      - run: node mobile/tests/admin-monthly-live-browser.mjs
+      - run: npx --yes deno@2.9.6 check --no-lock --node-modules-dir=manual ../integration/marketplace/asaas/functions/establishment-billing/index.ts ../integration/marketplace/asaas/functions/establishment-checkout/index.ts ../integration/marketplace/asaas/functions/asaas-webhook/index.ts ../integration/marketplace/asaas/functions/webhook-processor/index.ts
         working-directory: mobile
       - uses: actions/upload-artifact@v4
         if: always()

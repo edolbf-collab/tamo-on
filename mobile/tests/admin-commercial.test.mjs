@@ -47,6 +47,7 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116173521_partner_only_monthly_simulation.sql',import.meta.url),'utf8'));
  await db.exec(`create or replace function auth.jwt() returns jsonb language sql as $$select jsonb_build_object('session_id',auth.uid()::text)$$;insert into auth.sessions select id,id from auth.users;`);
  await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116181014_monthly_pix_sandbox_issuance.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116190716_monthly_webhook_routing.sql',import.meta.url),'utf8'));
  const dates=await rpc("select (date_trunc('month',now() at time zone 'America/Sao_Paulo')+interval '1 month')::date::text future,date_trunc('month',now() at time zone 'America/Sao_Paulo')::date::text current");
  const future=dates.future,year=Number(future.slice(0,4));
  const save=(venue=20,groups=[id(40)],start=future)=>rpc('select public.establishment_plan_save($1,$2,$3,$4,$5) r',[id(venue),start,groups,[],year]);
@@ -160,7 +161,14 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await role(0,'service_role');const bill=(await rpc("select public.establishment_invoice_issue_claim($1,'sandbox') r",[second])).r;assert.ok(bill);assert.equal((await rpc("select public.establishment_invoice_issue_claim($1,'sandbox') r",[second])).r,null);assert.equal((await rpc("select public.establishment_billing_claim('sandbox') r")).r,null);
  const payment={id:'pay_test',customer:'cus_test',externalReference:bill.reference,dueDate:bill.due_on,value:300,status:'PENDING',invoiceUrl:'https://sandbox.asaas.com/i/test'};
  const result=p=>rpc('select public.establishment_billing_result($1,$2,$3)',[bill.id,'sandbox',p]);
+ const webhookPayment={...payment,billingType:'PIX'};
+ const webhookContext=async p=>rpc('select public.establishment_webhook_context($1) r',[p]);
+ assert.equal((await webhookContext(webhookPayment)).r.id,bill.id,'In-flight initial issuance routes by exact reference');
+ assert.equal((await webhookContext({id:'pay_reservation',externalReference:'reservation'})).r,null);
+ for(const mismatch of [{externalReference:'tamoon-plan:invalid'},{externalReference:'tamoon-plan:'+id(999)},{value:299},{dueDate:'2000-01-01'},{billingType:'BOLETO'}])await assert.rejects(webhookContext({...webhookPayment,...mismatch}),/PLAN_/);
+ await role(2);await assert.rejects(webhookContext(webhookPayment),/permission denied/);await role(0,'service_role');
  await assert.rejects(result({...payment,value:299}),/PLAN_PAYMENT_MISMATCH/);await assert.rejects(result({...payment,invoiceUrl:'javascript:alert(1)'}),/PLAN_INVALID_PAYMENT_URL/);await result(payment);await result({...payment,status:'RECEIVED'});await result({...payment,status:'RECEIVED'});
+ await assert.rejects(webhookContext({...webhookPayment,id:'pay_other'}),/PLAN_PAYMENT_MISMATCH/);await assert.rejects(webhookContext({...webhookPayment,customer:'cus_other'}),/PLAN_PAYMENT_MISMATCH/);
  await role(1);d=(await read()).r;assert.equal(d.venues.find(v=>v.id===id(21)).invoices.length,1);assert.equal(d.venues.find(v=>v.id===id(21)).invoices[0].status,'paid');
  // A failed provider read retains the last verified status and records the issue.
  await role(0,'service_role');await rpc('select public.establishment_billing_result($1,$2,null,$3)',[bill.id,'sandbox','ASAAS_REQUEST_FAILED']);
