@@ -1936,7 +1936,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
 /* Regras de apresentacao. A autorizacao efetiva e conferida novamente pelo servidor. */
 (function(root){
   'use strict';
-  const pages={overview:[],agenda:['manage_schedule'],reservations:['manage_schedule'],spaces:['manage_spaces'],clients:['manage_schedule'],team:['manage_team'],vouchers:['manage_finance'],finance:['manage_finance'],metrics:['manage_finance'],commercial:['manage_finance'],registration:['manage_profile','manage_documents']};
+  const pages={overview:[],agenda:['manage_schedule'],reservations:['manage_schedule'],spaces:['manage_spaces'],clients:['manage_schedule'],team:['manage_team'],vouchers:['manage_finance'],finance:['manage_finance'],refunds:['manage_schedule','manage_finance'],metrics:['manage_finance'],commercial:['manage_finance'],registration:['manage_profile','manage_documents']};
   const actions={
     manage_spaces:['new-space','edit-space','toggle-space'],
     manage_team:['new-team-member','edit-team-member','toggle-team-member'],
@@ -2787,18 +2787,18 @@ const unpaid=i=>!['paid','cancelled','refunded'].includes(i.status);
 const overdue=(i,today)=>unpaid(i)&&i.due_on<today;
 function summarize(invoices,today){const sum=rows=>rows.reduce((n,i)=>n+Math.round(Number(i.amount)*100),0)/100;return {paid:sum(invoices.filter(i=>i.status==='paid')),open:sum(invoices.filter(unpaid)),overdue:sum(invoices.filter(i=>overdue(i,today)))};}
 function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
- const key=identity();let disposed=false,data=null,epoch=0,request=0,busy=false,timer=null,invoice=null,payment=null,opener=null;
+ const key=identity();let disposed=false,data=null,epoch=0,request=0,busy=false,timer=null,invoice=null,payment=null,opener=null,financeTimer=null,liveBusy=false,loading=false;
  let filters={venue:'',month:'',status:'all',environment:''};
  const valid=()=>!disposed&&root.isConnected&&identity()===key;
  const message=e=>errors[e?.message]||'Não foi possível concluir a consulta. Atualize e tente novamente.';
  const status=t=>{if(valid())root.querySelector('[data-monthly-status]').textContent=t;};
  function close(){clearTimeout(timer);request++;invoice=null;payment=null;busy=false;const dialog=root.querySelector('dialog');dialog?.close();opener?.focus();}
- function render(){
-  close();
+ function render(live=false){
+  if(!live)close();
   const venues=data.venues||[],all=data.invoices||[];
   const rows=all.filter(i=>i.environment===filters.environment&&(!filters.venue||i.venue_id===filters.venue)&&(!filters.month||i.competence.slice(0,7)===filters.month));
   const totals=summarize(rows,data.today),visible=rows.filter(i=>filters.status==='all'||(filters.status==='open'?unpaid(i):filters.status==='overdue'?overdue(i,data.today):i.status===filters.status));
-  root.innerHTML=`<section class="commercial-plans monthly-finance"><div class="section-heading"><div><h2>Mensalidades Tâmo On</h2><p>Histórico por estabelecimento. Valores separados das reservas e comissões.</p></div><button class="button ghost" data-monthly="plans">Consultar planos</button></div>
+  const markup=`<section class="commercial-plans monthly-finance"><div class="section-heading"><div><h2>Mensalidades Tâmo On</h2><p>Histórico por estabelecimento. Valores separados das reservas e comissões.</p></div><button class="button ghost" data-monthly="plans">Consultar planos</button></div>
    ${data.test_mode?'<p class="callout">Ambiente de testes. Simulações e pagamentos no Asaas Sandbox não movimentam dinheiro real.</p>':''}${data.admin?'<p class="callout">A Administração acompanha as mensalidades. O pagamento deve ser iniciado pelo responsável financeiro na conta do parceiro.</p>':''}${data.readonly?'<p class="callout">Visualização como parceiro · somente consulta.</p>':''}
    <div class="plan-toolbar"><label class="field"><span>Estabelecimento</span><select name="monthly-venue"><option value="">Todos os estabelecimentos</option>${venues.map(v=>`<option value="${esc(v.id)}" ${filters.venue===v.id?'selected':''}>${esc(v.partner)} · ${esc(v.name)}</option>`).join('')}</select></label><label class="field"><span>Mês de referência</span><input type="month" name="monthly-month" value="${esc(filters.month)}"></label><label class="field"><span>Situação</span><select name="monthly-status">${[['all','Todas'],['open','Em aberto (inclui vencidas)'],['overdue','Vencidas'],['paid','Pagas'],['cancelled','Canceladas'],['refunded','Devolvidas']].map(([v,t])=>`<option value="${v}" ${filters.status===v?'selected':''}>${t}</option>`).join('')}</select></label><label class="field"><span>Ambiente</span><select name="monthly-environment"><option value="sandbox" ${filters.environment==='sandbox'?'selected':''}>Testes e simulações</option><option value="production" ${filters.environment==='production'?'selected':''}>Pagamentos reais</option></select></label></div>
    <div class="item-actions"><button class="button ghost" data-monthly="all-months">Todos os meses</button><button class="button ghost" data-monthly="refresh">Atualizar mensalidades</button></div>
@@ -2806,13 +2806,46 @@ function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
    <div class="plan-summary" aria-label="Totais das mensalidades"><div class="stat"><span>Pagas</span><strong>${money(totals.paid)}</strong></div><div class="stat"><span>Em aberto</span><strong>${money(totals.open)}</strong></div><div class="stat"><span>Vencidas</span><strong>${money(totals.overdue)}</strong></div></div><p class="field-help">Totais do estabelecimento, mês e ambiente selecionados. Vencidas estão incluídas em “Em aberto”. A situação filtra apenas a lista.</p>
    <div class="card monthly-invoices">${visible.map(i=>`<article class="plan-invoice"><div><h3>${esc(i.venue)}</h3><small>${esc(i.partner)}</small><strong>${month(i.competence)} · ${money(i.amount)}</strong><small>Vencimento: ${date(i.due_on)} · ${esc(labels[i.status]||i.status)}${overdue(i,data.today)&&i.status!=='overdue'?' · Vencida':''}</small><small>${i.simulated?'Simulação':i.environment==='sandbox'?'Teste Asaas':'Pagamento real'}${i.payment_method?' · '+(i.payment_method==='balance'?'Saldo Asaas':'Pix'):''}</small>${i.paid_at?`<small>Pagamento registrado: ${paidDate(i.paid_at)} (Brasília)</small>`:''}${i.attempt_state?'<small>Solicitação de pagamento registrada.</small>':''}</div>${!data.readonly&&!data.admin&&unpaid(i)&&i.environment===(data.test_mode?'sandbox':'production')?`<button class="button primary" data-monthly="pay" data-invoice="${esc(i.id)}">${i.attempt_state?'Consultar pagamento':'Pagar mensalidade'}</button>`:''}</article>`).join('')||'<p>Nenhuma mensalidade neste filtro. A primeira será registrada quando a Administração fechar a carteira inicial do estabelecimento.</p>'}</div>
    <dialog class="monthly-payment-dialog" aria-labelledby="monthlyPaymentTitle"><div data-monthly-dialog></div></dialog></section>`;
+  if(live){
+   const template=document.createElement('template');template.innerHTML=markup;
+   for(const selector of ['.plan-summary','.monthly-invoices'])root.querySelector(selector)?.replaceWith(template.content.querySelector(selector));
+   return;
+  }
+  root.innerHTML=markup;
   root.querySelector('dialog').addEventListener('cancel',event=>{event.preventDefault();close();});
  }
- async function load(sync=false){const e=++epoch;close();if(!valid())return;root.innerHTML='<p data-monthly-status role="status">Carregando mensalidades…</p>';try{let result=await rpc('establishment_finance_read',{p_partner_id:partnerId});if(!valid()||e!==epoch)return;if(!Array.isArray(result?.invoices)||!Array.isArray(result?.venues))throw Error('Invalid response');let syncFailed=false;
+ async function load(sync=false){loading=true;const e=++epoch;close();if(!valid())return;root.innerHTML='<p data-monthly-status role="status">Carregando mensalidades…</p>';try{let result=await rpc('establishment_finance_read',{p_partner_id:partnerId});if(!valid()||e!==epoch)return;if(!Array.isArray(result?.invoices)||!Array.isArray(result?.venues))throw Error('Invalid response');let syncFailed=false;
  if(sync&&!result.readonly){const pending=result.invoices.filter(i=>i.provider_issued&&!i.simulated&&i.environment===(result.test_mode?'sandbox':'production')&&(!filters.venue||i.venue_id===filters.venue)&&(!filters.month||i.competence.slice(0,7)===filters.month));
   for(let offset=0;offset<pending.length;offset+=4){if(!valid()||e!==epoch)return;const checked=await Promise.allSettled(pending.slice(offset,offset+4).map(i=>invoke('establishment-checkout',{invoiceId:i.id,action:'status'})));if(checked.some(r=>r.status==='rejected'||r.value?.mode==='unavailable'))syncFailed=true;}
   if(pending.length)result=await rpc('establishment_finance_read',{p_partner_id:partnerId});}
- if(!valid()||e!==epoch)return;data=result;if(!filters.environment)filters.environment=data.test_mode?'sandbox':'production';render();if(syncFailed)status('Histórico carregado. Algumas confirmações do Asaas estão indisponíveis; os últimos registros foram preservados.');}catch(e){if(valid()){root.innerHTML='<p data-monthly-status role="alert"></p><button class="button ghost" data-monthly="refresh">Tentar novamente</button>';status(message(e));}}}
+ if(!valid()||e!==epoch)return;data=result;if(!filters.environment)filters.environment=data.test_mode?'sandbox':'production';render();if(syncFailed)status('Histórico carregado. Algumas confirmações do Asaas estão indisponíveis; os últimos registros foram preservados.');}catch(e){if(valid()){root.innerHTML='<p data-monthly-status role="alert"></p><button class="button ghost" data-monthly="refresh">Tentar novamente</button>';status(message(e));}}finally{if(e===epoch)loading=false;}}
+ function scheduleLive(){clearTimeout(financeTimer);if(valid())financeTimer=setTimeout(liveRefresh,10000);}
+ const editing=()=>root.contains(document.activeElement)&&document.activeElement.matches('input,select,textarea');
+ async function liveRefresh(){
+  if(!valid()){dispose();return;}if(liveBusy)return;const e=epoch;
+  try{
+   // Preserve an open checkout, editing focus and active filters; pause hidden tabs.
+   if(document.hidden||loading||invoice)return;
+   liveBusy=true;
+   const result=await rpc('establishment_finance_read',{p_partner_id:partnerId});
+   if(!valid()||e!==epoch||invoice||loading||document.hidden)return;
+   if(!Array.isArray(result?.invoices)||!Array.isArray(result?.venues))throw Error('Invalid response');
+   if(JSON.stringify(result)!==JSON.stringify(data)){
+    const scope=d=>JSON.stringify([d?.venues,d?.admin,d?.readonly,d?.test_mode]);
+    const preserve=scope(result)===scope(data);
+    if(!preserve&&editing())return;
+    const focus=document.activeElement?.dataset?.monthly;
+    data=result;if(!filters.environment)filters.environment=data.test_mode?'sandbox':'production';render(preserve);
+    if(focus&&!root.contains(document.activeElement))root.querySelector('[data-monthly="'+focus+'"]')?.focus();
+    status('Mensalidades atualizadas automaticamente.');
+   }
+  }catch(error){
+   if(valid()&&e===epoch&&['PLAN_ACCESS_DENIED','PLAN_SESSION_REQUIRED'].includes(error?.message)){
+    close();data=null;root.innerHTML='<p data-monthly-status role="alert"></p><button class="button ghost" data-monthly="refresh">Tentar novamente</button>';status(message(error));
+   }
+  }finally{liveBusy=false;scheduleLive();}
+ }
+ const onResume=()=>{if(!document.hidden)liveRefresh();};
  function dialogContent(){if(!valid()||!invoice)return;const p=payment,host=root.querySelector('[data-monthly-dialog]');
   host.innerHTML=`<h2 id="monthlyPaymentTitle">Pagar mensalidade</h2><p><strong>${esc(invoice.venue)} · ${month(invoice.competence)}</strong></p><p>${money(invoice.amount)} · vencimento ${date(invoice.due_on)}</p><p class="field-help">Recebedor: conta principal do Tâmo On no Asaas.</p><div role="status" data-payment-status>${busy?'Consultando pagamento…':''}</div><div class="monthly-payment-content">${p?.mode==='simulation'?`<p class="callout">Simulação de teste. Nenhuma cobrança Pix foi emitida e nenhum saldo será debitado. O QR Code e o Copia e Cola serão fornecidos pelo Asaas após a configuração da conta emissora.</p><label class="field"><span>Forma de pagamento a simular</span><select name="monthly-sim-method"><option value="pix">Pix</option><option value="balance">Saldo Asaas</option></select></label><button class="button secondary" data-monthly="simulate-confirm">Simular pagamento desta mensalidade</button>`:
    p?.mode==='pix'?`<p class="callout">Pix de homologação · use apenas no Asaas Sandbox, sem dinheiro real.</p><img class="monthly-qr" alt="QR Code Pix da mensalidade" src="data:image/png;base64,${esc(p.pix.encodedImage)}"><label class="field"><span>Pix Copia e Cola</span><textarea readonly rows="3" data-monthly-payload>${esc(p.pix.payload)}</textarea></label><button class="button primary" data-monthly="copy">Copiar código Pix</button><p class="field-help">Validade do código: ${esc(p.pix.expirationDate)}. O vencimento da mensalidade permanece ${date(invoice.due_on)}.</p><hr><button class="button secondary" data-monthly="balance-confirm" ${p.balanceAvailable?'':'disabled'}>Pagar com saldo Asaas</button><p class="field-help">${p.availableBalance==null?'Pagamento com saldo aguardando habilitação e homologação da subconta.':'Saldo disponível: '+money(p.availableBalance)+(p.balanceAvailable?'':'. Saldo insuficiente para esta mensalidade.')}</p>`:
@@ -2832,9 +2865,9 @@ function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
   if(action==='simulate'&&!busy&&invoice&&!data.readonly&&!data.admin){busy=true;button.disabled=true;const id=invoice.id,n=++request;try{await rpc('establishment_invoice_simulate',{p_invoice_id:id,p_method:button.dataset.method});if(valid()&&n===request){await load();status('Pagamento simulado registrado no histórico. Nenhum dinheiro real foi movimentado.');}}catch(error){if(valid()&&n===request){root.querySelector('[data-payment-status]').textContent=message(error);button.disabled=false;}}finally{if(n===request)busy=false;}}
  }
  function change(e){const name=e.target.name;if(!name?.startsWith('monthly-')||name==='monthly-sim-method')return;const field=name.slice(8);if(Object.hasOwn(filters,field)){filters[field]=e.target.value;render();}}
- function dispose(){if(disposed)return;close();disposed=true;epoch++;observer.disconnect();root.removeEventListener('click',click);root.removeEventListener('change',change);root.replaceChildren();}
+ function dispose(){if(disposed)return;close();disposed=true;epoch++;clearTimeout(financeTimer);document.removeEventListener('visibilitychange',onResume);global.removeEventListener('focus',onResume);observer.disconnect();root.removeEventListener('click',click);root.removeEventListener('change',change);root.replaceChildren();}
  const observer=new MutationObserver(()=>{if(!valid())dispose();});observer.observe(document.body,{childList:true,subtree:true});
- root.addEventListener('click',click);root.addEventListener('change',change);load();return {root,key,dispose};
+ root.addEventListener('click',click);root.addEventListener('change',change);document.addEventListener('visibilitychange',onResume);global.addEventListener('focus',onResume);load();scheduleLive();return {root,key,dispose};
 }
 global.TamoonMonthlyFinance={mount,summarize};
 })(window);
@@ -2966,6 +2999,7 @@ global.TamoonMonthlyFinance={mount,summarize};
       ["team", "♙", "Equipe"],
       ["vouchers", "%", "Vouchers"],
       ["finance", "$", "Financeiro"],
+      ["refunds", "↩", "Devoluções"],
       ["metrics", "▥", "Métricas"],
       ["commercial", "$", "Plano Tâmo On"],
       ["registration", "≡", "Cadastro"]
@@ -8246,6 +8280,10 @@ global.TamoonMonthlyFinance={mount,summarize};
 
   async function nav(role, page) {
     if(!await waitForInitialDetails())return;
+    if(role==="partner" && page==="refunds"){
+      if(state.role===role && backendIsOnline() && partnerPageAllowed(page))await openCancellationCases();
+      return;
+    }
     state.activePage[role] = page;
     saveState();
     render();
@@ -8280,7 +8318,7 @@ global.TamoonMonthlyFinance={mount,summarize};
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
-    if(backendIsOnline() && state.activePage?.[state.role]!=="metrics" && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
+    if(backendIsOnline() && state.role!=="partner" && state.activePage?.[state.role]!=="metrics" && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
