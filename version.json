@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Mensalidades com QR Code e Pix Copia e Cola Asaas Sandbox; indicadores financeiros com contorno no padrão do app.",
+  "notes": "Webhook das mensalidades corrigido e atualização automática do Financeiro nas contas da Administração e do parceiro.",
   "label": "Tâmo On 1.0 Build 174",
-  "integration": "174-R6"
+  "integration": "174-R7"
 }
