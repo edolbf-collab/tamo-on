@@ -1,3 +1,4 @@
+import {monthlyPartner} from './config.mjs';
 // Main-account receivables. Never use a subaccount key, split, or wallet debit.
 function uniqueResult(response, duplicateCode) {
  if(!Array.isArray(response?.data))throw Error('PROVIDER_INVALID_LIST');
@@ -6,7 +7,7 @@ function uniqueResult(response, duplicateCode) {
  return response.data[0];
 }
 const errorCode=error=>/^[A-Z_]+$/.test(error?.message||'')?error.message:'PROVIDER_RESULT_REQUIRES_REVIEW';
-export async function runBilling({rpc,request,environment}) {
+export async function runBilling({rpc,request,environment,env=()=>undefined}) {
  if(!['sandbox','production'].includes(environment))throw Error('BILLING_ENVIRONMENT');
  const list=await rpc('establishment_billing_pending',{p_environment:environment});
  let reconciled=0,issued=0,review=0;
@@ -25,7 +26,7 @@ export async function runBilling({rpc,request,environment}) {
  for(let n=0;n<20;n++){
   const item=await rpc('establishment_billing_claim',{p_environment:environment});if(!item)break;
   try{
-   const payment=await issueInvoice(item,request);
+   const payment=await issueInvoice(item,request,env);
    await rpc('establishment_billing_result',{p_id:item.id,p_environment:environment,p_payment:payment});issued++;
   }catch(error){
    // Do not persist provider response bodies or credentials.
@@ -35,14 +36,17 @@ export async function runBilling({rpc,request,environment}) {
  return {issued,reconciled,review};
 }
 
-export async function issueInvoice(item,request){
+export async function issueInvoice(item,request,env=()=>undefined){
    let payment=uniqueResult(await request('GET','/payments?externalReference='+encodeURIComponent(item.reference)+'&limit=2'),'DUPLICATE_REFERENCE');
    if(!payment){
+    item=await monthlyPartner(item,request,env);
     const tax=String(item.cpfCnpj||'').replace(/\D/g,'');
     if(![11,14].includes(tax.length)||!item.name)throw Error('PARTNER_BILLING_DATA_REQUIRED');
-    const existingCustomer=uniqueResult(await request('GET','/customers?cpfCnpj='+encodeURIComponent(tax)+'&limit=2'),'CUSTOMER_REVIEW_REQUIRED');
+    const customerReference='tamoon-partner:'+item.partner_id;
+    const existingCustomer=uniqueResult(await request('GET','/customers?externalReference='+encodeURIComponent(customerReference)+'&limit=2'),'CUSTOMER_REVIEW_REQUIRED');
+    if(existingCustomer&&(existingCustomer.externalReference!==customerReference||String(existingCustomer.cpfCnpj||'').replace(/\D/g,'')!==tax||existingCustomer.notificationDisabled!==true))throw Error('CUSTOMER_REVIEW_REQUIRED');
     const customer=existingCustomer||await request('POST','/customers',{
-     name:item.name,cpfCnpj:tax,email:item.email||undefined,externalReference:'tamoon-partner:'+item.partner_id,
+     name:item.name,cpfCnpj:tax,email:item.email||undefined,externalReference:customerReference,
      notificationDisabled:true
     });
     if(!customer.id)throw Error('CUSTOMER_ID_MISSING');

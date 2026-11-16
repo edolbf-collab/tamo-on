@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Pagamento da mensalidade pelo parceiro; Administração acompanha as cobranças sem baixa manual. Dinheiro real desativado.",
+  "notes": "Mensalidades com QR Code e Pix Copia e Cola Asaas Sandbox; indicadores financeiros com contorno no padrão do app.",
   "label": "Tâmo On 1.0 Build 174",
-  "integration": "174-R5"
+  "integration": "174-R6"
 }

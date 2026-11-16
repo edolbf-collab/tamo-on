@@ -1,5 +1,6 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.110.7';
 import {monthlyCheckout} from './core.mjs';
+import {monthlyEnvironment} from '../establishment-billing/config.mjs';
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'POST, OPTIONS'};
 const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:cors});
 Deno.serve(async(req:Request)=>{
@@ -12,7 +13,7 @@ Deno.serve(async(req:Request)=>{
   const admin=createClient(url,secret,{auth:{persistSession:false}});
   const rpc=(client:typeof user)=>async(name:string,args:Record<string,unknown>)=>{const {data,error}=await client.rpc(name,args);if(error)throw Error(error.message);return data;};
   const body=await req.json();
-  return reply(await monthlyCheckout(body,{userRpc:rpc(user),adminRpc:rpc(admin),env:(name:string)=>Deno.env.get(name),
+  return reply(await monthlyCheckout(body,{userRpc:rpc(user),adminRpc:rpc(admin),env:monthlyEnvironment((name:string)=>Deno.env.get(name)),
    request:async(key:string,method:string,path:string,body:unknown)=>{
     const response=await fetch('https://api-sandbox.asaas.com/v3'+path,{method,redirect:'error',signal:AbortSignal.timeout(15000),headers:{access_token:key,'Content-Type':'application/json','User-Agent':'TamoOn-Monthly-Sandbox'},body:body?JSON.stringify(body):undefined});
     if(!response.ok)throw Error('PLAN_PROVIDER_UNAVAILABLE');return response.json();
