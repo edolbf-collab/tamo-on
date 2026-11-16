@@ -96,7 +96,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   mobile-layout:
-    runs-on: ubuntu-latest
+    # The existing Playwright 1.56.1 suite supports Ubuntu 24.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:

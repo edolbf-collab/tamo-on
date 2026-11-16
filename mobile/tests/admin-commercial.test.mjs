@@ -11,7 +11,7 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  try{
  await db.exec(`create role anon;create role authenticated;create role service_role;
  create schema private;create schema auth;create schema tamoon_admin;
- create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;
+ create table auth.sessions(id uuid primary key,user_id uuid);create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;
  create function auth.jwt() returns jsonb language sql as $$select '{"session_id":"test"}'::jsonb$$;
  grant usage on schema auth to authenticated;
  create table public.profiles(id uuid primary key,status text);create table public.platform_admins(profile_id uuid);
@@ -38,6 +38,8 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  insert into public.monthly_customer_links values('${id(20)}','${id(40)}','active');insert into public.marketplace_settings values(false);
  insert into public.reservations values('${id(50)}','${id(20)}','${id(10)}','${id(30)}','${id(40)}',6);`);
  await db.exec(await readFile(migration,'utf8'));
+ await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261116115819_establishment_monthly_checkout.sql',import.meta.url),'utf8'));
+ await db.exec(`create or replace function auth.jwt() returns jsonb language sql as $$select jsonb_build_object('session_id',auth.uid()::text)$$;insert into auth.sessions select id,id from auth.users;`);
  const dates=await rpc("select (date_trunc('month',now() at time zone 'America/Sao_Paulo')+interval '1 month')::date::text future,date_trunc('month',now() at time zone 'America/Sao_Paulo')::date::text current");
  const future=dates.future,year=Number(future.slice(0,4));
  const save=(venue=20,groups=[id(40)],start=future)=>rpc('select public.establishment_plan_save($1,$2,$3,$4,$5) r',[id(venue),start,groups,[],year]);
@@ -57,6 +59,32 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await activate(20);await activate(20);await activate(21);await assert.rejects(save(),/PLAN_FROZEN/);
  d=(await read()).r;assert.equal(d.venues.find(v=>v.id===id(20)).invoices.length,1);assert.equal(d.venues.find(v=>v.id===id(20)).invoices[0].due_on,future);
  if(process.env.COMMERCIAL_FIXTURE)await writeFile(process.env.COMMERCIAL_FIXTURE,JSON.stringify(d));
+ // Finance/checkout scope and simulated payments use independent invoice records.
+ const finance=async(partner=null)=>(await rpc('select public.establishment_finance_read($1) r',[partner?id(partner):null])).r;
+ const first=d.venues.find(v=>v.id===id(20)).invoices[0].id;
+ const second=d.venues.find(v=>v.id===id(21)).invoices[0].id;
+ assert.equal((await finance()).invoices.length,2);
+ await role(3);await assert.rejects(rpc('select public.establishment_payment_context($1)',[first]),/PLAN_ACCESS_DENIED/);
+ await role(2);assert.equal((await finance(10)).invoices.length,2);
+ const context=async invoice=>(await rpc('select public.establishment_payment_context($1) r',[invoice])).r;
+ assert.equal((await context(first)).admin,false);
+ await assert.rejects(rpc('select public.establishment_balance_claim($1)',[first]),/PLAN_NOT_PAYABLE/);
+ await assert.rejects(rpc("select public.establishment_invoice_issue_claim($1,'sandbox')",[first]),/permission denied/);
+ await rpc("select public.establishment_invoice_simulate($1,'pix')",[first]);
+ await rpc("select public.establishment_invoice_simulate($1,'pix')",[first]);
+ let history=(await finance(10)).invoices.find(i=>i.id===first);assert.equal(history.status,'paid');assert.ok(history.paid_at);assert.equal(history.payment_method,'pix');
+ await db.exec('reset role');await db.query("update private.establishment_invoices set status='pending',provider_id='pay_monthly',provider_customer='cus_monthly' where id=$1",[second]);await role(2);
+ const attempt=(await rpc('select public.establishment_balance_claim($1) r',[second])).r;assert.equal(attempt.send,true);
+ assert.equal((await rpc('select public.establishment_balance_claim($1) r',[second])).r.send,false);
+ await assert.rejects(rpc("select public.establishment_invoice_simulate($1,'balance')",[second]),/PLAN_NOT_SIMULATABLE/);
+ await role(0,'service_role');await rpc("select public.establishment_balance_result($1,$2,'done')",[attempt.id,id(99)]);
+ await role(2);assert.equal((await context(second)).status,'pending','Debit completion alone never settles receivable');
+ await db.exec('reset role');await db.query('delete from auth.sessions where user_id=$1',[id(2)]);await role(2);await assert.rejects(context(second),/PLAN_SESSION_REQUIRED/);
+ await db.exec('reset role');await db.query('insert into auth.sessions values($1,$1)',[id(2)]);
+ await db.query('delete from private.establishment_payment_attempts where invoice_id=$1',[second]);await db.exec("update private.establishment_invoices set status='planned',simulated=false,paid_at=null,payment_method=null,provider_id=null,provider_customer=null");
+ await role(1);
+ if(process.env.MONTHLY_FIXTURE)await writeFile(process.env.MONTHLY_FIXTURE,JSON.stringify(await finance()));
+
  await db.exec('reset role');
  assert.equal((await rpc("select private.plan_due_date('2026-12-01','2027-01-01','{}')::text d")).d,'2027-01-11');
  assert.equal((await rpc("select private.plan_due_date('2027-01-01','2027-02-01',array['2027-02-08'::date,'2027-02-09'::date])::text d")).d,'2027-02-10');
@@ -77,8 +105,9 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await db.exec('update public.marketplace_settings set real_money_enabled=true');await assert.rejects(reserve(66),/PLAN_FIRST_PAYMENT_REQUIRED/);await role(1);await assert.rejects(rpc('select public.establishment_plan_simulate($1)',[id(20)]),/PLAN_SIMULATION_DISABLED/);
  await db.exec('reset role');await db.exec('update public.marketplace_settings set real_money_enabled=false');
  // A third bill exercises claim concurrency/idempotence and provider verification.
+ await role(0,'service_role');await assert.rejects(rpc('select public.establishment_invoice_issue_claim($1,$2)',[second,null]),/SANDBOX_ONLY/);await db.exec('reset role');
  await db.query("update private.establishment_invoices set status='planned',simulated=false,paid_at=null where venue_id=$1",[id(21)]);
- await role(0,'service_role');const bill=(await rpc("select public.establishment_billing_claim('sandbox') r")).r;assert.ok(bill);assert.equal((await rpc("select public.establishment_billing_claim('sandbox') r")).r,null);
+ await role(0,'service_role');const bill=(await rpc("select public.establishment_invoice_issue_claim($1,'sandbox') r",[second])).r;assert.ok(bill);assert.equal((await rpc("select public.establishment_invoice_issue_claim($1,'sandbox') r",[second])).r,null);assert.equal((await rpc("select public.establishment_billing_claim('sandbox') r")).r,null);
  const payment={id:'pay_test',customer:'cus_test',externalReference:bill.reference,dueDate:bill.due_on,value:300,status:'PENDING',invoiceUrl:'https://sandbox.asaas.com/i/test'};
  const result=p=>rpc('select public.establishment_billing_result($1,$2,$3)',[bill.id,'sandbox',p]);
  await assert.rejects(result({...payment,value:299}),/PLAN_PAYMENT_MISMATCH/);await assert.rejects(result({...payment,invoiceUrl:'javascript:alert(1)'}),/PLAN_INVALID_PAYMENT_URL/);await result(payment);await result({...payment,status:'RECEIVED'});await result({...payment,status:'RECEIVED'});
@@ -89,11 +118,12 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  // Sandbox history cannot settle or prevent creating a separate production bill.
  await db.exec('update public.marketplace_settings set real_money_enabled=true');await assert.rejects(reserve(67),/PLAN_FIRST_PAYMENT_REQUIRED/);
  await role(0,'service_role');await assert.rejects(rpc("select public.establishment_billing_claim('sandbox') r"),/PLAN_SANDBOX_DISABLED/);
+ await role(2);await assert.rejects(context(first),/PLAN_ENVIRONMENT_MISMATCH/);await role(0,'service_role');
  const production=[];for(let n=0;n<2;n++){const b=(await rpc("select public.establishment_billing_claim('production') r")).r;assert.ok(b);assert.notEqual(b.id,bill.id);production.push(b);
   await rpc('select public.establishment_billing_result($1,$2,$3)',[b.id,'production',{id:'pay_production_'+n,customer:'cus_partner',externalReference:b.reference,dueDate:b.due_on,value:300,status:'RECEIVED',invoiceUrl:'https://www.asaas.com/i/test'}]);}
  assert.equal((await rpc("select public.establishment_billing_claim('production') r")).r,null);
  await db.exec('reset role');assert.equal((await rpc("select count(*)::int n from private.establishment_invoices where environment='sandbox'")).n,2);assert.equal((await rpc("select count(*)::int n from private.establishment_invoices where environment='production'")).n,2);assert.equal((await reserve(67)).rows[0].r,'0');
- await db.exec('reset role');await db.exec(`insert into private.partner_readonly_context values('${id(1)}','${id(10)}','test')`);await role(1);assert.equal((await read()).r.admin,false);assert.equal((await read()).r.venues.length,2);await assert.rejects(activate(20),/PLAN_READ_ONLY/);await assert.rejects(read(11),/PLAN_ACCESS_DENIED/);
+ await db.exec('reset role');await db.exec(`insert into private.partner_readonly_context values('${id(1)}','${id(10)}','${id(1)}')`);await role(1);assert.equal((await read()).r.admin,false);assert.equal((await finance()).readonly,true);await assert.rejects(context(first),/PLAN_READ_ONLY/);assert.equal((await read()).r.venues.length,2);await assert.rejects(activate(20),/PLAN_READ_ONLY/);await assert.rejects(read(11),/PLAN_ACCESS_DENIED/);
  await db.exec('reset role');await db.exec(`delete from private.partner_readonly_context;update public.profiles set status='blocked' where id='${id(1)}'`);await role(1);await assert.rejects(read(),/PLAN_ACCESS_DENIED/);
  await db.exec('reset role');assert.equal((await rpc('select count(*)::int n from private.establishment_initial_groups')).n,1);
  }finally{await db.close();}

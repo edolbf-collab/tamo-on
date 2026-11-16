@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Planos por estabelecimento, carteira inicial e mensalidades no sexto dia útil disponíveis para testes web. Cobrança real permanece desativada.",
+  "notes": "Mensalidades no Financeiro, histórico separado e pagamento Pix/saldo preparado para homologação. Dinheiro real desativado.",
   "label": "Tâmo On 1.0 Build 174",
-  "integration": "174-R2"
+  "integration": "174-R3"
 }

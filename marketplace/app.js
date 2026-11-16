@@ -553,7 +553,7 @@
     return Boolean((typeof backendRuntime!=="undefined" && backendRuntime.bootstrap?.preview?.active) || (typeof window!=="undefined" && window.MarketplaceBackend?.readonlyStatus?.active));
   }
 
-  const partnerReadonlyActions = new Set(["partner-finance-tab","finance-reservation-open","finance-payment-details","export-reservation-payment-audit","finance-period-prev","finance-period-next","finance-period-today","finance-period-all","finance-period-retry","export-finance-movements","exit-partner-readonly","partner-schedule-date","partner-agenda-prev","partner-agenda-next","partner-agenda-month","partner-agenda-year","partner-agenda-today","schedule-slot-details","partner-reservation-details","reservation-details","pix-split-details","client-details","open-reservation-chat","open-monthly-request","open-occurrence-transfer-chat","open-partner-document","onboarding-open-dossier","partner-application-details","admin-partner-details","venue-details","venue-gallery","venue-schedule-day","export-partner-finance","export-partner-reservations","notification-inbox","notification-open"]);
+  const partnerReadonlyActions = new Set(["monthly-finance-section","partner-finance-tab","finance-reservation-open","finance-payment-details","export-reservation-payment-audit","finance-period-prev","finance-period-next","finance-period-today","finance-period-all","finance-period-retry","export-finance-movements","exit-partner-readonly","partner-schedule-date","partner-agenda-prev","partner-agenda-next","partner-agenda-month","partner-agenda-year","partner-agenda-today","schedule-slot-details","partner-reservation-details","reservation-details","pix-split-details","client-details","open-reservation-chat","open-monthly-request","open-occurrence-transfer-chat","open-partner-document","onboarding-open-dossier","partner-application-details","admin-partner-details","venue-details","venue-gallery","venue-schedule-day","export-partner-finance","export-partner-reservations","notification-inbox","notification-open"]);
 
   function applyPartnerReadonlyControls() {
     if(!partnerReadonlyActive()){
@@ -7379,7 +7379,7 @@
     const outside=view.outsideContract!==0?`<span>${view.outsideContract>0?"−":"+"} ${money(Math.abs(view.outsideContract))} ${view.outsideContract>0?"fora do contrato vigente":"ajuste do contratado"}</span>`:"";
     const history=`<dl class="finance-line-list">${line("Contratado original",finance.contractedValue||0)}${line("Encerrado ou cancelado",finance.cancelledValue||0)}${line("Valor contratado vigente",view.contracted)}${line("Devoluções concluídas",view.returned)}${line("Restituições pendentes",finance.refundPending||0)}</dl><p class="field-help">O contratado vigente já considera os descontos aplicados e exclui obrigações encerradas ou canceladas. Recebimentos para restituição ou excedentes permanecem no histórico, sem aumentar esse contrato.</p>`;
     const feeNote=Number(finance.asaasFeeEstimated||0)!==0?`Inclui ${money(finance.asaasFeeEstimated)} em tarifas estimadas.`:"Tarifas registradas na conciliação.";
-    const rules=`<p>A comissão respeita a condição registrada em cada reserva e incide uma única vez sobre o valor liquidado após vouchers. No novo plano, grupos da carteira inicial têm 0% e novos grupos têm 5%. A mensalidade do estabelecimento é apresentada em Plano Tâmo On. Recebimento externo não gera novo repasse.</p><dl class="finance-line-list">${line("Liquidado",view.liquidated)}${line("Comissão provisória — ainda não descontada",finance.commissionProvisional||0)}${line("Comissão com saldo elegível para retenção",finance.commissionRetained||0)}${line("Comissão transferida",finance.commissionSettled||0)}${line("Comissão a quitar pelo parceiro",finance.commissionPending||0)}${line("Crédito da instituição ainda não disponível ou comprovado",finance.asaasAwaitingCredit||0)}</dl><p class="field-help">${esc(feeNote)} Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%.</p>`;
+    const rules=`<p>A comissão respeita a condição registrada em cada reserva e incide uma única vez sobre o valor liquidado após vouchers. No novo plano, grupos da carteira inicial têm 0% e novos grupos têm 5%. As mensalidades estão na aba Mensalidades Tâmo On deste Financeiro. Recebimento externo não gera novo repasse.</p><dl class="finance-line-list">${line("Liquidado",view.liquidated)}${line("Comissão provisória — ainda não descontada",finance.commissionProvisional||0)}${line("Comissão com saldo elegível para retenção",finance.commissionRetained||0)}${line("Comissão transferida",finance.commissionSettled||0)}${line("Comissão a quitar pelo parceiro",finance.commissionPending||0)}${line("Crédito da instituição ainda não disponível ou comprovado",finance.asaasAwaitingCredit||0)}</dl><p class="field-help">${esc(feeNote)} Referências contratuais: Pix ${money(state.settings.asaasPixFixedFee)}; cartão ${money(state.settings.asaasCardFixedFee)} + ${String(state.settings.asaasCardPercentageFee).replace(".",",")}%.</p>`;
     return `${adminCommissionHighlight(view.commission)}<section class="finance-kpis" aria-label="Resumo financeiro">
       ${stat(money(view.contracted),"Valor contratado","obrigações vigentes")}
       ${stat(money(view.received),"Recebido bruto","antes de devoluções e descontos")}
@@ -7520,9 +7520,22 @@
     <div class="detail-line"><span>Situação financeira</span><strong>${esc(financialStatusLabel(f.financial_status,f,reservation))}</strong></div></div>${asaasRefundButton(reservation.backendId,f,reservation)}</div>`;
   }
 
+  function monthlyFinanceSelected(){return state.ui?.[state.role+'FinanceSection']==='monthly';}
+  function monthlyFinanceNav(){return `<div class="monthly-finance-nav" aria-label="Área financeira"><button class="button ${monthlyFinanceSelected()?'ghost':'primary'}" data-action="monthly-finance-section" data-section="reservations" aria-pressed="${!monthlyFinanceSelected()}">Reservas e comissões</button><button class="button ${monthlyFinanceSelected()?'primary':'ghost'}" data-action="monthly-finance-section" data-section="monthly" aria-pressed="${monthlyFinanceSelected()}">Mensalidades Tâmo On</button></div>`;}
+  function monthlyFinancePage(){return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader(state.role==='admin'?'Administração':'Portal do parceiro','Financeiro','Mensalidades por estabelecimento, pagamentos e pendências.')}${monthlyFinanceNav()}${metricsIdentity('finance')?'<div id="marketMonthlyFinance" data-ui-owned></div>':'<p class="callout">Entre com uma conta autorizada e conectada para consultar as mensalidades.</p>'}</div>`;}
+  let monthlyFinanceConsole=null;
+  function monthlyFinanceIdentity(){return monthlyFinanceSelected()?metricsIdentity('finance'):'';}
+  function mountMonthlyFinance(){
+    const host=app.querySelector('#marketMonthlyFinance'),key=monthlyFinanceIdentity();
+    if(monthlyFinanceConsole&&(monthlyFinanceConsole.root!==host||monthlyFinanceConsole.key!==key)){monthlyFinanceConsole.dispose();monthlyFinanceConsole=null;}
+    if(host&&key&&!monthlyFinanceConsole)monthlyFinanceConsole=window.TamoonMonthlyFinance.mount(host,{identity:monthlyFinanceIdentity,
+      partnerId:state.role==='partner'?state.partnerProfile.backendPartnerId:null,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args),invoke:(name,args)=>window.MarketplaceBackend.invoke(name,args),
+      onPlans:()=>{state.activePage[state.role]='commercial';saveState();render();}});
+  }
   function partnerFinance() {
+    if(monthlyFinanceSelected())return monthlyFinancePage();
     return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
-      ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
+      ${monthlyFinanceNav()}${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
 
   function partnerUploadDocumentTypes(registration) {
@@ -8110,10 +8123,11 @@
   }
 
   function adminFinance() {
+    if(monthlyFinanceSelected())return monthlyFinancePage();
     const selected=state.filters.adminFinancePartner || "Todos";
     return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
       <div class="toolbar"><label class="field"><span>Parceiro</span><select class="filter-select" id="adminFinancePartner"><option value="Todos">Todos os parceiros — consolidado</option>${state.adminPartners.map(partner=>`<option value="${esc(partner.backendPartnerId||partner.id)}" ${String(partner.backendPartnerId||partner.id)===selected?'selected':''}>${esc(partner.tradeName)}</option>`).join('')}</select></label></div>
-      ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
+      ${monthlyFinanceNav()}${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
 
   function adminSettings() {
@@ -8134,7 +8148,8 @@
     const host=app.querySelector('#marketCommercial'),key=commercialIdentity();
     if(commercialConsole&&(commercialConsole.root!==host||commercialConsole.key!==key)){commercialConsole.dispose();commercialConsole=null;}
     if(host&&key&&!commercialConsole)commercialConsole=window.TamoonCommercialPlans.mount(host,{identity:commercialIdentity,
-      partnerId:state.role==='partner'?state.partnerProfile.backendPartnerId:null,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args)});
+      partnerId:state.role==='partner'?state.partnerProfile.backendPartnerId:null,rpc:(name,args)=>window.MarketplaceBackend.rpc(name,args),
+      onFinance:()=>{state.ui=state.ui||{};state.ui[state.role+'FinanceSection']='monthly';state.activePage[state.role]='finance';saveState();render();}});
   }
   let metricsConsole=null;
   function metricsIdentity(page='metrics'){
@@ -8236,6 +8251,7 @@
     mountAdminOperations();
     mountMetrics();
     mountCommercial();
+    mountMonthlyFinance();
     applyPartnerReadonlyControls();
     window.MarketplaceAgendaNavigation.showSelected(app);
     updateBackendRoleAccess();
@@ -8768,6 +8784,10 @@
         askConfirm({title:retry?'Solicitar novo reembolso':`Devolver ${money(value)}`,message:`Devolver ${money(value)} do pagamento de ${esc(p.payer_name)} pela reserva ${c.reservation_code}? O sistema consultará o Asaas antes do envio. ${p.split_enabled?'A comissão será devolvida proporcionalmente. ':''}As tarifas ficam com o estabelecimento.`,confirmLabel:'Conferir e solicitar',onConfirm:async()=>{if(identity===backendRuntime.identityId)await openAsaasRefund(reservationId,retry?'retry':'submit',expected,paymentId,null);}});
       }catch(error){showToast(backendErrorMessage(error));}
       return;
+    }
+    if(action==="monthly-finance-section"){
+      if(!['partner','admin'].includes(state.role)||!['monthly','reservations'].includes(button.dataset.section))return;
+      state.ui=state.ui||{};state.ui[state.role+'FinanceSection']=button.dataset.section;saveState();render();return;
     }
     if(action==="partner-finance-tab"){
       if(!["partner","admin"].includes(state.role)||!window.PartnerFinanceView.tabs.some(([key])=>key===button.dataset.tab))return;
