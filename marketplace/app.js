@@ -4641,7 +4641,7 @@
   }
   function adminRefundPage(){
     const model=adminRefundStore.get();
-    const actions='<button class="button secondary small" data-action="admin-refund-refresh"'+(model.loading?' disabled':'')+'>Atualizar</button>';
+    const actions='<button class="button secondary small" data-action="cancellation-cases">Pedidos e manifestações</button><button class="button secondary small" data-action="admin-refund-refresh"'+(model.loading?' disabled':'')+'>Atualizar</button>';
     return pageHeader('Administração','Devoluções','Analise os pedidos e acompanhe os valores até a confirmação da devolução.',actions)
       +(adminRefundContext()?window.MarketplaceRefundReview.renderPage(model,{esc,money,date:backendDateTimeLabel})
         :'<div class="callout">Acesse com uma conta administrativa ativa para consultar as devoluções.</div>');
@@ -5441,7 +5441,7 @@
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
-    if(backendIsOnline() && state.role!=="partner" && state.activePage?.[state.role]!=="metrics" && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
+    if(backendIsOnline() && state.role==="user")actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
@@ -7526,8 +7526,8 @@
   }
 
   function monthlyFinanceSelected(){return state.ui?.[state.role+'FinanceSection']==='monthly';}
-  function monthlyFinanceNav(){return `<div class="monthly-finance-nav" aria-label="Área financeira"><button class="button ${monthlyFinanceSelected()?'ghost':'primary'}" data-action="monthly-finance-section" data-section="reservations" aria-pressed="${!monthlyFinanceSelected()}">Reservas e comissões</button><button class="button ${monthlyFinanceSelected()?'primary':'ghost'}" data-action="monthly-finance-section" data-section="monthly" aria-pressed="${monthlyFinanceSelected()}">Mensalidades Tâmo On</button></div>`;}
-  function monthlyFinancePage(){return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader(state.role==='admin'?'Administração':'Portal do parceiro','Financeiro','Mensalidades por estabelecimento, pagamentos e pendências.')}${monthlyFinanceNav()}${metricsIdentity('finance')?'<div id="marketMonthlyFinance" data-ui-owned></div>':'<p class="callout">Entre com uma conta autorizada e conectada para consultar as mensalidades.</p>'}</div>`;}
+  function monthlyFinanceNav(){return `<nav class="monthly-finance-nav" aria-label="Seções do Financeiro"><span class="monthly-finance-nav-title">Visualizar no Financeiro</span><div class="monthly-finance-nav-options"><button type="button" class="button ${monthlyFinanceSelected()?'ghost':'primary'}" data-action="monthly-finance-section" data-section="reservations" aria-pressed="${!monthlyFinanceSelected()}">Reservas e comissões</button><button type="button" class="button ${monthlyFinanceSelected()?'primary':'ghost'}" data-action="monthly-finance-section" data-section="monthly" aria-pressed="${monthlyFinanceSelected()}">Mensalidades Tâmo On</button></div></nav>`;}
+  function monthlyFinancePage(){return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${monthlyFinanceNav()}${pageHeader(state.role==='admin'?'Administração':'Portal do parceiro','Financeiro','Mensalidades por estabelecimento, pagamentos e pendências.')}${metricsIdentity('finance')?'<div id="marketMonthlyFinance" data-ui-owned></div>':'<p class="callout">Entre com uma conta autorizada e conectada para consultar as mensalidades.</p>'}</div>`;}
   let monthlyFinanceConsole=null;
   function monthlyFinanceIdentity(){return monthlyFinanceSelected()?metricsIdentity('finance'):'';}
   function mountMonthlyFinance(){
@@ -7539,8 +7539,8 @@
   }
   function partnerFinance() {
     if(monthlyFinanceSelected())return monthlyFinancePage();
-    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
-      ${monthlyFinanceNav()}${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${monthlyFinanceNav()}${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
+      ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
 
   function partnerUploadDocumentTypes(registration) {
@@ -8130,9 +8130,9 @@
   function adminFinance() {
     if(monthlyFinanceSelected())return monthlyFinancePage();
     const selected=state.filters.adminFinancePartner || "Todos";
-    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${monthlyFinanceNav()}${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
       <div class="toolbar"><label class="field"><span>Parceiro</span><select class="filter-select" id="adminFinancePartner"><option value="Todos">Todos os parceiros — consolidado</option>${state.adminPartners.map(partner=>`<option value="${esc(partner.backendPartnerId||partner.id)}" ${String(partner.backendPartnerId||partner.id)===selected?'selected':''}>${esc(partner.tradeName)}</option>`).join('')}</select></label></div>
-      ${monthlyFinanceNav()}${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
+      ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
 
   function adminSettings() {

@@ -1,9 +1,14 @@
-import {chromium} from 'playwright';import {readFile,mkdir} from 'node:fs/promises';import assert from 'node:assert/strict';
+import {chromium} from 'playwright';import {readFile,mkdir} from 'node:fs/promises';import assert from 'node:assert/strict';import vm from 'node:vm';
 const root=new URL('../../',import.meta.url),fixture=JSON.parse(await readFile('/tmp/monthly-fixture.json','utf8'));
+const appSource=await readFile(new URL('marketplace/app.js',root),'utf8');
+const screen={state:{role:'admin',ui:{adminFinanceSection:'monthly',partnerFinanceSection:'monthly'}},esc:String,financeScreenIdentity:()=> 'preview',metricsIdentity:()=> 'preview',backendIsOnline:()=>true};
+vm.createContext(screen);
+for(const [start,end] of [['  function pageHeader(', '  function stat('],['  function monthlyFinanceSelected(', '  let monthlyFinanceConsole=']])vm.runInContext(appSource.slice(appSource.indexOf(start),appSource.indexOf(end)),screen);
+const financeScreen=role=>{screen.state.role=role;return screen.monthlyFinancePage().replace('id="marketMonthlyFinance"','id="monthly"');};
 const browser=await chromium.launch(process.env.TAMOON_TEST_EXECUTABLE?{executablePath:process.env.TAMOON_TEST_EXECUTABLE,args:['--no-sandbox']}:{});
 try{
  const page=await browser.newPage({viewport:{width:1280,height:900},locale:'pt-BR'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.setContent('<html lang="pt-BR"><body><main style="max-width:1150px;margin:auto;padding:12px"><h1>Financeiro</h1><div id="monthly"></div></main></body></html>');
+ await page.setContent('<html lang="pt-BR"><body><main style="max-width:1150px;margin:auto;padding:12px">'+financeScreen('admin')+'</main></body></html>');
  for(const file of ['marketplace/styles.css','marketplace/commercial-plans.css'])await page.addStyleTag({content:await readFile(new URL(file,root),'utf8')});
  await page.addScriptTag({content:await readFile(new URL('marketplace/monthly-finance.js',root),'utf8')});
  await page.evaluate(f=>{window.fixture=f;window.who='admin';window.calls=[];window.mode='simulation';window.delayed=false;window.pending=[];
@@ -11,12 +16,14 @@ try{
  await page.getByRole('heading',{name:'Mensalidades Tâmo On'}).waitFor();
  await mkdir('/tmp/commercial-preview',{recursive:true});
  for(const profile of ['admin','partner'])for(const theme of ['dark','light']){
-  await page.evaluate(({profile,theme})=>{fixture.admin=profile==='admin';who=profile;document.documentElement.dataset.theme=theme;window.start();},{profile,theme});
+  await page.evaluate(({profile,theme,markup})=>{fixture.admin=profile==='admin';who=profile;document.documentElement.dataset.theme=theme;document.querySelector('main').innerHTML=markup;window.start();},{profile,theme,markup:financeScreen(profile)});
   await page.getByRole('heading',{name:'Mensalidades Tâmo On'}).waitFor();
   assert.equal(await page.locator('.plan-summary > .stat').count(),3);
   for(const width of [320,390,768,1280]){
    await page.setViewportSize({width,height:900});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${profile}/${theme}/${width}`);
+   assert.equal(await page.locator('.monthly-finance-nav [aria-pressed="true"]').count(),1);
+   const submenu=await page.locator('.monthly-finance-nav').boundingBox(),header=await page.locator('.page-header').boundingBox();assert.ok(submenu.y+submenu.height<=header.y,`${profile}: submenu precedes financial content`);
    assert.ok(await page.locator('.plan-summary > .stat').evaluateAll(cards=>cards.every(c=>getComputedStyle(c).borderTopWidth==='1px'&&getComputedStyle(c).borderTopStyle==='solid')));
    await page.screenshot({path:`/tmp/commercial-preview/monthly-${profile}-${theme}-${width}.png`,fullPage:true});
   }

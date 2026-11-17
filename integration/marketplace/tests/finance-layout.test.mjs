@@ -32,16 +32,18 @@ test('moving the cards leaves financial tabs and actions available without dupli
  assert.equal((body.match(/role="tab"/g)||[]).length,4);
  assert.match(body,/finance-reservation-open/);assert.match(body,/export-reservation-payment-audit/);
 });
-test('both financial pages put the metrics before exports and filters in document order',()=>{
+test('both financial pages put the submenu first and metrics before exports and filters',()=>{
  const c={state:{filters:{},adminPartners:[]},esc:escape,backendIsOnline:()=>true,
   financeScreenIdentity:()=> 'owner',financialPeriodPanel:summary=>summary?'METRICS':'DETAILS',financePeriodToolbar:()=>'<div>PERIOD</div>'};
  vm.createContext(c);
  for(const [start,end] of [['  function monthlyFinanceSelected(', '  function monthlyFinancePage('],['  function pageHeader(', '  function stat('],['  function partnerFinance(', '  function partnerUploadDocumentTypes('],['  function adminFinance(', '  function adminSettings(']])vm.runInContext(between(start,end),c);
- for(const render of [c.partnerFinance,c.adminFinance]){
+ for(const [role,render] of [['partner',c.partnerFinance],['admin',c.adminFinance]]){
+  c.state.role=role;
   const html=render();assert.ok(html.indexOf('Financeiro')<html.indexOf('METRICS'));
+  assert.ok(html.indexOf('monthly-finance-nav')<html.indexOf('page-header'));
   assert.ok(html.indexOf('METRICS')<html.indexOf('Exportar posição atual'));
   assert.ok(html.indexOf('METRICS')<html.indexOf('PERIOD'));
-  assert.equal((html.match(/METRICS/g)||[]).length,1);assert.match(html,/Cancelamentos e restituições/);
+  assert.equal((html.match(/METRICS/g)||[]).length,1);assert.doesNotMatch(html,/Cancelamentos e restituições/);
  }
 });
 test('changing period or receiving an error never shows metrics from an old financial query',()=>{

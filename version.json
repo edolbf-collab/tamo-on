@@ -1,11 +1,11 @@
 {
   "channel": "beta",
   "version": "1.0",
-  "build": 174,
+  "build": 175,
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Cancelamentos e restituições centralizados no menu Devoluções do parceiro, sem repetir o botão no cabeçalho das telas.",
-  "label": "Tâmo On 1.0 Build 174",
-  "integration": "174-R8"
+  "notes": "Financeiro com submenu destacado, devoluções centralizadas e mensalidades Tâmo On com Pix e atualização automática. Conteúdo integrado aos pacotes Android e iOS.",
+  "label": "Tâmo On 1.0 Build 175",
+  "integration": "175-R1"
 }
