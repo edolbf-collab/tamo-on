@@ -2,7 +2,8 @@
 export function nativeNotificationURL(value, origin = 'capacitor://localhost') {
   try {
     const url = new URL(value, 'https://app.tamoon.app.br');
-    if (!['https://app.tamoon.app.br', origin].includes(url.origin === 'null' ? `${url.protocol}//${url.host}` : url.origin)) return null;
+    if (url.username || url.password) return null;
+    if (!['https://app.tamoon.app.br', 'https://resenhafc-beta.pages.dev', origin].includes(url.origin === 'null' ? `${url.protocol}//${url.host}` : url.origin)) return null;
     if (!['/', '/index.html'].includes(url.pathname)) return null;
     return `${origin}/${url.search}`;
   } catch { return null; }

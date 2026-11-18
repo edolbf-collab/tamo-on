@@ -5,7 +5,7 @@
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Financeiro com submenu destacado, devoluções centralizadas e mensalidades Tâmo On com Pix e atualização automática. Conteúdo integrado aos pacotes Android e iOS.",
+  "notes": "Correção web na abertura de avisos antigos: compatibilidade com endereços anteriores e leitura do aviso quando o link não está mais disponível.",
   "label": "Tâmo On 1.0 Build 175",
-  "integration": "175-R1"
+  "integration": "175-R2"
 }
