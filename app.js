@@ -4104,13 +4104,23 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
 
     notificationAppUrl(value) {
       try {
-        let url = new URL(String(value || appBaseUrl()), document.baseURI);
-        if (window.TamoonNative?.isNative && url.origin === "https://app.tamoon.app.br" && ["/", "/index.html"].includes(url.pathname)) {
-          url = new URL(`${location.protocol}//${location.host}/${url.search}`);
-        }
         const base = new URL(appBaseUrl());
-        if (url.origin !== location.origin || ![base.pathname, `${base.pathname}index.html`].includes(url.pathname)) return null;
-        return url;
+        const url = new URL(String(value || base.href), document.baseURI);
+        if (url.username || url.password) return null;
+        // URL.origin may be "null" for Capacitor. Compare protocol and host explicitly.
+        const origin = `${url.protocol}//${url.host}`;
+        const localOrigin = `${base.protocol}//${base.host}`;
+        const appOrigins = ["https://app.tamoon.app.br", "https://resenhafc-beta.pages.dev", "capacitor://localhost"];
+        if (origin === localOrigin) {
+          if (![base.pathname, `${base.pathname}index.html`].includes(url.pathname)) return null;
+        } else if (!appOrigins.includes(origin) || !["/", "/index.html"].includes(url.pathname)) {
+          return null;
+        }
+        // Resolve only known app entry points locally; never navigate to another origin.
+        const target = new URL(base.href);
+        target.search = url.search;
+        target.hash = url.hash;
+        return target;
       } catch { return null; }
     },
 
@@ -4194,7 +4204,12 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
         }
         // O destino salvo na caixa do próprio usuário prevalece sobre parâmetros do link.
         const target = item ? this.notificationAppUrl(item.target_url) : requested;
-        if (!target) throw new Error("O destino deste aviso não é válido.");
+        if (!target) {
+          this.modal(item?.title || "Aviso", `<p style="white-space:pre-wrap">${escapeHtml(item?.body || "Consulte os avisos na central de notificações.")}</p><p class="muted">O link deste aviso não está mais disponível. Você pode consultar o conteúdo diretamente no grupo.</p>`);
+          if (!this.pendingNotificationUrl) history.replaceState({}, document.title, appBaseUrl());
+          if (item) this.notificationReadFeedback(item);
+          return;
+        }
         const groupId = item?.group_id || target.searchParams.get("group");
         const memberOfGroup = !groupId || this.state.groups.some(group => group.id === groupId);
         const announcementId = target.searchParams.get("announcement");
@@ -4240,7 +4255,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
             void this.drainNotificationOpen();
           }, { once: true });
         });
-        this.repo.logEvent("notification_open_failed", { message: error?.message || "Falha ao abrir aviso" }, "error");
+        this.repo.logEvent("notification_open_failed", { notification_id: requested.searchParams.get("notification") || null, message: error?.message || "Falha ao abrir aviso" }, "error");
       }
     },
 
@@ -4261,12 +4276,7 @@ As confirmações, o sorteio da espera e a quantidade configurada de times serã
     },
 
     notificationTargetUrl(item) {
-      try {
-        const url = new URL(String(item?.target_url || appBaseUrl()), document.baseURI);
-        return url.origin === location.origin ? url.href : appBaseUrl();
-      } catch {
-        return appBaseUrl();
-      }
+      return this.notificationAppUrl(item?.target_url)?.href || appBaseUrl();
     },
 
     openNotificationCenter() {
