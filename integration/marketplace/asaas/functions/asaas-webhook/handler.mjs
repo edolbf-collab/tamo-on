@@ -1,4 +1,4 @@
-import {accountRegistry} from '../_shared/asaas-accounts.mjs';
+import {accountRegistry,receiptEnvironment,uuid} from '../_shared/asaas-accounts.mjs';
 export async function handleAsaasWebhook(req, {env, adminClient, processWebhookEvent, jsonResponse, corsHeaders}) {
   if (req.method === 'OPTIONS') return new Response('ok',{headers:corsHeaders});
   if (req.method !== 'POST') return jsonResponse({received:false},405);
@@ -10,6 +10,14 @@ export async function handleAsaasWebhook(req, {env, adminClient, processWebhookE
   }
   let subaccount=false;
   try{subaccount=accountRegistry(env).some(a=>a.accountId===payload.account?.id);}catch{return jsonResponse({received:false,error:'WEBHOOK_CONFIG_INVALID'},503);}
+  if(!subaccount && uuid.test(payload.account?.id||'') && payload.account.id!==env('ASAAS_MAIN_ACCOUNT_ID')
+     && env('ASAAS_SUBACCOUNT_WEBHOOK_TOKEN')?.length>=32
+     && req.headers.get('asaas-access-token')===env('ASAAS_SUBACCOUNT_WEBHOOK_TOKEN')){
+    try{
+      const scoped=await receiptEnvironment(adminClient(),env,{accountId:payload.account.id});
+      subaccount=accountRegistry(scoped).some(a=>a.accountId===payload.account.id);
+    }catch{return jsonResponse({received:false,error:'WEBHOOK_CONFIG_INVALID'},503);}
+  }
   const expected=env(subaccount?'ASAAS_SUBACCOUNT_WEBHOOK_TOKEN':'ASAAS_WEBHOOK_TOKEN');
   if(!expected||expected.length<32)return jsonResponse({received:false,error:'WEBHOOK_TOKEN_NOT_CONFIGURED'},503);
   if(req.headers.get('asaas-access-token')!==expected)return jsonResponse({received:false,error:'INVALID_WEBHOOK_TOKEN'},401);

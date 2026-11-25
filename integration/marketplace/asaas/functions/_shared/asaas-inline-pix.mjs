@@ -1,4 +1,4 @@
-import {ASAAS_SANDBOX,requireSandbox,accountRegistry,accountKey,publicAccount,verifyPartnerAccount} from './asaas-accounts.mjs';
+import {receiptEnvironment,ASAAS_SANDBOX,requireSandbox,accountRegistry,accountKey,publicAccount,verifyPartnerAccount} from './asaas-accounts.mjs';
 import {definitiveCheckoutRejection,sandboxCheckoutUrl} from './asaas-checkout-core.mjs';
 import {checkoutDiagnostic,reportCheckoutDiagnostic} from './asaas-diagnostics.ts';
 const UUID=/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
@@ -74,9 +74,11 @@ export async function openInlinePix(admin,reservationId,profileId,deps,retryToke
  try{
   requireSandbox(deps.env);
   if(retryToken!==null&&!UUID.test(retryToken))return respond({error:'CHECKOUT_RETRY_INVALID'},400);
-  const {data:r,error}=await admin.from('reservations').select('partner_id,booking_mode,monthly_cycle_id,payment_method').eq('id',reservationId).single();
+  const {data:r,error}=await admin.from('reservations').select('receipt_mode,partner_id,booking_mode,monthly_cycle_id,payment_method').eq('id',reservationId).single();
   if(error)throw new Error('RESERVATION_NOT_FOUND');
   if(!r||!['single','monthly'].includes(r.booking_mode)||(r.booking_mode==='single'&&r.monthly_cycle_id)||r.payment_method!=='pix_direct_partner')return respond({error:'ASAAS_CHECKOUT_SCOPE'},409);
+  if(r.receipt_mode==='external')return respond({error:'RECEIPT_PAY_AT_VENUE'},409);
+  if(r.receipt_mode==='asaas')deps={...deps,env:await receiptEnvironment(admin,deps.env,{partnerId:r.partner_id})};
   const useSplit=deps.env('ASAAS_SPLIT_ENABLED')==='true';
   const partner=useSplit?accountRegistry(deps.env).find(x=>x.partnerId===r.partner_id&&x.active!==false):null;
   if(partner)await verifyPartnerAccount(partner,{env:deps.env,fetch:deps.fetchImpl||fetch});
@@ -150,12 +152,14 @@ export async function maintainInlinePix(admin,deps){
  requireSandbox(deps.env);const rpc=rpcFor(admin),jobs=await rpc('claim_asaas_inline_pix_jobs');
  if(!Array.isArray(jobs))throw new Error('PIX_JOBS_INVALID');
  // Independent charges can be checked concurrently; each has a DB lease.
+ const jobDeps=deps;
  const results=await Promise.all(jobs.map(async c=>{
   let state='open',error=null;
   try{
    if(!c.sent_at||['not_sent','rejected'].includes(c.attempt_outcome)){
     if(c.close_required)state='closed';
    }else{
+    const deps={...jobDeps,env:await receiptEnvironment(admin,jobDeps.env,{accountId:c.issuer_account_id})};
     const p=await findPayment(c,deps);
     if(!p)throw new Error('PIX_PAYMENT_AWAITING_RECONCILIATION');
     await rpc('bind_asaas_inline_pix',{p_session_key:c.session_key,p_payment:p});

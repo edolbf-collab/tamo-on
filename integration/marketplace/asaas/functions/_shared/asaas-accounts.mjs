@@ -57,3 +57,19 @@ export async function verifyPartnerAccount(row,deps){
   if(!Array.isArray(main.data)||!main.data.some(x=>x.id===row.commissionWalletId))throw new Error('ASAAS_COMMISSION_WALLET_MISMATCH');
 }
 export function publicAccount(row){return row?{partner_id:row.partnerId,issuer_account_id:row.accountId,issuer_wallet_id:row.walletId,split_wallet_id:row.commissionWalletId}:null;}
+
+// A reservation keeps its issuer after a venue stops accepting new payments.
+export async function receiptEnvironment(admin,env,{partnerId,accountId}){
+  if(!partnerId && (!uuid.test(accountId||'') || accountId===env('ASAAS_MAIN_ACCOUNT_ID')))return env;
+  const previous=accountRegistry(env);
+  if(!partnerId && previous.some(row=>row.accountId===accountId))return env;
+  const {data:route,error}=await admin.rpc('receipt_account_route',partnerId?{p_partner:partnerId}:{p_account:accountId});
+  if(error)throw Error('RECEIPT_ACCOUNT_LOOKUP_FAILED');
+  if(!route){
+    if(partnerId)throw Error('RECEIPT_ACCOUNT_REQUIRED');
+    return env;
+  }
+  if((partnerId && route.partnerId!==partnerId)||(accountId && route.accountId!==accountId))throw Error('RECEIPT_ACCOUNT_MISMATCH');
+  const entries=JSON.stringify([route]); // Grant this request only the selected issuer.
+  return name=>name==='ASAAS_SANDBOX_ACCOUNTS'?entries:name==='ASAAS_SPLIT_ENABLED'?'true':env(name);
+}

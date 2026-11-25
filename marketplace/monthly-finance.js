@@ -10,8 +10,28 @@ const errors={PLAN_SESSION_REQUIRED:'Entre novamente para continuar.',PLAN_READ_
 const unpaid=i=>!['paid','cancelled','refunded'].includes(i.status);
 const overdue=(i,today)=>unpaid(i)&&i.due_on<today;
 function summarize(invoices,today){const sum=rows=>rows.reduce((n,i)=>n+Math.round(Number(i.amount)*100),0)/100;return {paid:sum(invoices.filter(i=>i.status==='paid')),open:sum(invoices.filter(unpaid)),overdue:sum(invoices.filter(i=>overdue(i,today)))};}
+const receiptLabels={off:'Desativado',requested:'Aguardando autorização',activating:'Em ativação',on:'Ativo'};
+function receiptPanel(venue,data){
+ if(!venue?.receipts)return '';
+ const state=venue.receipts;
+ const request=!data.readonly&&!data.admin&&state==='off';
+ const approve=!data.readonly&&data.admin&&['requested','activating'].includes(state);
+ return `<section class="card" data-receipt-venue="${esc(venue.id)}"><h3>Receber pelo Tâmo On</h3>
+ <p>${esc(venue.name)} · <strong>${esc(receiptLabels[state])}</strong></p>
+ <p>Comissão fixa de R$ 300,00 por mês por estabelecimento. Pagamentos diretos são combinados com a arena.</p>
+ ${request?`<details><summary>Solicitar ativação</summary><form data-receipt-form>
+ <p>Abertura da subconta: R$ 12,90 uma vez. Escrow: R$ 9,90 por mês. O parceiro assume as tarifas por operação e a tarifa de R$ 19,90 por mês após mais de 180 dias sem movimentação.</p>
+ <label class="field">Tipo de empresa<select name="company" required><option value="">Selecione</option><option value="MEI">MEI</option><option value="LIMITED">Sociedade limitada</option><option value="INDIVIDUAL">Empresário individual</option><option value="ASSOCIATION">Associação</option></select></label>
+ <label class="field">Faturamento mensal declarado (R$)<input required name="income" type="number" min="0.01" max="999999999999" step="0.01"></label>
+ <label class="plan-check"><input required type="checkbox" name="terms">Aceito os custos e autorizo a criação da subconta e a ativação do escrow após a aprovação da administração.</label>
+ <button type="submit" class="button primary">Solicitar recebimentos</button></form></details>`:''}
+ ${approve?`<button type="button" class="button primary" data-monthly="receipt-approve">${state==='requested'?'Autorizar ativação':'Consultar ativação'}</button>`:''}
+ ${venue.opening_fee>0?`<p>Taxa única de abertura atribuída ao estabelecimento: ${money(venue.opening_fee)}. ${['RECEIVED','CONFIRMED'].includes(venue.fee_status)?'Paga.':!data.admin&&!data.readonly?(venue.fee_url&&/^https:\/\/sandbox\.asaas\.com\/i\/[a-zA-Z0-9_-]+$/.test(venue.fee_url)?`<a href="${esc(venue.fee_url)}" rel="noopener noreferrer" target="_blank">Pagar abertura pelo Pix</a>`:'<button type="button" class="button ghost" data-monthly="receipt-fee">Gerar Pix da abertura</button>'):''}</p>`:''}
+ ${!data.readonly&&state!=='off'?`<details><summary>${state==='requested'?'Retirar solicitação':'Desligar recebimentos'}</summary><p>As novas reservas terão pagamento direto. As cobranças anteriores seguem o fluxo contratado. O escrow continua ativo se já tiver sido habilitado.</p><button type="button" class="button secondary" data-monthly="receipt-off">Confirmar</button></details>`:''}</section>`;
+}
 function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
  const key=identity();let disposed=false,data=null,epoch=0,request=0,busy=false,timer=null,invoice=null,payment=null,opener=null,financeTimer=null,liveBusy=false,loading=false;
+ let receiptBusy=false;
  let filters={venue:'',month:'',status:'all',environment:''};
  const valid=()=>!disposed&&root.isConnected&&identity()===key;
  const message=e=>errors[e?.message]||'Não foi possível concluir a consulta. Atualize e tente novamente.';
@@ -27,6 +47,7 @@ function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
    <div class="plan-toolbar"><label class="field"><span>Estabelecimento</span><select name="monthly-venue"><option value="">Todos os estabelecimentos</option>${venues.map(v=>`<option value="${esc(v.id)}" ${filters.venue===v.id?'selected':''}>${esc(v.partner)} · ${esc(v.name)}</option>`).join('')}</select></label><label class="field"><span>Mês de referência</span><input type="month" name="monthly-month" value="${esc(filters.month)}"></label><label class="field"><span>Situação</span><select name="monthly-status">${[['all','Todas'],['open','Em aberto (inclui vencidas)'],['overdue','Vencidas'],['paid','Pagas'],['cancelled','Canceladas'],['refunded','Devolvidas']].map(([v,t])=>`<option value="${v}" ${filters.status===v?'selected':''}>${t}</option>`).join('')}</select></label><label class="field"><span>Ambiente</span><select name="monthly-environment"><option value="sandbox" ${filters.environment==='sandbox'?'selected':''}>Testes e simulações</option><option value="production" ${filters.environment==='production'?'selected':''}>Pagamentos reais</option></select></label></div>
    <div class="item-actions"><button class="button ghost" data-monthly="all-months">Todos os meses</button><button class="button ghost" data-monthly="refresh">Atualizar mensalidades</button></div>
    <p data-monthly-status role="status" aria-live="polite"></p>
+   ${(filters.venue?venues.filter(v=>v.id===filters.venue):venues.length===1?venues:[]).map(v=>receiptPanel(v,data)).join('') || (venues.length>1&&!filters.venue?'<p>Selecione um estabelecimento acima para consultar ou alterar o recebimento pelo app.</p>':'')}
    <div class="plan-summary" aria-label="Totais das mensalidades"><div class="stat"><span>Pagas</span><strong>${money(totals.paid)}</strong></div><div class="stat"><span>Em aberto</span><strong>${money(totals.open)}</strong></div><div class="stat"><span>Vencidas</span><strong>${money(totals.overdue)}</strong></div></div><p class="field-help">Totais do estabelecimento, mês e ambiente selecionados. Vencidas estão incluídas em “Em aberto”. A situação filtra apenas a lista.</p>
    <div class="card monthly-invoices">${visible.map(i=>`<article class="plan-invoice"><div><h3>${esc(i.venue)}</h3><small>${esc(i.partner)}</small><strong>${month(i.competence)} · ${money(i.amount)}</strong><small>Vencimento: ${date(i.due_on)} · ${esc(labels[i.status]||i.status)}${overdue(i,data.today)&&i.status!=='overdue'?' · Vencida':''}</small><small>${i.simulated?'Simulação':i.environment==='sandbox'?'Teste Asaas':'Pagamento real'}${i.payment_method?' · '+(i.payment_method==='balance'?'Saldo Asaas':'Pix'):''}</small>${i.paid_at?`<small>Pagamento registrado: ${paidDate(i.paid_at)} (Brasília)</small>`:''}${i.attempt_state?'<small>Solicitação de pagamento registrada.</small>':''}</div>${!data.readonly&&!data.admin&&unpaid(i)&&i.environment===(data.test_mode?'sandbox':'production')?`<button class="button primary" data-monthly="pay" data-invoice="${esc(i.id)}">${i.attempt_state?'Consultar pagamento':'Pagar mensalidade'}</button>`:''}</article>`).join('')||'<p>Nenhuma mensalidade neste filtro. A primeira será registrada quando a Administração fechar a carteira inicial do estabelecimento.</p>'}</div>
    <dialog class="monthly-payment-dialog" aria-labelledby="monthlyPaymentTitle"><div data-monthly-dialog></div></dialog></section>`;
@@ -49,7 +70,7 @@ function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
   if(!valid()){dispose();return;}if(liveBusy)return;const e=epoch;
   try{
    // Preserve an open checkout, editing focus and active filters; pause hidden tabs.
-   if(document.hidden||loading||invoice)return;
+   if(document.hidden||loading||invoice||receiptBusy||root.querySelector('[data-receipt-venue] details[open]'))return;
    liveBusy=true;
    const result=await rpc('establishment_finance_read',{p_partner_id:partnerId});
    if(!valid()||e!==epoch||invoice||loading||document.hidden)return;
@@ -79,7 +100,33 @@ function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
   if(['pix','processing','review'].includes(p.mode)){clearTimeout(timer);timer=setTimeout(()=>{if(valid()&&invoice?.id===id&&!document.hidden)checkout('refresh');},20000);}
  }catch(e){if(valid()&&n===request){busy=false;dialogContent();root.querySelector('[data-payment-status]').textContent=message(e);}}finally{if(n===request)busy=false;}}
  function confirm(kind){clearTimeout(timer);if(!invoice||busy||data.readonly||data.admin)return;const method=root.querySelector('[name=monthly-sim-method]')?.value||'pix';const content=root.querySelector('.monthly-payment-content');content.innerHTML=`<p>Confirmar ${kind==='simulate'?'a simulação do pagamento':'o pagamento com saldo Asaas'} de <strong>${money(invoice.amount)}</strong> para <strong>${esc(invoice.venue)}</strong>, referente a <strong>${month(invoice.competence)}</strong>?</p>${kind==='simulate'?'<p>Nenhum valor real será movimentado.</p>':'<p>Será utilizado o saldo disponível da subconta deste parceiro.</p>'}<button class="button primary" data-monthly="${kind==='simulate'?'simulate':'balance'}" data-method="${esc(method)}">Confirmar ${kind==='simulate'?'simulação':'pagamento'}</button><button class="button ghost" data-monthly="back">Voltar</button>`;}
+ async function changeReceipts(host,action){
+  if(receiptBusy||!valid()||data.readonly||!host)return;
+  const id=host.dataset.receiptVenue;
+  receiptBusy=true;
+  try{
+   let result;
+   if(action==='approve'||action==='fee')result=await invoke('establishment-receipts',{venueId:id,action});
+   else {
+    const form=host.querySelector('[data-receipt-form]');
+    const args={p_venue_id:id,p_action:action};
+    if(action==='request'){
+     if(!form?.reportValidity())return;
+     Object.assign(args,{p_terms:'receipts-v1',p_income:Number(form.elements.income.value),p_company_type:form.elements.company.value});
+    }
+    result=await rpc('establishment_receipt_change',args);
+   }
+   if(valid()){await load();status(receiptLabels[result.state]||'Situação atualizada.');}
+  }catch(e){
+   if(valid()){await load();status(e.message==='RECEIPT_CONFIGURATION_REQUIRED'?'Ativação pendente. A administração precisa conferir a configuração do Asaas e o prazo de retenção.':'Não foi possível concluir a alteração. Confira a situação antes de tentar novamente.');}
+  }finally{receiptBusy=false;}
+ }
+ function receiptSubmit(e){
+  if(!e.target.matches('[data-receipt-form]'))return;
+  e.preventDefault();changeReceipts(e.target.closest('[data-receipt-venue]'),'request');
+ }
  async function click(e){const button=e.target.closest('[data-monthly]');if(!button||!valid())return;const action=button.dataset.monthly;
+  if(action.startsWith('receipt-')){changeReceipts(button.closest('[data-receipt-venue]'),action.slice(8));return;}
   if(action==='refresh'){load(true);return;}if(action==='plans'){onPlans();return;}if(action==='all-months'){filters.month='';render();return;}
   if(action==='close'){close();return;}if(action==='back'){dialogContent();return;}
   if(action==='pay'){if(busy||data.readonly||data.admin)return;invoice=data.invoices.find(i=>i.id===button.dataset.invoice);if(!invoice)return;opener=button;payment=null;dialogContent();root.querySelector('dialog').showModal();checkout();return;}
@@ -89,9 +136,9 @@ function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
   if(action==='simulate'&&!busy&&invoice&&!data.readonly&&!data.admin){busy=true;button.disabled=true;const id=invoice.id,n=++request;try{await rpc('establishment_invoice_simulate',{p_invoice_id:id,p_method:button.dataset.method});if(valid()&&n===request){await load();status('Pagamento simulado registrado no histórico. Nenhum dinheiro real foi movimentado.');}}catch(error){if(valid()&&n===request){root.querySelector('[data-payment-status]').textContent=message(error);button.disabled=false;}}finally{if(n===request)busy=false;}}
  }
  function change(e){const name=e.target.name;if(!name?.startsWith('monthly-')||name==='monthly-sim-method')return;const field=name.slice(8);if(Object.hasOwn(filters,field)){filters[field]=e.target.value;render();}}
- function dispose(){if(disposed)return;close();disposed=true;epoch++;clearTimeout(financeTimer);document.removeEventListener('visibilitychange',onResume);global.removeEventListener('focus',onResume);observer.disconnect();root.removeEventListener('click',click);root.removeEventListener('change',change);root.replaceChildren();}
+ function dispose(){if(disposed)return;close();disposed=true;epoch++;clearTimeout(financeTimer);document.removeEventListener('visibilitychange',onResume);global.removeEventListener('focus',onResume);observer.disconnect();root.removeEventListener('submit',receiptSubmit);root.removeEventListener('click',click);root.removeEventListener('change',change);root.replaceChildren();}
  const observer=new MutationObserver(()=>{if(!valid())dispose();});observer.observe(document.body,{childList:true,subtree:true});
- root.addEventListener('click',click);root.addEventListener('change',change);document.addEventListener('visibilitychange',onResume);global.addEventListener('focus',onResume);load();scheduleLive();return {root,key,dispose};
+ root.addEventListener('submit',receiptSubmit);root.addEventListener('click',click);root.addEventListener('change',change);document.addEventListener('visibilitychange',onResume);global.addEventListener('focus',onResume);load();scheduleLive();return {root,key,dispose};
 }
 global.TamoonMonthlyFinance={mount,summarize};
 })(window);

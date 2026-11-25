@@ -1,5 +1,5 @@
 import {checkRefundBalance} from './asaas-refund-balance.mjs';
-import {forAccount} from './asaas-accounts.mjs';
+import {forAccount,receiptEnvironment} from './asaas-accounts.mjs';
 import {refundPayload} from './asaas-refund-payload.mjs';
 import {findRefundTransfer} from './asaas-refund-transfer.mjs';
 import {findRefundPix} from './asaas-refund-pix.mjs';
@@ -97,7 +97,8 @@ export async function refundOperation(body,userId,admin,deps){
     const lookups=new Map();
     for(const c of selected){
       if(!c.request_id||c.status==='completed')continue;
-      const scoped=forAccount(deps,c.route?.issuer_account_id);
+      const env=await receiptEnvironment(admin,deps.env,{accountId:c.route?.issuer_account_id});
+      const scoped=forAccount({...deps,env},c.route?.issuer_account_id);
       await apply(c,await fetchRefundEvidence(c.provider_payment_id,scoped));
       const fresh=(await context()).payments.find(p=>p.payment_id===c.payment_id);
       if(fresh.request_id&&fresh.billing_type==='PIX'&&!['completed','partial','not_requested','rejected'].includes(fresh.status)){
@@ -116,7 +117,9 @@ export async function refundOperation(body,userId,admin,deps){
     }
     all=await context();return safe({...all,payments:all.payments.map(c=>({...c,...(lookups.has(c.payment_id)?{transfer_lookup:lookups.get(c.payment_id)}:{})}))});
   }
-  let c=selected[0];const scoped=forAccount(deps,c.route?.issuer_account_id);
+  let c=selected[0];
+  deps={...deps,env:await receiptEnvironment(admin,deps.env,{accountId:c.route?.issuer_account_id})};
+  const scoped=forAccount(deps,c.route?.issuer_account_id);
   if(action==='balance'){
     const evidence=await fetchRefundEvidence(c.provider_payment_id,scoped);
     const payload=refundPayload({...c,request_amount:c.amount,request_id:c.request_id||'preview'},evidence);

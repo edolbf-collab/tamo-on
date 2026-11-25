@@ -1,11 +1,11 @@
 {
   "channel": "beta",
   "version": "1.0",
-  "build": 175,
+  "build": 177,
   "database": 152,
   "edge": 117,
   "mandatory": false,
-  "notes": "Correção web na abertura de avisos antigos: compatibilidade com endereços anteriores e leitura do aviso quando o link não está mais disponível.",
-  "label": "Tâmo On 1.0 Build 175",
-  "integration": "175-R2"
+  "notes": "Comissão fixa por estabelecimento e recebimento opcional pelo aplicativo.",
+  "label": "Tâmo On 1.0 Build 177",
+  "integration": "177-R1"
 }

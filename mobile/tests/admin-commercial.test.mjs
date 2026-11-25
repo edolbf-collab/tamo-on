@@ -184,5 +184,36 @@ test('Commercial plans: access, per-establishment billing, immutable portfolio, 
  await db.exec('reset role');await db.exec(`insert into private.partner_readonly_context values('${id(1)}','${id(10)}','${id(1)}')`);await role(1);assert.equal((await read()).r.admin,false);assert.equal((await finance()).readonly,true);await assert.rejects(context(first),/PLAN_READ_ONLY/);assert.equal((await read()).r.venues.length,2);await assert.rejects(activate(20),/PLAN_READ_ONLY/);await assert.rejects(read(11),/PLAN_ACCESS_DENIED/);
  await db.exec('reset role');await db.exec(`delete from private.partner_readonly_context;update public.profiles set status='blocked' where id='${id(1)}'`);await role(1);await assert.rejects(read(),/PLAN_ACCESS_DENIED/);
  await db.exec('reset role');assert.equal((await rpc('select count(*)::int n from private.establishment_initial_groups')).n,2);
+ // Apply the optional-payment migration after exercising every historical contract above.
+ await db.exec(`create schema vault;create table vault.decrypted_secrets(id uuid,decrypted_secret text);
+ create table public.monthly_cycles(id uuid,status text constraint monthly_cycles_status_check check(status in ('pre_reserved')));
+ create table public.payment_intents(reservation_id uuid);create table public.monthly_payment_stages(reservation_id uuid);
+ create table public.payments(reservation_id uuid);create table public.vouchers(source_reservation_id uuid);
+ create table public.schedule_slots(id uuid);
+ alter table public.venues add published boolean default true,add neighborhood text;
+ alter table public.partners add status text default 'approved',add phone text;
+ update public.profiles set status='active' where id='${id(1)}';
+ alter table public.reservations add status text,add user_id uuid,add monthly_cycle_id uuid;
+ `);
+ await db.exec(await readFile(new URL('../../integration/marketplace/supabase/migrations/20261125031000_optional_receipts.sql',import.meta.url),'utf8'));
+ assert.equal((await reserve(75,41)).rows[0].r,'0');
+ assert.equal((await rpc('select receipt_mode from public.reservations where id=$1',[id(75)])).receipt_mode,'external');
+ assert.equal((await rpc('select finance_commission_rate r from public.reservations where id=$1',[id(68)])).r,'5.00');
+ await assert.rejects(db.query('insert into public.payment_intents values($1)',[id(75)]),/RECEIPT_PAY_AT_VENUE/);
+ await role(2);
+ const change=(action,venue=20)=>rpc('select public.establishment_receipt_change($1,$2,$3,$4,$5) as result',[id(venue),action,'receipts-v1','LIMITED',2000]);
+ assert.equal((await change('request')).result.state,'requested');
+ await assert.rejects(change('approve'),/Admin required/);
+ await role(3);await assert.rejects(change('request'),/PLAN_ACCESS_DENIED/);
+ await role(1);assert.equal((await change('approve')).result.state,'activating');
+ await db.exec('reset role;update public.marketplace_settings set real_money_enabled=false');await role(0,'service_role');
+ const claim=(await rpc('select public.receipt_provision_claim($1) r',[id(20)])).r;
+ assert.equal(claim.create,true);
+ assert.equal((await rpc('select public.receipt_provision_claim($1) r',[id(20)])).r.create,false);
+ await db.exec('reset role');
+ await db.query('update private.receipt_accounts set account_id=$1 where partner_id=$2',[id(99),id(10)]);
+ await role(2);await change('off');
+ await role(0,'service_role');
+ assert.equal((await rpc('select public.receipt_provision_finish($1,$2,$3) ok',[id(20),claim.operation,id(99)])).ok,false);
  }finally{await db.close();}
 });
