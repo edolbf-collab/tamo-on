@@ -361,7 +361,7 @@ window.TAMO_ON_MARKETPLACE_BACKEND_CONFIG = Object.freeze({
     window.TamoonMarketplacePilot?.leave();
   }
 
-  const readonlyRpcNames = new Set(["establishment_plans_read","establishment_finance_read","marketplace_metrics","marketplace_financial_period","marketplace_financial_receipts","reservation_payment_audit","partner_readonly_status","partner_readonly_bootstrap","monthly_link_request_messages","occurrence_transfer_available_slots","occurrence_transfer_conversation","community_marketplace_notifications","admin_search_reservations","reservation_cancellation_preview"]);
+  const readonlyRpcNames = new Set(["reservation_receipt_mode","establishment_plans_read","establishment_finance_read","marketplace_metrics","marketplace_financial_period","marketplace_financial_receipts","reservation_payment_audit","partner_readonly_status","partner_readonly_bootstrap","monthly_link_request_messages","occurrence_transfer_available_slots","occurrence_transfer_conversation","community_marketplace_notifications","admin_search_reservations","reservation_cancellation_preview"]);
 
   async function assertWritable() {
     const c=requireClient();
@@ -2734,14 +2734,14 @@ function mount(root,{rpc,identity,partnerId=null,onFinance=()=>{}}){
  const p=v.plan,edit=data.admin&&p?.state!=='ready',imports=v.initial_imports||[];
  const month=p?.starts_on?.slice(0,7)||new Date(Date.UTC(Number(data.today.slice(0,4)),Number(data.today.slice(5,7))-(data.today.endsWith('-01')?1:0),1)).toISOString().slice(0,7);
  const year=Number(month.slice(0,4));
- host.innerHTML=`<section class="card"><h2>${esc(v.name)}</h2><p>${esc(v.address)} · ${esc(v.spaces)} quadra(s) / espaço(s)</p><div class="plan-summary"><div><span>Mensalidade</span><strong>${money(p?.monthly_value??300)}</strong></div><div><span>Carteira inicial</span><strong>0%</strong></div><div><span>Novos grupos</span><strong>5%</strong></div></div><p>Uma mensalidade por estabelecimento físico, independentemente da quantidade de quadras. Unidades em endereços diferentes têm planos separados, mesmo com o mesmo CNPJ. As tarifas de pagamento são do parceiro.</p><p><strong>${p?.state==='ready'?'Carteira inicial fechada · início em '+date(p.starts_on):p?'Plano em preparação':'Plano ainda não configurado'}</strong></p><p>A primeira mensalidade vence no dia 01 de início. As seguintes vencem no sexto dia útil: segunda a sexta, descontando feriados nacionais e os cadastrados para este estabelecimento.</p></section>
+ host.innerHTML=`<section class="card"><h2>${esc(v.name)}</h2><p>${esc(v.address)} · ${esc(v.spaces)} quadra(s) / espaço(s)</p><div class="plan-summary"><div><span>Comissão fixa mensal</span><strong>${money(p?.monthly_value??300)}</strong></div><div><span>Percentual sobre novas reservas</span><strong>0%</strong></div></div><p>Uma mensalidade por estabelecimento físico, independentemente da quantidade de quadras. Unidades em endereços diferentes têm planos separados, mesmo com o mesmo CNPJ. As tarifas de pagamento são do parceiro.</p><p><strong>${p?.state==='ready'?'Carteira inicial fechada · início em '+date(p.starts_on):p?'Plano em preparação':'Plano ainda não configurado'}</strong></p><p>A primeira mensalidade vence no dia 01 de início. As seguintes vencem no sexto dia útil: segunda a sexta, descontando feriados nacionais e os cadastrados para este estabelecimento.</p></section>
  <section class="card"><h2>${p?.state==='ready'?'Importados preservados na carteira inicial':'Pré-vínculos da carteira inicial'}</h2><p>${p?.state==='ready'?'O fechamento comercial está concluído. As associações pendentes continuam dependendo do responsável pelo grupo.':'Os registros abaixo serão incluídos no fechamento. Não é necessário aguardar a confirmação dos responsáveis.'}</p><div class="plan-groups">${imports.map(i=>`<p><strong>${esc(i.label)}</strong><small>${esc(weekdays[i.weekday]||'')} · ${esc(String(i.start_time).slice(0,5))}–${esc(String(i.end_time).slice(0,5))} · ${esc(importLabels[i.state]||i.state)}</small><small>Código da importação: ${esc(i.id)}</small></p>`).join('')||'<p>Nenhum pré-vínculo nesta carteira.</p>'}</div></section>
  ${data.admin?`<form class="card plan-form"><h2>${edit?'Preparar operação':'Calendário de vencimentos'}</h2>
  ${edit?`<label class="field"><span>Mês de início</span><input name="start" type="month" required value="${esc(month)}"></label><h3>Grupos da carteira inicial</h3><p>Selecione os grupos já identificados que atendem neste estabelecimento. Os pré-vínculos pendentes listados nesta tela e serão preservados no fechamento, mesmo sem aceite do responsável.</p><button type="button" class="button ghost" data-plan="suggest">Selecionar vínculos já importados</button><div class="plan-groups">${data.group_options.map(g=>`<label><input type="checkbox" name="group" value="${esc(g.id)}" ${v.groups.some(x=>x.id===g.id)?'checked':''}><span>${esc(g.name)}<small>Código: ${esc(g.id)}</small></span></label>`).join('')||'<p>Nenhum grupo cadastrado. Os pré-vínculos importados podem ser preservados sem associação confirmada.</p>'}</div>`:`<p>Carteira preservada: ${v.groups.length} grupo(s). O calendário pode ser revisado sem mudar a classificação dos grupos.</p>`}
  <label class="field"><span>Ano do calendário</span><input name="year" type="number" min="${Number(data.today.slice(0,4))}" max="${Number(data.today.slice(0,4))+3}" required value="${year}"></label>
  <label class="field"><span>Feriados locais e dias sem expediente bancário</span><textarea name="holidays" rows="4" placeholder="Uma data por linha: AAAA-MM-DD">${esc((p?.holidays||[]).filter(d=>d.startsWith(year+'-')).join('\n'))}</textarea></label><p class="plan-note">Feriados nacionais fixos já são considerados. Inclua os feriados estaduais, municipais e bancários móveis aplicáveis ao estabelecimento.</p>
  <label class="plan-check"><input name="reviewed" type="checkbox" required>Conferi o calendário deste ano e os dados acima.</label><button class="button primary" type="submit">${edit?'Salvar preparação':'Salvar calendário'}</button>
- </form>${edit&&p?`<section class="card"><h3>Fechar a carteira inicial</h3><p>Confira os grupos e pré-vínculos importados deste estabelecimento. O fechamento preserva esses registros e prepara a primeira mensalidade, mesmo com associações pendentes. Quando o responsável aceitar o vínculo, o grupo manterá 0% de comissão. Importações feitas após o fechamento não entram nessa carteira. O início depende do pagamento da primeira mensalidade.</p><label class="plan-check"><input type="checkbox" name="freeze">Conferi os grupos e pré-vínculos que compõem a carteira inicial, incluindo os pendentes de aceite.</label><button class="button primary" data-plan="activate">Fechar carteira inicial</button></section>`:''}`:''}
+ </form>${edit&&p?`<section class="card"><h3>Fechar a carteira inicial</h3><p>Confira os grupos e pré-vínculos importados deste estabelecimento. O fechamento preserva esses registros e prepara a primeira mensalidade, mesmo com associações pendentes. O aceite do vínculo fica a cargo do responsável pelo grupo. Importações feitas após o fechamento não entram nessa carteira. O início depende do pagamento da primeira mensalidade.</p><label class="plan-check"><input type="checkbox" name="freeze">Conferi os grupos e pré-vínculos que compõem a carteira inicial, incluindo os pendentes de aceite.</label><button class="button primary" data-plan="activate">Fechar carteira inicial</button></section>`:''}`:''}
  <section class="card"><h2>Grupos incluídos na mensalidade</h2><div class="plan-groups">${v.groups.map(g=>`<p><strong>${esc(g.name)}</strong><small>Código: ${esc(g.id)}</small></p>`).join('')||'<p>Nenhum grupo incluído.</p>'}</div></section>
  <section class="card"><h2>Mensalidades do estabelecimento</h2>${data.admin?'<p>O parceiro inicia o pagamento pela própria conta, em Financeiro → Mensalidades Tâmo On. A Administração acompanha a situação e o histórico.</p>':''}<button class="button secondary" data-plan="finance">Abrir mensalidades no Financeiro</button><p>As mensalidades Tâmo On são separadas dos valores das reservas. A emissão automática no Asaas será habilitada após a validação da conta emissora.</p>
  ${v.invoices.map(i=>`<article class="plan-invoice"><div><strong>${esc(i.competence.slice(0,7).split('-').reverse().join('/'))} · ${money(i.amount)}</strong><small>Vencimento: ${date(i.due_on)} · ${esc(labels[i.status]||i.status)}${i.simulated?' · Simulação':i.environment==='sandbox'?' · Teste Asaas':''}</small></div>${i.invoice_url&&/^https:\/\/(www\.|sandbox\.)?asaas\.com\//.test(i.invoice_url)?`<a class="button ghost" href="${esc(i.invoice_url)}" target="_blank" rel="noopener noreferrer">Abrir cobrança</a>`:''}</article>`).join('')||'<p>A cobrança inicial será preparada após o fechamento da carteira.</p>'}
@@ -2786,8 +2786,28 @@ const errors={PLAN_SESSION_REQUIRED:'Entre novamente para continuar.',PLAN_READ_
 const unpaid=i=>!['paid','cancelled','refunded'].includes(i.status);
 const overdue=(i,today)=>unpaid(i)&&i.due_on<today;
 function summarize(invoices,today){const sum=rows=>rows.reduce((n,i)=>n+Math.round(Number(i.amount)*100),0)/100;return {paid:sum(invoices.filter(i=>i.status==='paid')),open:sum(invoices.filter(unpaid)),overdue:sum(invoices.filter(i=>overdue(i,today)))};}
+const receiptLabels={off:'Desativado',requested:'Aguardando autorização',activating:'Em ativação',on:'Ativo'};
+function receiptPanel(venue,data){
+ if(!venue?.receipts)return '';
+ const state=venue.receipts;
+ const request=!data.readonly&&!data.admin&&state==='off';
+ const approve=!data.readonly&&data.admin&&['requested','activating'].includes(state);
+ return `<section class="card" data-receipt-venue="${esc(venue.id)}"><h3>Receber pelo Tâmo On</h3>
+ <p>${esc(venue.name)} · <strong>${esc(receiptLabels[state])}</strong></p>
+ <p>Comissão fixa de R$ 300,00 por mês por estabelecimento. Pagamentos diretos são combinados com a arena.</p>
+ ${request?`<details><summary>Solicitar ativação</summary><form data-receipt-form>
+ <p>Abertura da subconta: R$ 12,90 uma vez. Escrow: R$ 9,90 por mês. O parceiro assume as tarifas por operação e a tarifa de R$ 19,90 por mês após mais de 180 dias sem movimentação.</p>
+ <label class="field">Tipo de empresa<select name="company" required><option value="">Selecione</option><option value="MEI">MEI</option><option value="LIMITED">Sociedade limitada</option><option value="INDIVIDUAL">Empresário individual</option><option value="ASSOCIATION">Associação</option></select></label>
+ <label class="field">Faturamento mensal declarado (R$)<input required name="income" type="number" min="0.01" max="999999999999" step="0.01"></label>
+ <label class="plan-check"><input required type="checkbox" name="terms">Aceito os custos e autorizo a criação da subconta e a ativação do escrow após a aprovação da administração.</label>
+ <button type="submit" class="button primary">Solicitar recebimentos</button></form></details>`:''}
+ ${approve?`<button type="button" class="button primary" data-monthly="receipt-approve">${state==='requested'?'Autorizar ativação':'Consultar ativação'}</button>`:''}
+ ${venue.opening_fee>0?`<p>Taxa única de abertura atribuída ao estabelecimento: ${money(venue.opening_fee)}. ${['RECEIVED','CONFIRMED'].includes(venue.fee_status)?'Paga.':!data.admin&&!data.readonly?(venue.fee_url&&/^https:\/\/sandbox\.asaas\.com\/i\/[a-zA-Z0-9_-]+$/.test(venue.fee_url)?`<a href="${esc(venue.fee_url)}" rel="noopener noreferrer" target="_blank">Pagar abertura pelo Pix</a>`:'<button type="button" class="button ghost" data-monthly="receipt-fee">Gerar Pix da abertura</button>'):''}</p>`:''}
+ ${!data.readonly&&state!=='off'?`<details><summary>${state==='requested'?'Retirar solicitação':'Desligar recebimentos'}</summary><p>As novas reservas terão pagamento direto. As cobranças anteriores seguem o fluxo contratado. O escrow continua ativo se já tiver sido habilitado.</p><button type="button" class="button secondary" data-monthly="receipt-off">Confirmar</button></details>`:''}</section>`;
+}
 function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
  const key=identity();let disposed=false,data=null,epoch=0,request=0,busy=false,timer=null,invoice=null,payment=null,opener=null,financeTimer=null,liveBusy=false,loading=false;
+ let receiptBusy=false;
  let filters={venue:'',month:'',status:'all',environment:''};
  const valid=()=>!disposed&&root.isConnected&&identity()===key;
  const message=e=>errors[e?.message]||'Não foi possível concluir a consulta. Atualize e tente novamente.';
@@ -2803,6 +2823,7 @@ function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
    <div class="plan-toolbar"><label class="field"><span>Estabelecimento</span><select name="monthly-venue"><option value="">Todos os estabelecimentos</option>${venues.map(v=>`<option value="${esc(v.id)}" ${filters.venue===v.id?'selected':''}>${esc(v.partner)} · ${esc(v.name)}</option>`).join('')}</select></label><label class="field"><span>Mês de referência</span><input type="month" name="monthly-month" value="${esc(filters.month)}"></label><label class="field"><span>Situação</span><select name="monthly-status">${[['all','Todas'],['open','Em aberto (inclui vencidas)'],['overdue','Vencidas'],['paid','Pagas'],['cancelled','Canceladas'],['refunded','Devolvidas']].map(([v,t])=>`<option value="${v}" ${filters.status===v?'selected':''}>${t}</option>`).join('')}</select></label><label class="field"><span>Ambiente</span><select name="monthly-environment"><option value="sandbox" ${filters.environment==='sandbox'?'selected':''}>Testes e simulações</option><option value="production" ${filters.environment==='production'?'selected':''}>Pagamentos reais</option></select></label></div>
    <div class="item-actions"><button class="button ghost" data-monthly="all-months">Todos os meses</button><button class="button ghost" data-monthly="refresh">Atualizar mensalidades</button></div>
    <p data-monthly-status role="status" aria-live="polite"></p>
+   ${(filters.venue?venues.filter(v=>v.id===filters.venue):venues.length===1?venues:[]).map(v=>receiptPanel(v,data)).join('') || (venues.length>1&&!filters.venue?'<p>Selecione um estabelecimento acima para consultar ou alterar o recebimento pelo app.</p>':'')}
    <div class="plan-summary" aria-label="Totais das mensalidades"><div class="stat"><span>Pagas</span><strong>${money(totals.paid)}</strong></div><div class="stat"><span>Em aberto</span><strong>${money(totals.open)}</strong></div><div class="stat"><span>Vencidas</span><strong>${money(totals.overdue)}</strong></div></div><p class="field-help">Totais do estabelecimento, mês e ambiente selecionados. Vencidas estão incluídas em “Em aberto”. A situação filtra apenas a lista.</p>
    <div class="card monthly-invoices">${visible.map(i=>`<article class="plan-invoice"><div><h3>${esc(i.venue)}</h3><small>${esc(i.partner)}</small><strong>${month(i.competence)} · ${money(i.amount)}</strong><small>Vencimento: ${date(i.due_on)} · ${esc(labels[i.status]||i.status)}${overdue(i,data.today)&&i.status!=='overdue'?' · Vencida':''}</small><small>${i.simulated?'Simulação':i.environment==='sandbox'?'Teste Asaas':'Pagamento real'}${i.payment_method?' · '+(i.payment_method==='balance'?'Saldo Asaas':'Pix'):''}</small>${i.paid_at?`<small>Pagamento registrado: ${paidDate(i.paid_at)} (Brasília)</small>`:''}${i.attempt_state?'<small>Solicitação de pagamento registrada.</small>':''}</div>${!data.readonly&&!data.admin&&unpaid(i)&&i.environment===(data.test_mode?'sandbox':'production')?`<button class="button primary" data-monthly="pay" data-invoice="${esc(i.id)}">${i.attempt_state?'Consultar pagamento':'Pagar mensalidade'}</button>`:''}</article>`).join('')||'<p>Nenhuma mensalidade neste filtro. A primeira será registrada quando a Administração fechar a carteira inicial do estabelecimento.</p>'}</div>
    <dialog class="monthly-payment-dialog" aria-labelledby="monthlyPaymentTitle"><div data-monthly-dialog></div></dialog></section>`;
@@ -2825,7 +2846,7 @@ function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
   if(!valid()){dispose();return;}if(liveBusy)return;const e=epoch;
   try{
    // Preserve an open checkout, editing focus and active filters; pause hidden tabs.
-   if(document.hidden||loading||invoice)return;
+   if(document.hidden||loading||invoice||receiptBusy||root.querySelector('[data-receipt-venue] details[open]'))return;
    liveBusy=true;
    const result=await rpc('establishment_finance_read',{p_partner_id:partnerId});
    if(!valid()||e!==epoch||invoice||loading||document.hidden)return;
@@ -2855,7 +2876,33 @@ function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
   if(['pix','processing','review'].includes(p.mode)){clearTimeout(timer);timer=setTimeout(()=>{if(valid()&&invoice?.id===id&&!document.hidden)checkout('refresh');},20000);}
  }catch(e){if(valid()&&n===request){busy=false;dialogContent();root.querySelector('[data-payment-status]').textContent=message(e);}}finally{if(n===request)busy=false;}}
  function confirm(kind){clearTimeout(timer);if(!invoice||busy||data.readonly||data.admin)return;const method=root.querySelector('[name=monthly-sim-method]')?.value||'pix';const content=root.querySelector('.monthly-payment-content');content.innerHTML=`<p>Confirmar ${kind==='simulate'?'a simulação do pagamento':'o pagamento com saldo Asaas'} de <strong>${money(invoice.amount)}</strong> para <strong>${esc(invoice.venue)}</strong>, referente a <strong>${month(invoice.competence)}</strong>?</p>${kind==='simulate'?'<p>Nenhum valor real será movimentado.</p>':'<p>Será utilizado o saldo disponível da subconta deste parceiro.</p>'}<button class="button primary" data-monthly="${kind==='simulate'?'simulate':'balance'}" data-method="${esc(method)}">Confirmar ${kind==='simulate'?'simulação':'pagamento'}</button><button class="button ghost" data-monthly="back">Voltar</button>`;}
+ async function changeReceipts(host,action){
+  if(receiptBusy||!valid()||data.readonly||!host)return;
+  const id=host.dataset.receiptVenue;
+  receiptBusy=true;
+  try{
+   let result;
+   if(action==='approve'||action==='fee')result=await invoke('establishment-receipts',{venueId:id,action});
+   else {
+    const form=host.querySelector('[data-receipt-form]');
+    const args={p_venue_id:id,p_action:action};
+    if(action==='request'){
+     if(!form?.reportValidity())return;
+     Object.assign(args,{p_terms:'receipts-v1',p_income:Number(form.elements.income.value),p_company_type:form.elements.company.value});
+    }
+    result=await rpc('establishment_receipt_change',args);
+   }
+   if(valid()){await load();status(receiptLabels[result.state]||'Situação atualizada.');}
+  }catch(e){
+   if(valid()){await load();status(e.message==='RECEIPT_CONFIGURATION_REQUIRED'?'Ativação pendente. A administração precisa conferir a configuração do Asaas e o prazo de retenção.':'Não foi possível concluir a alteração. Confira a situação antes de tentar novamente.');}
+  }finally{receiptBusy=false;}
+ }
+ function receiptSubmit(e){
+  if(!e.target.matches('[data-receipt-form]'))return;
+  e.preventDefault();changeReceipts(e.target.closest('[data-receipt-venue]'),'request');
+ }
  async function click(e){const button=e.target.closest('[data-monthly]');if(!button||!valid())return;const action=button.dataset.monthly;
+  if(action.startsWith('receipt-')){changeReceipts(button.closest('[data-receipt-venue]'),action.slice(8));return;}
   if(action==='refresh'){load(true);return;}if(action==='plans'){onPlans();return;}if(action==='all-months'){filters.month='';render();return;}
   if(action==='close'){close();return;}if(action==='back'){dialogContent();return;}
   if(action==='pay'){if(busy||data.readonly||data.admin)return;invoice=data.invoices.find(i=>i.id===button.dataset.invoice);if(!invoice)return;opener=button;payment=null;dialogContent();root.querySelector('dialog').showModal();checkout();return;}
@@ -2865,9 +2912,9 @@ function mount(root,{rpc,invoke,identity,partnerId=null,onPlans=()=>{}}){
   if(action==='simulate'&&!busy&&invoice&&!data.readonly&&!data.admin){busy=true;button.disabled=true;const id=invoice.id,n=++request;try{await rpc('establishment_invoice_simulate',{p_invoice_id:id,p_method:button.dataset.method});if(valid()&&n===request){await load();status('Pagamento simulado registrado no histórico. Nenhum dinheiro real foi movimentado.');}}catch(error){if(valid()&&n===request){root.querySelector('[data-payment-status]').textContent=message(error);button.disabled=false;}}finally{if(n===request)busy=false;}}
  }
  function change(e){const name=e.target.name;if(!name?.startsWith('monthly-')||name==='monthly-sim-method')return;const field=name.slice(8);if(Object.hasOwn(filters,field)){filters[field]=e.target.value;render();}}
- function dispose(){if(disposed)return;close();disposed=true;epoch++;clearTimeout(financeTimer);document.removeEventListener('visibilitychange',onResume);global.removeEventListener('focus',onResume);observer.disconnect();root.removeEventListener('click',click);root.removeEventListener('change',change);root.replaceChildren();}
+ function dispose(){if(disposed)return;close();disposed=true;epoch++;clearTimeout(financeTimer);document.removeEventListener('visibilitychange',onResume);global.removeEventListener('focus',onResume);observer.disconnect();root.removeEventListener('submit',receiptSubmit);root.removeEventListener('click',click);root.removeEventListener('change',change);root.replaceChildren();}
  const observer=new MutationObserver(()=>{if(!valid())dispose();});observer.observe(document.body,{childList:true,subtree:true});
- root.addEventListener('click',click);root.addEventListener('change',change);document.addEventListener('visibilitychange',onResume);global.addEventListener('focus',onResume);load();scheduleLive();return {root,key,dispose};
+ root.addEventListener('submit',receiptSubmit);root.addEventListener('click',click);root.addEventListener('change',change);document.addEventListener('visibilitychange',onResume);global.addEventListener('focus',onResume);load();scheduleLive();return {root,key,dispose};
 }
 global.TamoonMonthlyFinance={mount,summarize};
 })(window);
@@ -4464,7 +4511,8 @@ global.TamoonMonthlyFinance={mount,summarize};
         statusKey:visual.key,
         status:visual.label,
         endpoint:visual.key === "confirmed" && payment ? (payment.metadata?.simulation ? "supabase.payment-simulator.confirmed" : `supabase.payments.${payment.status || "confirmed"}`) : `supabase.reservations.${reservation.status || "unknown"}`,
-        paymentStatus:reservation.status === "expired" ? "Prazo de pagamento encerrado" : rawMonthlyCycle
+        receiptMode:reservation.receipt_mode, externalReceivedAt:reservation.external_received_at,
+        paymentStatus:reservation.receipt_mode==='external' ? (reservation.external_received_at ? "Recebimento registrado pelo parceiro" : "Pagamento direto ao estabelecimento") : reservation.status === "expired" ? "Prazo de pagamento encerrado" : rawMonthlyCycle
           ? monthlyPaymentPresentation({backendStatus:reservation.status,financialClosedAt:reservation.financial_closed_at},rawMonthlyCycle).label
           : visual.key === "confirmed" ? (payment?.metadata?.simulation ? "Pagamento confirmado · simulação staging" : "Pagamento confirmado") : visual.key === "pending" ? (reservation.payment_configured_at ? "Pagamento pendente" : "Defina o pagamento em Minhas reservas") : cancellationMode === "voucher" ? "Cancelada · voucher integral emitido" : cancellationMode === "refund" ? (reservation.status === "refunded" ? "Cancelada · reembolso concluído" : "Cancelada · reembolso pendente") : "Cancelada sem compensação financeira",
         paymentDue:Number(reservation.payment_due || 0),
@@ -4874,6 +4922,7 @@ global.TamoonMonthlyFinance={mount,summarize};
       ||["cancelled","expired","refund_pending","refunded"].includes(reservation.backendStatus);
     const balance=closed?0:Math.max(0,Number(f.balance_pending??(total-paid)));
     const full=!closed&&(total>0||status==="fully_paid")&&Math.round(paid*100)>=Math.round(total*100)&&Math.round(balance*100)===0;
+    if(status==='external')return {closed:false,full:false,minimumReached:false,total,paid:0,minimum:0,balance:0,label:'Pagamento direto ao estabelecimento',finalDue:null,dueAt:''};
     const minimumReached=minimum>0&&Math.round(paid*100)>=Math.round(minimum*100);
     const label=closed?(status==="cancelled"?"Ciclo cancelado · sem saldo a pagar":"Ciclo encerrado · sem saldo a pagar")
       :full?"Mensal garantido · integralmente quitado":minimumReached?"Mínimo atingido · saldo pendente":"Mínimo inicial pendente";
@@ -7518,7 +7567,7 @@ global.TamoonMonthlyFinance={mount,summarize};
   }
   function adminRefundPage(){
     const model=adminRefundStore.get();
-    const actions='<button class="button secondary small" data-action="admin-refund-refresh"'+(model.loading?' disabled':'')+'>Atualizar</button>';
+    const actions='<button class="button secondary small" data-action="cancellation-cases">Pedidos e manifestações</button><button class="button secondary small" data-action="admin-refund-refresh"'+(model.loading?' disabled':'')+'>Atualizar</button>';
     return pageHeader('Administração','Devoluções','Analise os pedidos e acompanhe os valores até a confirmação da devolução.',actions)
       +(adminRefundContext()?window.MarketplaceRefundReview.renderPage(model,{esc,money,date:backendDateTimeLabel})
         :'<div class="callout">Acesse com uma conta administrativa ativa para consultar as devoluções.</div>');
@@ -7662,6 +7711,14 @@ global.TamoonMonthlyFinance={mount,summarize};
 
   let cancellationPreviewSequence=0;
   async function openOfficialReservationCancellation(reservation, actorLabel) {
+    if(reservation?.receiptMode==='external'){
+      openForm({title:"Cancelar reserva",description:"Eventuais devoluções são combinadas diretamente com o estabelecimento.",submitLabel:"Confirmar cancelamento",
+        fields:[{name:"reason",label:"Motivo",type:"textarea",required:true}],
+        onSubmit:async data=>Boolean(await runBackendMutation("Reserva cancelada.",async()=>{
+          await window.MarketplaceBackend.rpc("cancel_external_reservation",{p_id:reservation.backendId,p_reason:data.reason});return true;
+        }))});
+      return;
+    }
     if(reservation?.backendOfficial && actorLabel==="Usuário") {
       const identity=backendRuntime.identityId;
       try {
@@ -8318,7 +8375,7 @@ global.TamoonMonthlyFinance={mount,summarize};
   }
 
   function pageHeader(eyebrow, title, description, actions = "", financeSummary = null) {
-    if(backendIsOnline() && state.role!=="partner" && state.activePage?.[state.role]!=="metrics" && !(state.role==="admin" && ["refunds","operations"].includes(state.activePage.admin)))actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
+    if(backendIsOnline() && state.role==="user")actions+=`<button class="button ghost small" data-action="cancellation-cases">Cancelamentos e restituições</button>`;
     return `<header class="page-header"><div><span class="eyebrow">${esc(eyebrow)}</span><h1>${esc(title)}</h1><p>${esc(description)}</p></div>${financeSummary!==null?`<div id="financeSummaryHost">${financeSummary}</div>`:""}${actions ? `<div class="page-actions">${actions}</div>` : ""}</header>`;
   }
 
@@ -9146,6 +9203,7 @@ global.TamoonMonthlyFinance={mount,summarize};
   }
 
   function userPaymentAction(reservation) {
+    if(reservation?.receiptMode==='external')return '<span>Pagamento direto ao estabelecimento</span>';
     if(reservation?.monthlyCycleId&&monthlyPaymentPresentation(reservation).closed)return "";
     if (reservation?.statusKey === "pending" && !reservation.paymentConfigured && reservationBelongsToCurrentUser(reservation)) {
       return `${reservationPrebookingEditAction(reservation)}<button class="button primary small" data-action="configure-reservation-payment" data-id="${esc(reservation.id)}">Definir pagamento</button>`;
@@ -9858,6 +9916,11 @@ global.TamoonMonthlyFinance={mount,summarize};
     const transferUnread=reservation?occurrenceTransferUnreadForReservation(reservation):0;
     const base = `${chatButtonForPartner(item)}<button class="button ghost small ${transferUnread?"has-unread":""}" data-action="partner-reservation-details" data-id="${esc(item.id)}">${transferUnread?"Ver atualização":"Detalhes"}${messageBadge(transferUnread)}</button>${splitAction}`;
     if (reservation?.backendOfficial) {
+      if(reservation.receiptMode==='external'){
+        const record=canManageBackendFinance()&&!reservation.externalReceivedAt&&['confirmed','completed'].includes(reservation.statusKey)
+         ? `<button class="button secondary small" data-action="external-received" data-id="${esc(reservation.backendId)}">Registrar pagamento direto</button>` : '';
+        return base+record+(reservation.statusKey==='confirmed'?`<button class="button danger small" data-action="cancel-backend-partner-reservation" data-id="${esc(item.id)}">Cancelar reserva</button>`:'');
+      }
       const external=canManageBackendFinance()&&reservation.statusKey==="pending"&&reservation.paymentConfigured
         ?`<button class="button secondary small" data-action="register-external-receipt" data-id="${esc(reservation.id)}">Registrar recebimento externo</button>`:"";
       if(reservation.monthly)return `${base}${external}`;
@@ -10403,8 +10466,8 @@ global.TamoonMonthlyFinance={mount,summarize};
   }
 
   function monthlyFinanceSelected(){return state.ui?.[state.role+'FinanceSection']==='monthly';}
-  function monthlyFinanceNav(){return `<div class="monthly-finance-nav" aria-label="Área financeira"><button class="button ${monthlyFinanceSelected()?'ghost':'primary'}" data-action="monthly-finance-section" data-section="reservations" aria-pressed="${!monthlyFinanceSelected()}">Reservas e comissões</button><button class="button ${monthlyFinanceSelected()?'primary':'ghost'}" data-action="monthly-finance-section" data-section="monthly" aria-pressed="${monthlyFinanceSelected()}">Mensalidades Tâmo On</button></div>`;}
-  function monthlyFinancePage(){return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader(state.role==='admin'?'Administração':'Portal do parceiro','Financeiro','Mensalidades por estabelecimento, pagamentos e pendências.')}${monthlyFinanceNav()}${metricsIdentity('finance')?'<div id="marketMonthlyFinance" data-ui-owned></div>':'<p class="callout">Entre com uma conta autorizada e conectada para consultar as mensalidades.</p>'}</div>`;}
+  function monthlyFinanceNav(){return `<nav class="monthly-finance-nav" aria-label="Seções do Financeiro"><span class="monthly-finance-nav-title">Visualizar no Financeiro</span><div class="monthly-finance-nav-options"><button type="button" class="button ${monthlyFinanceSelected()?'ghost':'primary'}" data-action="monthly-finance-section" data-section="reservations" aria-pressed="${!monthlyFinanceSelected()}">Reservas e comissões</button><button type="button" class="button ${monthlyFinanceSelected()?'primary':'ghost'}" data-action="monthly-finance-section" data-section="monthly" aria-pressed="${monthlyFinanceSelected()}">Mensalidades Tâmo On</button></div></nav>`;}
+  function monthlyFinancePage(){return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${monthlyFinanceNav()}${pageHeader(state.role==='admin'?'Administração':'Portal do parceiro','Financeiro','Mensalidades por estabelecimento, pagamentos e pendências.')}${metricsIdentity('finance')?'<div id="marketMonthlyFinance" data-ui-owned></div>':'<p class="callout">Entre com uma conta autorizada e conectada para consultar as mensalidades.</p>'}</div>`;}
   let monthlyFinanceConsole=null;
   function monthlyFinanceIdentity(){return monthlyFinanceSelected()?metricsIdentity('finance'):'';}
   function mountMonthlyFinance(){
@@ -10416,8 +10479,8 @@ global.TamoonMonthlyFinance={mount,summarize};
   }
   function partnerFinance() {
     if(monthlyFinanceSelected())return monthlyFinancePage();
-    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
-      ${monthlyFinanceNav()}${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${monthlyFinanceNav()}${pageHeader("Portal do parceiro","Financeiro","Reservas, descontos e valores a receber.",'<button class="button ghost" data-action="export-partner-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
+      ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
 
   function partnerUploadDocumentTypes(registration) {
@@ -11007,9 +11070,9 @@ global.TamoonMonthlyFinance={mount,summarize};
   function adminFinance() {
     if(monthlyFinanceSelected())return monthlyFinancePage();
     const selected=state.filters.adminFinancePartner || "Todos";
-    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
+    return `<div class="finance-page" data-finance-identity="${esc(financeScreenIdentity())}">${monthlyFinanceNav()}${pageHeader("Administração","Financeiro","Reservas, taxas, comissão e valores dos parceiros.",'<button class="button ghost" data-action="export-admin-finance">Exportar posição atual</button>',financialPeriodPanel(true))}
       <div class="toolbar"><label class="field"><span>Parceiro</span><select class="filter-select" id="adminFinancePartner"><option value="Todos">Todos os parceiros — consolidado</option>${state.adminPartners.map(partner=>`<option value="${esc(partner.backendPartnerId||partner.id)}" ${String(partner.backendPartnerId||partner.id)===selected?'selected':''}>${esc(partner.tradeName)}</option>`).join('')}</select></label></div>
-      ${monthlyFinanceNav()}${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
+      ${financePeriodToolbar()}<div id="financeMovementsHost">${financialPeriodPanel()}</div></div>`;
   }
 
   function adminSettings() {
@@ -11257,7 +11320,7 @@ global.TamoonMonthlyFinance={mount,summarize};
     if(updated&&detailDialog.open&&detailDialog.dataset.view==="monthly-request-chat"&&detailDialog.dataset.requestId===requestId)await openMonthlyLinkRequestConversation(updated,{refresh:true});
   }
 
-  function openMonthlyCycleActivation(cycle, venue, day, slot) {
+  async function openMonthlyCycleActivation(cycle, venue, day, slot) {
     if (state.role === "user" && !canManageMonthlySubject(cycle)) {
       showToast("Você não tem permissão para administrar este vínculo mensalista.");
       return;
@@ -11267,6 +11330,10 @@ global.TamoonMonthlyFinance={mount,summarize};
       return;
     }
     const reservation=(state.reservations||[]).find((item)=>item.monthlyCycleId===cycle.id||item.backendId===cycle.reservationId);
+    if(reservation?.receiptMode==='external'||cycle.status==='external'){
+      openDetail({eyebrow:"Mensalista",title:"Reserva confirmada",body:`<p>Pagamento direto ao estabelecimento.</p><p>Valor do ciclo: ${money(cycle.monthlyTotal)}</p>`});
+      return;
+    }
     const startTime=slot?.time||cycle.link.startTime||reservation?.time||"";
     const endTime=slot?slotEndTime(slot):cycle.link.endTime||reservation?.endTime||"";
     const displayPeriod=startTime&&endTime?timeRange(startTime,endTime):"Horário protegido";
@@ -11274,6 +11341,20 @@ global.TamoonMonthlyFinance={mount,summarize};
     const displaySpace=slot?normalizedSlotSpace(slot):cycle.spaceName||reservation?.space||"Espaço mensalista";
     if(!reservation){
       const reviewedTotal=Number(cycle.monthlyTotal);
+      let mode;
+      const identity=backendRuntime.identityId;
+      try{mode=await window.MarketplaceBackend.rpc('reservation_receipt_mode',{p_venue_id:venue?.backendVenueId||cycle.link.venueId});}
+      catch{showToast("Não foi possível consultar a forma de pagamento.");return;}
+      if(identity!==backendRuntime.identityId||!['external','asaas','legacy'].includes(mode))return;
+      if(mode==='external'){
+        askConfirm({title:"Confirmar reserva mensalista",message:`${displayDate} · ${displaySpace}. O valor de ${money(reviewedTotal)} será pago diretamente ao estabelecimento.`,
+          confirmLabel:"Confirmar reserva",onConfirm:async()=>{
+            const result=await runBackendMutation("Reserva mensalista confirmada. Pagamento direto ao estabelecimento.",()=>window.MarketplaceBackend.rpc('book_cycle_with_receipt_mode',{
+              p_cycle:cycle.id,p_total:reviewedTotal,p_policy:"marketplace-cancellation-7d-v1",p_accepted:true,p_expected:mode}));
+            if(result){state.activePage.user="reservations";state.userReservationTab="monthly";saveState();render();}
+          }});
+        return;
+      }
       openForm({
         eyebrow:"Mensalista protegido",
         title:`Confirmar pré-reserva de ${cycle.groupName}`,
@@ -11285,7 +11366,7 @@ global.TamoonMonthlyFinance={mount,summarize};
         ],
         onSubmit:async(data)=>{
           if(data.monthly_policy_accepted!=="true")return markFormFieldInvalid("monthlyPolicy","Campo obrigatório: aceite as regras para criar a pré-reserva.");
-          const result=await runBackendMutation("Pré-reserva mensalista criada. Defina o pagamento em Minhas reservas.",()=>window.MarketplaceBackend.activateMonthlyCyclePrebooking({monthlyCycleId:cycle.id,expectedTotal:reviewedTotal,policyVersion:"marketplace-cancellation-7d-v1",policyAccepted:true}));
+          const result=await runBackendMutation("Pré-reserva mensalista criada. Defina o pagamento em Minhas reservas.",()=>window.MarketplaceBackend.rpc('book_cycle_with_receipt_mode',{p_cycle:cycle.id,p_total:reviewedTotal,p_policy:"marketplace-cancellation-7d-v1",p_accepted:true,p_expected:mode}));
           if(!result)return false;
           state.activePage.user="reservations";
           state.userReservationTab="monthly";
@@ -11350,6 +11431,23 @@ global.TamoonMonthlyFinance={mount,summarize};
     return true;
   }
 
+  let reviewedVenueMode=null,receiptRead=0;
+  async function reviewVenueReceipts(venue) {
+    const n=++receiptRead, note=document.getElementById('reservationReceiptNotice');
+    reviewedVenueMode=null;reservationAutomationPreview.hidden=false;
+    document.getElementById('confirmReservation').textContent='Fazer pré-reserva';
+    if(!backendIsOnline() || !venue.backendVenueId){note.hidden=true;return;}
+    note.hidden=false;note.textContent='Consultando a forma de pagamento do estabelecimento…';
+    try{
+      const mode=await window.MarketplaceBackend.rpc('reservation_receipt_mode',{p_venue_id:venue.backendVenueId});
+      if(n!==receiptRead||selectedReservation?.venue?.id!==venue.id)return;
+      if(!['asaas','external','legacy'].includes(mode))throw Error();
+      reviewedVenueMode={id:venue.id,mode};
+      note.textContent=mode==='external'?'Pagamento direto ao estabelecimento. A confirmação reserva o horário na agenda.':'Pagamento pelo aplicativo após a criação da pré-reserva.';
+      reservationAutomationPreview.hidden=mode==='external';
+      if(mode==='external')document.getElementById('confirmReservation').textContent='Confirmar reserva';
+    }catch{if(n===receiptRead)note.textContent='Forma de pagamento indisponível. Reabra o horário para consultar novamente.';}
+  }
   function openReservation(venueId, time, shortDate, requestedEndTime = "", requestedSpace = "", requestedSlotId = "") {
     const venue = state.venues.find((item) => item.id === venueId);
     if (!venue) return;
@@ -11394,6 +11492,7 @@ global.TamoonMonthlyFinance={mount,summarize};
     populateReservationGroups();
     if (detailDialog.open) detailDialog.close();
     reservationDialog.showModal();
+    reviewVenueReceipts(selectedReservation.venue);
     focusDialog(reservationDialog);
   }
 
@@ -12304,6 +12403,10 @@ global.TamoonMonthlyFinance={mount,summarize};
       slot.blocked=false;delete slot.blockTitle;delete slot.blockDetail;
       if(Number(slot.price||0)<=0){const baseSpace=state.partnerSpaces.find((item)=>item.name===normalizedSlotSpace(slot));slot.price=Number(baseSpace?.price||0);}
       saveState();render();showToast("Horário desbloqueado e disponibilizado na mesma grade do marketplace.");
+    } else if(action==='external-received'&&canManageBackendFinance()){
+      askConfirm({title:"Registrar pagamento direto",message:"Confirma que o estabelecimento já recebeu este valor por fora do aplicativo?",confirmLabel:"Registrar",onConfirm:()=>runBackendMutation("Recebimento registrado pelo parceiro.",async()=>{
+        await window.MarketplaceBackend.rpc("reservation_record_external",{p_id:id});return true;
+      })});
     } else if (action === "partner-reservation-details") {
       const item=state.partnerReservations.find((r)=>r.id===id);
       if(item){
@@ -13137,19 +13240,25 @@ global.TamoonMonthlyFinance={mount,summarize};
         showToast("A agenda ou o grupo ainda não possui identificação oficial do staging.");
         return;
       }
+      if(reviewedVenueMode?.id!==selectedReservation.venue.id){
+        showToast("Confira a forma de pagamento e confirme novamente.");reviewVenueReceipts(selectedReservation.venue);return;
+      }
       const request = { slotId,groupId,eventId,createEvent:createsNewEvent,
         policyVersion:"marketplace-cancellation-7d-v1",policyAccepted:true };
       reservationReturnContext = null;
       reservationDialog.close();
-      const result = await runBackendMutation("", () => directMonthly
-        ? window.MarketplaceBackend.contractDirectMonthlyPrebooking(request)
-        : window.MarketplaceBackend.createReservationPrebooking(request));
+      const result = await runBackendMutation("", () => window.MarketplaceBackend.rpc('book_with_receipt_mode',{
+        p_slot:slotId,p_group:groupId,p_event:eventId,p_create_event:createsNewEvent,p_monthly:directMonthly,
+        p_policy:request.policyVersion,p_accepted:true,p_expected:reviewedVenueMode.mode
+      }));
       if (result) {
         state.activePage.user = "reservations";
         state.userReservationTab=directMonthly?"monthly":"single";
         saveState();
         render();
-        if (directMonthly) {
+        if(result.receipt_mode==='external'){
+          showToast("Reserva confirmada. Combine o pagamento diretamente com o estabelecimento.");
+        } else if (directMonthly) {
           showToast(`Mensalista ${result.public_code || "oficial"} pré-reservado. Defina o pagamento em Minhas reservas.`);
         } else {
           showToast(`Pré-reserva ${result.public_code || "oficial"} criada. Defina o pagamento em Minhas reservas dentro do prazo informado.`);

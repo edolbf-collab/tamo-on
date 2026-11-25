@@ -1587,7 +1587,8 @@
         statusKey:visual.key,
         status:visual.label,
         endpoint:visual.key === "confirmed" && payment ? (payment.metadata?.simulation ? "supabase.payment-simulator.confirmed" : `supabase.payments.${payment.status || "confirmed"}`) : `supabase.reservations.${reservation.status || "unknown"}`,
-        paymentStatus:reservation.status === "expired" ? "Prazo de pagamento encerrado" : rawMonthlyCycle
+        receiptMode:reservation.receipt_mode, externalReceivedAt:reservation.external_received_at,
+        paymentStatus:reservation.receipt_mode==='external' ? (reservation.external_received_at ? "Recebimento registrado pelo parceiro" : "Pagamento direto ao estabelecimento") : reservation.status === "expired" ? "Prazo de pagamento encerrado" : rawMonthlyCycle
           ? monthlyPaymentPresentation({backendStatus:reservation.status,financialClosedAt:reservation.financial_closed_at},rawMonthlyCycle).label
           : visual.key === "confirmed" ? (payment?.metadata?.simulation ? "Pagamento confirmado · simulação staging" : "Pagamento confirmado") : visual.key === "pending" ? (reservation.payment_configured_at ? "Pagamento pendente" : "Defina o pagamento em Minhas reservas") : cancellationMode === "voucher" ? "Cancelada · voucher integral emitido" : cancellationMode === "refund" ? (reservation.status === "refunded" ? "Cancelada · reembolso concluído" : "Cancelada · reembolso pendente") : "Cancelada sem compensação financeira",
         paymentDue:Number(reservation.payment_due || 0),
@@ -1997,6 +1998,7 @@
       ||["cancelled","expired","refund_pending","refunded"].includes(reservation.backendStatus);
     const balance=closed?0:Math.max(0,Number(f.balance_pending??(total-paid)));
     const full=!closed&&(total>0||status==="fully_paid")&&Math.round(paid*100)>=Math.round(total*100)&&Math.round(balance*100)===0;
+    if(status==='external')return {closed:false,full:false,minimumReached:false,total,paid:0,minimum:0,balance:0,label:'Pagamento direto ao estabelecimento',finalDue:null,dueAt:''};
     const minimumReached=minimum>0&&Math.round(paid*100)>=Math.round(minimum*100);
     const label=closed?(status==="cancelled"?"Ciclo cancelado · sem saldo a pagar":"Ciclo encerrado · sem saldo a pagar")
       :full?"Mensal garantido · integralmente quitado":minimumReached?"Mínimo atingido · saldo pendente":"Mínimo inicial pendente";
@@ -4785,6 +4787,14 @@
 
   let cancellationPreviewSequence=0;
   async function openOfficialReservationCancellation(reservation, actorLabel) {
+    if(reservation?.receiptMode==='external'){
+      openForm({title:"Cancelar reserva",description:"Eventuais devoluções são combinadas diretamente com o estabelecimento.",submitLabel:"Confirmar cancelamento",
+        fields:[{name:"reason",label:"Motivo",type:"textarea",required:true}],
+        onSubmit:async data=>Boolean(await runBackendMutation("Reserva cancelada.",async()=>{
+          await window.MarketplaceBackend.rpc("cancel_external_reservation",{p_id:reservation.backendId,p_reason:data.reason});return true;
+        }))});
+      return;
+    }
     if(reservation?.backendOfficial && actorLabel==="Usuário") {
       const identity=backendRuntime.identityId;
       try {
@@ -6269,6 +6279,7 @@
   }
 
   function userPaymentAction(reservation) {
+    if(reservation?.receiptMode==='external')return '<span>Pagamento direto ao estabelecimento</span>';
     if(reservation?.monthlyCycleId&&monthlyPaymentPresentation(reservation).closed)return "";
     if (reservation?.statusKey === "pending" && !reservation.paymentConfigured && reservationBelongsToCurrentUser(reservation)) {
       return `${reservationPrebookingEditAction(reservation)}<button class="button primary small" data-action="configure-reservation-payment" data-id="${esc(reservation.id)}">Definir pagamento</button>`;
@@ -6981,6 +6992,11 @@
     const transferUnread=reservation?occurrenceTransferUnreadForReservation(reservation):0;
     const base = `${chatButtonForPartner(item)}<button class="button ghost small ${transferUnread?"has-unread":""}" data-action="partner-reservation-details" data-id="${esc(item.id)}">${transferUnread?"Ver atualização":"Detalhes"}${messageBadge(transferUnread)}</button>${splitAction}`;
     if (reservation?.backendOfficial) {
+      if(reservation.receiptMode==='external'){
+        const record=canManageBackendFinance()&&!reservation.externalReceivedAt&&['confirmed','completed'].includes(reservation.statusKey)
+         ? `<button class="button secondary small" data-action="external-received" data-id="${esc(reservation.backendId)}">Registrar pagamento direto</button>` : '';
+        return base+record+(reservation.statusKey==='confirmed'?`<button class="button danger small" data-action="cancel-backend-partner-reservation" data-id="${esc(item.id)}">Cancelar reserva</button>`:'');
+      }
       const external=canManageBackendFinance()&&reservation.statusKey==="pending"&&reservation.paymentConfigured
         ?`<button class="button secondary small" data-action="register-external-receipt" data-id="${esc(reservation.id)}">Registrar recebimento externo</button>`:"";
       if(reservation.monthly)return `${base}${external}`;
@@ -8380,7 +8396,7 @@
     if(updated&&detailDialog.open&&detailDialog.dataset.view==="monthly-request-chat"&&detailDialog.dataset.requestId===requestId)await openMonthlyLinkRequestConversation(updated,{refresh:true});
   }
 
-  function openMonthlyCycleActivation(cycle, venue, day, slot) {
+  async function openMonthlyCycleActivation(cycle, venue, day, slot) {
     if (state.role === "user" && !canManageMonthlySubject(cycle)) {
       showToast("Você não tem permissão para administrar este vínculo mensalista.");
       return;
@@ -8390,6 +8406,10 @@
       return;
     }
     const reservation=(state.reservations||[]).find((item)=>item.monthlyCycleId===cycle.id||item.backendId===cycle.reservationId);
+    if(reservation?.receiptMode==='external'||cycle.status==='external'){
+      openDetail({eyebrow:"Mensalista",title:"Reserva confirmada",body:`<p>Pagamento direto ao estabelecimento.</p><p>Valor do ciclo: ${money(cycle.monthlyTotal)}</p>`});
+      return;
+    }
     const startTime=slot?.time||cycle.link.startTime||reservation?.time||"";
     const endTime=slot?slotEndTime(slot):cycle.link.endTime||reservation?.endTime||"";
     const displayPeriod=startTime&&endTime?timeRange(startTime,endTime):"Horário protegido";
@@ -8397,6 +8417,20 @@
     const displaySpace=slot?normalizedSlotSpace(slot):cycle.spaceName||reservation?.space||"Espaço mensalista";
     if(!reservation){
       const reviewedTotal=Number(cycle.monthlyTotal);
+      let mode;
+      const identity=backendRuntime.identityId;
+      try{mode=await window.MarketplaceBackend.rpc('reservation_receipt_mode',{p_venue_id:venue?.backendVenueId||cycle.link.venueId});}
+      catch{showToast("Não foi possível consultar a forma de pagamento.");return;}
+      if(identity!==backendRuntime.identityId||!['external','asaas','legacy'].includes(mode))return;
+      if(mode==='external'){
+        askConfirm({title:"Confirmar reserva mensalista",message:`${displayDate} · ${displaySpace}. O valor de ${money(reviewedTotal)} será pago diretamente ao estabelecimento.`,
+          confirmLabel:"Confirmar reserva",onConfirm:async()=>{
+            const result=await runBackendMutation("Reserva mensalista confirmada. Pagamento direto ao estabelecimento.",()=>window.MarketplaceBackend.rpc('book_cycle_with_receipt_mode',{
+              p_cycle:cycle.id,p_total:reviewedTotal,p_policy:"marketplace-cancellation-7d-v1",p_accepted:true,p_expected:mode}));
+            if(result){state.activePage.user="reservations";state.userReservationTab="monthly";saveState();render();}
+          }});
+        return;
+      }
       openForm({
         eyebrow:"Mensalista protegido",
         title:`Confirmar pré-reserva de ${cycle.groupName}`,
@@ -8408,7 +8442,7 @@
         ],
         onSubmit:async(data)=>{
           if(data.monthly_policy_accepted!=="true")return markFormFieldInvalid("monthlyPolicy","Campo obrigatório: aceite as regras para criar a pré-reserva.");
-          const result=await runBackendMutation("Pré-reserva mensalista criada. Defina o pagamento em Minhas reservas.",()=>window.MarketplaceBackend.activateMonthlyCyclePrebooking({monthlyCycleId:cycle.id,expectedTotal:reviewedTotal,policyVersion:"marketplace-cancellation-7d-v1",policyAccepted:true}));
+          const result=await runBackendMutation("Pré-reserva mensalista criada. Defina o pagamento em Minhas reservas.",()=>window.MarketplaceBackend.rpc('book_cycle_with_receipt_mode',{p_cycle:cycle.id,p_total:reviewedTotal,p_policy:"marketplace-cancellation-7d-v1",p_accepted:true,p_expected:mode}));
           if(!result)return false;
           state.activePage.user="reservations";
           state.userReservationTab="monthly";
@@ -8473,6 +8507,23 @@
     return true;
   }
 
+  let reviewedVenueMode=null,receiptRead=0;
+  async function reviewVenueReceipts(venue) {
+    const n=++receiptRead, note=document.getElementById('reservationReceiptNotice');
+    reviewedVenueMode=null;reservationAutomationPreview.hidden=false;
+    document.getElementById('confirmReservation').textContent='Fazer pré-reserva';
+    if(!backendIsOnline() || !venue.backendVenueId){note.hidden=true;return;}
+    note.hidden=false;note.textContent='Consultando a forma de pagamento do estabelecimento…';
+    try{
+      const mode=await window.MarketplaceBackend.rpc('reservation_receipt_mode',{p_venue_id:venue.backendVenueId});
+      if(n!==receiptRead||selectedReservation?.venue?.id!==venue.id)return;
+      if(!['asaas','external','legacy'].includes(mode))throw Error();
+      reviewedVenueMode={id:venue.id,mode};
+      note.textContent=mode==='external'?'Pagamento direto ao estabelecimento. A confirmação reserva o horário na agenda.':'Pagamento pelo aplicativo após a criação da pré-reserva.';
+      reservationAutomationPreview.hidden=mode==='external';
+      if(mode==='external')document.getElementById('confirmReservation').textContent='Confirmar reserva';
+    }catch{if(n===receiptRead)note.textContent='Forma de pagamento indisponível. Reabra o horário para consultar novamente.';}
+  }
   function openReservation(venueId, time, shortDate, requestedEndTime = "", requestedSpace = "", requestedSlotId = "") {
     const venue = state.venues.find((item) => item.id === venueId);
     if (!venue) return;
@@ -8517,6 +8568,7 @@
     populateReservationGroups();
     if (detailDialog.open) detailDialog.close();
     reservationDialog.showModal();
+    reviewVenueReceipts(selectedReservation.venue);
     focusDialog(reservationDialog);
   }
 
@@ -9427,6 +9479,10 @@
       slot.blocked=false;delete slot.blockTitle;delete slot.blockDetail;
       if(Number(slot.price||0)<=0){const baseSpace=state.partnerSpaces.find((item)=>item.name===normalizedSlotSpace(slot));slot.price=Number(baseSpace?.price||0);}
       saveState();render();showToast("Horário desbloqueado e disponibilizado na mesma grade do marketplace.");
+    } else if(action==='external-received'&&canManageBackendFinance()){
+      askConfirm({title:"Registrar pagamento direto",message:"Confirma que o estabelecimento já recebeu este valor por fora do aplicativo?",confirmLabel:"Registrar",onConfirm:()=>runBackendMutation("Recebimento registrado pelo parceiro.",async()=>{
+        await window.MarketplaceBackend.rpc("reservation_record_external",{p_id:id});return true;
+      })});
     } else if (action === "partner-reservation-details") {
       const item=state.partnerReservations.find((r)=>r.id===id);
       if(item){
@@ -10260,19 +10316,25 @@
         showToast("A agenda ou o grupo ainda não possui identificação oficial do staging.");
         return;
       }
+      if(reviewedVenueMode?.id!==selectedReservation.venue.id){
+        showToast("Confira a forma de pagamento e confirme novamente.");reviewVenueReceipts(selectedReservation.venue);return;
+      }
       const request = { slotId,groupId,eventId,createEvent:createsNewEvent,
         policyVersion:"marketplace-cancellation-7d-v1",policyAccepted:true };
       reservationReturnContext = null;
       reservationDialog.close();
-      const result = await runBackendMutation("", () => directMonthly
-        ? window.MarketplaceBackend.contractDirectMonthlyPrebooking(request)
-        : window.MarketplaceBackend.createReservationPrebooking(request));
+      const result = await runBackendMutation("", () => window.MarketplaceBackend.rpc('book_with_receipt_mode',{
+        p_slot:slotId,p_group:groupId,p_event:eventId,p_create_event:createsNewEvent,p_monthly:directMonthly,
+        p_policy:request.policyVersion,p_accepted:true,p_expected:reviewedVenueMode.mode
+      }));
       if (result) {
         state.activePage.user = "reservations";
         state.userReservationTab=directMonthly?"monthly":"single";
         saveState();
         render();
-        if (directMonthly) {
+        if(result.receipt_mode==='external'){
+          showToast("Reserva confirmada. Combine o pagamento diretamente com o estabelecimento.");
+        } else if (directMonthly) {
           showToast(`Mensalista ${result.public_code || "oficial"} pré-reservado. Defina o pagamento em Minhas reservas.`);
         } else {
           showToast(`Pré-reserva ${result.public_code || "oficial"} criada. Defina o pagamento em Minhas reservas dentro do prazo informado.`);

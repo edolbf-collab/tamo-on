@@ -1,5 +1,6 @@
+import {provision} from '../establishment-receipts/provision.mjs';
 import {monthlyWebhookOutcome} from './asaas-monthly-webhook.mjs';
-import {forAccount,getAsaas,accountRegistry} from './asaas-accounts.mjs';
+import {receiptEnvironment,forAccount,getAsaas,accountRegistry} from './asaas-accounts.mjs';
 import {fetchRefundEvidence} from './asaas-webhook-refund-evidence.mjs';
 import {processRefundTransfer,transferEvents} from './asaas-refund-transfer.mjs';
 import {processRefundPixWebhook,pixRefundEvents} from './asaas-refund-pix-webhook.mjs';
@@ -10,7 +11,14 @@ const splitEvents=['PAYMENT_SPLIT_DONE','PAYMENT_SPLIT_CANCELLED','PAYMENT_SPLIT
 const checkoutEvents=['CHECKOUT_CANCELED','CHECKOUT_EXPIRED','CHECKOUT_PAID','CHECKOUT_CREATED'];
 export async function processAsaasEvent(admin,event,deps){
   const payload=event.payload||{},type=event.event_type||payload.event,accountId=payload.account?.id||null;
+  if(accountId)deps={...deps,env:await receiptEnvironment(admin,deps.env,{accountId})};
   const rpc=async(name,args)=>{const {data,error}=await admin.rpc(name,args);if(error)throw error;return data;};
+  if(type==='ACCOUNT_STATUS_GENERAL_APPROVAL_APPROVED'){
+    if(!accountId)throw Error('ASAAS_EVENT_ACCOUNT_MISMATCH');
+    const venues=await rpc('receipt_awaiting_venues',{p_account:accountId});
+    for(const venue of venues)await provision(venue,{env:deps.env,rpc,fetch:deps.fetch||fetch});
+    return 'processed';
+  }
   const checkAccount=route=>{
     const expected=route?.issuer_account_id||deps.env('ASAAS_MAIN_ACCOUNT_ID');
     if(expected&&expected!==accountId)throw new Error('ASAAS_EVENT_ACCOUNT_MISMATCH');
@@ -30,6 +38,11 @@ export async function processAsaasEvent(admin,event,deps){
     const route=await rpc('asaas_payment_route',{p_payment:{checkoutSession:payload.checkout.id,externalReference:payload.checkout.externalReference}});
     checkAccount(route);
     await rpc('apply_asaas_checkout_event',{p_event_type:type,p_checkout:payload.checkout});return 'processed';
+  }
+  if(type?.startsWith('PAYMENT_') && payload.payment?.externalReference?.startsWith('tamoon-opening:')){
+    if(!accountId||accountId!==deps.env('ASAAS_MAIN_ACCOUNT_ID'))throw Error('ASAAS_EVENT_ACCOUNT_MISMATCH');
+    const payment=await getAsaas('/payments/'+payload.payment.id,deps);
+    await rpc('receipt_fee_result',{p_payment:payment});return 'processed';
   }
   if(type?.startsWith('PAYMENT_')&&payload.payment){const monthly=await monthlyWebhookOutcome(admin,event,deps);if(monthly)return monthly;}
   if(!paymentEvents.includes(type)&&!splitEvents.includes(type))return 'ignored';

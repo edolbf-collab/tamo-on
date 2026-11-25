@@ -1,4 +1,4 @@
-import {accountRegistry, accountKey, publicAccount, verifyPartnerAccount} from './asaas-accounts.mjs';
+import {receiptEnvironment, accountRegistry, accountKey, publicAccount, verifyPartnerAccount} from './asaas-accounts.mjs';
 const SANDBOX = 'https://api-sandbox.asaas.com/v3';
 
 export function asaasCheckoutPayload(context, callbacks, at = Date.now()) {
@@ -60,10 +60,12 @@ export async function openSandboxCheckout(admin,reservationId,profileId,{env,fet
     return jsonResponse({error:'CHECKOUT_RETRY_INVALID'},400);
   let config;try {config=sandboxConfig(env);} catch(error){return jsonResponse({error:error.message},503);}
   const {data:r,error:reservationError}=await admin.from('reservations')
-    .select('partner_id,booking_mode,monthly_cycle_id,split_pix,payment_method,payment_expires_at').eq('id',reservationId).single();
+    .select('receipt_mode,partner_id,booking_mode,monthly_cycle_id,split_pix,payment_method,payment_expires_at').eq('id',reservationId).single();
   if(reservationError)throw reservationError;
   if(!r || r.booking_mode!=='single' || r.monthly_cycle_id || !['pix_direct_partner','credit_card_asaas'].includes(r.payment_method)
       || (r.payment_method==='credit_card_asaas' && r.split_pix))return jsonResponse({error:'ASAAS_CHECKOUT_SCOPE'},409);
+  if(r.receipt_mode==='external')return jsonResponse({error:'RECEIPT_PAY_AT_VENUE'},409);
+  if(r.receipt_mode==='asaas')env=await receiptEnvironment(admin,env,{partnerId:r.partner_id});
   const useSplit=env('ASAAS_SPLIT_ENABLED')==='true';
   let partner=null;
   try{
