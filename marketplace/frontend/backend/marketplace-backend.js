@@ -183,8 +183,22 @@
     if (!readonlyRpcNames.has(name)) await assertWritable();
     const c = requireClient();
     const { data, error } = await c.rpc(name, args);
-    if (error) throw error;
-    return data;
+    if (!error) return data;
+    // During the web rollout PostgREST may still expose the previous API.
+    // Only a missing endpoint is safe to retry. A timeout may have created the booking.
+    if (error.code === "PGRST202" && String(error.message).includes("public." + name + "(")) {
+      if (name === "reservation_receipt_mode") return "legacy";
+      if (args.p_expected === "legacy" && name === "book_with_receipt_mode") {
+        const request = { slotId: args.p_slot, groupId: args.p_group, eventId: args.p_event,
+          createEvent: args.p_create_event, policyVersion: args.p_policy, policyAccepted: args.p_accepted };
+        return args.p_monthly ? contractDirectMonthlyPrebooking(request) : createReservationPrebooking(request);
+      }
+      if (args.p_expected === "legacy" && name === "book_cycle_with_receipt_mode") {
+        return activateMonthlyCyclePrebooking({ monthlyCycleId: args.p_cycle, expectedTotal: args.p_total,
+          policyVersion: args.p_policy, policyAccepted: args.p_accepted });
+      }
+    }
+    throw error;
   }
 
   // Keep the database pool available for other clients during a full refresh.
